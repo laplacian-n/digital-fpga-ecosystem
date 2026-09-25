@@ -1,0 +1,53 @@
+# =====================================================================
+# Intent-JSON v1  - GBNF grammar for the gate schematic editor
+# ---------------------------------------------------------------------
+# The LLM emits TOPOLOGY ONLY: components (id + type + optional name/label)
+# and nets (from driver -> to sink, by component id). There is NO x/y/pts
+# ANYWHERE in this grammar by construction - the deterministic engine
+# (autoRouteSheet) computes all geometry. This removes the hardest LLM
+# failure mode (coordinate/wire hallucination) at the decoding level.
+#
+# Mirrors validateIntent()/buildSchematicFromIntent() in
+#   schematic&bus2vhdl.html  (INTENT_TYPES, net from/to = "id" or "id.pin").
+# Contract recap:
+#   - from/to are component ids; a driver's output pin is implicit "o".
+#   - a sink's input pin is auto-indexed i0,i1,... in net-declaration order;
+#     write "id.i1" only to pin a specific input (rare).
+#   - gate arity is inferred from #nets into it (NOT/BUF forced to 1).
+#   - DFF/MUX have NAMED pins: a net to/from one MUST spell the pin as "id.pin"
+#     (DFF sink d/clk/rst/pre, source q/qn; MUX sink d0..dN/s0..sM, source y).
+#     "id.pin" is already covered by the string rule (strchar includes ".").
+#     DFF params (edge/reset/preset) and MUX inputs are inferred from the pins used
+#     (reset/preset from rst/pre nets; inputs from the max d-index) — a params object
+#     is NOT part of this grammar yet, so edge defaults to "rising".
+#
+# NOTES (llama.cpp GBNF quirks, learned the hard way):
+#   - keep this file ASCII only.
+#   - strings are restricted to identifier-safe chars so we never need to put
+#     a backslash next to a "]" in a char class, which llama.cpp mis-parses
+#     (it reads "\]" as an escaped bracket and the class never closes).
+#     ids/types/names are all identifiers, so this loses nothing.
+# Use with llama.cpp:  --grammar-file ai/grammar/intent.gbnf  (or the "grammar"
+# field in a /v1/chat/completions request).
+# =====================================================================
+
+root        ::= ws "{" ws module? components (ws "," ws nets)? ws "}" ws
+
+module      ::= "\"module\"" ws ":" ws string ws "," ws
+
+components  ::= "\"components\"" ws ":" ws "[" ws component (ws "," ws component)* ws "]"
+component   ::= "{" ws "\"id\"" ws ":" ws string ws "," ws "\"type\"" ws ":" ws type optfield* ws "}"
+optfield    ::= ws "," ws ("\"name\"" | "\"label\"") ws ":" ws string
+
+# NOTE: keep every alternation on ONE line - llama.cpp GBNF does not accept a
+# rule continued onto the next line with a leading "|".
+type        ::= "\"IN\"" | "\"OUT\"" | "\"VCC\"" | "\"GND\"" | "\"CONST\"" | "\"AND\"" | "\"OR\"" | "\"XOR\"" | "\"NAND\"" | "\"NOR\"" | "\"XNOR\"" | "\"NOT\"" | "\"BUF\"" | "\"DFF\"" | "\"MUX\""
+
+nets        ::= "\"nets\"" ws ":" ws "[" ws (net (ws "," ws net)*)? ws "]"
+net         ::= "{" ws "\"from\"" ws ":" ws string ws "," ws "\"to\"" ws ":" ws string ws "}"
+
+# identifier-safe string: letters, digits, _ . space and - (hyphen last = literal)
+string      ::= "\"" strchar* "\""
+strchar     ::= [a-zA-Z0-9_. -]
+
+ws          ::= [ \t\n\r]*

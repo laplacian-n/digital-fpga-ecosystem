@@ -1,0 +1,116 @@
+===== PAGE 1 =====
+ภาควิชาวิศวกรรมคอมพิวเตอร์ คณะวิศวกรรมศาสตร์
+สถาบันเทคโนโลยีพระจอมเกล้าเจ้าคุณทหารลาดกระบัง
+การทดลองที่ 0  การใช้งานบอร์ด FPGA และ โปรแกรม Vivado 2025.2
+วัตถุประสงค์
+1. เพื่อให้นักศึกษาติดตั้งและฝึกการใช้งานบอร์ด FPGA
+2. เพื่อให้นักศึกษาฝึกการใช้งานโปรแกรม Vivado 2025.2
+** หมายเหตุ ให้อ่านเอกสารการทดลองและเอกสารประกอบให้ครบก่อนเริ่มท าการทดลอง **
+การใช้งานบอร์ด FPGA
+ การทดลองนี้ นักศึกษาจะได้รู้จักการออกแบบวงจรดิจิทัลด้วยการวาดผังวงจร ( Schematic
+Circuit) จ าลองการท างานของวงจร และบันทึกโปรแกรม ( Configuration) ลงในชิป Field
+Programmable Gate Array (FPGA) ซึ่งเป็นวงจรรวมที่ผู้ใช้สามารถปรับแต่งให้ท างานเป็นวงจรลอจิก
+แบบต่าง ๆ ได้ตามที่ออกแบบ โดยในการทดลองจะใช้บอร์ด FPGA ตระกูล Spartan-7 ร่วมกับโปรแกรม
+Vivado 2025.2 ในการสังเคราะห์วงจร (Synthesis) และดาวน์โหลดวงจรลงบอร์ดเพื่อทดสอบการท างาน
+จริง
+
+===== PAGE 2 =====
+วิธีการติดตั้ง โปรแกรม Vivado 2025.2
+1. ดาวน์โหลดโปรแกรมจาก เว็บไซต์ AMD (2025.2) จากนั้นเลือก “AMD Unified Installer for
+FPGAs & Adaptive SoCs 2025.2: Windows Self Extracting Web Installer
+***ต้องใช้พื้นที่ใน drive ส าหรับติดตั้งอย่างน้อย 50 GB***
+2. สร้างบัญชี AMD Account หากยังไม่มีบัญชี หรือกรอกอีเมลและรหัสผ่านเพื่อเข้าสู่ระบบ
+
+===== PAGE 3 =====
+3. กรอกข้อมูลส่วนตัวให้ จากนั้นกด “Download”
+4. เมื่อดาวน์โหลดเสร็จ เปิดไฟล์ติดตั้งที่ได้มาในโฟลเดอร์ Downloads เพื่อเริ่มการติดตั้ง
+
+===== PAGE 4 =====
+5. Installation ให้กด Next
+6. กรอกอีเมลและรหัสผ่านของ AMD Account เลือก “Download and Install Now” แล้วกด Next
+
+===== PAGE 5 =====
+7. เลือก “Vivado” แล้วกด Next
+8. เลือกเป็น “Vivado ML Standard” แล้วกด Next
+
+===== PAGE 6 =====
+9. ติ๊ก บอร์ดตระกูลชิป “Spartan-7 FPGAs” จากนั้นกด Next
+10. ติ๊กเลือก “I Agree” ทุกช่อง แล้วกด Next
+
+===== PAGE 7 =====
+11. เลือกต าแหน่งที่จะติดตั้ง จากนั้นกด Next
+12. กด “Install” เพื่อเริ่มดาวน์โหลดและติดตั้ง รอจนกระบวนการเสร็จสมบูรณ์
+
+===== PAGE 8 =====
+13. หลังติดตั้งเสร็จ โปรแกรม Vivado License Manager จะเด้งขึ้นมาเองโดยอัตโนมัติ หรือไปที่
+Get License > Obtain License เลือก “Get My Full or Purchased Certificate-Based
+License” แล้วกด “Connect Now”
+14. กรอกเหมือนขั้นตอนที่ 3 แล้วกด “Submit”
+
+===== PAGE 9 =====
+15. เลือกแท็บ “Create New Licenses” โดยผลิตภัณฑ์ที่ติ๊กไว้คือ “Vivado Design Suite: HL
+WebPACK 2015 and Earlier License” (No Charge) จากนั้นกด “Generate Node-Locked
+License”
+16. กด “Next” ไปเรื่อยๆ
+
+===== PAGE 10 =====
+17. เมื่อขึ้นหน้า  “Congratulations” และส่งไฟล์ไปยังอีเมลที่ลงทะเบียนไว้ แล้วดาวน์โหลดไฟล์
+ไลเซนส์ (.lic)
+18. กลับมาที่ Vivado License Manager ไปที่ Get License > Load License กด “Copy
+License…” แล้วเลือกไฟล์ .lic ที่ดาวน์โหลดมา เพื่อติดตั้งไลเซนส์ เป็นอันเสร็จสิ้น พร้อมใช้งาน
+Vivado
+
+===== PAGE 11 =====
+การใช้งาน โปรแกรม Vivado 2025.2
+1. เปิดโปรแกรม จากนั้นที่หน้า Quick Start กด “Create Project” เพื่อเริ่มสร้างโปรเจกต์ใหม่
+2. หน้าต่าง New Project จะแสดงข้อความต้อนรับ กด “Next”
+
+===== PAGE 12 =====
+3. ตั้งชื่อโปรเจกต์ (Project name) และเลือกต าแหน่งที่เก็บไฟล์ (Project location) แล้วกด “Next”
+4. เลือกชนิดโปรเจกต์เป็น “RTL Project” และติ๊ก “Do not specify sources at this time” แล้วกด
+“Next”
+
+===== PAGE 13 =====
+5. ที่หน้า Default Part เลือกชิป Spartan-7 รุ่น “xc7s15ftgb196-1” แล้วกด “Next”
+โดยในขั้นก าหนด port สามารถกดปุ่ม “−” เพื่อลบ port ที่ไม่ต้องการได้
+6. แล้วกด “Finish” เพื่อสร้างโปรเจกต์
+
+===== PAGE 14 =====
+7. ที่ Project Manager กด “Add Sources” เลือก “Add or create design sources” แล้วกด
+“Next”
+]
+8. กด “Create File” เลือก File type เป็น “VHDL” ตั้งชื่อไฟล์ แล้วกด “OK”
+
+===== PAGE 15 =====
+9. ที่หน้าต่าง Define Module ก าหนดชื่อ Entity และรายการ I/O Port (Port Name, Direction,
+Bus) ตามต้องการ หรือสามารถกดปุ่ม “−” เพื่อลบ port ได้เลย เมื่อเสร็จกด “OK”
+10. ไฟล์ VHDL (Top_layer.vhd) จะถูกสร้างและเปิดขึ้นในหน้าต่างแก้ไขโค้ด พร้อมให้เขียนวงจร
+ดิจิทัล
+
+===== PAGE 16 =====
+11. สร้างไฟล์ Constraint โดยกด “Add Sources” เลือก “Add or create constraints” แล้วกด
+“Next”
+12. กด “Create File” เลือก File type เป็น “XDC” ตั้งชื่อไฟล์ (เช่น port) แล้วกด “OK”
+
+===== PAGE 17 =====
+13. ไฟล์ XDC (port.xdc) จะถูกสร้างและเปิดขึ้น ใช้ส าหรับก าหนดขา (pin) ของบอร์ด FPGA ให้
+ตรงกับ port ของวงจรที่ออกแบบไว้
+14. ที่ Flow Navigator ในส่วน PROGRAM AND DEBUG กด “Generate Bitstream” เพื่อสร้าง
+ไฟล์ Bitstream (.bit) โดย Vivado จะรัน Synthesis และ Implementation ให้อัตโนมัติ
+
+===== PAGE 18 =====
+15. เปิด “Open Hardware Manager” แล้วที่ Open Target คลิกขวาเลือก “Auto Connect” เพื่อ
+เชื่อมต่อกับบอร์ด FPGA
+16. เลือก “Program Device” แล้วเลือกชิปเป้าหมาย (เช่น xc7s15_0)
+
+===== PAGE 19 =====
+17. ที่หน้าต่าง Program Device เลือกไฟล์ Bitstream (.bit) ในช่อง Bitstream file แล้วกด
+“Program” เพื่อโปรแกรมวงจรลงบอร์ด
+18. การสร้างไฟล์ .mcs ท าได้ 2 ทาง คือ (1) ที่หน้าต่าง “Bitstream Generation Completed” เลือก
+“Generate Memory Configuration File” หรือ (2) ไปที่เมนู Tools > Generate Memory
+Configuration File
+
+===== PAGE 20 =====
+19. ที่หน้าต่าง Write Memory Configuration File ตั้งค่า Format เป็น “MCS” เลือก Memory Part
+และ Interface ตั้งชื่อไฟล์ในช่อง Filename และเลือกไฟล์ Bitstream ที่สร้างไว้แล้วกด “OK”
+เพื่อสร้างไฟล์ .mcs

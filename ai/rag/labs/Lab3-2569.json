@@ -1,0 +1,167 @@
+{
+  "source": "Lab3-2569.pdf",
+  "group": "labs",
+  "lab": "3",
+  "title": "การลดรูปสมการบูลีน (Boolean Simplification) วงจร Combinational Logic",
+  "objectives": [
+    "ลดรูปสมการบูลีนด้วย Boolean Algebra และ K-Map",
+    "ออกแบบวงจรสำหรับ FPGA เบื้องต้น",
+    "เข้าใจขั้นตอนออกแบบ combinational logic"
+  ],
+  "items": [
+    {
+      "id": "lab3-1",
+      "question": "f(a,b,c,d) = Σm(2,3,4,10,12,13,15) + Σd(เลขโดดรหัสนักศึกษา 5 ตัวท้าย ที่ไม่ซ้ำกันเองและไม่ซ้ำกับ minterm). งาน: 1.1 เขียน Truth Table, 1.2 ลดรูปด้วย Boolean Algebra (บรรทัดละขั้น), 1.3 ลดรูปด้วย K-Map, 1.4 วาด Logic Diagram หลังลดรูป, 2. วาดลงโปรแกรมแล้วอัปโหลดแบบ PROM ลง FPGA (บอร์ดใหม่) อินพุต SW22,SW21,SW19,SW17 = a,b,c,d ; เอาต์พุต D14.",
+      "params": "เลือกตัวอย่าง don't-care = เลขท้ายรหัส 5 ตัว {0,1,5,6,7} (ต่างกันหมดและไม่ทับ minterm {2,3,4,...}). ถ้ารหัสจริงต่างออกไป ให้แทนชุด Σd ใหม่แล้วลดรูปด้วยวิธีเดียวกัน",
+      "subtasks": [
+        "1.1 Truth Table",
+        "1.2 Boolean Algebra",
+        "1.3 K-Map",
+        "1.4 Logic Diagram",
+        "2. ลง FPGA (SW22/21/19/17 -> D14)"
+      ],
+      "topic": "kmap|boolean-simplification|truth-table",
+      "solution": {
+        "steps": "วางลง K-map 4 ตัวแปร (a=MSB..d=LSB), ใส่ 1 ที่ minterm, X ที่ don't-care {0,1,5,6,7}, จับกลุ่มใหญ่สุดโดยใช้ X ช่วย:\n- a'=1 ครอบ 0..7 (minterm 2,3,4 + dc 0,1,5,6,7 ทั้งหมดอยู่ครึ่ง a=0) -> พจน์ a'\n- กลุ่ม b·d ครอบ 13,15 (+dc)\n- กลุ่ม b·c' ครอบ 12,13\n- กลุ่ม b'·c'·d' ครอบ 10 (กับ 2 ใน a')\nได้ SOP ต่ำสุด",
+        "truth_table": "16 แถว: f=1 ที่ {2,3,4,10,12,13,15}; X ที่ {0,1,5,6,7}; f=0 ที่ {8,9,11,14}",
+        "kmap": "ใช้ don't-care {0,1,5,6,7} ช่วยขยายกลุ่ม -> พจน์ a' คลุมทั้งครึ่งบน",
+        "final_expression": "f = a' + b*d + b*c' + b'*c'*d'",
+        "intent_json": {
+          "module": "lab3_f",
+          "components": [
+            {
+              "id": "a",
+              "type": "IN",
+              "name": "a"
+            },
+            {
+              "id": "b",
+              "type": "IN",
+              "name": "b"
+            },
+            {
+              "id": "c",
+              "type": "IN",
+              "name": "c"
+            },
+            {
+              "id": "d",
+              "type": "IN",
+              "name": "d"
+            },
+            {
+              "id": "na",
+              "type": "NOT"
+            },
+            {
+              "id": "nb",
+              "type": "NOT"
+            },
+            {
+              "id": "nc",
+              "type": "NOT"
+            },
+            {
+              "id": "nd",
+              "type": "NOT"
+            },
+            {
+              "id": "t2",
+              "type": "AND"
+            },
+            {
+              "id": "t3",
+              "type": "AND"
+            },
+            {
+              "id": "t4",
+              "type": "AND"
+            },
+            {
+              "id": "o",
+              "type": "OR"
+            },
+            {
+              "id": "f",
+              "type": "OUT",
+              "name": "f"
+            }
+          ],
+          "nets": [
+            {
+              "from": "a",
+              "to": "na"
+            },
+            {
+              "from": "b",
+              "to": "nb"
+            },
+            {
+              "from": "c",
+              "to": "nc"
+            },
+            {
+              "from": "d",
+              "to": "nd"
+            },
+            {
+              "from": "b",
+              "to": "t2"
+            },
+            {
+              "from": "d",
+              "to": "t2"
+            },
+            {
+              "from": "b",
+              "to": "t3"
+            },
+            {
+              "from": "nc",
+              "to": "t3"
+            },
+            {
+              "from": "nb",
+              "to": "t4"
+            },
+            {
+              "from": "nc",
+              "to": "t4"
+            },
+            {
+              "from": "nd",
+              "to": "t4"
+            },
+            {
+              "from": "na",
+              "to": "o"
+            },
+            {
+              "from": "t2",
+              "to": "o"
+            },
+            {
+              "from": "t3",
+              "to": "o"
+            },
+            {
+              "from": "t4",
+              "to": "o"
+            },
+            {
+              "from": "o",
+              "to": "f"
+            }
+          ]
+        },
+        "notes": "a=MSB, d=LSB. ' = NOT. คำตอบขึ้นกับชุด don't-care ที่เลือก — นี่คือชุดตัวอย่าง {0,1,5,6,7}"
+      },
+      "verify": "enumerate 16 แถว: SOP ให้ 1 ครบทุก minterm และ 0 ครบทุก care-term ที่ไม่ใช่ minterm (True/True). intent_json ผ่าน validate ok=True",
+      "related_content": [
+        "ch4-karnaugh-map",
+        "ch3-boolean-algebra",
+        "ch4-algebraic-simplification"
+      ]
+    }
+  ]
+}

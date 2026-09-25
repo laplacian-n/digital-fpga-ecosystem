@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# Kept OUT of git: too big, vendor-licensed, re-downloadable, or regenerable.
+# See README.md → "สิ่งที่ไม่ได้อยู่ใน repo" for how to get each back.
+# ---------------------------------------------------------------------------
+
+# Xilinx Vivado/ISE bundle (~14 GB, vendor-licensed) + build output + license
+FPGA_Builder_Package/tools/
+FPGA_Builder_Package/build/
+FPGA_Builder_Package/*.exe
+*.lic
+
+# AI runtime + models (~47 GB) — download with ai/setup_llama.ps1
+ai/models/
+ai/llama/
+*.gguf
+# GHDL binaries
+ai/tools/
+# third-party VHDL dataset (re-downloadable)
+ai/datasets/
+# generated .vhd/.xdc/.bit/.tcl
+ai/out/
+
+# RAG index — rebuild with ai/rag/build_index.py + embed_index.py
+ai/rag/index.jsonl
+ai/rag/emb.npz
+
+# Course material & graded lab work (copyrighted / personal) — local only
+/content/
+/labAssignment/
+/mywork/
+
+# generated / local state
+__pycache__/
+*.pyc
+hub/hub.db
+.claude/
+*.bit
+*.zip
+*.dll

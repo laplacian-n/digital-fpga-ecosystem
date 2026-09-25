@@ -1,0 +1,748 @@
+{
+  "source": "Lab5-2569.pdf",
+  "group": "labs",
+  "lab": "5",
+  "title": "BCD (HEX) 7-Segment Decoder & Counter (Asynchronous / Synchronous, JK Flip-Flop)",
+  "objectives": [
+    "ออกแบบวงจรนับแบบ Asynchronous และ Synchronous ได้",
+    "ออกแบบวงจร MOD ความถี่ได้",
+    "สร้างวงจรนับที่ออกแบบโดยใช้ JK Flip-Flop ได้"
+  ],
+  "items": [
+    {
+      "id": "lab5-1",
+      "question": "ออกแบบวงจร BCD (HEX) to 7-Segment สำหรับถอดรหัสเลขฐานสองขนาด 4 บิต เพื่อขับสัญญาณให้ตัว 7-Segment แสดงผลเลข 0-F (16 ค่า). หมายเหตุในโจทย์: หลักการนี้เรียนแล้วในการทดลองที่ 4 ให้อ้างอิงวิธีการและตารางค่าความจริงจากการทดลองดังกล่าว",
+      "params": "อินพุต 4 บิต D C B A (D=MSB) แทนเลขฐานสิบหก 0-15 (0x0-0xF); เอาต์พุต 7 เส้น a..g ควบคุมแต่ละส่วนของ 7-segment ตามรูปเลข 0-F มาตรฐาน (font 7-segment ปกติ). กำหนดสมมติฐาน (ไม่ได้ระบุใน pdf ของแล็บนี้โดยตรง): ใช้ convention 'active-HIGH' คือ segment=1 หมายถึงติด (แบบเดียวกับที่มักสอนในแล็บ 4); หากใช้จอ 7-segment แบบ Common Anode บนบอร์ดจริง (ตามภาคผนวกแล็บ 6/7) ต้องกลับสัญญาณ (invert) ทุกเอาต์พุตก่อนต่อขา FPGA จริง",
+      "subtasks": [
+        "สร้างตารางค่าความจริงของ 4 อินพุต (D,C,B,A) กับ 7 เอาต์พุต (a..g) สำหรับเลข 0-F",
+        "หาสมการลดรูปของแต่ละเซกเมนต์ด้วย K-map",
+        "วาดวงจรเกต"
+      ],
+      "topic": "combinational-design",
+      "solution": {
+        "steps": "แบ่งปัญหาออกเป็น 7 เอาต์พุตอิสระ (a..g) แต่ละเอาต์พุตเป็นฟังก์ชันของ D,C,B,A (16 มินเทอม, ไม่มี don't-care เพราะใช้ครบทั้ง 16 ค่า 0x0-0xF). ใช้ K-map 4 ตัวแปรแยกทีละเซกเมนต์ (แนวทางเดียวกับแล็บ 4) แล้วจัดกลุ่มมินเทอมเป็น SOP ที่กระชับที่สุด. ผลลัพธ์ตรวจสอบด้วยโปรแกรม Python (sympy.logic.SOPform) และยืนยันว่าตรงกับ pattern มาตรฐานของตัวเลข 0-F บน 7-segment ทุกค่า (ดู verify).",
+        "truth_table": "D C B A | a b c d e f g   (เลข)\n0 0 0 0 | 1 1 1 1 1 1 0   (0)\n0 0 0 1 | 0 1 1 0 0 0 0   (1)\n0 0 1 0 | 1 1 0 1 1 0 1   (2)\n0 0 1 1 | 1 1 1 1 0 0 1   (3)\n0 1 0 0 | 0 1 1 0 0 1 1   (4)\n0 1 0 1 | 1 0 1 1 0 1 1   (5)\n0 1 1 0 | 1 0 1 1 1 1 1   (6)\n0 1 1 1 | 1 1 1 0 0 0 0   (7)\n1 0 0 0 | 1 1 1 1 1 1 1   (8)\n1 0 0 1 | 1 1 1 1 0 1 1   (9)\n1 0 1 0 | 1 1 1 0 1 1 1   (A)\n1 0 1 1 | 0 0 1 1 1 1 1   (b)\n1 1 0 0 | 1 0 0 1 1 1 0   (C)\n1 1 0 1 | 0 1 1 1 1 0 1   (d)\n1 1 1 0 | 1 0 0 1 1 1 1   (E)\n1 1 1 1 | 1 0 0 0 1 1 1   (F)",
+        "kmap": "แยก K-map 4 ตัวแปร (แกน DC x BA) ทีละ 7 แผ่นสำหรับ a,b,c,d,e,f,g เติมค่า 0/1 ตามตาราง truth table แล้วจัดกลุ่มเทอมที่เป็น 1 ให้ใหญ่ที่สุด (จัดกลุ่มละเอียดสามารถทำได้ด้วยมือ; ในไฟล์นี้ใช้ SOPform ของ sympy เพื่อความถูกต้องที่ตรวจสอบได้)",
+        "final_expression": "a = B*C + B*D' + D*A' + A'*C' + A*C*D' + D*B'*C'\nb = A'*C' + C'*D' + A*B*D' + A*D*B' + A'*B'*D'\nc = A*B' + A*D' + C*D' + D*C' + B'*D'\nd = D*B' + A*B*C' + A*C*B' + B*C*A' + A'*C'*D'\ne = B*D + C*D + B*A' + A'*C'\nf = B*D + C*A' + D*C' + A'*B' + C*B'*D'\ng = A*D + B*A' + B*C' + D*C' + C*B'*D'\n(หมายเหตุ: NOT เขียนด้วย ' ตามข้อกำหนด, ' ผูกกับตัวแปรก่อนหน้าเท่านั้น)",
+        "intent_json": {
+          "module": "bcd_hex_to_7seg",
+          "components": [
+            {
+              "id": "D",
+              "type": "IN",
+              "name": "D"
+            },
+            {
+              "id": "C",
+              "type": "IN",
+              "name": "C"
+            },
+            {
+              "id": "B",
+              "type": "IN",
+              "name": "B"
+            },
+            {
+              "id": "A",
+              "type": "IN",
+              "name": "A"
+            },
+            {
+              "id": "and1",
+              "type": "AND"
+            },
+            {
+              "id": "not1",
+              "type": "NOT"
+            },
+            {
+              "id": "and2",
+              "type": "AND"
+            },
+            {
+              "id": "not2",
+              "type": "NOT"
+            },
+            {
+              "id": "and3",
+              "type": "AND"
+            },
+            {
+              "id": "not3",
+              "type": "NOT"
+            },
+            {
+              "id": "and4",
+              "type": "AND"
+            },
+            {
+              "id": "and5",
+              "type": "AND"
+            },
+            {
+              "id": "not4",
+              "type": "NOT"
+            },
+            {
+              "id": "and6",
+              "type": "AND"
+            },
+            {
+              "id": "or1",
+              "type": "OR"
+            },
+            {
+              "id": "a",
+              "type": "OUT",
+              "name": "a"
+            },
+            {
+              "id": "and7",
+              "type": "AND"
+            },
+            {
+              "id": "and8",
+              "type": "AND"
+            },
+            {
+              "id": "and9",
+              "type": "AND"
+            },
+            {
+              "id": "and10",
+              "type": "AND"
+            },
+            {
+              "id": "or2",
+              "type": "OR"
+            },
+            {
+              "id": "b",
+              "type": "OUT",
+              "name": "b"
+            },
+            {
+              "id": "and11",
+              "type": "AND"
+            },
+            {
+              "id": "and12",
+              "type": "AND"
+            },
+            {
+              "id": "and13",
+              "type": "AND"
+            },
+            {
+              "id": "and14",
+              "type": "AND"
+            },
+            {
+              "id": "and15",
+              "type": "AND"
+            },
+            {
+              "id": "or3",
+              "type": "OR"
+            },
+            {
+              "id": "c",
+              "type": "OUT",
+              "name": "c"
+            },
+            {
+              "id": "and16",
+              "type": "AND"
+            },
+            {
+              "id": "and17",
+              "type": "AND"
+            },
+            {
+              "id": "and18",
+              "type": "AND"
+            },
+            {
+              "id": "and19",
+              "type": "AND"
+            },
+            {
+              "id": "and20",
+              "type": "AND"
+            },
+            {
+              "id": "or4",
+              "type": "OR"
+            },
+            {
+              "id": "d",
+              "type": "OUT",
+              "name": "d"
+            },
+            {
+              "id": "and21",
+              "type": "AND"
+            },
+            {
+              "id": "and22",
+              "type": "AND"
+            },
+            {
+              "id": "and23",
+              "type": "AND"
+            },
+            {
+              "id": "or5",
+              "type": "OR"
+            },
+            {
+              "id": "e",
+              "type": "OUT",
+              "name": "e"
+            },
+            {
+              "id": "and24",
+              "type": "AND"
+            },
+            {
+              "id": "and25",
+              "type": "AND"
+            },
+            {
+              "id": "and26",
+              "type": "AND"
+            },
+            {
+              "id": "or6",
+              "type": "OR"
+            },
+            {
+              "id": "f",
+              "type": "OUT",
+              "name": "f"
+            },
+            {
+              "id": "and27",
+              "type": "AND"
+            },
+            {
+              "id": "and28",
+              "type": "AND"
+            },
+            {
+              "id": "or7",
+              "type": "OR"
+            },
+            {
+              "id": "g",
+              "type": "OUT",
+              "name": "g"
+            }
+          ],
+          "nets": [
+            {
+              "from": "B",
+              "to": "and1"
+            },
+            {
+              "from": "C",
+              "to": "and1"
+            },
+            {
+              "from": "D",
+              "to": "not1"
+            },
+            {
+              "from": "B",
+              "to": "and2"
+            },
+            {
+              "from": "not1",
+              "to": "and2"
+            },
+            {
+              "from": "A",
+              "to": "not2"
+            },
+            {
+              "from": "D",
+              "to": "and3"
+            },
+            {
+              "from": "not2",
+              "to": "and3"
+            },
+            {
+              "from": "C",
+              "to": "not3"
+            },
+            {
+              "from": "not2",
+              "to": "and4"
+            },
+            {
+              "from": "not3",
+              "to": "and4"
+            },
+            {
+              "from": "A",
+              "to": "and5"
+            },
+            {
+              "from": "C",
+              "to": "and5"
+            },
+            {
+              "from": "not1",
+              "to": "and5"
+            },
+            {
+              "from": "B",
+              "to": "not4"
+            },
+            {
+              "from": "D",
+              "to": "and6"
+            },
+            {
+              "from": "not4",
+              "to": "and6"
+            },
+            {
+              "from": "not3",
+              "to": "and6"
+            },
+            {
+              "from": "and1",
+              "to": "or1"
+            },
+            {
+              "from": "and2",
+              "to": "or1"
+            },
+            {
+              "from": "and3",
+              "to": "or1"
+            },
+            {
+              "from": "and4",
+              "to": "or1"
+            },
+            {
+              "from": "and5",
+              "to": "or1"
+            },
+            {
+              "from": "and6",
+              "to": "or1"
+            },
+            {
+              "from": "or1",
+              "to": "a"
+            },
+            {
+              "from": "not3",
+              "to": "and7"
+            },
+            {
+              "from": "not1",
+              "to": "and7"
+            },
+            {
+              "from": "A",
+              "to": "and8"
+            },
+            {
+              "from": "B",
+              "to": "and8"
+            },
+            {
+              "from": "not1",
+              "to": "and8"
+            },
+            {
+              "from": "A",
+              "to": "and9"
+            },
+            {
+              "from": "D",
+              "to": "and9"
+            },
+            {
+              "from": "not4",
+              "to": "and9"
+            },
+            {
+              "from": "not2",
+              "to": "and10"
+            },
+            {
+              "from": "not4",
+              "to": "and10"
+            },
+            {
+              "from": "not1",
+              "to": "and10"
+            },
+            {
+              "from": "and4",
+              "to": "or2"
+            },
+            {
+              "from": "and7",
+              "to": "or2"
+            },
+            {
+              "from": "and8",
+              "to": "or2"
+            },
+            {
+              "from": "and9",
+              "to": "or2"
+            },
+            {
+              "from": "and10",
+              "to": "or2"
+            },
+            {
+              "from": "or2",
+              "to": "b"
+            },
+            {
+              "from": "A",
+              "to": "and11"
+            },
+            {
+              "from": "not4",
+              "to": "and11"
+            },
+            {
+              "from": "A",
+              "to": "and12"
+            },
+            {
+              "from": "not1",
+              "to": "and12"
+            },
+            {
+              "from": "C",
+              "to": "and13"
+            },
+            {
+              "from": "not1",
+              "to": "and13"
+            },
+            {
+              "from": "D",
+              "to": "and14"
+            },
+            {
+              "from": "not3",
+              "to": "and14"
+            },
+            {
+              "from": "not4",
+              "to": "and15"
+            },
+            {
+              "from": "not1",
+              "to": "and15"
+            },
+            {
+              "from": "and11",
+              "to": "or3"
+            },
+            {
+              "from": "and12",
+              "to": "or3"
+            },
+            {
+              "from": "and13",
+              "to": "or3"
+            },
+            {
+              "from": "and14",
+              "to": "or3"
+            },
+            {
+              "from": "and15",
+              "to": "or3"
+            },
+            {
+              "from": "or3",
+              "to": "c"
+            },
+            {
+              "from": "D",
+              "to": "and16"
+            },
+            {
+              "from": "not4",
+              "to": "and16"
+            },
+            {
+              "from": "A",
+              "to": "and17"
+            },
+            {
+              "from": "B",
+              "to": "and17"
+            },
+            {
+              "from": "not3",
+              "to": "and17"
+            },
+            {
+              "from": "A",
+              "to": "and18"
+            },
+            {
+              "from": "C",
+              "to": "and18"
+            },
+            {
+              "from": "not4",
+              "to": "and18"
+            },
+            {
+              "from": "B",
+              "to": "and19"
+            },
+            {
+              "from": "C",
+              "to": "and19"
+            },
+            {
+              "from": "not2",
+              "to": "and19"
+            },
+            {
+              "from": "not2",
+              "to": "and20"
+            },
+            {
+              "from": "not3",
+              "to": "and20"
+            },
+            {
+              "from": "not1",
+              "to": "and20"
+            },
+            {
+              "from": "and16",
+              "to": "or4"
+            },
+            {
+              "from": "and17",
+              "to": "or4"
+            },
+            {
+              "from": "and18",
+              "to": "or4"
+            },
+            {
+              "from": "and19",
+              "to": "or4"
+            },
+            {
+              "from": "and20",
+              "to": "or4"
+            },
+            {
+              "from": "or4",
+              "to": "d"
+            },
+            {
+              "from": "B",
+              "to": "and21"
+            },
+            {
+              "from": "D",
+              "to": "and21"
+            },
+            {
+              "from": "C",
+              "to": "and22"
+            },
+            {
+              "from": "D",
+              "to": "and22"
+            },
+            {
+              "from": "B",
+              "to": "and23"
+            },
+            {
+              "from": "not2",
+              "to": "and23"
+            },
+            {
+              "from": "and21",
+              "to": "or5"
+            },
+            {
+              "from": "and22",
+              "to": "or5"
+            },
+            {
+              "from": "and23",
+              "to": "or5"
+            },
+            {
+              "from": "and4",
+              "to": "or5"
+            },
+            {
+              "from": "or5",
+              "to": "e"
+            },
+            {
+              "from": "C",
+              "to": "and24"
+            },
+            {
+              "from": "not2",
+              "to": "and24"
+            },
+            {
+              "from": "not2",
+              "to": "and25"
+            },
+            {
+              "from": "not4",
+              "to": "and25"
+            },
+            {
+              "from": "C",
+              "to": "and26"
+            },
+            {
+              "from": "not4",
+              "to": "and26"
+            },
+            {
+              "from": "not1",
+              "to": "and26"
+            },
+            {
+              "from": "and21",
+              "to": "or6"
+            },
+            {
+              "from": "and24",
+              "to": "or6"
+            },
+            {
+              "from": "and14",
+              "to": "or6"
+            },
+            {
+              "from": "and25",
+              "to": "or6"
+            },
+            {
+              "from": "and26",
+              "to": "or6"
+            },
+            {
+              "from": "or6",
+              "to": "f"
+            },
+            {
+              "from": "A",
+              "to": "and27"
+            },
+            {
+              "from": "D",
+              "to": "and27"
+            },
+            {
+              "from": "B",
+              "to": "and28"
+            },
+            {
+              "from": "not3",
+              "to": "and28"
+            },
+            {
+              "from": "and27",
+              "to": "or7"
+            },
+            {
+              "from": "and23",
+              "to": "or7"
+            },
+            {
+              "from": "and28",
+              "to": "or7"
+            },
+            {
+              "from": "and14",
+              "to": "or7"
+            },
+            {
+              "from": "and26",
+              "to": "or7"
+            },
+            {
+              "from": "or7",
+              "to": "g"
+            }
+          ]
+        },
+        "notes": "สมการที่ได้จาก SOPform ของ sympy เป็นรูป SOP ที่ถูกต้อง (verified) แต่ไม่ได้ถูกจัดกลุ่มให้ 'สวยที่สุด' แบบมือวาด K-map เสมอไป — นักศึกษาสามารถจัดกลุ่มใหม่ในกระดาษให้ได้เทอมน้อยกว่านี้ในบางเซกเมนต์ ตราบใดที่ตารางค่าความจริงตรงกันทั้ง 16 แถว. intent_json รวม 7 เอาต์พุตในโมดูลเดียว (bcd_hex_to_7seg)."
+      },
+      "verify": "เขียนสคริปต์ Python (sympy.logic.SOPform) สร้างมินเทอมของแต่ละเซกเมนต์จาก pattern 7-segment มาตรฐานของเลข 0-F แล้วลดรูปเป็น SOP จากนั้น substitute ค่าอินพุตทั้ง 16 ชุดกลับเข้าไปในสมการที่ลดรูปแล้ว เปรียบเทียบกับ pattern ต้นฉบับ — ผลคือ 'Task1 all segments verified across all 16 rows: True' (ตรงทุกแถวของทั้ง 7 เอาต์พุต).",
+      "related_content": []
+    },
+    {
+      "id": "lab5-2",
+      "question": "ออกแบบวงจร MOD ความถี่ และวงจร Counter นับขึ้นจาก 0 ไป 7 (0 1 2 3 4 5 6 7 ...) ผ่าน JK Flip-Flop แบบ Asynchronous (ripple) โดยวงจร Counter จะเปลี่ยนเลขทุก ๆ 1 วินาที แล้วทดสอบการทำงานบนบอร์ด FPGA โดยแสดงผลทาง 7-Segment",
+      "params": "สมมติสัญญาณนาฬิกาบอร์ด 50 MHz (เป็นค่ามาตรฐานของบอร์ด EDGE Spartan-7 XC7S15 ที่ใช้ในแล็บอื่น ๆ ของชุดนี้) ต้องการสัญญาณ 1 Hz (เปลี่ยนค่าทุก 1 วินาที)",
+      "subtasks": [
+        "ออกแบบวงจรหารความถี่ (MOD-N) จาก 50 MHz ให้เหลือ 1 Hz",
+        "ออกแบบวงจรนับ 0-7 ด้วย JK Flip-Flop 3 ตัวต่อแบบ Asynchronous (ripple), J=K=1 ทุกตัว (toggle mode)",
+        "นำเอาต์พุตของวงจรนับไปเข้ารหัส 7-segment (จากข้อ 1) และทดสอบบนบอร์ด"
+      ],
+      "topic": "counter",
+      "solution": {
+        "steps": "1) วงจร MOD: ต้องการสลับสถานะเอาต์พุต (toggle) ทุก ๆ ครึ่งคาบของ 1 Hz คือทุก 1/(2*1)=0.5 วินาที ดังนั้น N = f_clock / (2*f_out) = 50,000,000/(2*1) = 25,000,000. ใช้ตัวนับไบนารีขนาด ~25 บิต (2^25=33,554,432 > 25,000,000) นับจาก 0 ถึง N-1 แล้ว toggle เอาต์พุต + reset ตัวนับ, ผลลัพธ์เป็นสัญญาณคลื่นสี่เหลี่ยม 1 Hz ใช้เป็นคล็อกของวงจรนับหลัก\n2) วงจรนับ 0-7 แบบ ripple: ใช้ JK Flip-Flop 3 ตัว (FF_A=LSB, FF_B, FF_C=MSB) ต่อ J=K=1 ทุกตัว (โหมด toggle). สัญญาณนาฬิกา 1 Hz (จากข้อ 1) เข้า clock ของ FF_A (กระตุ้นขอบขาลง). เอาต์พุต Q_A ของ FF_A ใช้เป็นคล็อกของ FF_B (ripple), และ Q_B เป็นคล็อกของ FF_C. เมื่อ Q_C Q_B Q_A ครบ 111 แล้วจะ toggle กลับเป็น 000 อัตโนมัติ (mod-8 wrap โดยธรรมชาติของ toggle-mode 3 บิต ไม่ต้องมีวงจร reset เพิ่มเติม)\n3) ต่อ Q_C Q_B Q_A (แทนค่า D=0,C=Q_C,B=Q_B,A=Q_A ของ lab5-1) เข้าตัวถอดรหัส 7-segment จาก lab5-1 เพื่อแสดงเลข 0-7",
+        "truth_table": "state(dec) Q_C Q_B Q_A\n0  0 0 0\n1  0 0 1\n2  0 1 0\n3  0 1 1\n4  1 0 0\n5  1 0 1\n6  1 1 0\n7  1 1 1\n8(=0) 0 0 0  <- wrap อัตโนมัติ",
+        "kmap": null,
+        "final_expression": "N_MOD = 50,000,000 / (2*1) = 25,000,000 (ตัวนับ ~25 บิต); J_A=K_A=J_B=K_B=J_C=K_C=1 (toggle ทุกตัว); clk_B=Q_A(falling edge), clk_C=Q_B(falling edge)",
+        "intent_json": null,
+        "notes": "เป็นวงจรลำดับ (sequential, ใช้ flip-flop) ไม่ใช่วงจร combinational ล้วน — Intent-JSON ตาม ai/prompts/intent_system.md รองรับเฉพาะเกต combinational (AND/OR/XOR/NAND/NOR/XNOR/NOT/BUF, ไม่มี FF) จึงไม่ออก intent_json ให้ข้อนี้ ให้ใช้สมการ J/K ข้างต้นเป็นคำตอบแทน. คำเตือนเรื่อง glitch จาก propagation delay ของวงจร ripple ตามที่ระบุในโจทย์ ไม่กระทบการทำงานที่ความถี่ต่ำ (1 Hz) ของแล็บนี้",
+        "steps_detail_note": null
+      },
+      "verify": "จำลองวงจรนับ ripple แบบ toggle-mode JK ด้วย Python (สลับ Q_A ทุก clock, สลับ Q_B เมื่อ Q_A ตกจาก 1->0, สลับ Q_C เมื่อ Q_B ตกจาก 1->0) ได้ลำดับ [0,1,2,3,4,5,6,7,0] ตรงตามที่โจทย์ต้องการ (นับ 0-7 วนซ้ำ). ค่า N=25,000,000 ตรวจสอบด้วยเลขคณิต 50,000,000/(2*1)=25,000,000",
+      "related_content": [
+        "lab5-1"
+      ]
+    },
+    {
+      "id": "lab5-3",
+      "question": "ออกแบบวงจร Counter นับขึ้นจาก 0 ไป 9 โดยไม่เอาตัวเลขที่อยู่ในรหัสนักศึกษา 4 หลักสุดท้าย แบบ Synchronous โดยวงจร Counter จะเปลี่ยนเลขทุก ๆ 1 วินาที แล้วทดสอบการทำงานบนบอร์ด FPGA โดยแสดงผลทาง 7-Segment (ตัวอย่างในโจทย์: รหัสนักศึกษา 64010522 จะทำการนับ 1 3 4 6 7 8 9 ....)",
+      "params": "โจทย์ขึ้นกับรหัสนักศึกษาของผู้ทำ (parameterized). เลือกใช้ตัวอย่างที่ระบุไว้ในเอกสารแล็บเองเป็นกรณีศึกษาที่เป็นรูปธรรม: รหัสนักศึกษา 64010522 -> 4 หลักสุดท้าย = 0,5,2,2 (ตัดตัวซ้ำเหลือ 0,2,5) -> เลข 0-9 ที่เหลือหลังตัด {0,2,5} ออก คือลำดับการนับ = 1,3,4,6,7,8,9 (วนกลับไป 1 ใหม่หลัง 9). สถานะ 0,2,5 และ 10-15 (ฐานสอง 4 บิตที่ไม่ได้ใช้เพราะเกิน 9) ถือเป็น don't-care",
+      "subtasks": [
+        "3.1 สร้างตารางค่าการนับ (Output, State transition) ของลำดับ 1 3 4 6 7 8 9 (วน)",
+        "3.2 สร้างตารางค่าความจริงของอินพุต J,K ของ FF3,FF2,FF1,FF0 (มี X ได้)",
+        "3.3 หาสมการอินพุต J,K ของแต่ละฟลิปฟลอปด้วย K-map (รวม don't-care)",
+        "3.4 วาดวงจร JK Flip-Flop และทดสอบบนบอร์ด FPGA"
+      ],
+      "topic": "counter",
+      "solution": {
+        "steps": "ใช้ 4 บิต Q3Q2Q1Q0 (เนื่องจากค่าสูงสุดคือ 9 ต้องการ 4 บิต). ลำดับการนับ (วน): 1->3->4->6->7->8->9->1. สถานะที่ไม่อยู่ในลำดับ (0,2,5,10,11,12,13,14,15) เป็น don't-care ทั้งค่า Q และ J/K.\nสำหรับแต่ละฟลิปฟลอป ใช้ Excitation Table ของ JK (0->0:J=0,K=X | 0->1:J=1,K=X | 1->0:J=X,K=1 | 1->1:J=X,K=0) สร้างตาราง J,K ของ FF3..FF0 จากสถานะปัจจุบัน/ถัดไปที่กำหนด แล้วลดรูปด้วย K-map (4 ตัวแปร Q3Q2Q1Q0, ใช้ don't-care ให้กลุ่มใหญ่ที่สุด) ได้สมการดังนี้ (ตรวจสอบด้วยโปรแกรมและยืนยันว่า transition ที่ต้องการทุกสถานะถูกต้อง)",
+        "truth_table": "เลข(ปัจจุบัน) Q3Q2Q1Q0 | เลข(ถัดไป) Q3'Q2'Q1'Q0'\n1  0001 | 3  0011\n3  0011 | 4  0100\n4  0100 | 6  0110\n6  0110 | 7  0111\n7  0111 | 8  1000\n8  1000 | 9  1001\n9  1001 | 1  0001   (วนกลับ)\n(สถานะ 0,2,5,10-15 = don't-care, ไม่ปรากฏในลำดับการนับ)",
+        "kmap": "ตารางค่าความจริง J,K (จากสถานะที่ใช้จริง 7 สถานะ, ที่เหลือเป็น X):\nQ3Q2Q1Q0(cur) | J3 K3 J2 K2 J1 K1 J0 K0\n0001 (1) | 0 X | 1 X | X 0 | X 1\n0011 (3) | 0 X | X 0 | X 1 | 1 X\n0100 (4) | 0 X | 1 X | 0 X | 0 X\n0110 (6) | 0 X | X 0 | X 0 | 1 X\n0111 (7) | 1 X | X 1 | X 1 | X 1\n1000 (8) | X 0 | 0 X | 0 X | 1 X\n1001 (9) | X 1 | 0 X | 0 X | X 1\nจัดกลุ่ม K-map (4 ตัวแปร, ใช้ don't-care อย่างเต็มที่) แต่ละอินพุตแยกกัน ได้สมการใน final_expression (ยืนยันด้วยโปรแกรมว่าให้ transition ที่ถูกต้องครบทั้ง 7 สถานะ)",
+        "final_expression": "J3 = Q2*Q0 ,  K3 = Q0\nJ2 = Q1 ,  K2 = Q0\nJ1 = Q3' ,  K1 = Q0\nJ0 = Q1 + Q2' ,  K0 = Q1",
+        "intent_json": null,
+        "notes": "คำตอบนี้ใช้กรณีตัวอย่างที่ให้ไว้ในเอกสารแล็บเอง (รหัสนักศึกษา 64010522 -> ลำดับ 1,3,4,6,7,8,9) นักศึกษาที่ใช้รหัสอื่นต้องหาลำดับของตนเองแล้วทำซ้ำขั้นตอนเดียวกัน (state table -> excitation table -> K-map พร้อม don't-care -> สมการ J,K). เป็นวงจรลำดับ (ใช้ JK Flip-Flop) จึงไม่ได้ออก intent_json (schema Intent-JSON ไม่มี component ชนิด flip-flop) — ให้สมการ J,K ของแต่ละฟลิปฟลอปเป็นคำตอบวงจรแทน"
+      },
+      "verify": "เขียนสคริปต์ Python: (1) กำหนด next-state map จากลำดับ 1,3,4,6,7,8,9(วน); (2) สร้างมินเทอม/don't-care ของ J,K แต่ละฟลิปฟลอปจาก excitation table แล้วลดรูปด้วย sympy.logic.SOPform (พร้อม don't-care); (3) จำลองผลลัพธ์ J,K ที่ได้ย้อนกลับเป็นสถานะถัดไปสำหรับทั้ง 7 สถานะที่ใช้จริง แล้วเทียบกับ next-state ที่ต้องการ — ผลคือ 'ALL TRANSITIONS VERIFIED: True' (ทุกสถานะ 1,3,4,6,7,8,9 ให้ next-state ถูกต้องตามสมการ J,K ที่ลดรูปแล้ว)",
+      "related_content": [
+        "lab5-1",
+        "lab5-2"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "source": "Lab6-2569.pdf",
+  "group": "labs",
+  "lab": "6",
+  "title": "การออกแบบวงจรดิจิตอลด้วยวิธี Schematic โดยกระบวนการ Top-Down Design (Digital Counter 00-yy)",
+  "objectives": [
+    "เข้าใจการออกแบบวงจรดิจิตอลด้วยวิธี Schematic",
+    "สามารถออกแบบวงจรดิจิตอลโดยกระบวนการ Top-Down Design"
+  ],
+  "items": [
+    {
+      "id": "lab6-1",
+      "question": "สร้างวงจรนับเลขดิจิตอล (Digital Counter) บนบอร์ด EDGE Spartan-7 (XC7S15): อินพุต SW[7:0] (สวิตช์เลื่อน) กำหนดค่าสิ้นสุด yy (SW[7:4]=หลักสิบ, SW[3:0]=หลักหน่วย, รหัส BCD), สวิตช์กดติดปล่อยดับ 1 ตัวทำหน้าที่ Start/Stop แบบ Toggle, เอาต์พุตเป็น 7-segment 2 หลัก (00-99) แสดงค่านับที่นับขึ้นทีละ 1 ด้วยความถี่ 20 Hz วนกลับที่ 00 เมื่อถึง yy, และ LED แสดง Error เมื่อ yy ไม่ใช่ BCD ที่ถูกต้อง หรือค่านับปัจจุบันมากกว่า yy ให้ออกแบบด้วยกระบวนการ Top-Down Design แล้วสร้างจริงด้วยวิธี Schematic",
+      "params": "ตัวอย่างค่าคงที่ที่ใช้ในคำตอบ: ความถี่บอร์ด 50 MHz, ความถี่นับ 20 Hz (คาบ 50 ms) ตามที่ระบุในโจทย์; ตัวอย่างค่า yy ที่ใช้ทดสอบ = 45 (SW[7:4]=0100, SW[3:0]=0101)",
+      "subtasks": [
+        "ออกแบบ Block diagram แบบ Top-Down (แตกจากบล็อกใหญ่ไปบล็อกย่อย)",
+        "ออกแบบวงจรหารความถี่ 50MHz -> 20Hz",
+        "ออกแบบ Edge Detector + Toggle (T Flip-Flop) จากปุ่มกด Start/Stop",
+        "ออกแบบ BCD Up-Counter (2 หลัก, มี Enable/Clear) ที่วนกลับ 00 เมื่อถึง yy",
+        "ออกแบบวงจรตรวจสอบ error (BCD ไม่ถูกต้อง / count > yy)",
+        "ออกแบบวงจรแสดงผล 7-segment 2 หลักแบบ Multiplex (Common Anode)"
+      ],
+      "topic": "fpga",
+      "solution": {
+        "steps": "Top-Down decomposition (จากบล็อกบนลงล่าง):\nLEVEL 0 (system): Digital_Counter(SW[7:0], BTN_start_stop, clk_50MHz) -> {SEG[6:0], DIGIT[1:0], LED_error}\nLEVEL 1 (ระบบย่อย 6 บล็อก ตามคำใบ้ในโจทย์):\n  1) Edge_Detector: ตรวจจับขอบขาขึ้นของ BTN_start_stop ด้วย 2 D-FF (สร้างพัลส์ 1 clock กว้าง เพื่อกันการกดค้าง/bounce ให้ toggle เพียงครั้งเดียวต่อการกด 1 ครั้ง ตามข้อบังคับ 2.6.4)\n  2) Toggle_FF (T Flip-Flop): รับพัลส์จาก Edge_Detector เป็นสัญญาณ T (toggle enable); เอาต์พุต run_flag สลับสถานะทุกครั้งที่มีพัลส์ = สถานะ 'กำลังนับ'\n  3) Clock_Divider (MOD-N, N=50,000,000/20=2,500,000): แบ่งความถี่ 50MHz ให้เหลือ 20Hz เป็น clock enable (tick_20hz) สำหรับวงจรนับหลัก\n  4) BCD_Counter (2 หลัก, หลักสิบ+หลักหน่วย): นับขึ้นเมื่อ (run_flag AND tick_20hz AND NOT error); โหลด/วนกลับเป็น 00 เมื่อค่าปัจจุบัน = yy (ใช้ผลจาก Comparator เป็นสัญญาณ Clear แบบ synchronous)\n  5) Comparator: เปรียบเทียบค่านับปัจจุบัน (count_tens,count_units) กับ yy (yy_tens,yy_units) แบบ cascaded BCD digit compare (เทียบหลักสิบก่อน ถ้าเท่ากันค่อยเทียบหลักหน่วย) ให้สัญญาณ count_gt_yy และ count_eq_yy(สำหรับวนกลับ)\n  6) Error_Checker: BCD_invalid(yy_tens) OR BCD_invalid(yy_units) OR count_gt_yy -> LED_error (ทำงานตลอดเวลาไม่ว่านับอยู่หรือหยุด ตามข้อ 2.6.6); เมื่อ error=1 การกด Start/Stop จะไม่มีผล (ใช้ error เป็นสัญญาณ inhibit ของ run_flag/enable)\n  7) Display_Driver: BCD_to_7seg (จาก lab5-1, สลับเป็น active-low เพราะจอ Common Anode) x2 หลัก + Digit_Multiplexer (สแกนความถี่ >=1kHz สลับ DIGIT1/DIGIT2)\nการเชื่อมสัญญาณ: SW[7:0] -> {Error_Checker, BCD_Counter(สำหรับเทียบ yy), Comparator}; BTN -> Edge_Detector -> Toggle_FF -> run_flag; clk_50MHz -> Clock_Divider -> tick_20hz; enable ของ BCD_Counter = run_flag AND tick_20hz AND NOT LED_error; count -> Comparator และ -> Display_Driver -> SEG[6:0], DIGIT[1:0]",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": "N_divider = 50,000,000/20 = 2,500,000; LED_error = BCD_invalid(SW[7:4]) OR BCD_invalid(SW[3:0]) OR (count > yy)",
+        "intent_json": null,
+        "notes": "ข้อนี้เป็นการออกแบบระดับระบบ (Top-Down block diagram) ตามโจทย์ที่ขอ 'block diagram + hint แบ่งเป็นส่วนๆ' — Intent-JSON (gate-only, ไม่มี flip-flop/counter/mux เป็น primitive) ไม่เหมาะกับการแทนทั้งระบบนี้ในโมดูลเดียว. บล็อกย่อยที่เป็น combinational ล้วน (BCD_invalid checker, comparator) แยกให้ intent_json ในข้อ lab6-2/lab6-3",
+        "board_pins_reference": "SW[0..7]->K11,M11,N14,P12,N10,P10,M10,N4 ; BTN(Start/Stop)->J12(SW18) ; LED_error->K12(D2, ต้องเสียบ jumper J4->GND) ; DIGIT1..4->H4,H3,H2,H1 (ใช้ DIGIT1,DIGIT2) ; Segment A..G,DP->L3,P4,P2,M3,M1,J4,K4,J2 (Common Anode, active-low; ต้องถอด jumper J9)"
+      },
+      "verify": "ไม่ใช่งาน combinational ล้วน (เป็น top-down architecture) จึงตรวจสอบเชิงตรรกะของแต่ละบล็อกแทน: (1) เลข N=2,500,000 ตรวจด้วยเลขคณิต 50,000,000/20; (2) ความถูกต้องของ BCD_invalid และ comparator ตรวจแยกใน lab6-2/lab6-3 ด้วยการ enumerate ครบทุกกรณี",
+      "related_content": [
+        "lab5-1"
+      ]
+    },
+    {
+      "id": "lab6-2",
+      "question": "ออกแบบวงจรย่อย (สำหรับข้อ 2.5.1 ของแล็บ): ตรวจสอบว่าค่าที่ป้อนจาก Slide Switch หนึ่งหลัก (nibble 4 บิต, W X Y Z โดย W=MSB) เป็นรหัส BCD ที่ถูกต้องหรือไม่ (ไม่ถูกต้องเมื่อค่ามากกว่า 9)",
+      "params": "ตัวแปรอินพุต W,X,Y,Z คือ 4 บิตของหนึ่งหลัก BCD (เช่น SW[7:4] หรือ SW[3:0]); ใช้ตรวจทั้ง 2 หลักของ yy แล้ว OR ผลลัพธ์เข้าด้วยกัน",
+      "subtasks": [
+        "สร้างตารางค่าความจริง 16 แถวของ invalid = (ค่า > 9)",
+        "หาสมการลดรูปด้วย K-map",
+        "รวมผลของ 2 หลัก (SW[7:4], SW[3:0]) ด้วย OR"
+      ],
+      "topic": "boolean-simplification",
+      "solution": {
+        "steps": "invalid=1 เมื่อค่าฐานสิบของ (W X Y Z) มากกว่า 9 นั่นคือมินเทอม 10-15 (1010-1111) ทั้งหมด ซึ่งทุกมินเทอมกลุ่มนี้มี W=1 และ (X=1 หรือ Y=1) จัดกลุ่ม K-map ได้ 2 พจน์",
+        "truth_table": "W X Y Z | invalid\n0..9 (0000-1001) | 0\n10 1010 | 1\n11 1011 | 1\n12 1100 | 1\n13 1101 | 1\n14 1110 | 1\n15 1111 | 1",
+        "kmap": "กลุ่มมินเทอม {10,11,14,15} (W=1,X=1) และ {12,13,14,15} (W=1,Y=1) รวมกันครอบคลุมมินเทอม 10-15 ทั้งหมดโดยไม่มีคำซ้อนเกิน (10,11 ต้องการ W.X ; 12..15 ต้องการ W.Y)",
+        "final_expression": "invalid = W*X + W*Y",
+        "intent_json": {
+          "module": "bcd_digit_invalid",
+          "components": [
+            {
+              "id": "W",
+              "type": "IN",
+              "name": "W"
+            },
+            {
+              "id": "X",
+              "type": "IN",
+              "name": "X"
+            },
+            {
+              "id": "Y",
+              "type": "IN",
+              "name": "Y"
+            },
+            {
+              "id": "Z",
+              "type": "IN",
+              "name": "Z"
+            },
+            {
+              "id": "and1",
+              "type": "AND"
+            },
+            {
+              "id": "and2",
+              "type": "AND"
+            },
+            {
+              "id": "or1",
+              "type": "OR"
+            },
+            {
+              "id": "invalid",
+              "type": "OUT",
+              "name": "invalid"
+            }
+          ],
+          "nets": [
+            {
+              "from": "W",
+              "to": "and1"
+            },
+            {
+              "from": "X",
+              "to": "and1"
+            },
+            {
+              "from": "W",
+              "to": "and2"
+            },
+            {
+              "from": "Y",
+              "to": "and2"
+            },
+            {
+              "from": "and1",
+              "to": "or1"
+            },
+            {
+              "from": "and2",
+              "to": "or1"
+            },
+            {
+              "from": "or1",
+              "to": "invalid"
+            }
+          ]
+        },
+        "notes": "ใช้ตรวจ 1 หลัก (nibble); สำหรับ yy ทั้ง 2 หลัก ให้เรียกวงจรนี้ 2 ชุด (สำหรับ SW[7:4] และ SW[3:0]) แล้ว OR ผลลัพธ์เป็น yy_invalid = invalid(SW[7:4]) OR invalid(SW[3:0])"
+      },
+      "verify": "สคริปต์ Python: สร้างมินเทอมของ invalid จาก def v>9 สำหรับ v=0..15, ลดรูปด้วย sympy SOPform ได้ (W&X)|(W&Y), แล้ว substitute กลับทั้ง 16 ค่าเทียบกับ v>9 — ผลคือ 'verified BCD_invalid over all 16 rows: True'",
+      "related_content": [
+        "lab6-1",
+        "lab7-2"
+      ]
+    },
+    {
+      "id": "lab6-3",
+      "question": "ออกแบบวงจรย่อย (สำหรับข้อ 2.5.2): เปรียบเทียบค่านับปัจจุบัน 2 หลัก BCD (count_tens,count_units) กับค่า yy 2 หลัก BCD (yy_tens,yy_units) ให้เอาต์พุต count_gt_yy = 1 เมื่อค่านับปัจจุบันมากกว่า yy",
+      "params": "ใช้ตัวเปรียบเทียบขนาด 4 บิตต่อหลัก (0-9) แบบ cascade ตามหลักการ magnitude comparator: เทียบหลักสิบก่อน ถ้าเท่ากันจึงเทียบหลักหน่วย",
+      "subtasks": [
+        "ออกแบบ 1-digit BCD comparator (ให้ GT,EQ,LT ของแต่ละหลัก)",
+        "ต่อ cascade ระหว่างหลักสิบและหลักหน่วยเพื่อเปรียบเทียบเลข 2 หลัก"
+      ],
+      "topic": "combinational-design",
+      "solution": {
+        "steps": "หลักการ cascaded magnitude comparator: เทียบหลักสูง (tens) ก่อน ถ้า count_tens != yy_tens ผลเปรียบเทียบของเลข 2 หลักเท่ากับผลเปรียบเทียบของหลักสิบเพียงอย่างเดียว (count_gt_yy = count_tens > yy_tens). ถ้า count_tens == yy_tens ต้องพิจารณาหลักหน่วยต่อ (count_gt_yy = count_units > yy_units). แต่ละ '1-digit compare' (4-bit > 4-bit, ค่า 0-9) สร้างจาก standard 4-bit magnitude comparator (สามารถสร้างจากเกต XOR/AND/OR มาตรฐาน หรือใช้ IC/module เปรียบเทียบสำเร็จรูปก็ได้ตามที่อนุญาตในกระบวนการ schematic)",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": "count_gt_yy = (count_tens > yy_tens) OR ((count_tens == yy_tens) AND (count_units > yy_units))",
+        "intent_json": null,
+        "notes": "ไม่ได้ลดรูปเป็นสมการ AND/OR ระดับบิตเดียวเพราะเป็นการเปรียบเทียบขนาด 8 บิตรวม (2 หลัก, ค่าที่เป็นไปได้ 0-99 x 0-99) — ใหญ่เกินกว่าจะแสดงเป็น SOP เดียวอย่างมีประโยชน์ในเอกสารนี้ จึงให้เป็นสมการเชิงโครงสร้าง (cascade ของ 1-digit comparator) ตามที่นิยมสอนกัน และตรวจสอบด้วยการ enumerate ค่าที่เป็นไปได้ทั้งหมดแทนการลดรูป Boolean แบบเกตเดียว"
+      },
+      "verify": "สคริปต์ Python enumerate ค่า count และ yy ทุกค่าตั้งแต่ 0-99 (รวม 100x100=10,000 คู่) แปลงเป็นหลักสิบ/หลักหน่วยแล้วคำนวณผลด้วยสูตร cascade เทียบกับผลเปรียบเทียบจำนวนเต็มโดยตรง (count > yy) — ผลคือ 'Lab6 cascaded 2-digit BCD comparator verified over all 100x100 pairs: True'",
+      "related_content": [
+        "lab6-1"
+      ]
+    }
+  ]
+}

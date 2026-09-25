@@ -1,0 +1,393 @@
+===== PAGE 1 =====
+Chapter 2 – Number Systems and Codes – Dr. Xu
+
+===== PAGE 2 =====
+• Selected areas covered in this chapter:
+– Converting between number systems.
+• Decimal, binary, hexadecimal.
+– Advantages of the hexadecimal number system.
+• Counting in hexadecimal.
+– Representing decimal numbers using the BCD code.
+• Pros and cons of using BCD.
+• Differences between BCD and straight binary.
+– Purpose of alphanumeric codes such as ASCII code.
+– Parity method for error detection.
+• Determine the parity bit to be attached to a digital data
+string.
+Chapter 2 Objectives
+
+===== PAGE 3 =====
+2-1 Binary to Decimal Conversion
+• Convert binary to decimal by summing the
+positions that contain a 1:
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+• An example with a greater number of bits:
+
+===== PAGE 4 =====
+2-1 Binary to Decimal Conversion
+• The double-dabble method avoids addition of
+large numbers:
+– Write down the left-most 1 in the binary number.
+– Double it and add the next bit to the right.
+– Write down the result under the next bit.
+– Continue with steps 2 and 3 until finished with
+the binary number.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 5 =====
+2-1 Binary to Decimal Conversion
+• Binary numbers verify the double-dabble method:
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 6 =====
+2-1 Binary to Decimal Conversion
+• Reverse process described in 2-1.
+– Note that all positions must be accounted for.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+• Another example:
+
+===== PAGE 7 =====
+2-1 Binary to Decimal Conversion
+Repeated
+Division
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+Divide the decimal
+number by 2.
+Write the remainder
+after each division
+until a quotient of
+zero is obtained.
+The first remainder
+is the LSB.
+The last is the MSB.
+
+===== PAGE 8 =====
+Ronald Tocci/Neal Widmer/Gregory Moss
+Repeated
+Division
+This flowchart
+describes the
+process and can
+be used to convert
+from decimal to
+any other number
+system.
+2-2 Decimal to Binary Conversion
+
+===== PAGE 9 =====
+2-3 Hexadecimal Number System
+• Convert 3710 to binary:
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 10 =====
+2-3 Hexadecimal Number System
+• Hexadecimal allows convenient handling of long
+binary strings, using groups of 4 bits—Base 16
+– 16 possible symbols: 0-9 and A-F
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 11 =====
+2-3 Hexadecimal Number System
+Relationships between
+hexadecimal, decimal,
+and binary numbers.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 12 =====
+2-3 Hexadecimal Number System – Hex to Decimal
+• Convert from hex to decimal by multiplying
+each hex digit by its positional weight.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+• In a 2nd example, the value 10 was substituted
+for A and 15 substituted for F.
+For practice, verify that 1BC216 is equal to 710610
+
+===== PAGE 13 =====
+2-3 Hexadecimal Number System – Decimal to Hex
+• Convert from decimal to hex by using the
+repeated division method used for decimal
+to binary conversion.
+• Divide the decimal number by 16
+– The first remainder is the LSB—the last is the MSB.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 14 =====
+2-3 Hexadecimal Number System – Decimal to Hex
+• Convert 42310 to hex:
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 15 =====
+2-3 Hexadecimal Number System – Decimal to Hex
+• Convert 21410 to hex:
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 16 =====
+2-3 Hexadecimal Number System – Hex to Binary
+• Leading zeros can be added to the left of the MSB
+to fill out the last group.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+For practice, verify that BA616 = 1011101001102
+
+===== PAGE 17 =====
+2-3 Hexadecimal Number System – Binary to Hex
+• Convert from binary to hex by grouping bits in four
+starting with the LSB.
+– Each group is then converted to the hex equivalent
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+• The binary number is grouped into groups of four
+bits & each is converted to its equivalent hex digit.
+For practice, verify that 101011111 2 = 15F16
+
+===== PAGE 18 =====
+2-3 Hexadecimal Number System – Decimal to Hex to Binary
+• Convert decimal 378 to a 16-bit binary number
+by first converting to hexadecimal.
+
+===== PAGE 19 =====
+2-3 Hexadecimal Number System
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+To perform conversions
+between hex & binary, it
+is necessary to know the
+four-bit binary numbers
+(0000 - 1111), and their
+equivalent hex digits.
+
+===== PAGE 20 =====
+2-3 Hexadecimal Number System – Counting in Hex
+• When counting in hex, each digit position can
+be incremented (increased by 1) from 0 to F.
+– On reaching value F, it is reset to 0, and the
+next digit position is incremented.
+38,39,3A,3B,3C,3D,3E,3F,40,41,42
+When there is a 9 in a digit position, it
+becomes an A when it is incremented.
+Example:
+With three hex digits, we can count from 00016 to FFF16
+which is 010  to 409510  — a total of 4096 = 163 values.
+
+===== PAGE 21 =====
+2-4 BCD Code
+• Binary Coded Decimal (BCD) is a widely used
+way to present decimal numbers in binary form.
+– Combines features of both decimal and binary
+systems.
+• Each digit is converted to a binary equivalent.
+• BCD is not a number system.
+– It is a decimal number with each digit encoded
+to its binary equivalent.
+• A BCD number is not the same as a straight
+binary number.
+– The primary advantage of BCD is the relative
+ease of converting to and from decimal.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 22 =====
+2-4 BCD Code
+• Convert the number 87410 to BCD:
+– Each decimal digit is represented using 4 bits.
+• Each 4-bit group can never be greater than 9.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+• Reverse the process to convert BCD to decimal.
+
+===== PAGE 23 =====
+2-4 BCD Code
+• Convert 0110100000111001 (BCD) to its
+decimal equivalent.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+Divide the BCD number into four-bit
+groups and convert each to decimal.
+
+===== PAGE 24 =====
+2-4 BCD Code
+• Convert 0110100000111001 (BCD) to its
+decimal equivalent.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+Divide the BCD number into four-bit
+groups and convert each to decimal.
+
+===== PAGE 25 =====
+2-4 BCD Code
+• Convert BCD 011111000001 to its decimal
+equivalent.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+The forbidden group represents
+an error in the BCD number.
+
+===== PAGE 26 =====
+2-5 The Gray Code
+• The Gray code is used in applications where
+numbers change rapidly.
+– Only one bit changes from each value to the next.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+Three bit binary
+and Gray code
+equivalents.
+
+===== PAGE 27 =====
+2-5 The Gray Code
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+Binary to Gray                       Gray to Binary
+
+===== PAGE 28 =====
+2-5 The Gray Code
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+An eight-position,
+three-bit shaft
+encoder
+These devices produce a binary
+value that represents the position
+of a rotating mechanical shaft.
+
+===== PAGE 29 =====
+2-6 Putting It All Together
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+Decimal numbers 1 – 15 in binary, hex, BCD, Gray
+
+===== PAGE 30 =====
+2-7 The Byte, Nibble, and Word
+• Most microcomputers handle and store binary
+data and information in groups of eight bits.
+– 8 bits = 1 byte.
+• A byte can represent numerous types of data/information.
+• Binary numbers are often broken into groups
+of four bits.
+– Because a group of four bits is half as big as a
+byte, it was named a nibble.
+• A word is a group of bits that represents a
+certain unit of information.
+– Word size can be defined as the number of bits
+in the binary word a digital system operates on.
+• PC word size is eight bytes (64 bits).
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 31 =====
+2-8 Alphanumeric Codes
+• Represents characters and functions found on
+a computer keyboard.
+– 26 lowercase & 26 uppercase letters, 10 digits,
+7 punctuation marks, 20 to 40 other characters.
+• ASCII – American Standard Code for Information
+Interchange.
+– Seven bit code: 27 = 128 possible code groups
+– Examples of use: transfer information between
+computers; computers & printers; internal storage.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 32 =====
+2-8 Alphanumeric Codes
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+ASCII – American Standard Code
+for Information Interchange
+See the entire table on page 49 of your textbook.
+
+===== PAGE 33 =====
+2-9 Parity Method for Error Detection
+• Binary data and codes are frequently moved
+between locations:
+– Digitized voice over a microwave link.
+– Storage/retrieval of data from magnetic/optical disks.
+– Communication between computer systems
+over telephone lines, using a modem.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 34 =====
+2-9 Parity Method for Error Detection
+• Electrical noise can cause errors during
+transmission.
+– Spurious fluctuations in voltage or current present
+in all electronic systems.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+• Many digital systems employ methods for error
+detection—and sometimes correction.
+– One of the simplest and most widely used schemes
+for error detection is the parity method.
+
+===== PAGE 35 =====
+2-9 Parity Method for Error Detection
+• The parity method of error detection requires the
+addition of an extra bit to a code group.
+– Called the parity bit, it can be either a 0 or 1,
+depending on the number of 1s in the code group.
+• There are two parity methods, even and odd.
+– The transmitter and receiver must “agree” on
+the type of parity checking used.
+• Even seems to be used more often.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 36 =====
+2-9 Parity Method for Error Detection
+• Even parity method—the total number of bits in
+a group including the parity bit must add up to
+an even number.
+– The binary group 1 0 1 1 would require the addition
+of a parity bit 1, making the group 1 1 0 1 1.
+• The parity bit may be added at either end of a group.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+
+===== PAGE 37 =====
+2-9 Parity Method for Error Detection
+• Odd parity method—the total number of bits in a
+group including the parity bit must add up to an
+odd number.
+– The binary group 1 1 1 1 would require the addition
+of a parity bit 1, making the group 1 1 1 1 1.
+Ronald Tocci/Neal Widmer/Gregory Moss
+Columbus, OH  43235
+The parity bit becomes a part of the code word.
+Adding a parity bit to the seven-bit ASCII
+code produces an eight-bit code.
+
+===== PAGE 38 =====
+• When ASCII characters are transmitted there
+must be a way to tell the receiver a new
+character is coming.
+– There is often a need to detect errors in the
+transmission as well.
+• The method of transfer is called asynchronous
+data communication.
+2-10 Applications
+
+===== PAGE 39 =====
+• An ASCII character must be “framed” so the
+receiver knows where the data begins and ends.
+– The first bit must always be a start bit (logic 0).
+• ASCII code is sent LSB first and MSB last.
+– After the MSB, a parity bit is appended to check
+for transmission errors.
+– Transmission is ended by sending a stop bit (logic 1).
+2-10 Applications
+
+===== PAGE 40 =====
+END

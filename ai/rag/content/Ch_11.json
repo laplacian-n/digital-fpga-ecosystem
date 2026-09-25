@@ -1,0 +1,615 @@
+{
+  "source": "Ch_11.pdf",
+  "group": "content",
+  "chapter": "11",
+  "title": "Interfacing with the Analog World",
+  "chunks": [
+    {
+      "id": "ch11-11-1-digital-analog-review",
+      "section": "11-1",
+      "topic": "Digital vs. Analog Quantities and the Interfacing Chain",
+      "type": "concept",
+      "summary": "Digital quantities take on one of two discrete values while analog quantities vary continuously; transducers, ADCs, computers, DACs, and actuators form the standard chain for interfacing a digital system to the physical (analog) world.",
+      "text": "A digital quantity can take on only one of two possible values (e.g., HIGH/LOW, 1/0); because only two states are distinguished, the actual voltage can fall anywhere within a specified range without changing its meaning, so the exact value is not critical. An analog quantity, by contrast, can take on an infinite number of values over a continuous range, and the exact value matters. Most physical variables that engineers care about (temperature, pressure, flow, light intensity, speed, etc.) are analog and are normally nonelectrical in nature. A transducer is a device that converts such a nonelectrical physical variable into a corresponding electrical (analog) variable; examples include thermistors (temperature), photocells and photodiodes (light), flow meters (flow rate), pressure transducers, and tachometers (speed). The transducer's analog electrical output becomes the analog input to an analog-to-digital converter (ADC). The ADC converts that analog input voltage into a digital output consisting of a number of bits whose value is proportional to the analog input voltage. This digital value is transmitted to a digital computer, which stores and processes it according to a program of instructions -- for example, performing calculations to decide on a corrective action. The resulting digital output from the computer is then fed to a digital-to-analog converter (DAC), which converts it back into a proportional analog voltage or current. That analog signal typically drives an actuator (an electrically controlled valve, motor, thermostat, etc.) that controls the physical variable being managed, closing the loop between the physical world and the digital system.",
+      "keywords": [
+        "digital quantity",
+        "analog quantity",
+        "transducer",
+        "ADC",
+        "DAC",
+        "actuator",
+        "interfacing"
+      ],
+      "pages": [
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-2-dac-conversion-basics",
+      "section": "11-2",
+      "topic": "Digital-to-Analog Conversion: Weighted Sum and Proportionality",
+      "type": "concept",
+      "summary": "A DAC converts a digital code into a proportional voltage/current output, where each bit contributes a weighted amount according to its binary position (weights double from LSB to MSB); increasing the number of input bits increases resolution.",
+      "text": "Digital-to-analog (D/A) conversion is the process of converting a value represented in digital code into a voltage or current that is proportional to that digital value; many analog-to-digital conversion methods internally rely on a DAC as part of their circuitry. For a given DAC, each possible digital input number maps to a unique output voltage, expressed generally as VOUT = K * (digital input value), where K is a proportionality (scaling) factor that is constant for a given DAC operating from a fixed reference voltage. Strictly speaking, the DAC's output is not a true analog quantity, because it can only take on a finite set of specific (discrete) output values -- one for each possible digital input code. However, as the number of input bits is increased, the number of possible output levels increases and the voltage difference between successive output values (the step size) decreases, so the output looks more and more like a continuously varying analog quantity. Because of this, the DAC output is called a 'pseudo-analog' quantity that approximates a true analog signal closely enough that it is simply referred to as 'analog' for convenience. Internally, each bit of the digital input contributes a different amount to the total analog output, weighted according to its position in the binary number: the weight of each bit is successively doubled going from the LSB toward the MSB (i.e., bit weights are 1, 2, 4, 8, ... times the LSB weight). The DAC's analog output voltage VOUT can therefore be viewed as the weighted sum of all the digital input bits that are active (HIGH).",
+      "keywords": [
+        "DAC",
+        "D/A conversion",
+        "weighted sum",
+        "proportionality factor",
+        "binary weighting",
+        "pseudo-analog"
+      ],
+      "pages": [
+        9,
+        10,
+        11
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-2-resolution-step-size",
+      "section": "11-2",
+      "topic": "DAC Resolution, Step Size, and Bipolar/Negative Output",
+      "type": "definition",
+      "summary": "Resolution (step size) is the smallest change a DAC output can make for a one-bit change in digital input, equal to the weight of the LSB and numerically equal to the DAC's proportionality factor K; some DACs can also produce negative or bipolar (2's-complement) outputs.",
+      "text": "The resolution of a D/A converter is defined as the smallest change that can occur in the analog output as a result of a one-step change in the digital input. This smallest change is always equal to the weight of the least significant bit (LSB) and is commonly called the step size -- it is the amount by which VOUT changes as the digital input value changes from one consecutive value to the next. Numerically, the resolution (step size) of a DAC is the same as its input/output proportionality factor K described by VOUT = K * (digital input value), for a DAC connected to a fixed reference voltage. A DAC's resolution improves (the step size gets smaller, giving finer output granularity) as the number of input bits increases. Beyond producing only positive, unipolar outputs, many DACs can also be made to produce negative voltages by making slight modifications to the analog circuitry at the DAC's output stage. Some DAC devices have this extra circuitry built in and are designed to accept signed digital inputs in 2's-complement form, allowing them to directly generate a bipolar (positive and negative) analog output range.",
+      "keywords": [
+        "resolution",
+        "step size",
+        "LSB weight",
+        "proportionality factor",
+        "bipolar DAC",
+        "2's complement"
+      ],
+      "pages": [
+        12,
+        13,
+        14
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-3-binary-weighted-resistor-dac",
+      "section": "11-3",
+      "topic": "Binary-Weighted Resistor DAC Using an Op-Amp Summing Amplifier",
+      "type": "method",
+      "summary": "A simple DAC can be built from an op-amp summing amplifier whose input resistors are binary-weighted (doubling from MSB to LSB) so each digital input contributes a correctly scaled amount to the output; accuracy depends on resistor and reference-voltage precision, and digital inputs must be buffered/switched rather than driven directly from logic outputs.",
+      "text": "One of the simplest practical DAC circuits uses an operational-amplifier summing amplifier whose input resistors are binary-weighted: starting from the resistor connected to the MSB, each successive resistor (toward the LSB) is twice the value of the previous one. Because the summing amplifier's contribution from each input is inversely proportional to its input resistor value, this progressively doubling resistor pattern produces the correct binary weighting in the amplifier's voltage output, effectively summing the weighted digital inputs into an analog voltage. How closely such a circuit's actual VOUT matches the ideal calculated values depends primarily on two factors: the precision of the input and feedback resistors, and the precision (stability) of the digital input voltage levels applied to those resistors. Precision resistors can be manufactured (by trimming) to within about 0.01 percent of their nominal values, so resistor tolerance is not usually the limiting factor. However, the digital inputs cannot be taken directly from the outputs of flip-flops or logic gates, because logic HIGH/LOW output levels vary within a specified voltage range rather than being fixed exact values; feeding such variable levels into the weighted-resistor network would introduce error. Therefore, additional circuitry must be placed between each digital input and its corresponding input resistor to present the summing amplifier with a precise, stable voltage level regardless of logic-gate output variation.",
+      "keywords": [
+        "binary-weighted resistor DAC",
+        "summing amplifier",
+        "op-amp",
+        "resistor precision",
+        "reference voltage"
+      ],
+      "pages": [
+        15,
+        16
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 15/16 shows a schematic of a simple DAC built from an op-amp summing amplifier: several binary digital inputs each feed through their own input resistor (values doubling in a binary-weighted sequence, largest resistor for the MSB) into the inverting input of an op-amp with a feedback resistor, producing an analog output voltage proportional to the weighted sum of the active inputs. Exact resistor values and op-amp pin labeling were not visually verified because PDF page rendering (poppler/pdftoppm) was unavailable in this environment; the description above is inferred from the slide's caption/body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-3-four-bit-dac-reference-switches",
+      "section": "11-3",
+      "topic": "Complete Four-Bit DAC with Precision Reference and Switches",
+      "type": "concept",
+      "summary": "A practical DAC adds a precision reference supply and a semiconductor switch (e.g., CMOS transmission gate) per digital input, so a HIGH input connects the stable reference voltage to its weighted input resistor and a LOW input opens the switch, solving the logic-level precision problem.",
+      "text": "To solve the problem of imprecise logic-level voltages feeding the weighted-resistor network, a complete four-bit DAC design adds, for each digital input bit, a semiconductor switch (such as a CMOS transmission gate) controlled by that bit, along with a single precision reference voltage supply shared by all the switches. When a given digital input is HIGH, its switch closes and connects the precision reference supply -- which produces a very stable, accurate voltage -- to that bit's weighted input resistor, so the amplifier always sees a consistent, precise voltage level for an active bit regardless of the actual logic HIGH voltage from the driving gate or flip-flop. When the input is LOW, the corresponding switch is open, so that resistor contributes nothing to the summed output. This arrangement decouples the DAC's analog accuracy from the variability of ordinary logic output voltage levels.",
+      "keywords": [
+        "precision reference supply",
+        "CMOS transmission gate",
+        "four-bit DAC",
+        "switch-controlled input"
+      ],
+      "pages": [
+        17
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 17 shows a complete four-bit DAC schematic: four digital inputs each control a semiconductor switch (CMOS transmission gate) that, when closed, connects a shared precision reference voltage supply through a binary-weighted resistor into the summing amplifier. Exact layout not visually verified because PDF page rendering (poppler/pdftoppm) was unavailable in this environment; description is inferred from the slide's caption/body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-3-r2r-ladder-dac",
+      "section": "11-3",
+      "topic": "R/2R Ladder DAC",
+      "type": "concept",
+      "summary": "The R/2R ladder network avoids the large resistor-value spread of binary-weighted DACs by using resistances that only span a 2-to-1 ratio, which is easier to manufacture with high precision across all bits.",
+      "text": "A drawback of the binary-weighted-resistor DAC is that, for wide bit widths, there is a very large difference in resistor values between the resistor for the LSB and the resistor for the MSB (since values double for every additional bit), which makes it difficult to fabricate all the resistors with equally high precision across such a wide range of values. The R/2R ladder network solves this problem: instead of one resistor value per bit spanning many octaves, the R/2R ladder is built entirely from resistors of only two values, R and 2R, arranged in a repeating ladder structure. Because the resistor values used span only a 2-to-1 range, it is much easier to manufacture all of the resistors to a consistently high precision, improving overall DAC accuracy and manufacturability compared with the binary-weighted-resistor approach.",
+      "keywords": [
+        "R/2R ladder",
+        "resistor ratio",
+        "DAC accuracy",
+        "binary-weighted resistor DAC comparison"
+      ],
+      "pages": [
+        18
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-4-dac-specifications",
+      "section": "11-4",
+      "topic": "Key DAC Specifications",
+      "type": "definition",
+      "summary": "Commercial DAC ICs are characterized by specifications including resolution, accuracy, offset error, settling time, and monotonicity.",
+      "text": "Many DACs are sold as integrated circuits (ICs) or self-contained modules, and manufacturers characterize them using a standard set of key specifications: Resolution -- the number of possible discrete output levels (related to the number of input bits) and the corresponding step size; Accuracy -- how closely the actual output matches the ideal calculated value for a given input; Offset error -- the DAC's output error when the digital input is all zeros (ideally the output should be exactly zero); Settling time -- the time required for the DAC output to settle within a specified error band after a change in digital input; and Monotonicity -- the property that the DAC's output must consistently increase (or stay the same) as the digital input code increases, with no output decreases for increasing input codes across its full range.",
+      "keywords": [
+        "resolution",
+        "accuracy",
+        "offset error",
+        "settling time",
+        "monotonicity",
+        "DAC specifications"
+      ],
+      "pages": [
+        19
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-5-ad7524-ic-dac",
+      "section": "11-5",
+      "topic": "AD7524: An Integrated Circuit DAC (R/2R Ladder, 8-bit, Latched)",
+      "type": "example",
+      "summary": "The AD7524 is a CMOS 8-bit DAC using an R/2R ladder with internally latched digital inputs (via Chip Select and WRITE); external op-amp circuitry converts its current output to a unipolar 0 to -10V or bipolar +/-10V voltage output.",
+      "text": "The AD7524 is a real-world example of an integrated-circuit DAC: it is a CMOS 8-bit digital-to-analog converter built around an R/2R ladder network. It provides an 8-bit digital input that can be latched internally under control of a Chip Select and a WRITE input. When either of these control inputs goes HIGH, the current 8-bit digital input value is latched internally, and the DAC's analog output remains fixed at the level corresponding to that latched value even if the input data lines subsequently change, until the next valid write. Because the AD7524's native output is a current rather than a voltage, external op-amp circuitry is typically added: (a) the AD7524 itself provides the 8-bit latched DAC core; (b) an op-amp current-to-voltage converter stage is connected to its output to produce a unipolar analog voltage output ranging from 0 V to approximately -10 V; and (c) an additional op-amp circuit stage can be used to shift and scale this into a bipolar output ranging from about -10 V to +10 V, allowing the DAC to represent both positive and negative analog values.",
+      "keywords": [
+        "AD7524",
+        "CMOS DAC",
+        "R/2R ladder",
+        "Chip Select",
+        "WRITE",
+        "latched DAC",
+        "current-to-voltage converter",
+        "bipolar output"
+      ],
+      "pages": [
+        20,
+        21
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 21 shows three related sub-figures: (a) the AD7524 8-bit DAC block with latched digital inputs controlled by Chip Select/WRITE; (b) an op-amp current-to-voltage converter stage producing roughly 0 to -10 V output; (c) an additional op-amp stage producing a bipolar output of about -10 V to +10 V. Exact op-amp wiring/pin values not visually verified because PDF page rendering (poppler/pdftoppm) was unavailable in this environment; description is inferred from the slide's caption text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-6-dac-applications",
+      "section": "11-6",
+      "topic": "Applications of DACs",
+      "type": "concept",
+      "summary": "DACs are used wherever a digital circuit must produce an analog output: process control, automatic testing, signal reconstruction, digital amplitude control, and multi-channel serial DACs.",
+      "text": "DACs are used any time a digital system needs to generate an analog voltage or current output. Common applications include: Control -- using a digital computer's output, through a DAC, to adjust an analog quantity such as motor speed or furnace temperature; Automatic testing -- generating computer-controlled analog test signals to exercise and verify analog circuitry; Signal reconstruction -- restoring an analog signal after it has previously been converted into digital form (the counterpart operation to A/D conversion); Digital amplitude control -- using a DAC's proportional response to digitally reduce (attenuate) the amplitude of an existing analog signal; and Serial DACs -- DAC chips that include a built-in serial-in/parallel-out shift register so that digital data can be loaded serially, reducing pin count; many such chips integrate more than one DAC on the same chip.",
+      "keywords": [
+        "DAC applications",
+        "process control",
+        "automatic testing",
+        "signal reconstruction",
+        "amplitude control",
+        "serial DAC"
+      ],
+      "pages": [
+        22
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-7-troubleshooting-dacs",
+      "section": "11-7",
+      "topic": "Troubleshooting DAC Circuits",
+      "type": "method",
+      "summary": "Because a DAC has both digital and analog sides, digital inputs are tested with logic probes/pulsers while the analog output requires a meter or oscilloscope; static-accuracy and staircase tests are the two main functional test procedures.",
+      "text": "DACs are mixed digital/analog devices, so troubleshooting them requires different tools on each side: logic probes and logic pulsers can be used to check and stimulate the digital inputs, while a precision meter or an oscilloscope must be used to observe the analog output. Two standard functional test procedures are used to verify correct DAC operation: the Static accuracy test, in which a fixed binary input value is applied and the resulting analog output is checked against its expected value using a very accurate meter; and the Staircase test, in which the binary input is incremented step-by-step (e.g., from an up-counter) while the analog output is observed, typically on an oscilloscope, to check that each output 'step' is uniform and free of glitches or missing/incorrect steps.",
+      "keywords": [
+        "DAC troubleshooting",
+        "logic probe",
+        "logic pulser",
+        "static accuracy test",
+        "staircase test"
+      ],
+      "pages": [
+        23
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-8-adc-general-architecture",
+      "section": "11-8",
+      "topic": "General Feedback-Type ADC Architecture Using a DAC and Comparator",
+      "type": "concept",
+      "summary": "One important class of ADCs works by using a DAC and control logic to generate a trial analog voltage VAX, comparing it against the analog input VA with an op-amp comparator, and adjusting the digital register until VAX matches VA within a threshold, then signaling end-of-conversion (EOC).",
+      "text": "An analog-to-digital converter (ADC) accepts an analog input voltage and, after some conversion time, produces a digital output code that represents that analog input's value; several important ADC types internally use a DAC as part of their conversion circuitry. This general class of ADC (sometimes introduced via the 'op-amp comparator ADC' concept) works as follows. A control unit contains the logic circuitry needed to generate the proper sequence of operations, with overall timing provided by an input clock signal. The control unit continually modifies a binary number held in an internal register; this register value is converted into a corresponding analog voltage, VAX, by an internal DAC. An op-amp comparator has two analog inputs -- VAX and the actual analog input voltage VA -- and produces a digital output that switches states depending on which of its two analog inputs is greater. The basic operation is: a START command pulse initiates a conversion; at a rate set by the clock, the control unit repeatedly updates the register's binary number (different ADC variants differ mainly in exactly how the control section modifies this number); the register value is continuously converted to VAX by the DAC; and the comparator compares VAX against VA. While VAX is less than VA, the comparator output stays HIGH; once VAX exceeds VA by at least a small threshold voltage VT, the comparator output goes LOW, which stops further modification of the register (the correct digital code has now been found). The control logic then asserts an end-of-conversion signal, EOC, to indicate that the digital output in the register is valid and the conversion is complete.",
+      "keywords": [
+        "ADC",
+        "op-amp comparator",
+        "DAC feedback",
+        "control unit",
+        "EOC",
+        "end of conversion",
+        "threshold voltage"
+      ],
+      "pages": [
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 25-27 present a general block diagram of this class of ADC (referenced but not confirmed to be one of the flagged image_pages): a control unit driven by a clock and START input feeds a register, whose output goes through a DAC to produce VAX; an op-amp comparator takes VAX and the analog input VA and feeds its output back to the control unit, which also outputs the final digital code and an EOC signal. Exact box layout/labels not visually verified because PDF page rendering (poppler/pdftoppm) was unavailable in this environment; description is inferred from the slides' body text only.",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-9-digital-ramp-adc",
+      "section": "11-9",
+      "topic": "Digital-Ramp ADC",
+      "type": "concept",
+      "summary": "The simplest version of the general feedback ADC uses a binary counter as its register: the clock increments the counter one step at a time until the DAC's ramping output VAX exceeds the analog input VA, producing a step-by-step ramp waveform at VAX.",
+      "text": "One of the simplest implementations of the general feedback-type ADC uses a plain binary up-counter in place of the general-purpose register: the control unit simply allows the clock to increment the counter one step at a time, starting from zero, until the comparator detects that VAX has exceeded the analog input VA. Because the corresponding DAC output voltage VAX therefore rises in a series of small, discrete steps that resemble a staircase or ramp shape over time, this circuit is called a digital-ramp ADC. When the count is stopped (comparator output goes LOW), the counter's value at that point is the digital representation of the analog input, and the EOC signal is asserted. Because the counter must count up from zero on every conversion, the digital-ramp ADC's conversion time is not fixed -- it varies depending on the magnitude of the analog input (larger inputs require more clock steps and thus longer conversion time).",
+      "keywords": [
+        "digital-ramp ADC",
+        "binary counter",
+        "staircase waveform",
+        "VAX",
+        "conversion time"
+      ],
+      "pages": [
+        29,
+        30
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 30: block diagram of a digital-ramp ADC. An analog comparator (Op amp) takes VA on its + input and VAX (fed back from the D/A converter) on its - input, producing an EOC-bar (End Of Conversion, active-low) output. EOC-bar and a Clock line both feed a 2-input AND gate (with a small circle/inverter bubble on the Clock input side), whose output is the CLOCK to a Counter block. The Counter's parallel outputs feed a D/A converter block, which outputs VAX back to the comparator's - input and also brings out 'Digital result'. A Start pulse resets the Counter (via a RESET line) and also gates into the AND logic. The accompanying timing diagram (right side) shows START pulsing high, VAX stepping up in a staircase from 0 until it just exceeds VA (at which point EOC-bar drops low, stopping the counter -- labeled 'Conversion complete-counter stops counting'), with tC marking the total conversion time.",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-9-adc-resolution-quantization-error",
+      "section": "11-9",
+      "topic": "A/D Resolution, Accuracy, and Quantization Error",
+      "type": "concept",
+      "summary": "Any ADC has an inherent measurement error because it can only represent the analog input to within one step size; reducing the step size (adding bits) reduces but never eliminates this quantization error.",
+      "text": "Because an ADC represents a continuously variable analog input using a finite number of discrete digital codes, some amount of measurement error is unavoidable -- this is called quantization error, and it arises because any analog value that falls between two adjacent digital step levels must be rounded to one of them. The maximum quantization error is directly tied to the ADC's step size (its resolution): the larger the step size, the larger the possible error between the true analog value and its digital representation. Reducing the step size -- for example, by using a DAC/register with more bits inside a digital-ramp ADC -- can reduce the magnitude of this error, but it can never be completely eliminated, since there will always be some finite step size for any real (finite-resolution) converter.",
+      "keywords": [
+        "quantization error",
+        "ADC resolution",
+        "ADC accuracy",
+        "step size"
+      ],
+      "pages": [
+        31
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-10-data-acquisition-sampling",
+      "section": "11-10",
+      "topic": "Data Acquisition and Sampling",
+      "type": "definition",
+      "summary": "Data acquisition is the process by which a computer repeatedly digitizes an analog signal using an ADC (e.g., a digital-ramp ADC); each individual acquired value is called a sample, and reconstructing the original signal from these samples is the counterpart goal.",
+      "text": "The overall process by which a computer acquires digitized values of an analog signal is called data acquisition. Acquiring the value of the analog signal at a single instant in time is referred to as sampling the analog signal, and the resulting digitized value is often called a sample. In a typical setup, a microcomputer is connected to a digital-ramp ADC (or another ADC type) to perform data acquisition: the computer repeatedly triggers the ADC to sample the incoming analog signal VA and reads back each resulting digital sample. Over a sequence of samples, waveforms illustrate how this process produces a digital version of the original analog signal -- essentially a sequence of discrete digital values recorded at successive points in time, which approximates the continuously varying analog waveform. On the output side, the process can be reversed: reconstructing the signal from the recorded digital data (e.g., feeding the sequence of digital values back through a DAC) can regenerate an approximation of the original analog signal.",
+      "keywords": [
+        "data acquisition",
+        "sampling",
+        "sample",
+        "digitizing",
+        "signal reconstruction"
+      ],
+      "pages": [
+        32,
+        33,
+        34
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 32-34 include waveform diagrams of a microcomputer/digital-ramp-ADC data-acquisition setup and of digitizing an analog signal versus reconstructing it from the digital samples (staircase approximation of the analog waveform, then a smoothed/reconstructed version). Exact waveform shapes not visually verified because PDF page rendering (poppler/pdftoppm) was unavailable in this environment; description is inferred from the slides' captions only.",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-10-nyquist-aliasing",
+      "section": "11-10",
+      "topic": "Sampling Frequency, the Nyquist Criterion, and Aliasing",
+      "type": "theorem",
+      "summary": "To avoid loss of information, a signal must be sampled at more than twice the highest frequency component it contains (the Nyquist rate); sampling below this rate causes aliasing, where a higher-frequency component is misrepresented as a lower alias frequency.",
+      "text": "The rate at which samples of an analog signal are taken is called the sampling frequency, FS. To avoid losing information about the original analog signal, it must be sampled at a rate greater than twice the highest frequency component present in that signal -- a result proven by Harry Nyquist and known as the Nyquist criterion (the minimum required rate, twice the highest frequency component, is called the Nyquist rate). If the sampling rate is too low relative to a frequency component in the signal, a phenomenon called aliasing occurs: a higher-frequency component gets misrepresented in the sampled data as if it were a different, lower 'alias' frequency. For example, if a 10 kHz signal is sampled at 20,000 samples/sec (i.e., FS = 20 kHz, exactly twice the 10 kHz component, which is already a marginal/insufficient rate in practice), and a 12 kHz tone were also present in the input, that 12 kHz component would need a minimum rate of 24,000 samples/sec to be captured correctly; since the actual rate (20,000 samples/sec) is below this, the 12 kHz tone would be aliased into a false lower-frequency signal. In general, the alias frequency produced is equal to the difference between the incoming (true) frequency and the nearest integer multiple of the sampling frequency.",
+      "keywords": [
+        "sampling frequency",
+        "Nyquist criterion",
+        "Nyquist rate",
+        "aliasing",
+        "alias frequency"
+      ],
+      "pages": [
+        35,
+        36,
+        37
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 37: waveform plot titled 'An alias signal due to undersampling.' A fast yellow sinusoid ('Analog input', period T = 526 microseconds) is sampled every Ts = 500 microseconds; the sampled points (dark red squares connected by a line, legend 'Alias') trace out a much slower apparent sinusoid with period Ta = 10 ms across the plot (Amplitude axis from -1 to 1, Time axis horizontal) -- visually demonstrating that sampling a signal slower than the Nyquist rate produces a spurious low-frequency 'alias' waveform that does not exist in the original analog input.",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-11-successive-approximation-adc",
+      "section": "11-11",
+      "topic": "Successive-Approximation ADC",
+      "type": "concept",
+      "summary": "The successive-approximation ADC is one of the most widely used ADC types: it has more complex circuitry than a digital-ramp ADC but a much shorter, fixed conversion time that does not depend on the analog input's magnitude.",
+      "text": "The successive-approximation converter is one of the most widely used ADC architectures in practice. Compared with the simple digital-ramp ADC, it uses more complex internal circuitry, but this complexity buys a much shorter conversion time. Crucially, its conversion time is fixed -- it does not depend on the value of the analog input being converted (unlike the digital-ramp ADC, whose count-up time grows with the input magnitude). Internally, a successive-approximation ADC tests one bit at a time from MSB to LSB: it tentatively sets a bit, uses the internal DAC/comparator to check whether the resulting VAX is above or below VA, keeps or clears that bit based on the result, and moves on to the next bit -- converging on the correct digital code in a fixed number of steps equal to the number of bits, rather than counting through every possible value.",
+      "keywords": [
+        "successive-approximation ADC",
+        "SAR",
+        "fixed conversion time",
+        "bit-by-bit conversion"
+      ],
+      "pages": [
+        38,
+        39
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 39: two diagrams. Left: block diagram of a successive-approximation ADC -- an analog comparator (+VA, -VAX inputs) produces COMP into a Control logic block (which also takes Clock, START and produces EOC); Control logic drives a Control register (showing MSB...LSB bit positions) which feeds a DAC block; the DAC's analog output VAX feeds back to the comparator's - input. Right: a flowchart -- START -> Clear all bits -> Start at MSB -> Set bit=1 -> decision diamond 'IS VAX > VA?' (Yes -> Clear bit back to 0, No -> continue) -> decision diamond 'Have all bits been checked?' (No -> Go to next lower bit, loops back to 'Set bit=1'; Yes -> 'Conversion is complete and result is in REGISTER') -> END. This shows the bit-by-bit binary-search algorithm that gives the method its name.",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-11-adc0804-ic",
+      "section": "11-11",
+      "topic": "ADC0804: An Integrated Circuit Successive-Approximation ADC",
+      "type": "example",
+      "summary": "The ADC0804 is a 20-pin CMOS successive-approximation ADC with two analog inputs (for differential measurement), an internal clock generator, an eight-bit tristate output, and separate digital/analog grounds.",
+      "text": "The ADC0804 is a commercially available example of a successive-approximation ADC. It is a 20-pin CMOS IC that performs A/D conversion using the successive-approximation technique. It provides two analog inputs, which allows it to measure a differential analog input voltage (the difference between the two input pins) rather than only a single-ended signal. It converts this differential analog input into an eight-bit, tristate-buffered digital output, so its output pins can be safely tied to a shared data bus and enabled only when needed. The chip includes an internal clock generator circuit that produces its own operating clock frequency based on the values of a small number of externally connected passive components (typically a resistor and capacitor). It also provides separate ground connections for its digital and analog circuitry, which helps reduce digital switching noise from corrupting the sensitive analog measurement.",
+      "keywords": [
+        "ADC0804",
+        "successive-approximation ADC IC",
+        "differential input",
+        "tristate output",
+        "internal clock generator",
+        "analog/digital ground separation"
+      ],
+      "pages": [
+        40
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-12-flash-adc",
+      "section": "11-12",
+      "topic": "Flash ADCs",
+      "type": "concept",
+      "summary": "The flash converter is the fastest ADC architecture because it uses a bank of parallel comparators with no clock or sequencing; conversion time depends only on comparator/encoder propagation delay, at the cost of much greater circuit complexity, higher cost, lower resolution, and higher power consumption.",
+      "text": "The flash converter is the highest-speed type of ADC, but it requires substantially more circuitry than other ADC types to achieve that speed -- typically it uses a large bank of analog comparators operating in parallel (one comparator per possible output code, or per code minus one), whose outputs feed into a priority-encoder-like logic block that produces the final digital code. IC flash converters are commonly available with two- to eight-bit resolution, and some nine- and ten-bit units also exist. Because a flash converter compares the analog input simultaneously against many reference levels, it needs no clock signal at all and requires no timing or sequencing logic -- conversion happens continuously and essentially instantaneously. Whenever the analog input value changes, the comparator outputs change immediately, which in turn changes the encoder's output; as a result, the total conversion time depends only on the propagation delays of the comparators and the encoder logic, not on any clock period or bit-by-bit iteration. The tradeoff is that flash converters can be very expensive to build (since they need one comparator per code level) and tend to have relatively low resolution along with high power consumption compared with slower ADC architectures.",
+      "keywords": [
+        "flash ADC",
+        "parallel comparators",
+        "no clock",
+        "propagation delay",
+        "high speed",
+        "low resolution tradeoff"
+      ],
+      "pages": [
+        41,
+        42
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-13-other-adc-methods",
+      "section": "11-13",
+      "topic": "Other A/D Conversion Methods (Dual-Slope, Voltage-to-Frequency, Sigma-Delta, Pipelined)",
+      "type": "concept",
+      "summary": "Besides digital-ramp, successive-approximation, and flash ADCs, other important architectures include the slow but low-cost dual-slope converter, the DAC-free voltage-to-frequency converter, the oversampling sigma-delta converter, and the multi-stage pipelined ADC.",
+      "text": "Beyond the digital-ramp, successive-approximation, and flash converters, there are several other important A/D conversion methods, each with different tradeoffs. The dual-slope converter has one of the slowest conversion times of any common ADC type, typically in the range of 10 to 100 milliseconds; its advantage is relatively low cost, since it does not require precision components to achieve good accuracy. The voltage-to-frequency ADC is structurally simpler than most other ADC types because it does not use an internal DAC at all: instead, it uses a linear voltage-controlled oscillator (VCO) whose output frequency is made proportional to the input voltage, and that frequency is then measured (e.g., by counting cycles over a fixed time window) to obtain the digital result. A sigma-delta (sigma/delta) modulation converter is an oversampling device: it effectively samples the analog input far more often than the theoretical minimum (Nyquist) sample rate, which allows it to achieve high resolution using a comparatively simple 1-bit (or low-resolution) internal quantizer combined with digital filtering. A pipelined ADC uses two or more cascaded 'subranging' stages, where each stage contains its own smaller n-bit ADC along with a corresponding n-bit DAC; each stage resolves a few bits and passes the residual (remaining) analog error on to the next stage, allowing high overall resolution and speed through pipelining.",
+      "keywords": [
+        "dual-slope ADC",
+        "voltage-to-frequency ADC",
+        "VCO",
+        "sigma-delta ADC",
+        "oversampling",
+        "pipelined ADC"
+      ],
+      "pages": [
+        43
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-14-typical-adc-architecture-applications",
+      "section": "11-14",
+      "topic": "Matching ADC Architecture to Application Areas",
+      "type": "concept",
+      "summary": "Most real-world ADC applications fall into one of four categories -- precision industrial measurement, voice/audio, data acquisition, and high-speed applications -- and each category tends to favor a particular ADC architecture based on its speed/resolution/cost tradeoffs.",
+      "text": "Most practical applications that require an ADC fall into one of four broad application areas: precision industrial measurement (where high accuracy and stability typically matter more than raw speed, favoring architectures like dual-slope or successive-approximation converters), voice/audio applications (which need moderate resolution and speed sufficient to capture audio-bandwidth signals, often using sigma-delta or successive-approximation converters), data acquisition (general-purpose sampling of one or more analog channels, commonly using successive-approximation ADCs, often combined with multiplexers), and high-speed applications (which require very fast conversion, typically served by flash converters or pipelined ADCs despite their higher cost or lower resolution). Selecting the right ADC architecture for a design generally comes down to matching its speed, resolution, accuracy, and cost characteristics to the demands of one of these four application categories.",
+      "keywords": [
+        "ADC selection",
+        "precision measurement",
+        "voice/audio ADC",
+        "data acquisition ADC",
+        "high-speed ADC"
+      ],
+      "pages": [
+        44
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-15-sample-and-hold",
+      "section": "11-15",
+      "topic": "Sample-and-Hold (S/H) Circuits",
+      "type": "concept",
+      "summary": "A sample-and-hold circuit holds the analog input voltage constant while an ADC performs its conversion, preventing conversion errors caused by an analog input that changes during the conversion time; the time the S/H switch must stay closed to capture the signal is the acquisition time.",
+      "text": "If an analog voltage is connected directly to an ADC's input, the accuracy of the conversion can be adversely affected whenever that analog voltage keeps changing during the time the ADC takes to complete its conversion -- since most ADC architectures assume the input is essentially constant throughout the conversion process. The stability (and therefore accuracy) of a conversion can be significantly improved by placing a sample-and-hold (S/H) circuit ahead of the ADC input, whose job is to capture (sample) the analog voltage at a specific instant and then hold that captured voltage constant on a storage capacitor while the ADC performs its (relatively slower) conversion. In a computer-controlled data-acquisition system, the sample-and-hold circuit's internal switch (which connects the input signal to the hold capacitor during sampling) would itself be controlled by a digital signal generated by the computer. The amount of time that this switch must remain closed in order to let the hold capacitor fully charge to (track) the input voltage before opening again is called the acquisition time.",
+      "keywords": [
+        "sample-and-hold",
+        "S/H circuit",
+        "acquisition time",
+        "conversion stability",
+        "hold capacitor"
+      ],
+      "pages": [
+        45,
+        46
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 46: simplified sample-and-hold circuit. An analog input signal VA (shown as a wavy curve sampled at instant t0 to value V0) feeds a unity-gain buffer op-amp A1 (input +, feedback from output to -), whose output connects through an analog switch (drawn as a switch symbol) controlled by a 'Digital control input*' (via a buffer/driver triangle) to a hold capacitor Ch to ground; the capacitor node feeds a second buffer op-amp A2 (feedback from output to -, input +) whose output goes 'To ADC input'. A note states: Control = 1 -> switch closed -> sample mode; Control = 0 -> switch open -> hold mode -- i.e. closing the switch lets Ch charge to track VA (sample), opening it isolates Ch so A2's output holds that voltage steady (hold) for the ADC to convert.",
+      "related_labs": [
+        "Lab8"
+      ]
+    },
+    {
+      "id": "ch11-11-16-analog-multiplexing",
+      "section": "11-16",
+      "topic": "Analog Multiplexing for Time-Shared ADC Conversion",
+      "type": "concept",
+      "summary": "When several analog input sources must be digitized, an analog multiplexer can sequentially switch each source into a single shared ADC under clock control, and many ADC ICs (e.g., ADC0808) integrate this multiplexing on-chip for up to eight channels.",
+      "text": "When analog signals from several different sources need to be converted to digital form, it is often impractical or unnecessary to give each source its own dedicated ADC. Instead, an analog multiplexing technique can be used so that a single ADC is time-shared among the multiple analog input channels. In such a system, a multiplexing clock controls the rate at which the various analog input signals are sequentially switched, one at a time, into the shared ADC for conversion; using semiconductor switches for this channel-selection function helps minimize the switch delay time between channel changes. Many commercially available integrated ADCs include the necessary multiplexing circuitry directly on the same chip as the ADC itself, simplifying system design. For example, the ADC0808 is an integrated ADC that can multiplex eight different analog input channels into a single on-chip ADC, selecting one channel at a time for conversion under digital control.",
+      "keywords": [
+        "analog multiplexing",
+        "time-shared ADC",
+        "multiplexing clock",
+        "ADC0808",
+        "semiconductor switch"
+      ],
+      "pages": [
+        47,
+        48,
+        49
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-17-dsp-intro-mac",
+      "section": "11-17",
+      "topic": "Digital Signal Processing (DSP) Fundamentals and the MAC Architecture",
+      "type": "concept",
+      "summary": "A DSP is a specialized microprocessor optimized for repetitive calculations on streams of digitized data (typically from an ADC), most commonly for filtering/conditioning analog signals; its central hardware feature is the multiply-and-accumulate (MAC) unit.",
+      "text": "A digital signal processor (DSP) is a highly specialized form of microprocessor that is optimized to perform repetitive numerical calculations on streams of digitized data at high speed; this digitized data is usually fed to the DSP directly from an analog-to-digital converter. One of the most important applications of a DSP is filtering or conditioning of analog signals in the digital domain. Compared with a traditional analog filter built from resistors and capacitors, a major advantage of DSP-based filtering is flexibility: the filter's critical (cutoff) frequency and other characteristics can be changed simply by altering the software/coefficients running on the DSP, without needing to physically switch or replace any hardware components. A useful analogy for understanding digital filtering is analyzing stock market data: to decide when to buy or sell, an analyst wants to ignore sudden, short-term (high-frequency) price fluctuations but still respond to genuine longer-term trends -- for example, tracking a 30-day moving average rather than reacting to every daily jump. The basic hardware architecture of a DSP centers on a multiply-and-accumulate (MAC) unit: this MAC section, which can multiply two values and add the result into a running accumulator total in a single operation, is central to virtually every DSP architecture and is used in most DSP applications (filtering, correlation, transforms, etc.).",
+      "keywords": [
+        "DSP",
+        "digital signal processor",
+        "digital filtering",
+        "multiply-and-accumulate",
+        "MAC",
+        "moving average"
+      ],
+      "pages": [
+        50,
+        51,
+        52
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-17-dsp-filtering-process-and-oversampling",
+      "section": "11-17",
+      "topic": "DSP Weighted-Average Filtering Process and Oversampling/Interpolation",
+      "type": "method",
+      "summary": "A digital filter can be implemented as a running weighted average: read the newest sample, discard the oldest, multiply each stored sample by its weight coefficient, sum the products, and output the result to a DAC; oversampling/interpolation filtering inserts extra interpolated data points to reduce noise.",
+      "text": "One common way to implement digital filtering on a DSP is as a running weighted-average (finite impulse response style) process, repeated for every new sample: (1) read in the newest incoming sample; (2) discard (replace) the oldest sample held in the DSP's sample buffer with this new one, keeping a fixed-length sliding window of recent samples (e.g., 256 samples); (3) multiply each of the samples currently in the buffer by its own corresponding weighting (coefficient) constant; (4) add together all of these weighted products (this multiply-and-accumulate step is exactly what the DSP's MAC hardware is optimized for); and (5) output the resulting sum-of-products value to a D/A converter, producing the filtered analog output for that time step. Another useful DSP technique is oversampling, also called interpolation filtering: this involves inserting additional, mathematically interpolated data points in between the actual measured digital samples of a signal, which has the effect of reducing quantization noise and smoothing the reconstructed output.",
+      "keywords": [
+        "digital filter",
+        "weighted average",
+        "FIR filter",
+        "MAC operation",
+        "oversampling",
+        "interpolation filtering"
+      ],
+      "pages": [
+        53,
+        54
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-17-dsp-applications",
+      "section": "11-17",
+      "topic": "Common DSP Application Examples",
+      "type": "concept",
+      "summary": "DSP techniques are widely used in consumer and communications electronics, including CD-player noise filtering, telephone echo cancellation, PC modems, musical instrument effects, digital television, and voice recognition.",
+      "text": "Digital signal processing techniques of the kind described above (digital filtering, oversampling, etc.) are used in a wide range of everyday electronic applications, including: filters in CD players used to minimize quantization noise in the reproduced audio; echo canceling in telephone systems, which removes unwanted echo from voice signals; PC modems, which use DSP to modulate/demodulate data signals over communication lines; musical instrument special effects, which apply DSP algorithms to shape or transform an instrument's audio signal; digital television, which relies heavily on DSP for video signal processing and compression; and voice recognition systems, which use DSP to analyze and interpret spoken audio input.",
+      "keywords": [
+        "DSP applications",
+        "CD player filtering",
+        "echo cancellation",
+        "modem",
+        "digital television",
+        "voice recognition"
+      ],
+      "pages": [
+        55
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch11-11-18-analog-interfacing-applications",
+      "section": "11-18",
+      "topic": "Applications of Analog Interfacing: Data Acquisition Systems and the Digital Camera Example",
+      "type": "example",
+      "summary": "A data acquisition system block diagram ties together transducers, signal conditioning, sample-and-hold, an ADC, and a computer/DSP; a digital camera is a concrete example, using a CCD transducer, analog signal conditioning, an ADC, on-chip DSP for image processing, and data compression before storage.",
+      "text": "A data acquisition system block diagram brings together many of the concepts from this chapter into a single pipeline: an analog transducer signal is conditioned (amplified/filtered), optionally passed through a sample-and-hold circuit and/or an analog multiplexer, digitized by an ADC, and then handed off to a computer or DSP for processing and storage. A familiar real-world application that interfaces analog devices to a digital system in this way is a digital camera. In a digital camera, the transducer is typically a charge-coupled device (CCD) image sensor. Analog image signals are read out of the CCD by shifting the accumulated electric charges through a chain of successive capacitors, a process controlled by dedicated driver and timing circuits. This raw analog signal is then amplified and conditioned (signal conditioning) before being digitized by an ADC. After digitization, a DSP block applies image signal-processing algorithms to the digital image data before it is stored in a memory device. Because raw digitized image data are typically very large, the data are usually compressed before storage. Data compression is the process of encoding information using fewer bits than the original raw representation; it only works correctly when both the encoder (sender) and the decoder (receiver) of the compressed data agree on and understand the exact same specific encoding scheme being used.",
+      "keywords": [
+        "data acquisition system",
+        "digital camera",
+        "CCD",
+        "signal conditioning",
+        "DSP image processing",
+        "data compression"
+      ],
+      "pages": [
+        56,
+        57,
+        58
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 56 shows a block diagram of a generic data acquisition system, likely chaining a transducer, signal conditioning, sample-and-hold, an ADC, and a computer/DSP block. Exact block layout not visually verified because PDF page rendering (poppler/pdftoppm) was unavailable in this environment; description is inferred from the slide's caption/body text only, not directly observed.",
+      "related_labs": [
+        "Lab8"
+      ]
+    }
+  ]
+}

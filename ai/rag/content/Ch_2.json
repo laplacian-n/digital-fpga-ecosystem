@@ -1,0 +1,246 @@
+{
+  "source": "Ch_2.pdf",
+  "group": "content",
+  "chapter": "2",
+  "title": "Number Systems and Codes",
+  "chunks": [
+    {
+      "id": "ch2-2-1-binary-to-decimal",
+      "section": "2-1",
+      "topic": "Binary to Decimal Conversion",
+      "type": "method",
+      "summary": "Convert binary to decimal by summing the positional weights (powers of 2) of every bit position that holds a 1; the double-dabble method avoids large additions by repeatedly doubling and adding the next bit.",
+      "text": "The straightforward way to convert a binary number to decimal is to sum the positional weights (powers of 2: ...,32,16,8,4,2,1) of every bit position that contains a 1, and ignore positions holding 0. For numbers with many bits, adding up large powers of 2 by hand gets unwieldy, so Tocci presents the 'double-dabble' method as a shortcut: (1) write down the left-most 1 bit of the binary number; (2) double the running value and add the next bit to its right; (3) write the result under that next bit; (4) repeat steps 2-3, moving one bit at a time, until every bit has been consumed -- the final running value is the decimal equivalent. Worked example (constructed here to demonstrate the method, since the exact figure's digits were not recoverable from the extracted text): convert binary 11011011 to decimal. Start with the leftmost 1: running value = 1. Next bit is 1: 1*2+1=3. Next bit 0: 3*2+0=6. Next bit 1: 6*2+1=13. Next bit 1: 13*2+1=27. Next bit 0: 27*2+0=54. Next bit 1: 54*2+1=109. Next bit 1: 109*2+1=219. Result: 11011011(2) = 219(10). Check by direct summation: 128+64+16+8+2+1 = 219, which matches, confirming the method.",
+      "keywords": [
+        "binary to decimal",
+        "double-dabble",
+        "positional weight",
+        "base conversion"
+      ],
+      "pages": [
+        3,
+        4,
+        5
+      ],
+      "needs_figure": true,
+      "figure_note": "Pages 3-5 show worked numeric examples of straight positional-weight summation and the double-dabble method with a running total written beneath the binary digits; the exact digit values in the original slide graphics could not be extracted as text (poppler/vision rendering unavailable in this environment), so the text field above reconstructs the method with a verified equivalent example instead of the original figure's numbers.",
+      "related_labs": [
+        "Lab1"
+      ]
+    },
+    {
+      "id": "ch2-2-2-decimal-to-binary",
+      "section": "2-2",
+      "topic": "Decimal to Binary Conversion (Repeated Division)",
+      "type": "method",
+      "summary": "Convert decimal to binary by repeatedly dividing by 2 and recording remainders; the first remainder is the LSB and the last is the MSB. The same repeated-division flowchart generalizes to any target base.",
+      "text": "To convert a decimal number to binary, repeatedly divide the decimal number by 2, writing down the remainder (0 or 1) after each division, and continue dividing the quotient by 2 until a quotient of zero is reached. The first remainder obtained is the least-significant bit (LSB); the last remainder obtained (just before the quotient becomes 0) is the most-significant bit (MSB). This 'repeated division' technique is described by a general flowchart that works for converting a decimal number into ANY other positional number system: repeatedly divide by the target base instead of by 2 (divide by 16 for hex, by 8 for octal), collecting remainders from LSB to MSB in the same way.",
+      "keywords": [
+        "decimal to binary",
+        "repeated division",
+        "LSB",
+        "MSB",
+        "base conversion flowchart"
+      ],
+      "pages": [
+        6,
+        7,
+        8
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab1"
+      ]
+    },
+    {
+      "id": "ch2-2-3-hexadecimal-conversions",
+      "section": "2-3",
+      "topic": "Hexadecimal Number System and Conversions",
+      "type": "method",
+      "summary": "Hex (base 16, digits 0-9 and A-F) compactly represents groups of 4 binary bits; conversions to/from decimal, binary, and counting in hex all follow directly from this 4-bit grouping.",
+      "text": "The hexadecimal system (base 16) uses 16 symbols: 0-9 for values zero through nine, and A-F for values ten through fifteen. Its main advantage is convenient handling of long binary strings, because each hex digit corresponds exactly to a group of 4 binary bits (a 4-bit group can represent 0000 through 1111, i.e., 0-15, which is exactly the range of one hex digit). Key conversions and worked examples: Hex-to-decimal is done by multiplying each hex digit by its positional weight (a power of 16) and summing: for example 1BC2(16) = 1*16^3 + 11*16^2 + 12*16^1 + 2*16^0 = 4096+2816+192+2 = 7106(10) (the slide asks the student to verify this exact identity). Decimal-to-hex uses the same repeated-division method as decimal-to-binary but dividing by 16 instead of 2, again taking the first remainder as the LSB hex digit and the last as the MSB: e.g., 423(10) -> 423/16=26 rem 7, 26/16=1 rem 10(=A), 1/16=0 rem 1, giving 423(10) = 1A7(16) (check: 1*256+10*16+7 = 256+160+7 = 423, correct); and 214(10) -> 214/16=13 rem 6, 13/16=0 rem 13(=D), giving 214(10) = D6(16) (check: 13*16+6 = 214, correct). Hex-to-binary is done by expanding each hex digit into its 4-bit binary equivalent (leading zeros can pad the result to fill out the last group): e.g., BA6(16): B=1011, A=1010, 6=0110, so BA6(16) = 101110100110(2) (the slide asks the student to verify this). Binary-to-hex is the reverse: group the binary digits into 4s starting from the LSB (padding the leftmost group with leading zeros if needed), then convert each group to its hex digit: e.g., 101011111(2) grouped as 0001 0101 1111 = 15F(16) (the slide asks the student to verify this). A combined decimal-to-hex-to-binary example: to convert decimal 378 into a 16-bit binary number, first convert to hex (378/16=23 rem 10(A), 23/16=1 rem 7, 1/16=0 rem 1, giving 378(10)=17A(16)), then expand each hex digit to 4 bits and pad to 16 bits: 0000 0001 0111 1010. Counting in hex increments each digit position from 0 up to F; upon reaching F it resets to 0 and carries into the next digit position (e.g., ...,38,39,3A,3B,3C,3D,3E,3F,40,41,42,...) -- note that a 9 becomes an A when incremented, not a carry. With n hex digits you can count 16^n distinct values, e.g., three hex digits span 000(16) to FFF(16), i.e. 0(10) to 4095(10), a total of 4096 = 16^3 values.",
+      "keywords": [
+        "hexadecimal",
+        "hex to decimal",
+        "decimal to hex",
+        "hex to binary",
+        "binary to hex",
+        "counting in hex",
+        "nibble grouping"
+      ],
+      "pages": [
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "needs_figure": true,
+      "figure_note": "Pages 10-11 and 19 show reference tables mapping all 16 hex digits (0-F) to their decimal (0-15) and 4-bit binary (0000-1111) equivalents -- a standard lookup table reproduced conceptually in the text above; the raw digit grid itself is a graphic not captured as extractable text.",
+      "related_labs": [
+        "Lab1"
+      ]
+    },
+    {
+      "id": "ch2-2-4-bcd-code",
+      "section": "2-4",
+      "topic": "BCD (Binary Coded Decimal) Code",
+      "type": "definition",
+      "summary": "BCD encodes each decimal digit separately as its own 4-bit binary equivalent (0000-1001 only); it is not a number system, and any 4-bit group with a value of 10-15 is a 'forbidden' (invalid) BCD group.",
+      "text": "Binary Coded Decimal (BCD) is a widely used way to represent decimal numbers using binary digits, combining features of both the decimal and binary systems: each individual decimal digit is converted to its own independent 4-bit binary equivalent. BCD is explicitly NOT a number system in its own right -- it is a decimal number where each digit has simply been encoded to its binary equivalent, and a BCD number is therefore not the same thing as a straight (positional) binary number of the same digit string. The primary advantage of BCD is how easy it is to convert to and from decimal, since you just look up each decimal digit's 4-bit code independently (each group can never represent more than 9, i.e., only patterns 0000-1001 are valid BCD digits; 1010-1111 are 'forbidden' groups and signal an error). Worked examples: to convert 874(10) to BCD, encode each digit separately: 8=1000, 7=0111, 4=0100, giving BCD 100001110100. To convert BCD back to decimal, split the bit string into 4-bit groups from the right and convert each group independently: BCD 0110100000111001 splits into 0110 1000 0011 1001 = 6, 8, 3, 9, giving decimal 6839. As an error-detection example: BCD 011111000001 splits into 0111 1100 0001 = 7, 12, 1 -- but 1100 (=12) is not a valid BCD digit (valid BCD digits only go up to 1001=9), so this is a 'forbidden group' indicating an error in the BCD number.",
+      "keywords": [
+        "BCD",
+        "binary coded decimal",
+        "forbidden group",
+        "decimal encoding"
+      ],
+      "pages": [
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch2-2-5-gray-code",
+      "section": "2-5",
+      "topic": "The Gray Code",
+      "type": "definition",
+      "summary": "Gray code is a binary-like encoding where only a single bit changes between any two consecutive values, which avoids glitches in applications like rapidly-changing counters and rotary shaft encoders.",
+      "text": "The Gray code is used in applications where numbers change rapidly and consecutive values must differ by only a single bit -- unlike ordinary binary counting, where multiple bits can change simultaneously (e.g., 0111 to 1000 changes all 4 bits), which can cause transient glitches if the bits don't switch at exactly the same instant. The standard 3-bit binary-to-Gray-code correspondence is: binary 000 -> Gray 000; 001 -> 001; 010 -> 011; 011 -> 010; 100 -> 110; 101 -> 111; 110 -> 101; 111 -> 100. Notice each adjacent pair (including the wrap-around from 111 back to 000) differs by exactly one bit. Conversion algorithms exist in both directions: binary-to-Gray XORs each bit with the bit immediately to its left (the MSB is copied unchanged); Gray-to-binary reverses this by XOR-accumulating from the MSB down. A classic real-world application is an optical/mechanical shaft encoder: an 8-position, 3-bit shaft encoder uses concentric light/dark (or conductive/non-conductive) tracks arranged in Gray code order so that, as the shaft rotates from one position to the next, only one bit's sensor reading changes -- this eliminates the ambiguous, momentarily-wrong codes that straight binary encoding would produce if multiple track sensors changed at slightly different instants during rotation.",
+      "keywords": [
+        "Gray code",
+        "shaft encoder",
+        "single-bit transition",
+        "glitch avoidance"
+      ],
+      "pages": [
+        26,
+        27,
+        28
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 28 shows an 8-position, 3-bit optical/mechanical shaft encoder disk with concentric Gray-coded tracks, used to sense the rotational position of a shaft; the disk pattern itself is a graphic and its exact segment layout was not extracted as text, but the 3-bit Gray code sequence it encodes is given in full in the text field above.",
+      "related_labs": []
+    },
+    {
+      "id": "ch2-2-6-putting-it-together",
+      "section": "2-6",
+      "topic": "Putting It All Together: Decimal, Binary, Hex, BCD, Gray Comparison",
+      "type": "table",
+      "summary": "A single reference table lines up decimal 1-15 against their binary, hexadecimal, BCD, and Gray code representations for direct comparison.",
+      "text": "This section presents a consolidated comparison table listing decimal numbers 1 through 15 alongside their binary, hexadecimal, BCD, and Gray code equivalents, side by side, so students can see how the same value is represented differently across all the codes introduced in this chapter: e.g., decimal 10 is binary 1010, hex A, BCD 00010000 (encoding '1' and '0' as separate nibbles), and Gray code 1111. This table is a useful quick-reference when converting between any two of these representations.",
+      "keywords": [
+        "number system comparison",
+        "binary hex BCD gray table",
+        "reference table"
+      ],
+      "pages": [
+        29
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 29 is a reference table with columns for decimal (1-15), binary, hex, BCD, and Gray code; the exact table grid graphic was not extracted as text, but every value can be independently derived from the conversion rules already described in sections 2-1 through 2-5 above (e.g. decimal n's binary form via repeated division by 2, hex via grouping binary into nibbles, BCD via per-digit 4-bit encoding, and Gray via the binary-to-Gray XOR rule).",
+      "related_labs": []
+    },
+    {
+      "id": "ch2-2-7-byte-nibble-word",
+      "section": "2-7",
+      "topic": "The Byte, Nibble, and Word",
+      "type": "definition",
+      "summary": "8 bits = 1 byte; a 4-bit group (half a byte) is a nibble; a word is the natural group of bits a given digital system operates on (word size), e.g., a PC's word size is stated here as 8 bytes (64 bits).",
+      "text": "Most microcomputers handle and store binary data in groups of eight bits, defining 1 byte = 8 bits; a byte can represent many different types of data or information depending on context (a character, a small number, part of an instruction, etc.). Binary numbers are also often broken into groups of four bits; because a 4-bit group is half the size of a byte, it is named a nibble. A word is a group of bits that represents a certain unit of information as processed by a particular digital system; word size is defined as the number of bits in the binary word that a digital system natively operates on. The slide states a PC's word size as eight bytes (64 bits), reflecting a modern 64-bit processor architecture (note that word size has historically varied, e.g., 8-bit, 16-bit, 32-bit, and 64-bit machines all exist; the '8 bytes' figure corresponds to a contemporary 64-bit CPU).",
+      "keywords": [
+        "byte",
+        "nibble",
+        "word size",
+        "bit grouping"
+      ],
+      "pages": [
+        30
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch2-2-8-alphanumeric-codes-ascii",
+      "section": "2-8",
+      "topic": "Alphanumeric Codes: ASCII",
+      "type": "definition",
+      "summary": "Alphanumeric codes represent keyboard characters (letters, digits, punctuation, control characters); ASCII is the dominant 7-bit code (128 possible characters), used for interchange between computers, printers, and internal storage.",
+      "text": "Alphanumeric codes represent the characters and functions found on a computer keyboard: 26 lowercase and 26 uppercase letters, 10 digits, roughly 7 punctuation marks, and 20-40 other special/control characters. ASCII (American Standard Code for Information Interchange) is the most common such code: it is a seven-bit code, giving 2^7 = 128 possible code groups (enough to cover uppercase/lowercase letters, digits, punctuation, and control characters). Typical uses of ASCII include transferring information between computers, between computers and printers, and for internal text storage. (The full ASCII table itself, mapping each of the 128 codes to its character, is a large reference table found in the textbook and is not reproduced here; the important RAG-relevant facts are the 7-bit width and 128-code range.)",
+      "keywords": [
+        "ASCII",
+        "alphanumeric code",
+        "character encoding",
+        "7-bit code"
+      ],
+      "pages": [
+        31,
+        32
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch2-2-9-parity-error-detection",
+      "section": "2-9",
+      "topic": "Parity Method for Error Detection",
+      "type": "method",
+      "summary": "The parity method appends one extra bit to a code group so the total number of 1-bits is always even (even parity) or always odd (odd parity), letting a receiver detect single-bit transmission errors caused by electrical noise.",
+      "text": "Binary data is frequently moved between locations -- digitized voice over a microwave link, storage/retrieval from magnetic or optical disks, or communication between computers over a modem/telephone line -- and electrical noise (spurious voltage/current fluctuations present in all electronic systems) can corrupt bits during that transfer. The parity method is one of the simplest and most widely used error-detection schemes: it adds one extra bit, the parity bit, to a code group; its value (0 or 1) is chosen based on how many 1-bits are already in the group. There are two variants -- even parity and odd parity -- and the transmitter and receiver must agree in advance on which one is used (even parity is more common in practice). In the even parity method, the parity bit is chosen so the TOTAL count of 1-bits in the group (data bits plus parity bit) is even: e.g., the 4-bit group 1011 has three 1s (odd), so it requires a parity bit of 1 to make the total four 1s (even), yielding the 5-bit group 11011; the parity bit may be placed at either end of the group. In the odd parity method, the parity bit is instead chosen so the total count of 1-bits is odd: e.g., the group 1111 already has four 1s (even), so it requires an appended parity bit of 1 to make the total five 1s (odd), yielding 11111. The parity bit becomes a permanent part of the transmitted code word; adding one parity bit to the standard seven-bit ASCII code produces an eight-bit code (7 data bits + 1 parity bit), which is a common real-world encoding for serial character transmission.",
+      "keywords": [
+        "parity bit",
+        "even parity",
+        "odd parity",
+        "error detection",
+        "noise"
+      ],
+      "pages": [
+        33,
+        34,
+        35,
+        36,
+        37
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch2-2-10-applications-async-communication",
+      "section": "2-10",
+      "topic": "Applications: Asynchronous Serial Data Communication Framing",
+      "type": "concept",
+      "summary": "Asynchronous serial transmission frames each ASCII character with a start bit (logic 0), the 7 data bits sent LSB-first, a parity bit, and a stop bit (logic 1), so the receiver can detect character boundaries and single-bit errors.",
+      "text": "When ASCII characters are transmitted serially, the receiver needs a way to know when a new character begins, and it is often useful to detect transmission errors as well; this combined framing-plus-detection scheme is called asynchronous data communication. Each ASCII character is 'framed' so the receiver can identify exactly where the character's data begins and ends: the first bit sent is always a start bit, which is logic 0; the ASCII code bits are then sent least-significant-bit (LSB) first and most-significant-bit (MSB) last; after the MSB, a parity bit is appended so the receiver can check for transmission errors (per section 2-9); and finally the transmission of that character is ended by sending a stop bit, which is logic 1. This start-bit / 7 data bits (LSB first) / parity bit / stop-bit framing is the classic structure underlying UART-style asynchronous serial communication.",
+      "keywords": [
+        "asynchronous serial communication",
+        "start bit",
+        "stop bit",
+        "UART framing",
+        "LSB first"
+      ],
+      "pages": [
+        38,
+        39
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    }
+  ]
+}

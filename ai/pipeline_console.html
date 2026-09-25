@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AI Pipeline Console</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#111725; --panel2:#0d1320; --line:#1e2633; --ink:#e6e9ef;
+    --muted:#7d8798; --accent:#7ee787; --accent2:#9ecbff; --warn:#e3b341; --bad:#f47067;
+    --chip:#182234;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 ui-monospace,Consolas,monospace}
+  header{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel2);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  header h1{font-size:15px;margin:0;font-weight:600;color:var(--accent)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;background:var(--bad)}
+  .dot.up{background:var(--accent)}
+  input,textarea,select,button{font:inherit;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+  input#ep{width:190px}
+  button{cursor:pointer}
+  button.primary{background:var(--accent);color:#06210f;border-color:var(--accent);font-weight:700}
+  button:hover{filter:brightness(1.1)}
+  .wrap{display:grid;grid-template-columns:340px 1fr;gap:12px;padding:12px;max-width:1400px;margin:0 auto}
+  @media(max-width:820px){.wrap{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .card h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+  textarea{width:100%;min-height:96px;resize:vertical}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{background:var(--chip);border:1px solid var(--line);border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--accent2)}
+  .chip:hover{border-color:var(--accent2)}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px;flex-wrap:wrap}
+  .tab{padding:7px 12px;border:1px solid transparent;border-bottom:none;border-radius:8px 8px 0 0;cursor:pointer;color:var(--muted);font-size:13px}
+  .tab.active{color:var(--ink);background:var(--panel);border-color:var(--line)}
+  .tab .b{display:inline-block;min-width:18px;text-align:center}
+  .view{display:none}
+  .view.active{display:block}
+  pre{white-space:pre-wrap;word-break:break-word;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;max-height:60vh;overflow:auto;margin:0}
+  .stage{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--panel2)}
+  .stage .s{width:16px;text-align:center}
+  .stage .n{flex:1;text-transform:capitalize}
+  .stage .d{color:var(--muted);font-size:12px}
+  .ok{color:var(--accent)} .fail{color:var(--bad)} .pend{color:var(--warn)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:12px}
+  .badge.VERIFIED{background:#12351f;color:var(--accent);border:1px solid #1f5c34}
+  .badge.VALID_UNVERIFIED{background:#3a2f10;color:var(--warn);border:1px solid #6b551b}
+  .badge.REJECTED{background:#3a1614;color:var(--bad);border:1px solid #6b2420}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border:1px solid var(--line);padding:4px 8px;text-align:center}
+  th{background:var(--panel2);color:var(--muted)}
+  .row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .muted{color:var(--muted)}
+  .copy{font-size:11px;padding:3px 8px}
+  .meta{font-size:12px;color:var(--muted);margin-top:6px}
+  svg{max-width:100%;height:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚙ AI Pipeline Console</h1>
+  <span class="muted">|</span>
+  <span><span id="dotSrv" class="dot"></span>chat_server</span>
+  <span><span id="dotLlm" class="dot"></span>LLM</span>
+  <span class="muted">endpoint</span>
+  <input id="ep" value="http://127.0.0.1:8770"/>
+  <button onclick="checkHealth()">reconnect</button>
+  <span class="muted" id="hint" style="flex:1;text-align:right"></span>
+</header>
+
+<div class="wrap">
+  <!-- LEFT: input -->
+  <div>
+    <div class="card">
+      <h2>สเปควงจร (spec)</h2>
+      <textarea id="spec" placeholder="เช่น: 4-bit comparator | f = &#931;m(2,3,5,7) | 2-bit up counter with enable en | sum = a xor b"></textarea>
+      <div class="row2" style="margin-top:8px">
+        <button class="primary" onclick="run()">▶ Run pipeline</button>
+        <label class="muted"><input type="checkbox" id="useRag" checked style="width:auto"> RAG</label>
+        <label class="muted"><input type="checkbox" id="useLlm" checked style="width:auto"> LLM</label>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="meta" id="runmeta"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h2>สถานะ</h2>
+      <div id="statusLine"><span class="muted">ยังไม่ได้รัน</span></div>
+      <div id="stages" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: tabs -->
+  <div class="card">
+    <div class="tabs" id="tabs">
+      <div class="tab active" data-t="sim">🌊 Sim</div>
+      <div class="tab" data-t="intent">{ } Intent</div>
+      <div class="tab" data-t="vhdl">📄 VHDL</div>
+      <div class="tab" data-t="xdc">📌 XDC</div>
+      <div class="tab" data-t="raw">🧾 Evidence</div>
+    </div>
+
+    <div class="view active" id="v-sim">
+      <div class="row2">
+        <button onclick="simulate()">↻ Simulate current</button>
+        <label class="muted">cycles <input id="cycles" type="number" value="8" min="1" max="64" style="width:64px"></label>
+        <span class="muted" id="simhint"></span>
+      </div>
+      <div id="simOut"><span class="muted">รัน pipeline แล้วผลจำลองจะขึ้นที่นี่ (ตารางความจริง หรือ waveform)</span></div>
+    </div>
+    <div class="view" id="v-intent"><div class="row2"><button class="copy" onclick="copyId('intentPre')">copy</button></div><pre id="intentPre" class="muted">—</pre></div>
+    <div class="view" id="v-vhdl"><div class="row2"><button class="copy" onclick="copyId('vhdlPre')">copy</button><span class="muted" id="vhdlhint"></span></div><pre id="vhdlPre" class="muted">—</pre></div>
+    <div class="view" id="v-xdc"><div class="row2"><button class="copy" onclick="copyId('xdcPre')">copy</button></div><pre id="xdcPre" class="muted">—</pre></div>
+    <div class="view" id="v-raw"><pre id="rawPre" class="muted">—</pre></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const base = () => $('ep').value.replace(/\/+$/,'');
+let last = null;              // last full result
+
+const EXAMPLES = [
+  "4-bit comparator", "8-to-1 mux", "3-to-8 decoder", "2-bit multiplier",
+  "4-input priority encoder", "f = Σm(2,3,5,7)", "4-bit inv = Σm(10,11,12,13,14,15)",
+  "2-bit up counter with enable en; outputs c1 msb, c0 lsb", "full adder",
+  "sum = a xor b\ncarry = a and b"
+];
+$('chips').innerHTML = EXAMPLES.map(e=>`<span class="chip">${e.replace(/</g,'&lt;').replace(/\n/g,' ⏎ ')}</span>`).join('');
+[...document.querySelectorAll('.chip')].forEach((c,i)=>c.onclick=()=>{$('spec').value=EXAMPLES[i];});
+
+// tabs
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  t.classList.add('active'); $('v-'+t.dataset.t).classList.add('active');
+});
+
+async function checkHealth(){
+  try{
+    const r = await fetch(base()+'/health'); const j = await r.json();
+    $('dotSrv').classList.add('up');
+    $('dotLlm').classList.toggle('up', !!j.llm_up);
+    $('hint').textContent = j.llm_up ? 'LLM พร้อม' : 'LLM ปิดอยู่ (deterministic/known ยังใช้ได้)';
+  }catch(e){ $('dotSrv').classList.remove('up'); $('dotLlm').classList.remove('up');
+    $('hint').textContent='ต่อ chat_server ไม่ได้ — สั่ง: py ai/chat_server.py'; }
+}
+
+const STAGE_TH = {retrieve:'ค้นคลัง(RAG)',generate:'สร้างวงจร',validate:'ตรวจ ERC',simulate:'จำลอง logic',
+  verify:'ตรวจความถูกต้อง',codegen:'สร้าง VHDL',cosim:'co-sim GHDL',draw:'วาดวงจร',synth:'สังเคราะห์',
+  constraints:'พิน XDC',parametric:'สูตรสำเร็จ','truth-table':'ลดรูปมินเทอม',known:'วงจรมาตรฐาน'};
+
+function stageRow(st, ok, info){
+  const name = STAGE_TH[st] || st;
+  const det = info ? Object.entries(info).filter(([k])=>k!=='context').map(([k,v])=>`${k}=${JSON.stringify(v)}`).join(' ') : '';
+  const icon = ok===false ? '<span class="fail">✕</span>' : '<span class="ok">✓</span>';
+  return `<div class="stage"><span class="s">${icon}</span><span class="n">${name}</span><span class="d">${det}</span></div>`;
+}
+
+async function run(){
+  const message = $('spec').value.trim();
+  if(!message) return;
+  last=null; $('stages').innerHTML=''; $('statusLine').innerHTML='<span class="pend">กำลังรัน…</span>';
+  $('runmeta').textContent=''; const t0=performance.now();
+  let stagesHtml='';
+  try{
+    const resp = await fetch(base()+'/chat_stream',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message, use_rag:$('useRag').checked, use_llm:$('useLlm').checked})});
+    const reader = resp.body.getReader(); const dec=new TextDecoder(); let buf='';
+    while(true){
+      const {value,done} = await reader.read(); if(done) break;
+      buf += dec.decode(value,{stream:true}); let i;
+      while((i=buf.indexOf('\n\n'))>=0){
+        const chunk=buf.slice(0,i); buf=buf.slice(i+2);
+        const line=chunk.split('\n').find(l=>l.startsWith('data:')); if(!line) continue;
+        const evt=JSON.parse(line.slice(5));
+        if(evt.event==='stage'){ stagesHtml+=stageRow(evt.stage,evt.ok,evt.info); $('stages').innerHTML=stagesHtml; }
+        else if(evt.event==='done'){ render(evt.result, (performance.now()-t0)/1000); }
+      }
+    }
+  }catch(e){
+    $('statusLine').innerHTML='<span class="fail">error: '+e.message+'</span> — chat_server รันอยู่ไหม?';
+  }
+}
+
+function render(r, secs){
+  last=r;
+  const st=r.status||'?';
+  const conf=r.confidence!=null?` · confidence ${r.confidence} · ${r.recommend||''}`:'';
+  const src=r.source?` · <span class="muted">${r.source}</span>`:'';
+  $('statusLine').innerHTML=`<span class="badge ${st}">${st}</span>${conf}${src}` + (r.reason?` <span class="fail">(${r.reason})</span>`:'');
+  $('runmeta').textContent = (secs!=null?`เสร็จใน ${secs.toFixed(1)}s`:'');
+  // evidence
+  $('rawPre').className=''; $('rawPre').textContent = JSON.stringify(r.evidence||[], null, 2);
+  // intent
+  $('intentPre').className=''; $('intentPre').textContent = r.intent? JSON.stringify(r.intent,null,2) : '(ไม่มี intent)';
+  // vhdl
+  $('vhdlPre').className=''; $('vhdlPre').textContent = r.vhdl || '(ไม่มี VHDL)';
+  $('vhdlhint').textContent = r.vhdl? (r.vhdl.split('\n').length+' บรรทัด') : '';
+  // xdc
+  $('xdcPre').className=''; $('xdcPre').textContent = r.xdc || '(ไม่มี XDC)';
+  // sim from the result (truth table / sequence)
+  renderSimFromResult(r);
+}
+
+function truthTable(tt){
+  const head = tt.inputs.concat(tt.outputs);
+  let h='<table><tr>'+head.map(x=>`<th>${x}</th>`).join('')+'</tr>';
+  for(const [ins,outs] of tt.rows){
+    h+='<tr>'+ins.map(v=>`<td>${v}</td>`).join('')+outs.map(v=>`<td class="ok">${v}</td>`).join('')+'</tr>';
+  }
+  return h+'</table>';
+}
+
+function renderSimFromResult(r){
+  const el=$('simOut');
+  if(r.truth_table){ $('simhint').textContent='combinational — ตารางความจริง'; el.innerHTML=truthTable(r.truth_table); }
+  else if(r.sequence){ $('simhint').textContent='sequential — กด "Simulate current" เพื่อดู waveform';
+    el.innerHTML='<div class="muted">มีลำดับ '+r.sequence.rows.length+' cycle — กด Simulate เพื่อดู waveform</div>'; }
+  else { $('simhint').textContent=''; el.innerHTML='<span class="muted">ไม่มีผลจำลอง</span>'; }
+}
+
+async function simulate(){
+  if(!last || !last.intent){ $('simOut').innerHTML='<span class="muted">ยังไม่มี intent — รัน pipeline ก่อน</span>'; return; }
+  $('simOut').innerHTML='<span class="pend">กำลังจำลอง…</span>';
+  try{
+    const r=await fetch(base()+'/sim',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({intent:last.intent, cycles:parseInt($('cycles').value)||8})});
+    const j=await r.json();
+    if(!j.ok){ $('simOut').innerHTML='<span class="fail">'+(j.reason||'sim failed')+'</span>'; return; }
+    if(j.waveform_svg){ $('simhint').textContent='sequential — waveform'; $('simOut').innerHTML=j.waveform_svg; }
+    else if(j.truth_table){ $('simhint').textContent='combinational — ตารางความจริง'; $('simOut').innerHTML=truthTable(j.truth_table); }
+    else $('simOut').innerHTML='<span class="muted">ไม่มีผล</span>';
+  }catch(e){ $('simOut').innerHTML='<span class="fail">'+e.message+'</span>'; }
+}
+
+function copyId(id){ navigator.clipboard.writeText($(id).textContent); }
+
+checkHealth();
+</script>
+</body>
+</html>

@@ -1,0 +1,382 @@
+{
+  "title": "1st Layer (Mod20m)",
+  "module": "Mod20m",
+  "frame": {
+    "x": 100,
+    "y": 120,
+    "w": 1720,
+    "h": 480
+  },
+  "nodes": [
+    {
+      "id": "clk_in",
+      "type": "port",
+      "x": 150,
+      "y": 300,
+      "name": "CLK",
+      "side": "left"
+    },
+    {
+      "id": "rst_in",
+      "type": "port",
+      "x": 150,
+      "y": 460,
+      "name": "RST",
+      "side": "left"
+    },
+    {
+      "id": "m1",
+      "type": "block",
+      "x": 250,
+      "y": 260,
+      "label": "Mod10 #1",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q[3:0]",
+        "CO"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "m2",
+      "type": "block",
+      "x": 460,
+      "y": 260,
+      "label": "Mod10 #2",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q[3:0]",
+        "CO"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "m3",
+      "type": "block",
+      "x": 670,
+      "y": 260,
+      "label": "Mod10 #3",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q[3:0]",
+        "CO"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "m4",
+      "type": "block",
+      "x": 880,
+      "y": 260,
+      "label": "Mod10 #4",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q[3:0]",
+        "CO"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "m5",
+      "type": "block",
+      "x": 1090,
+      "y": 260,
+      "label": "Mod10 #5",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q[3:0]",
+        "CO"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "m6",
+      "type": "block",
+      "x": 1300,
+      "y": 260,
+      "label": "Mod10 #6",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q[3:0]",
+        "CO"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "jk",
+      "type": "block",
+      "x": 1510,
+      "y": 300,
+      "label": "JK-FF (toggle)",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "J",
+        "K",
+        "~CLR"
+      ],
+      "pinsR": [
+        "Q"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "cJ",
+      "type": "const",
+      "x": 1470,
+      "y": 340,
+      "value": "1",
+      "pin": "p"
+    },
+    {
+      "id": "cK",
+      "type": "const",
+      "x": 1470,
+      "y": 370,
+      "value": "1",
+      "pin": "p"
+    },
+    {
+      "id": "q_out",
+      "type": "port",
+      "x": 1680,
+      "y": 330,
+      "name": "Q_MSB",
+      "side": "right"
+    }
+  ],
+  "wires": [
+    {
+      "from": {
+        "node": "clk_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m1",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m1",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m2",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m3",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m4",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m5",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "m6",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "rst_in",
+        "pin": "p"
+      },
+      "to": {
+        "node": "jk",
+        "pin": "L3"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "m1",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "m2",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "m2",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "m3",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "m3",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "m4",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "m4",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "m5",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "m5",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "m6",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "m6",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "jk",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "cJ",
+        "pin": "p"
+      },
+      "to": {
+        "node": "jk",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "cK",
+        "pin": "p"
+      },
+      "to": {
+        "node": "jk",
+        "pin": "L2"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "jk",
+        "pin": "R0"
+      },
+      "to": {
+        "node": "q_out",
+        "pin": "p"
+      },
+      "bus": 0
+    }
+  ]
+}

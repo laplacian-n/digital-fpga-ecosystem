@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "top-down-schematic": {
+      "command": "C:\\Users\\dinuc\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "args": ["C:\\Users\\dinuc\\OneDrive\\เอกสาร\\digital\\topdown\\topdown_mcp.py", "--serve"]
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "source": "Ch_2_Addon.pdf",
+  "group": "content",
+  "chapter": "2-addon",
+  "title": "Number Systems Add-on (Thai supplementary slides)",
+  "chunks": [
+    {
+      "id": "ch2addon-1-conversion-map-overview",
+      "section": "addon-1",
+      "topic": "Overview Map of Number-System Conversions",
+      "type": "concept",
+      "summary": "A Thai-language overview slide maps the conversion relationships among binary, octal, decimal, hexadecimal, and BCD, framing them as the four/five representations covered in Ch.2.",
+      "text": "This short Thai-language add-on deck reviews Chapter 2's number systems: Binary (เลขฐานสอง), Octal (เลขฐานแปด), Decimal (เลขฐานสิบ), and Hexadecimal (เลขฐานสิบหก). Its second slide presents a conversion map/diagram (ผังการแปลงเลขฐานต่าง ๆ) showing the relationships and conversion paths between hexadecimal, binary, decimal, octal, and BCD (เลข BCD) representations -- i.e., which conversions go through which intermediate representation (e.g., octal and hex both typically convert to/from decimal via binary grouping, as covered in section 2-3 for hex). It also includes the well-known programmer's joke: 'There are only 10 types of people in the world: those who understand binary, and those who don't' (a pun that only makes sense once you realize '10' is being read as binary for two).",
+      "keywords": [
+        "number system overview",
+        "conversion map",
+        "binary octal decimal hex BCD",
+        "Thai supplementary material"
+      ],
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 2 shows a diagram/flowchart (ผังการแปลงเลขฐานต่าง ๆ) with five labeled nodes -- hexadecimal, binary, decimal, octal, BCD -- and connecting arrows indicating which conversions the course expects students to perform directly versus via an intermediate base; the exact arrow topology could not be extracted as text but conceptually mirrors the direct conversions taught in Ch_2 (binary<->decimal, binary<->hex via nibble grouping, decimal<->BCD via per-digit encoding).",
+      "related_labs": [
+        "Lab1"
+      ]
+    },
+    {
+      "id": "ch2addon-2-binary-decimal-shortcut-trick",
+      "section": "addon-2",
+      "topic": "Shortcut Trick for Binary-to-Decimal Conversion",
+      "type": "method",
+      "summary": "The addon shows a progressive-buildup shortcut for binary-to-decimal conversion (การแปลงเลขฐานสอง วิธีลัด), which is the same double-dabble idea taught in Ch_2 section 2-1 but presented as growing the binary string one bit at a time.",
+      "text": "The slide titled 'การแปลงเลขฐานสอง วิธีลัด' ('shortcut method for binary conversion') shows a sequence of progressively longer binary strings: 1, then 10, then 101, then 1101, then 11011011, illustrating how a running decimal value can be updated incrementally as each new bit is appended from the left -- this is the same double-dabble technique already detailed in Ch_2 section 2-1 (double the current value and add the next bit), just visualized as building up the binary string step by step rather than emphasizing the arithmetic. As a worked check using the final string shown, 11011011(2): starting from the leftmost 1 -> 1, ->1*2+1=3, ->3*2+0=6, ->6*2+1=13, ->13*2+1=27, ->27*2+0=54, ->54*2+1=109, ->109*2+1=219, giving 11011011(2) = 219(10) (matches the double-dabble worked example already reconstructed in ch2-2-1-binary-to-decimal). This reinforces that the 'shortcut' is not a different algorithm from double-dabble, just an alternate way of drawing the same running computation.",
+      "keywords": [
+        "binary to decimal shortcut",
+        "double-dabble",
+        "Thai supplementary example"
+      ],
+      "pages": [
+        4
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 4 shows a vertically stacked sequence of growing binary strings (1 / 10 / 101 / 1101 / 11011011) presumably with a running decimal total written alongside each step, matching the double-dabble method; the exact accompanying decimal annotations were not recoverable as text, so the value above is independently computed and verified rather than copied from the image.",
+      "related_labs": [
+        "Lab1"
+      ]
+    },
+    {
+      "id": "ch2addon-3-powers-of-two-reference-table",
+      "section": "addon-3",
+      "topic": "Powers of Two Reference Table and Binary Prefixes (K/M/G/T)",
+      "type": "table",
+      "summary": "Reference table of 2^0 through 2^9, plus the binary-prefix shorthand 2^10=1K, 2^20=1M, 2^30=1G, 2^40=1T, posed against a review question asking students to find 2^0 through 2^49 (and specifically 2^35).",
+      "text": "This addon reinforces memorizing powers of two, which is essential for hex/binary arithmetic and for reasoning about memory sizes. The reference table given is: 2^0=1, 2^1=2, 2^2=4, 2^3=8, 2^4=16, 2^5=32, 2^6=64, 2^7=128, 2^8=256, 2^9=512. It then introduces the common computing shorthand for large powers of two: 2^10 = 1,024 = 1K (kilo), 2^20 = 1,024K = 1M (mega), 2^30 = 1G (giga), 2^40 = 1T (tera). The slide poses a review question, 'find the value of 2^0 to 2^49' (จงหาค่าของ 2^0 – 2^49), and specifically flags 2^35 as a value to compute (2^35 = ??). Worked answers: 2^35 = 2^30 * 2^5 = 1,073,741,824 * 32 = 34,359,738,368. Extending the pattern to the full requested range, 2^49 = 2^40 * 2^9 = 1,099,511,627,776 * 512 = 562,949,953,421,312. These values are useful when reasoning about address-space sizes (e.g., a 35-bit or 49-bit address bus) in the digital-systems and FPGA context of this course.",
+      "keywords": [
+        "powers of two",
+        "binary prefixes",
+        "kilo mega giga tera",
+        "2^35",
+        "2^49",
+        "address space sizing"
+      ],
+      "pages": [
+        6,
+        7
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch2addon-4-review-question-slide",
+      "section": "addon-4",
+      "topic": "End-of-Addon Review Prompt",
+      "type": "concept",
+      "summary": "Closing slide simply prompts an open Q&A / review session on the number-systems addon material.",
+      "text": "The final slide of this addon is a bare 'Question?????' prompt, indicating an open floor for student questions on the number-systems review material (conversion map, binary-decimal shortcut, and powers-of-two table) covered in this short supplementary deck.",
+      "keywords": [
+        "review session",
+        "Q&A"
+      ],
+      "pages": [
+        8
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    }
+  ]
+}

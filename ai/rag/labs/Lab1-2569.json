@@ -1,0 +1,199 @@
+{
+  "source": "Lab1-2569.pdf",
+  "group": "labs",
+  "lab": "1",
+  "title": "ลอจิกเกต (Logic Gates)",
+  "objectives": [
+    "เพื่อให้นักศึกษาสามารถใช้งานเครื่องมือและอุปกรณ์สำหรับการทดสอบวงจรดิจิทัลเบื้องต้นได้",
+    "เพื่อให้นักศึกษาเข้าใจการทำงานของไอซีลอจิกเกตพื้นฐาน",
+    "เพื่อให้นักศึกษาฝึกใช้งานโปรแกรมทูลช่วยการออกแบบวงจรดิจิตอล (Logisim)"
+  ],
+  "items": [
+    {
+      "id": "lab1-1",
+      "question": "ใช้โปรแกรม Logisim สร้างวงจรลอจิกด้วยตนเอง (แบบที่ 1: วางเกต ต่อ input/output pin แล้วทดสอบ)",
+      "params": null,
+      "subtasks": [
+        "1. Click เลือก Gate ที่จะใช้งาน และนำมาวางที่หน้าจอ",
+        "2. สร้าง input pin และตั้งชื่อ",
+        "3. สร้าง output pin และตั้งชื่อ",
+        "4. เชื่อม input เข้า gate และ output ออกจาก gate",
+        "5. Click เพื่อทำการสวิตช์ค่าและตรวจสอบผลลัพธ์"
+      ],
+      "topic": "logisim",
+      "solution": {
+        "steps": "ขั้นตอนการใช้งานเบื้องต้นของ Logisim: วางเกตที่ต้องการ, สร้าง pin อินพุต/เอาต์พุตและตั้งชื่อ, ลากสายเชื่อมต่อ, แล้วคลิกที่ pin อินพุตเพื่อสลับค่า 0/1 และดูผลลัพธ์ที่ pin เอาต์พุต โปรแกรมดาวน์โหลดได้จาก sourceforge.net/projects/circuit/ (พัฒนาโดย Dr. Carl Burch)",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "เป็นขั้นตอนการใช้งานเครื่องมือ (procedural) สรุปจากข้อความหน้า 1-6; ภาพประกอบ (image_pages 3,4,5,6) เป็นภาพหน้าจอ Logisim ไม่มีข้อมูลตรรกะเพิ่มเติมนอกจากคำอธิบายที่ให้ไว้ในข้อความ"
+      },
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab1-2",
+      "question": "ใช้โปรแกรม Logisim สร้างวงจรจาก Truth Table ที่กำหนดมาโดยอัตโนมัติ (แบบที่ 2: Analyze Circuit -> Build Circuit)",
+      "params": null,
+      "subtasks": [
+        "1. สร้าง input pin, output pin และตั้งชื่อ",
+        "2. Click ขวาที่ main แล้วเลือก Analyze Circuit",
+        "3. Click เพื่อตรวจสอบค่า input และ output",
+        "4. Click เพื่อกำหนดค่าตาราง (Truth Table) ให้ครบทุกแถว",
+        "5. กด Build Circuit และเลือกรูปแบบ gate ที่ต้องการใช้ จากนั้นกด OK จะได้วงจรออกมา"
+      ],
+      "topic": "logisim",
+      "solution": {
+        "steps": "Logisim มีฟีเจอร์ Analyze Circuit ที่ให้ผู้ใช้กรอกค่าใน Truth Table ของแต่ละเอาต์พุตแล้วให้โปรแกรมสังเคราะห์วงจรลอจิกเกตให้อัตโนมัติ (Build Circuit) โดยเลือกชนิดของเกตที่ต้องการใช้ได้ (เช่น AND/OR/NOT หรือ NAND/NOR เท่านั้น)",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "สรุปจากข้อความหน้า 7-10; หน้า 10 เป็นภาพเปล่า/หัวข้อผลลัพธ์ ไม่มีเนื้อหาข้อความ"
+      },
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab1-3",
+      "question": "ทำความรู้จักอุปกรณ์ Logic Trainer และไอซีลอจิกเกตพื้นฐาน 6 ชนิด (7408 AND, 7432 OR, 7404 NOT, 7400 NAND, 7402 NOR, 7486 XOR) พร้อมข้อควรระวังด้านความปลอดภัย",
+      "params": null,
+      "subtasks": [
+        "อธิบายส่วนประกอบของ Logic Trainer: Power Supply (+5V/-5V/+12V/-12V/GND ใช้เฉพาะ +5V ในแล็บนี้), Logic Switch (ป้อนลอจิก 0/1 ด้วยสวิตช์โยก 8 ตัว), Logic Monitor (แสดงผลด้วย LED สีแดง=1, สีเขียว=0, ดับ=ไม่มีแรงดัน)",
+        "อธิบายลักษณะการทำงานของไอซี AND(7408), OR(7432), NOT/Inverter(7404), NAND(7400), NOR(7402), XOR(7486)",
+        "ข้อควรระวัง: ตรวจสอบขา VCC(+5V)/GND ก่อนต่อ, ระดับลอจิก 0 อยู่ช่วง 0-0.5V และลอจิก 1 อยู่ช่วง 2.5-5V, ถอดไอซีด้วยไขควงงัดอย่างระมัดระวัง, ให้อาจารย์ตรวจและเซ็นใบตรวจเมื่อทำสำเร็จ"
+      ],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "สรุปจากคำอธิบายในเอกสาร: AND gate เอาต์พุตเป็น 1 ก็ต่อเมื่ออินพุตทุกตัวเป็น 1; OR gate เอาต์พุตเป็น 0 ก็ต่อเมื่ออินพุตทุกตัวเป็น 0; NOT gate กลับค่าอินพุต; NAND คือ AND ตามด้วย NOT (กลับค่าของ AND); NOR คือ OR ตามด้วย NOT (กลับค่าของ OR); XOR เอาต์พุตเป็น 1 เมื่ออินพุตไม่เข้าพวกกัน (ต่างค่ากัน) และเป็น 0 เมื่ออินพุตเหมือนกันทั้งหมด (ทั้ง 0 หมดหรือ 1 หมด)",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "เนื้อหาพื้นฐาน/ความปลอดภัย ไม่ใช่โจทย์ให้แก้ สรุปจากหน้า 11-15 (รูปที่ 2,3,4 ในหน้า 14-15 เป็นภาพประกอบการต่อวงจรบนโพรโตบอร์ดและโครงสร้างภายในไอซี ไม่ได้ Read-vision เนื่องจากไม่มีตัวเรนเดอร์ PDF เป็นภาพในสภาพแวดล้อมนี้ [pdftoppm ไม่พร้อมใช้งาน] จึงสรุปจากคำอธิบายข้อความเท่านั้น ไม่ได้เพิ่มเติมรายละเอียดที่มองไม่เห็น)"
+      },
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab1-4",
+      "question": "การทดลองข้อ 3: ต่อวงจร AND gate (ไอซีลอจิกเกตมี AND gate 4 ชุดในตัวเดียว ใช้ชุดใดก็ได้) ป้อนอินพุตที่ขา a และ b แล้วตรวจสอบค่าเอาต์พุตที่ขา y บันทึกผลลงตาราง",
+      "params": "ใช้ 2-input AND gate (เช่น หนึ่งใน 4 ชุดของไอซี 7408) อินพุต a,b เอาต์พุต y = a*b",
+      "subtasks": ["ต่อวงจรตามรูป", "ป้อนค่า a,b ครบทั้ง 4 กรณี", "บันทึกค่า y ที่ได้จาก Logic Trainer และเปรียบเทียบกับ Logisim"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "AND gate 2 อินพุต: y=1 เมื่อ a=1 และ b=1 เท่านั้น กรณีอื่น y=0 ตามคำอธิบายไอซี 7408 ในหน้า 12 ของเอกสาร (ผลลัพธ์จาก Logic Trainer และจาก Logisim ควรตรงกันทุกแถวเพราะเป็นเกตชนิดเดียวกัน)",
+        "truth_table": "a b | y\n0 0 | 0\n0 1 | 0\n1 0 | 0\n1 1 | 1",
+        "kmap": null,
+        "final_expression": "y = a * b",
+        "intent_json": {"module": "and_gate_test", "components": [{"id": "a", "type": "IN", "name": "a"}, {"id": "b", "type": "IN", "name": "b"}, {"id": "g1", "type": "AND"}, {"id": "y", "type": "OUT", "name": "y"}], "nets": [{"from": "a", "to": "g1"}, {"from": "b", "to": "g1"}, {"from": "g1", "to": "y"}]},
+        "notes": "รูปวงจรจริงอยู่ในภาพประกอบ (ไม่มีตัวเรนเดอร์ PDF ในสภาพแวดล้อมนี้) แต่ข้อความหน้า 15 ระบุชัดเจนว่าเป็น AND gate 2 อินพุต a,b -> y จึงใช้นิยามมาตรฐานของ AND gate ได้โดยไม่ต้องอาศัยรูป"
+      },
+      "verify": "enumerated all 4 rows of a 2-input AND gate by definition (y=1 iff a=1 and b=1); matches the IC 7408 behavior described in the source text verbatim.",
+      "related_content": []
+    },
+    {
+      "id": "lab1-5",
+      "question": "การทดลองข้อ 4: ต่อวงจรแบบเดียวกับข้อ 3 แต่เปลี่ยน AND gate เป็นเกตชนิดอื่น (OR, NOT, NAND, NOR, XOR) แล้วบันทึกผลการทดลองลงตาราง",
+      "params": "ตัวอย่างที่แสดงคำตอบแบบละเอียด: 2-input OR gate (ไอซี 7432), อินพุต a,b เอาต์พุต y = a+b; ตารางค่าความจริงของเกตอื่นๆ ที่เหลือ (NOT, NAND, NOR, XOR) ก็สร้างจากนิยามเกตในลักษณะเดียวกัน",
+      "subtasks": ["ต่อวงจรเกตแต่ละชนิดแทน AND ทีละชนิด", "ป้อนค่า a,b (หรือค่าเดียวสำหรับ NOT) ครบทุกกรณี", "บันทึกผลจาก Logic Trainer และ Logisim เปรียบเทียบกัน"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "แสดงตัวอย่างละเอียดด้วย OR gate (7432): y=0 เมื่อ a=0 และ b=0 เท่านั้น กรณีอื่น y=1 (ตรงกับคำอธิบายไอซี 7432 ในหน้า 12) เกตอื่นๆ ในการทดลองนี้ทำแบบเดียวกันโดยใช้นิยามที่ให้ไว้ในหน้า 12-13: NOT(7404): y=a'; NAND(7400): y=(a*b)'; NOR(7402): y=(a+b)'; XOR(7486): y=a^b (1 เมื่ออินพุตต่างกัน)",
+        "truth_table": "OR (a b | y): 0 0|0, 0 1|1, 1 0|1, 1 1|1",
+        "kmap": null,
+        "final_expression": "y = a + b  (ตัวอย่าง OR gate; เกตอื่น: NOT y=a', NAND y=(ab)', NOR y=(a+b)', XOR y=a^b)",
+        "intent_json": {"module": "or_gate_test", "components": [{"id": "a", "type": "IN", "name": "a"}, {"id": "b", "type": "IN", "name": "b"}, {"id": "g1", "type": "OR"}, {"id": "y", "type": "OUT", "name": "y"}], "nets": [{"from": "a", "to": "g1"}, {"from": "b", "to": "g1"}, {"from": "g1", "to": "y"}]},
+        "notes": "โจทย์ให้ทดลองสลับเกตหลายชนิดในวงจรเดียวกัน เลือก OR เป็นตัวอย่างละเอียดตาม params; เกตอื่นๆ ที่เหลือใช้นิยามมาตรฐานเดียวกันซึ่งตรงกับคำอธิบายไอซีในหน้า 12-13 ของเอกสารเป๊ะ ไม่ได้อนุมานเพิ่มเติม"
+      },
+      "verify": "enumerated all 4 rows of a 2-input OR gate by definition (y=0 iff a=0 and b=0); matches IC 7432 description in the source text verbatim. The other four gate types (NOT/NAND/NOR/XOR) follow directly from their standard truth tables, which the source text also states explicitly (page 12-13), so no separate enumeration script was needed beyond the OR check shown.",
+      "related_content": []
+    },
+    {
+      "id": "lab1-6",
+      "question": "การทดลองข้อ 5: ต่อวงจรที่ประกอบด้วยไอซี 74LS86 (XOR) กับ 74LS08 (AND) โดยป้อนอินพุตที่ขา a และ b แล้วบันทึกค่าเอาต์พุตที่ขา x และ y",
+      "params": "สมมติฐานที่ระบุชัด (เนื่องจากรูปวงจรจริงเป็นภาพที่ไม่สามารถเรนเดอร์ได้ในสภาพแวดล้อมนี้): จากข้อความที่ระบุว่าทั้งสองไอซีรับอินพุต a,b ชุดเดียวกันและแยกเอาต์พุตเป็น x (จาก 74LS86/XOR) และ y (จาก 74LS08/AND) จึงตีความว่า x = a XOR b และ y = a AND b ซึ่งเป็นวงจรครึ่งบวก (Half Adder) แบบไม่มีป้ายชื่อ sum/carry",
+      "subtasks": ["ต่อวงจรตามรูปที่กำหนด (74LS86 + 74LS08)", "ป้อน a,b ครบ 4 กรณี", "บันทึก x,y จาก Logic Trainer แล้วเรียกให้ตรวจ"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "x มาจากเกต XOR (74LS86): x=1 เมื่อ a,b ต่างค่ากัน. y มาจากเกต AND (74LS08): y=1 เมื่อ a=b=1. รวมกันแล้วเป็นผลลัพธ์แบบเดียวกับ Half Adder (x=sum, y=carry) แม้เอกสารจะไม่ได้เรียกชื่อนี้ตรงๆ",
+        "truth_table": "a b | x(XOR) y(AND)\n0 0 | 0 0\n0 1 | 1 0\n1 0 | 1 0\n1 1 | 0 1",
+        "kmap": null,
+        "final_expression": "x = a ^ b ,  y = a * b",
+        "intent_json": {"module": "xor_and_dual_ic", "components": [{"id": "a", "type": "IN", "name": "a"}, {"id": "b", "type": "IN", "name": "b"}, {"id": "x1", "type": "XOR"}, {"id": "a1", "type": "AND"}, {"id": "x", "type": "OUT", "name": "x"}, {"id": "y", "type": "OUT", "name": "y"}], "nets": [{"from": "a", "to": "x1"}, {"from": "b", "to": "x1"}, {"from": "a", "to": "a1"}, {"from": "b", "to": "a1"}, {"from": "x1", "to": "x"}, {"from": "a1", "to": "y"}]},
+        "notes": "ASSUMPTION explicitly flagged: the exact wiring figure for this step is an image the extraction environment could not render (pdftoppm unavailable), so this solution is inferred from the strong textual cue that both ICs share inputs a,b and produce separate outputs x,y -- the most natural reading given the two named gate types (XOR, AND) on the same two inputs. If the actual figure wires the gates in series instead (e.g. y feeding into x's gate), this solution would not apply; flagged here rather than silently assumed."
+      },
+      "verify": "enumerated all 4 rows for x=a^b and y=a&b against the standard XOR/AND definitions given in the source text (page 12-13); both match by construction. NOTE: verification confirms the *assumed* wiring is internally consistent, not that it is the literal figure in the PDF (see notes -- figure unavailable to this extraction pass).",
+      "related_content": []
+    },
+    {
+      "id": "lab1-7",
+      "question": "การทดลองข้อ 6: ต่อวงจร 3 อินพุต (a,b,c) ตามรูปที่กำหนด (ต้องพิจารณาโครงสร้างภายในไอซีจากรูปที่ 4) แล้วบันทึกค่าเอาต์พุต x,y ลงตาราง พร้อมตอบคำถาม 6.1 ใช้ไอซีเบอร์อะไรบ้างในการสร้างวงจร",
+      "params": null,
+      "subtasks": ["ระบุเบอร์ไอซีที่ใช้ (คำตอบเปิดสำหรับนักศึกษากรอกเอง)", "ต่อวงจร ป้อน a,b,c ครบ 8 กรณี", "บันทึก x,y ทั้งจาก Logic Trainer และ Logisim"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "ไม่สามารถให้คำตอบที่ตรวจสอบได้ เนื่องจากวงจรจริงของข้อนี้อยู่ในรูปภาพประกอบเท่านั้น (ไม่มีคำอธิบายเป็นข้อความ) และสภาพแวดล้อมการแยกข้อมูลนี้ไม่มีตัวเรนเดอร์ PDF เป็นภาพ (pdftoppm ไม่พร้อมใช้งาน) จึงไม่มีข้อมูลเพียงพอที่จะระบุเบอร์ไอซีหรือสมการเอาต์พุต x,y โดยไม่คาดเดา",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "ต้องอาศัยรูปวงจรจริงในเอกสาร (หน้า 18) ซึ่งเป็นภาพที่ไม่สามารถเข้าถึงได้ในสภาพแวดล้อมนี้ ไม่ได้แต่งเติมคำตอบขึ้นเอง ตามข้อกำหนดของ spec ('Don't invent lab steps/figures')"
+      },
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab1-8",
+      "question": "การทดลองข้อ 7a (ภาพที่ 7.1): ต่อวงจรตามรูป (3 อินพุต a,b,c) โดยใช้ Logisim หรือ Logic Trainer เท่านั้น แล้วบันทึกผลตามตาราง x,y",
+      "params": null,
+      "subtasks": ["ต่อวงจรตามภาพที่ 7.1", "ป้อน a,b,c ครบ 8 กรณี", "บันทึกผล x,y"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "ไม่สามารถให้คำตอบที่ตรวจสอบได้ เนื่องจากภาพที่ 7.1 เป็นรูปวงจรเท่านั้น ไม่มีคำอธิบายเป็นข้อความ และสภาพแวดล้อมนี้ไม่มีตัวเรนเดอร์ PDF เป็นภาพ",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "ต้องอาศัยรูปที่ 7.1 (หน้า 19) ซึ่งเข้าถึงไม่ได้ในสภาพแวดล้อมนี้ ไม่ได้แต่งเติมคำตอบขึ้นเอง"
+      },
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab1-9",
+      "question": "การทดลองข้อ 7b (ภาพที่ 7.2): ต่อวงจรตามรูป (4 อินพุต a,b,c,d) แล้วบันทึกผลตามตาราง x,y (16 แถว)",
+      "params": null,
+      "subtasks": ["ต่อวงจรตามภาพที่ 7.2", "ป้อน a,b,c,d ครบ 16 กรณี", "บันทึกผล x,y"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "ไม่สามารถให้คำตอบที่ตรวจสอบได้ เนื่องจากภาพที่ 7.2 เป็นรูปวงจรเท่านั้น ไม่มีคำอธิบายเป็นข้อความ และสภาพแวดล้อมนี้ไม่มีตัวเรนเดอร์ PDF เป็นภาพ",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "ต้องอาศัยรูปที่ 7.2 (หน้า 20) ซึ่งเข้าถึงไม่ได้ในสภาพแวดล้อมนี้ ไม่ได้แต่งเติมคำตอบขึ้นเอง"
+      },
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab1-10",
+      "question": "การทดลองข้อ 7c (ภาพที่ 7.3): ต่อวงจรตามรูป (5 อินพุต a,b,c,d,e) แล้วบันทึกผลตามตาราง x,y,z (32 แถว); 7d) เปรียบเทียบผลการทดลองจริงกับผลที่คำนวณได้ทางทฤษฎีว่าเหมือนหรือต่างกันอย่างไร และถ้าต่างเป็นเพราะเหตุใด",
+      "params": null,
+      "subtasks": ["ต่อวงจรตามภาพที่ 7.3", "ป้อน a,b,c,d,e ครบ 32 กรณี", "บันทึกผล x,y,z", "เปรียบเทียบผลจริงกับทฤษฎี"],
+      "topic": "logic-gates",
+      "solution": {
+        "steps": "7c: ไม่สามารถให้สมการ/ตารางที่ตรวจสอบได้ เพราะภาพที่ 7.3 เป็นรูปวงจรเท่านั้น ไม่มีคำอธิบายเป็นข้อความ และเข้าถึงไม่ได้ในสภาพแวดล้อมนี้. 7d: เป็นคำถามให้นักศึกษาสะท้อนผลการทดลองของตนเอง โดยทั่วไปหากต่อวงจรถูกต้อง ผลจาก Logic Trainer กับ Logisim ควรตรงกับที่คำนวณได้ทางทฤษฎี ความแตกต่างที่อาจเกิดขึ้นมักมาจากสาเหตุเชิงปฏิบัติ เช่น การต่อสายผิดขา, ไอซีชำรุด, หน้าสัมผัสหลวมบนโพรโตบอร์ด, หรือสวิตช์/LED ทำงานผิดพลาด ไม่ใช่ความผิดพลาดทางทฤษฎี",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": null,
+        "intent_json": null,
+        "notes": "7c ต้องอาศัยรูปที่ 7.3 (หน้า 21) ซึ่งเข้าถึงไม่ได้ในสภาพแวดล้อมนี้ ไม่ได้แต่งเติมคำตอบขึ้นเอง; 7d เป็นคำถามปลายเปิดเชิงสะท้อนผล ไม่มีคำตอบเดียวที่ตรวจสอบได้"
+      },
+      "verify": null,
+      "related_content": []
+    }
+  ]
+}

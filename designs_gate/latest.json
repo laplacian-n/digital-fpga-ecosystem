@@ -1,0 +1,2177 @@
+{
+  "version": 2,
+  "workspace": {
+    "projects": {
+      "prj2": {
+        "name": "my_project",
+        "topId": "sch1",
+        "schematics": {
+          "sch1": {
+            "id": "sch1",
+            "name": "top",
+            "components": [
+              {
+                "id": "c3",
+                "type": "IN",
+                "x": 88,
+                "y": 110,
+                "params": {
+                  "name": "a",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c4",
+                "type": "IN",
+                "x": 88,
+                "y": 132,
+                "params": {
+                  "name": "b",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c5",
+                "type": "XOR",
+                "x": 264,
+                "y": 110,
+                "params": {
+                  "inputs": 2
+                }
+              },
+              {
+                "id": "c6",
+                "type": "AND",
+                "x": 264,
+                "y": 220,
+                "params": {
+                  "inputs": 2
+                }
+              },
+              {
+                "id": "c7",
+                "type": "OUT",
+                "x": 484,
+                "y": 121,
+                "params": {
+                  "name": "sum",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c8",
+                "type": "OUT",
+                "x": 484,
+                "y": 231,
+                "params": {
+                  "name": "cout",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c15",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 126,
+                "params": {
+                  "axis": "h"
+                }
+              },
+              {
+                "id": "c19",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 148,
+                "params": {
+                  "axis": "h"
+                }
+              }
+            ],
+            "wires": [
+              {
+                "id": "w13",
+                "from": {
+                  "cid": "c5",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c7",
+                  "pid": "i"
+                },
+                "name": "sum_w",
+                "width": 1
+              },
+              {
+                "id": "w14",
+                "from": {
+                  "cid": "c6",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c8",
+                  "pid": "i"
+                },
+                "name": "carry",
+                "width": 1
+              },
+              {
+                "id": "w16",
+                "from": {
+                  "cid": "c3",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c15",
+                  "pid": "j"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w17",
+                "from": {
+                  "cid": "c15",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c5",
+                  "pid": "i0"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w18",
+                "from": {
+                  "cid": "c15",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c6",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w20",
+                "from": {
+                  "cid": "c4",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c19",
+                  "pid": "j"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w21",
+                "from": {
+                  "cid": "c19",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c5",
+                  "pid": "i1"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w22",
+                "from": {
+                  "cid": "c19",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c6",
+                  "pid": "i1"
+                },
+                "name": ""
+              }
+            ]
+          },
+          "sch51": {
+            "id": "sch51",
+            "name": "tt_seg_a",
+            "components": [
+              {
+                "id": "a",
+                "type": "IN",
+                "x": 66,
+                "y": 275,
+                "params": {
+                  "name": "a",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "b",
+                "type": "IN",
+                "x": 66,
+                "y": 385,
+                "params": {
+                  "name": "b",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "c",
+                "type": "IN",
+                "x": 66,
+                "y": 627,
+                "params": {
+                  "name": "c",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "d",
+                "type": "IN",
+                "x": 66,
+                "y": 198,
+                "params": {
+                  "name": "d",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g1",
+                "type": "NOT",
+                "x": 264,
+                "y": 66,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g2",
+                "type": "NOT",
+                "x": 264,
+                "y": 132,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g3",
+                "type": "AND",
+                "x": 462,
+                "y": 66,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g4",
+                "type": "NOT",
+                "x": 264,
+                "y": 198,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g5",
+                "type": "AND",
+                "x": 660,
+                "y": 77,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g6",
+                "type": "NOT",
+                "x": 264,
+                "y": 275,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g7",
+                "type": "AND",
+                "x": 462,
+                "y": 363,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g8",
+                "type": "AND",
+                "x": 660,
+                "y": 198,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g9",
+                "type": "OR",
+                "x": 858,
+                "y": 88,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g10",
+                "type": "NOT",
+                "x": 264,
+                "y": 693,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g11",
+                "type": "AND",
+                "x": 462,
+                "y": 627,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g12",
+                "type": "OR",
+                "x": 1056,
+                "y": 99,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g13",
+                "type": "NOT",
+                "x": 264,
+                "y": 385,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g14",
+                "type": "AND",
+                "x": 462,
+                "y": 275,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g15",
+                "type": "NOT",
+                "x": 264,
+                "y": 627,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g16",
+                "type": "AND",
+                "x": 660,
+                "y": 286,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g17",
+                "type": "OR",
+                "x": 1254,
+                "y": 110,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "seg_a",
+                "type": "OUT",
+                "x": 1452,
+                "y": 121,
+                "params": {
+                  "name": "seg_a",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "c534",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 214,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c538",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 643,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c542",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 401,
+                "params": {
+                  "axis": "h",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c549",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 291,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c550",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 258,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              }
+            ],
+            "wires": [
+              {
+                "id": "w517",
+                "from": {
+                  "cid": "_g1",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g3",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w518",
+                "from": {
+                  "cid": "_g2",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g3",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 154
+                  },
+                  {
+                    "x": 451,
+                    "y": 110
+                  }
+                ]
+              },
+              {
+                "id": "w519",
+                "from": {
+                  "cid": "_g3",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g5",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w520",
+                "from": {
+                  "cid": "_g4",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g5",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 220
+                  },
+                  {
+                    "x": 649,
+                    "y": 121
+                  }
+                ]
+              },
+              {
+                "id": "w521",
+                "from": {
+                  "cid": "_g6",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g7",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 297
+                  },
+                  {
+                    "x": 451,
+                    "y": 385
+                  }
+                ]
+              },
+              {
+                "id": "w522",
+                "from": {
+                  "cid": "_g7",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g8",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 396
+                  },
+                  {
+                    "x": 649,
+                    "y": 242
+                  }
+                ]
+              },
+              {
+                "id": "w523",
+                "from": {
+                  "cid": "_g5",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g9",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w524",
+                "from": {
+                  "cid": "_g8",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g9",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 847,
+                    "y": 231
+                  },
+                  {
+                    "x": 847,
+                    "y": 132
+                  }
+                ]
+              },
+              {
+                "id": "w525",
+                "from": {
+                  "cid": "_g10",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g11",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 715
+                  },
+                  {
+                    "x": 451,
+                    "y": 671
+                  }
+                ]
+              },
+              {
+                "id": "w526",
+                "from": {
+                  "cid": "_g9",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g12",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w527",
+                "from": {
+                  "cid": "_g11",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g12",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 1045,
+                    "y": 660
+                  },
+                  {
+                    "x": 1045,
+                    "y": 143
+                  }
+                ]
+              },
+              {
+                "id": "w528",
+                "from": {
+                  "cid": "_g13",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g14",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 440,
+                    "y": 407
+                  },
+                  {
+                    "x": 440,
+                    "y": 319
+                  }
+                ]
+              },
+              {
+                "id": "w529",
+                "from": {
+                  "cid": "_g14",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g16",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w530",
+                "from": {
+                  "cid": "_g15",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g16",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 429,
+                    "y": 649
+                  },
+                  {
+                    "x": 429,
+                    "y": 352
+                  },
+                  {
+                    "x": 638,
+                    "y": 352
+                  },
+                  {
+                    "x": 638,
+                    "y": 330
+                  }
+                ]
+              },
+              {
+                "id": "w531",
+                "from": {
+                  "cid": "_g12",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g17",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w532",
+                "from": {
+                  "cid": "_g16",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g17",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 1243,
+                    "y": 319
+                  },
+                  {
+                    "x": 1243,
+                    "y": 154
+                  }
+                ]
+              },
+              {
+                "id": "w533",
+                "from": {
+                  "cid": "_g17",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "seg_a",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w535",
+                "from": {
+                  "cid": "d",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c534",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w536",
+                "from": {
+                  "cid": "c534",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g4",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w537",
+                "from": {
+                  "cid": "c534",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g8",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 253,
+                    "y": 253
+                  },
+                  {
+                    "x": 638,
+                    "y": 253
+                  },
+                  {
+                    "x": 638,
+                    "y": 231
+                  },
+                  {
+                    "x": 649,
+                    "y": 231
+                  },
+                  {
+                    "x": 649,
+                    "y": 220
+                  }
+                ]
+              },
+              {
+                "id": "w539",
+                "from": {
+                  "cid": "c",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c538",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w540",
+                "from": {
+                  "cid": "c538",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g11",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 253,
+                    "y": 616
+                  },
+                  {
+                    "x": 451,
+                    "y": 616
+                  },
+                  {
+                    "x": 451,
+                    "y": 649
+                  }
+                ]
+              },
+              {
+                "id": "w541",
+                "from": {
+                  "cid": "c538",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g15",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w544",
+                "from": {
+                  "cid": "b",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c542",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w546",
+                "from": {
+                  "cid": "c542",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g2",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 242,
+                    "y": 154
+                  }
+                ]
+              },
+              {
+                "id": "w547",
+                "from": {
+                  "cid": "c542",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g13",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w548",
+                "from": {
+                  "cid": "c542",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g7",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 253,
+                    "y": 440
+                  },
+                  {
+                    "x": 451,
+                    "y": 440
+                  },
+                  {
+                    "x": 451,
+                    "y": 407
+                  }
+                ]
+              },
+              {
+                "id": "w551",
+                "from": {
+                  "cid": "a",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c549",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w552",
+                "from": {
+                  "cid": "c549",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g6",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w553",
+                "from": {
+                  "cid": "c549",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g10",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 231,
+                    "y": 715
+                  }
+                ]
+              },
+              {
+                "id": "w554",
+                "from": {
+                  "cid": "c549",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c550",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w555",
+                "from": {
+                  "cid": "c550",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g1",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 231,
+                    "y": 88
+                  }
+                ]
+              },
+              {
+                "id": "w556",
+                "from": {
+                  "cid": "c550",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g14",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 264
+                  },
+                  {
+                    "x": 451,
+                    "y": 297
+                  }
+                ]
+              }
+            ],
+            "locked": true
+          }
+        },
+        "customs": {},
+        "id": "prj2",
+        "openTabs": [
+          "sch1",
+          "sch51"
+        ],
+        "activeId": "sch51"
+      }
+    },
+    "activeId": "prj2"
+  },
+  "project": {
+    "name": "my_project",
+    "topId": "sch1",
+    "schematics": {
+      "sch1": {
+        "id": "sch1",
+        "name": "top",
+        "components": [
+          {
+            "id": "c3",
+            "type": "IN",
+            "x": 88,
+            "y": 110,
+            "params": {
+              "name": "a",
+              "width": 1
+            }
+          },
+          {
+            "id": "c4",
+            "type": "IN",
+            "x": 88,
+            "y": 132,
+            "params": {
+              "name": "b",
+              "width": 1
+            }
+          },
+          {
+            "id": "c5",
+            "type": "XOR",
+            "x": 264,
+            "y": 110,
+            "params": {
+              "inputs": 2
+            }
+          },
+          {
+            "id": "c6",
+            "type": "AND",
+            "x": 264,
+            "y": 220,
+            "params": {
+              "inputs": 2
+            }
+          },
+          {
+            "id": "c7",
+            "type": "OUT",
+            "x": 484,
+            "y": 121,
+            "params": {
+              "name": "sum",
+              "width": 1
+            }
+          },
+          {
+            "id": "c8",
+            "type": "OUT",
+            "x": 484,
+            "y": 231,
+            "params": {
+              "name": "cout",
+              "width": 1
+            }
+          },
+          {
+            "id": "c15",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 126,
+            "params": {
+              "axis": "h"
+            }
+          },
+          {
+            "id": "c19",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 148,
+            "params": {
+              "axis": "h"
+            }
+          }
+        ],
+        "wires": [
+          {
+            "id": "w13",
+            "from": {
+              "cid": "c5",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c7",
+              "pid": "i"
+            },
+            "name": "sum_w",
+            "width": 1
+          },
+          {
+            "id": "w14",
+            "from": {
+              "cid": "c6",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c8",
+              "pid": "i"
+            },
+            "name": "carry",
+            "width": 1
+          },
+          {
+            "id": "w16",
+            "from": {
+              "cid": "c3",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c15",
+              "pid": "j"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w17",
+            "from": {
+              "cid": "c15",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c5",
+              "pid": "i0"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w18",
+            "from": {
+              "cid": "c15",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c6",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w20",
+            "from": {
+              "cid": "c4",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c19",
+              "pid": "j"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w21",
+            "from": {
+              "cid": "c19",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c5",
+              "pid": "i1"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w22",
+            "from": {
+              "cid": "c19",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c6",
+              "pid": "i1"
+            },
+            "name": ""
+          }
+        ]
+      },
+      "sch51": {
+        "id": "sch51",
+        "name": "tt_seg_a",
+        "components": [
+          {
+            "id": "a",
+            "type": "IN",
+            "x": 66,
+            "y": 275,
+            "params": {
+              "name": "a",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "b",
+            "type": "IN",
+            "x": 66,
+            "y": 385,
+            "params": {
+              "name": "b",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "c",
+            "type": "IN",
+            "x": 66,
+            "y": 627,
+            "params": {
+              "name": "c",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "d",
+            "type": "IN",
+            "x": 66,
+            "y": 198,
+            "params": {
+              "name": "d",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g1",
+            "type": "NOT",
+            "x": 264,
+            "y": 66,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g2",
+            "type": "NOT",
+            "x": 264,
+            "y": 132,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g3",
+            "type": "AND",
+            "x": 462,
+            "y": 66,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g4",
+            "type": "NOT",
+            "x": 264,
+            "y": 198,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g5",
+            "type": "AND",
+            "x": 660,
+            "y": 77,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g6",
+            "type": "NOT",
+            "x": 264,
+            "y": 275,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g7",
+            "type": "AND",
+            "x": 462,
+            "y": 363,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g8",
+            "type": "AND",
+            "x": 660,
+            "y": 198,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g9",
+            "type": "OR",
+            "x": 858,
+            "y": 88,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g10",
+            "type": "NOT",
+            "x": 264,
+            "y": 693,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g11",
+            "type": "AND",
+            "x": 462,
+            "y": 627,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g12",
+            "type": "OR",
+            "x": 1056,
+            "y": 99,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g13",
+            "type": "NOT",
+            "x": 264,
+            "y": 385,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g14",
+            "type": "AND",
+            "x": 462,
+            "y": 275,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g15",
+            "type": "NOT",
+            "x": 264,
+            "y": 627,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g16",
+            "type": "AND",
+            "x": 660,
+            "y": 286,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g17",
+            "type": "OR",
+            "x": 1254,
+            "y": 110,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "seg_a",
+            "type": "OUT",
+            "x": 1452,
+            "y": 121,
+            "params": {
+              "name": "seg_a",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "c534",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 214,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c538",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 643,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c542",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 401,
+            "params": {
+              "axis": "h",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c549",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 291,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c550",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 258,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          }
+        ],
+        "wires": [
+          {
+            "id": "w517",
+            "from": {
+              "cid": "_g1",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g3",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w518",
+            "from": {
+              "cid": "_g2",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g3",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 154
+              },
+              {
+                "x": 451,
+                "y": 110
+              }
+            ]
+          },
+          {
+            "id": "w519",
+            "from": {
+              "cid": "_g3",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g5",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w520",
+            "from": {
+              "cid": "_g4",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g5",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 220
+              },
+              {
+                "x": 649,
+                "y": 121
+              }
+            ]
+          },
+          {
+            "id": "w521",
+            "from": {
+              "cid": "_g6",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g7",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 297
+              },
+              {
+                "x": 451,
+                "y": 385
+              }
+            ]
+          },
+          {
+            "id": "w522",
+            "from": {
+              "cid": "_g7",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g8",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 396
+              },
+              {
+                "x": 649,
+                "y": 242
+              }
+            ]
+          },
+          {
+            "id": "w523",
+            "from": {
+              "cid": "_g5",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g9",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w524",
+            "from": {
+              "cid": "_g8",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g9",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 847,
+                "y": 231
+              },
+              {
+                "x": 847,
+                "y": 132
+              }
+            ]
+          },
+          {
+            "id": "w525",
+            "from": {
+              "cid": "_g10",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g11",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 715
+              },
+              {
+                "x": 451,
+                "y": 671
+              }
+            ]
+          },
+          {
+            "id": "w526",
+            "from": {
+              "cid": "_g9",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g12",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w527",
+            "from": {
+              "cid": "_g11",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g12",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 1045,
+                "y": 660
+              },
+              {
+                "x": 1045,
+                "y": 143
+              }
+            ]
+          },
+          {
+            "id": "w528",
+            "from": {
+              "cid": "_g13",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g14",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 440,
+                "y": 407
+              },
+              {
+                "x": 440,
+                "y": 319
+              }
+            ]
+          },
+          {
+            "id": "w529",
+            "from": {
+              "cid": "_g14",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g16",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w530",
+            "from": {
+              "cid": "_g15",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g16",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 429,
+                "y": 649
+              },
+              {
+                "x": 429,
+                "y": 352
+              },
+              {
+                "x": 638,
+                "y": 352
+              },
+              {
+                "x": 638,
+                "y": 330
+              }
+            ]
+          },
+          {
+            "id": "w531",
+            "from": {
+              "cid": "_g12",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g17",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w532",
+            "from": {
+              "cid": "_g16",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g17",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 1243,
+                "y": 319
+              },
+              {
+                "x": 1243,
+                "y": 154
+              }
+            ]
+          },
+          {
+            "id": "w533",
+            "from": {
+              "cid": "_g17",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "seg_a",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w535",
+            "from": {
+              "cid": "d",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c534",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w536",
+            "from": {
+              "cid": "c534",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g4",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w537",
+            "from": {
+              "cid": "c534",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g8",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 253,
+                "y": 253
+              },
+              {
+                "x": 638,
+                "y": 253
+              },
+              {
+                "x": 638,
+                "y": 231
+              },
+              {
+                "x": 649,
+                "y": 231
+              },
+              {
+                "x": 649,
+                "y": 220
+              }
+            ]
+          },
+          {
+            "id": "w539",
+            "from": {
+              "cid": "c",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c538",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w540",
+            "from": {
+              "cid": "c538",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g11",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 253,
+                "y": 616
+              },
+              {
+                "x": 451,
+                "y": 616
+              },
+              {
+                "x": 451,
+                "y": 649
+              }
+            ]
+          },
+          {
+            "id": "w541",
+            "from": {
+              "cid": "c538",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g15",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w544",
+            "from": {
+              "cid": "b",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c542",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w546",
+            "from": {
+              "cid": "c542",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g2",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 242,
+                "y": 154
+              }
+            ]
+          },
+          {
+            "id": "w547",
+            "from": {
+              "cid": "c542",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g13",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w548",
+            "from": {
+              "cid": "c542",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g7",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 253,
+                "y": 440
+              },
+              {
+                "x": 451,
+                "y": 440
+              },
+              {
+                "x": 451,
+                "y": 407
+              }
+            ]
+          },
+          {
+            "id": "w551",
+            "from": {
+              "cid": "a",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c549",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w552",
+            "from": {
+              "cid": "c549",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g6",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w553",
+            "from": {
+              "cid": "c549",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g10",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 231,
+                "y": 715
+              }
+            ]
+          },
+          {
+            "id": "w554",
+            "from": {
+              "cid": "c549",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c550",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w555",
+            "from": {
+              "cid": "c550",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g1",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 231,
+                "y": 88
+              }
+            ]
+          },
+          {
+            "id": "w556",
+            "from": {
+              "cid": "c550",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g14",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 264
+              },
+              {
+                "x": 451,
+                "y": 297
+              }
+            ]
+          }
+        ],
+        "locked": true
+      }
+    },
+    "customs": {},
+    "id": "prj2",
+    "openTabs": [
+      "sch1",
+      "sch51"
+    ],
+    "activeId": "sch51"
+  },
+  "activeId": "sch51",
+  "openTabs": [
+    "sch1",
+    "sch51"
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "source": "Ch7_CounterAddon.pdf",
+  "group": "content",
+  "chapter": "7",
+  "title": "Synchronous Counter Design (Addon, Thai)",
+  "chunks": [
+    {
+      "id": "ch7-addon-1-synchronous-counter-overview",
+      "section": "addon-1",
+      "topic": "ภาพรวม Synchronous Counter (Synchronous Counter Overview)",
+      "type": "concept",
+      "summary": "Synchronous Counter คือวงจรนับที่ Flip-Flop ทุกตัวทำงานพร้อมกันโดยใช้ clock ร่วมกัน ทำให้เอาต์พุตเปลี่ยนพร้อมกันและมีความผิดพลาดน้อยกว่าวงจรแบบ asynchronous.",
+      "text": "Synchronous Counter เป็นวงจรนับที่มีการควบคุมการทำงานของ Flip-Flop ทุกตัวที่อยู่ในวงจรให้ทำงานพร้อมกัน โดยใช้สัญญาณ clock ตัวเดียวกันเป็นสัญญาณควบคุมการทำงานของทุก Flip-Flop (ไม่เหมือนวงจร ripple/asynchronous counter ที่ clock ของแต่ละตัวต่อไล่กันไปจากเอาต์พุตของตัวก่อนหน้า) เมื่อ Flip-Flop ทุกตัวใช้สัญญาณ clock เดียวกัน และหากแต่ละ Flip-Flop มีเวลาในการทำงาน (propagation delay) ใกล้เคียงกัน เอาต์พุตของการนับทุกบิตจะเปลี่ยนค่าไปพร้อมกันในจังหวะเดียวกัน ข้อดีหลักของ Synchronous Counter คือ (1) เวลาในการทำงานรวมของวงจรเท่ากับเวลาของ Flip-Flop ตัวเดียวหรือของสัญญาณที่ใช้เวลามากที่สุดเท่านั้น (ไม่สะสมความหน่วงเหมือน ripple counter) และ (2) ความผิดพลาด (glitch/error) ที่อาจเกิดขึ้นจากความหน่วงสะสมมีโอกาสเกิดน้อยลงมาก ตัวอย่างวงจรพื้นฐานคือ 4-Bit Binary Synchronous Counter ซึ่งใช้ JK Flip-Flop แบบ Preset-Clear (มีขา PRESET และ CLEAR แบบ asynchronous) ต่อร่วมกับ AND gate เพื่อสร้างสัญญาณ J และ K ให้แต่ละ Flip-Flop toggle เฉพาะเมื่อบิตที่มีนัยสำคัญต่ำกว่าทั้งหมดเป็น 1",
+      "keywords": ["synchronous counter", "clock ร่วม", "propagation delay", "JK flip-flop", "preset-clear"],
+      "pages": [1, 2],
+      "needs_figure": true,
+      "figure_note": "Page 2 (image page) แสดงวงจร 4-Bit Binary Synchronous Counter: Flip-Flop A, B, C, D เรียงจากซ้ายไปขวา แต่ละตัวเป็น negative-edge-triggered JK Flip-Flop; FF A มี J=K=1 คงที่ (toggle ทุก clock); เอาต์พุต Q ของ A ต่อเข้า AND gate ร่วมกับสายที่มาจาก 2^1 เพื่อสร้าง J/K ของ FF B; เอาต์พุตของ AND gate แรกต่อร่วมกับ Q ของ FF C เข้า AND gate ที่สองเพื่อสร้าง J/K ของ FF D; ทุก Flip-Flop clock ร่วมกันจากสาย Clock เดียวกัน เอาต์พุต Q ของแต่ละตัวคือบิต 2^0 (A), 2^1 (B), 2^2 (C), 2^3 (D) ตามลำดับ -- โครงสร้างเดียวกับวงจร synchronous up counter มาตรฐานใน Ch_7.pdf หน้า 12.",
+      "related_labs": []
+    },
+    {
+      "id": "ch7-addon-2-jk-input-control-and-design-steps",
+      "section": "addon-2",
+      "topic": "การควบคุมอินพุต JK และขั้นตอนการออกแบบ Synchronous Counter",
+      "type": "method",
+      "summary": "การป้อนค่า J,K (หรือ D) ให้ Flip-Flop ขึ้นกับว่าต้องการให้เอาต์พุตเปลี่ยนจากค่าใดไปค่าใด; การออกแบบ Synchronous Counter มี 4 ขั้นตอนหลัก: สร้างตารางค่านับ, สร้างตารางความจริงหาค่า J/K, หาสมการด้วย Boolean/K-map, แล้วสร้างวงจร.",
+      "text": "การทำงานของ Synchronous Counter คือการควบคุมให้ค่าเอาต์พุตเปลี่ยนไปตามลำดับที่ต้องการ ดังนั้นผู้ออกแบบต้องเข้าใจว่า หากต้องการให้เอาต์พุตของ Flip-Flop เปลี่ยนจาก 0 เป็น 1 (หรือค่าอื่น ๆ) จะต้องป้อนค่าอินพุตควบคุมอย่างไร ซึ่งค่าที่ต้องป้อนจะแตกต่างกันไปตามชนิดของ Flip-Flop: กรณี D-Flip-Flop ป้อนค่า D เท่ากับค่าถัดไป (D=1 เพื่อให้ผลลัพธ์เป็น 1) ส่วนกรณี JK Flip-Flop การเปลี่ยนจาก 0 เป็น 1 สามารถป้อนได้สองแบบคือ J=1,K=0 (Set) หรือ J=1,K=1 (Toggle) ก็ได้ ในทางปฏิบัติทั่วไปนิยมใช้ Preset-Clear JK Flip-Flop (มีขา asynchronous PRESET, CLEAR เพิ่มจาก J,K,Clock ปกติ) ตาราง Truth Table ของ negative-edge-triggered JK Flip-Flop สรุปได้เป็นสองรูปแบบ: (ก) ตารางแบบ PRESET/CLEAR/J/K/Clock -> Q,Q-bar ซึ่งรวมทั้ง Set State, Reset State, Unchanged State, Toggle, และ Unused State (เมื่อ PRESET=CLEAR=0 พร้อมกัน); (ข) ตารางแบบ excitation (Before Clock Q -> J,K ที่ต้องป้อน -> After Clock Q): 0->0 ต้องการ J=0,K=X; 0->1 ต้องการ J=1,K=X; 1->0 ต้องการ J=X,K=1; 1->1 ต้องการ J=X,K=0 ขั้นตอนการออกแบบ Synchronous Counter มี 4 ขั้นตอน: 1) สร้างตารางค่าการนับ (เอาต์พุต) ที่ต้องการ; 2) สร้างตารางความจริงสำหรับหาค่า Input (J และ K) ของ Flip-Flop ทุกตัว โดยอาศัย Output ที่กำหนดและตารางการเปลี่ยนแปลง (excitation table) ของ Flip-Flop ที่ใช้ (กรณีนี้คือ JK FF); 3) นำตารางความจริงที่ได้มาหาค่า Input ของ Flip-Flop ทุกตัวในรูปสมการ โดยใช้ Boolean Algebra หรือ Karnaugh Map; 4) นำสมการที่ได้มาสร้างวงจรจริง",
+      "keywords": ["JK excitation table", "PRESET CLEAR", "D flip-flop", "ขั้นตอนออกแบบ counter", "Boolean algebra", "Karnaugh map"],
+      "pages": [3, 4, 5, 6],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch7-addon-3-example-3bit-synchronous-counter-design",
+      "section": "addon-3",
+      "topic": "ตัวอย่างการออกแบบ 3-Bit Binary Synchronous Counter",
+      "type": "example",
+      "summary": "ตัวอย่างออกแบบวงจรนับไบนารี 3 บิต (0-7) แบบ Synchronous ด้วย JK Flip-Flop ครบทุกขั้นตอน ตั้งแต่ตาราง PRESENT/NEXT state จนถึงสมการสุดท้าย: JA=1, KA=1, JB=A, KB=A, JC=AB, KC=AB.",
+      "text": "ตัวอย่างการออกแบบ 3-Bit Binary Synchronous Counter (นับ 0 ถึง 7 วนซ้ำ: 0->1->2->...->7->0) เริ่มจากสร้างตารางค่าการนับ/ตารางการเปลี่ยนแปลง Output (Q) ของ Flip-Flop ทุกตัว เป็นตาราง PRESENT state (QC QB QA) กับ NEXT state (QC QB QA): 000->001, 001->010, 010->011, 011->100, 100->101, 101->110, 110->111, 111->000 ขั้นตอนถัดไปสร้างตารางความจริงหาค่า Input JA,KA,JB,KB,JC,KC จาก Output ที่กำหนดและตารางการเปลี่ยนแปลงของ JK Flip-Flop (excitation table: 0->0:J=0,K=X; 0->1:J=1,K=X; 1->0:J=X,K=1; 1->1:J=X,K=0) จากนั้นใช้ Karnaugh Map (แปรผัน BA ตามแกนนอน, C ตามแกนตั้ง) หาค่า Input ของแต่ละ Flip-Flop จนได้ผลลัพธ์ดังนี้: JC = AB (K-map ของ JC มีค่า 1 เฉพาะที่ตำแหน่ง C=0,BA=11 และเป็น X ทั้งแถว C=1); KC = AB (สมมาตรกัน โดยมีค่า 1 ที่ C=1,BA=11); JB = A (ไม่ขึ้นกับ C); KB = A; JA = 1 (คงที่); KA = 1 (คงที่) สรุปสมการสุดท้ายสำหรับวงจร 3-bit synchronous up counter มาตรฐาน: JA=1, KA=1 (Flip-Flop A toggle ทุก clock เสมอ); JB=A, KB=A (Flip-Flop B toggle เมื่อ QA=1); JC=A*B, KC=A*B (Flip-Flop C toggle เมื่อ QA=1 และ QB=1 พร้อมกัน) ซึ่งตรงกับโครงสร้างมาตรฐานของ synchronous binary up counter ที่ใช้ AND gate ไล่ระดับ (cascaded AND) ในตำราหลัก Ch_7 (7-3 และ 7-9/7-10).",
+      "keywords": ["3-bit synchronous counter", "K-map", "JA KA JB KB JC KC", "excitation table", "PRESENT NEXT state"],
+      "pages": [7, 8, 9, 10, 11, 12, 13],
+      "needs_figure": true,
+      "figure_note": "Page 10 (transcribed via vision) shows the K-maps (axes BA=00/01/11/10 horizontal, C=0/1 vertical) for JC and KC: JC K-map has a single 1 at C=0,BA=11 (rest 0, C=1 row all X), giving JC=AB; KC K-map has a single 1 at C=1,BA=11 (rest 0, C=0 row all X), giving KC=AB. Pages 11-12 show analogous K-maps for JB/KB (giving JB=A, KB=A) and JA/KA (giving JA=1, KA=1, i.e. all-1 maps). Page 13 is a summary slide restating all six final equations.",
+      "related_labs": ["Lab6", "Lab7"]
+    },
+    {
+      "id": "ch7-addon-4-mod-n-synchronous-counter",
+      "section": "addon-4",
+      "topic": "Mod-N Synchronous Counter (ตัวอย่าง Mod-5 และ Mod-6)",
+      "type": "example",
+      "summary": "การออกแบบ Mod-N Synchronous Counter ใช้วิธีเดียวกับ Synchronous Counter ปกติ เพียงกำหนดค่าการนับ (PRESENT/NEXT state) ให้ตรงกับจำนวน Mod ที่ต้องการ ตัวอย่าง Mod-5 ได้ JA=C, KA=1, JB=A, KB=A, JC=AB, KC=1 และ Mod-6 ได้ JC=AB, KC=A, JB=AC, KB=A, JA=1, KA=1.",
+      "text": "การออกแบบ Mod-N Synchronous Counter ใช้วิธีการเดียวกันกับการออกแบบวงจร Synchronous Counter ปกติ (ตามขั้นตอน 4 ข้อในหัวข้อก่อนหน้า) เพียงแต่กำหนดค่าการนับ (ลำดับ PRESENT/NEXT state) ให้ตรงกับค่า Mod ที่ต้องการ แทนที่จะนับครบวงจรไบนารีเต็ม (Mod = 2^N) โดยลำดับการนับจะถูกบังคับให้วนกลับไปที่ 0 ก่อนถึงค่าสูงสุดตามธรรมชาติของจำนวนบิตนั้น ตัวอย่างที่ยกมาคือ Mod-5 Counter (PRESENT/NEXT: 000->001->010->011->100->000) และ Mod-6 Counter (PRESENT/NEXT: 000->001->010->011->100->101->000) ทั้งสองใช้ Flip-Flop 3 ตัว (A,B,C) เหมือนกัน แต่มีสถานะที่ 'จบ' (ค่าที่วนกลับ 0) ต่างกัน คือ Mod-5 จบที่ 100 (=4) แล้ววนกลับ 0 ส่วน Mod-6 จบที่ 101 (=5) แล้ววนกลับ 0 หลังผ่านขั้นตอน Karnaugh Map เช่นเดียวกับตัวอย่างวงจร 3-bit ปกติ ได้สมการ Mod-5 Synchronous Counter ดังนี้: JA = C, KA = 1, JB = A, KB = A, JC = AB, KC = 1 และสมการ Mod-6 Synchronous Counter ดังนี้: JC = AB, KC = A, JB = AC, KB = A, JA = 1, KA = 1 สังเกตว่าสมการของ Mod-N Counter จะต่างจาก Binary Counter ปกติ (ซึ่งมี JA=KA=1 เสมอ, JB=KB=A, JC=KC=AB) เนื่องจากต้องมีเงื่อนไขพิเศษเพื่อบังคับให้วงจรกลับไปที่ 0 แทนที่จะนับต่อไปจนครบ 2^N สถานะ",
+      "keywords": ["Mod-N counter", "Mod-5 counter", "Mod-6 counter", "PRESENT NEXT state", "Karnaugh map"],
+      "pages": [14, 15, 16],
+      "needs_figure": true,
+      "figure_note": "Page 14 shows two PRESENT/NEXT-state tables side by side for Mod-5 (000,001,010,011,100 cycling, with 100->000) and Mod-6 (000,001,010,011,100,101 cycling, with 101->000), labeled with column headers Cq,Bq,Aq (present) and Cq,Bq,Aq (next). Pages 15-16 (equation-summary slides) list the final JA/KA/JB/KB/JC/KC equations for Mod-5 and Mod-6 respectively as transcribed in the text.",
+      "related_labs": ["Lab6", "Lab7"]
+    },
+    {
+      "id": "ch7-addon-5-synchronous-down-counter",
+      "section": "addon-5",
+      "topic": "Synchronous Down Counter",
+      "type": "concept",
+      "summary": "วงจร Synchronous Down Counter ใช้เอาต์พุตกลับด้าน (Q-bar) ของ Flip-Flop บิตต่ำกว่า แทนที่ Q ปกติ เพื่อป้อนเข้าตรรกะ J/K ของ Flip-Flop บิตสูงกว่า ทำให้วงจรนับถอยหลังแทนการนับขึ้น.",
+      "text": "Synchronous Down Counter คือวงจรนับถอยหลังที่ Flip-Flop ทุกตัวทำงานพร้อมกันเช่นเดียวกับ Synchronous (Up) Counter แต่ต่างกันตรงที่วงจรนี้ใช้เอาต์พุตกลับด้าน (inverted output, Q-bar) ของ Flip-Flop บิตที่มีนัยสำคัญต่ำกว่า มาต่อควบคุมค่า J,K ของ Flip-Flop บิตที่มีนัยสำคัญสูงกว่า (higher-order) แทนที่จะใช้เอาต์พุตปกติ (Q) เหมือนวงจรนับขึ้น ตัวอย่างวงจร 3-bit Synchronous Down Counter: Flip-Flop บิต 2^0 มี J=K=1 คงที่ (toggle ทุก clock เหมือนเดิม); เอาต์พุต Q-bar ของบิต 2^0 ต่อเข้า J,K ของบิต 2^1; ส่วน J,K ของบิต 2^2 มาจาก AND ของเอาต์พุต Q-bar ของบิต 2^0 และ 2^1 ทุก Flip-Flop clock ร่วมกันจากสาย Clock เดียวกัน ทำให้ลำดับการนับเป็น 111 -> 110 -> 101 -> ... -> 000 -> 111 (นับถอยหลังวนซ้ำ) ซึ่งเป็นภาพสะท้อนของวงจร Synchronous Up Counter ที่สลับใช้ Q-bar แทน Q ทุกจุด",
+      "keywords": ["synchronous down counter", "Q-bar", "inverted output", "count down"],
+      "pages": [17],
+      "needs_figure": true,
+      "figure_note": "Page 17 (image page, rendered via vision) shows the 3-bit Synchronous Down Counter schematic: three JK flip-flops (bits 2^0, 2^1, 2^2) with a common Clock line; JA=KA=1 fixed; the Q-bar output of the 2^0 FF feeds J and K of the 2^1 FF; a 2-input AND gate combining the Q-bar outputs of the 2^0 and 2^1 FFs feeds J and K of the 2^2 FF -- the mirror image of the standard up-counter using Q-bar at every stage instead of Q.",
+      "related_labs": ["Lab7"]
+    },
+    {
+      "id": "ch7-addon-6-synchronous-updown-counter",
+      "section": "addon-6",
+      "topic": "Synchronous Up-Down Counter",
+      "type": "concept",
+      "summary": "Synchronous Up-Down Counter นับขึ้นหรือนับลงได้ในวงจรเดียว โดยอาศัยสัญญาณควบคุม (Up/Down) เลือกว่าจะนับขึ้นหรือนับลง ณ ขณะนั้น ใช้ได้ในงานเช่นแสดงจำนวนที่จอดรถว่างในลานจอดรถ.",
+      "text": "Synchronous Up-Down Counter เป็นวงจรนับที่สามารถนับขึ้นหรือนับลงได้ในวงจรเดียวกัน โดยอาศัยสัญญาณควบคุม (เรียกว่า Up/Down) เลือกโหมดการนับในเวลาหนึ่ง ๆ วงจรลักษณะนี้ถูกนำไปใช้งานได้หลากหลาย เช่น ใช้เป็นตัวแสดงจำนวนรถในลานจอดรถ เพื่อให้ทราบว่าขณะนั้นยังมีที่ว่างสำหรับจอดรถได้อีกกี่คัน (นับขึ้นเมื่อรถออก นับลงเมื่อรถเข้า หรือในทางกลับกัน) การทำงาน: เมื่อขาควบคุม Up/Down ถูกกำหนดให้เป็นโหมดนับขึ้น สัญญาณ Clock ที่เข้ามาจะทำให้เอาต์พุตของวงจรมีค่าการนับเพิ่มขึ้นเรื่อย ๆ (0,1,2,...,7,0,... สำหรับ 3 บิต) แต่หากขาควบคุมถูกกำหนดให้เป็นโหมดนับลง Clock เดียวกันจะทำให้เอาต์พุตมีค่าการนับลดลงเรื่อย ๆ (7,6,5,...,0,7,...) ตัวอย่างตารางการนับ 3-bit UP-DOWN counter: Clock Pulse 0-7 กับคอลัมน์ UP (ลูกศรวนขึ้นจาก Q2Q1Q0=000 ผ่าน 001,010,011,100,101,110,111 แล้ววนกลับ 000) และคอลัมน์ DOWN (ลูกศรวนย้อนกลับทิศทางเดียวกัน แสดงว่าเมื่อกำหนดนับลง จะไล่จาก 111 ลงมาที่ 000 แล้ววนกลับ 111) โครงสร้างวงจรใช้ตรรกะ AND/OR/NOT ผสมกันในแต่ละบิต: อินพุต Up/Down ถูก invert ด้วย NOT gate แล้วทั้งค่าปกติและค่ากลับด้านต่างก็ถูก AND กับเอาต์พุต Q หรือ Q-bar ของบิตก่อนหน้าตามลำดับ (Q เมื่อ Up ถูกเลือก, Q-bar เมื่อ Down ถูกเลือก) แล้วนำผลของ AND ทั้งสองมา OR รวมกันเพื่อป้อนเป็น J,K ของ Flip-Flop บิตถัดไป ทำให้แต่ละ Flip-Flop ใช้ Q หรือ Q-bar ของบิตต่ำกว่าโดยอัตโนมัติตามโหมดที่เลือก",
+      "keywords": ["synchronous up-down counter", "Up/Down control", "count up", "count down", "AND-OR gating", "parking lot counter application"],
+      "pages": [18, 19, 20, 21],
+      "needs_figure": true,
+      "figure_note": "Page 19 (image page) shows a black-and-white scanned table titled 'CLOCK PULSE / UP / Q2 / Q1 / Q0 / DOWN' listing clock pulses 0-7 against Q2Q1Q0 = 000,001,010,011,100,101,110,111 with curved arrows on the UP side going forward (0->1->2...->7) and on the DOWN side going backward (7->6->...->0), illustrating that the same state sequence is traversed forward for UP and backward for DOWN. Page 21 (image page) shows the 3-bit Synchronous Up-Down Counter schematic: an Up/Down control line and its NOT-gate complement feed a pair of AND gates ahead of each stage (one gated by Up/Down using Q, one gated by NOT(Up/Down) using Q-bar of the previous stage), each pair combined through an OR gate before driving the next flip-flop's J and K inputs; all three JK flip-flops (A,B,C) share a common Clock line and produce outputs 2^0, 2^1, 2^2.",
+      "related_labs": ["Lab7"]
+    }
+  ]
+}

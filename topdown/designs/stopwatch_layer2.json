@@ -1,0 +1,286 @@
+{
+  "title": "2nd Layer (Stop-watch)",
+  "module": "Stop-watch",
+  "frame": {
+    "x": 100,
+    "y": 120,
+    "w": 1500,
+    "h": 500
+  },
+  "_layout_note": "Block y positions are chosen so connected pins share a row: cc.R0..R3 (368/390/412/434) equal disp.L2..L5, and each port y equals the pin it feeds. That is what makes the wires straight — the router cannot straighten a wire whose two ends sit on different rows.",
+  "nodes": [
+    {
+      "id": "clk_p",
+      "type": "port",
+      "x": 150,
+      "y": 198,
+      "name": "CLK",
+      "side": "left"
+    },
+    {
+      "id": "btn_p",
+      "type": "port",
+      "x": 150,
+      "y": 220,
+      "name": "Button",
+      "side": "left"
+    },
+    {
+      "id": "clr_p",
+      "type": "port",
+      "x": 150,
+      "y": 560,
+      "name": "CLR_Button",
+      "side": "left"
+    },
+    {
+      "id": "tog",
+      "type": "block",
+      "x": 350,
+      "y": 170,
+      "label": "Toggle",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "Button",
+        "CLR_Button"
+      ],
+      "pinsR": [
+        "Q"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "cc",
+      "type": "block",
+      "x": 640,
+      "y": 340,
+      "label": "Clock-Counter",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "CLR"
+      ],
+      "pinsR": [
+        "D0[3:0]",
+        "D1[3:0]",
+        "D2[3:0]",
+        "D3[3:0]"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "disp",
+      "type": "block",
+      "x": 960,
+      "y": 296,
+      "label": "Display",
+      "pinsL": [
+        {
+          "name": "clk",
+          "inv": true
+        },
+        "CLR",
+        "D0[3:0]",
+        "D1[3:0]",
+        "D2[3:0]",
+        "D3[3:0]"
+      ],
+      "pinsR": [
+        "Segment[a:g]",
+        "Point",
+        "Common[3:0]"
+      ],
+      "pinsB": [],
+      "pinsT": []
+    },
+    {
+      "id": "seg_out",
+      "type": "port",
+      "x": 1400,
+      "y": 324,
+      "name": "Segment_a_g",
+      "side": "right",
+      "bus": 7
+    },
+    {
+      "id": "point_out",
+      "type": "port",
+      "x": 1400,
+      "y": 346,
+      "name": "Point",
+      "side": "right"
+    },
+    {
+      "id": "common_out",
+      "type": "port",
+      "x": 1400,
+      "y": 368,
+      "name": "Common",
+      "side": "right",
+      "bus": 4
+    }
+  ],
+  "wires": [
+    {
+      "from": {
+        "node": "clk_p",
+        "pin": "p"
+      },
+      "to": {
+        "node": "tog",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "clk_p",
+        "pin": "p"
+      },
+      "to": {
+        "node": "disp",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "btn_p",
+        "pin": "p"
+      },
+      "to": {
+        "node": "tog",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "clr_p",
+        "pin": "p"
+      },
+      "to": {
+        "node": "tog",
+        "pin": "L2"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "clr_p",
+        "pin": "p"
+      },
+      "to": {
+        "node": "cc",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "clr_p",
+        "pin": "p"
+      },
+      "to": {
+        "node": "disp",
+        "pin": "L1"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "tog",
+        "pin": "R0"
+      },
+      "to": {
+        "node": "cc",
+        "pin": "L0"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "cc",
+        "pin": "R0"
+      },
+      "to": {
+        "node": "disp",
+        "pin": "L2"
+      },
+      "bus": 4
+    },
+    {
+      "from": {
+        "node": "cc",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "disp",
+        "pin": "L3"
+      },
+      "bus": 4
+    },
+    {
+      "from": {
+        "node": "cc",
+        "pin": "R2"
+      },
+      "to": {
+        "node": "disp",
+        "pin": "L4"
+      },
+      "bus": 4
+    },
+    {
+      "from": {
+        "node": "cc",
+        "pin": "R3"
+      },
+      "to": {
+        "node": "disp",
+        "pin": "L5"
+      },
+      "bus": 4
+    },
+    {
+      "from": {
+        "node": "disp",
+        "pin": "R0"
+      },
+      "to": {
+        "node": "seg_out",
+        "pin": "p"
+      },
+      "bus": 7
+    },
+    {
+      "from": {
+        "node": "disp",
+        "pin": "R1"
+      },
+      "to": {
+        "node": "point_out",
+        "pin": "p"
+      },
+      "bus": 0
+    },
+    {
+      "from": {
+        "node": "disp",
+        "pin": "R2"
+      },
+      "to": {
+        "node": "common_out",
+        "pin": "p"
+      },
+      "bus": 4
+    }
+  ]
+}

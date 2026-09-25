@@ -1,0 +1,127 @@
+{
+  "source": "Introduction.pdf",
+  "group": "content",
+  "chapter": "0",
+  "title": "Digital System Fundamentals - Course Introduction",
+  "chunks": [
+    {
+      "id": "intro-0-1-course-description",
+      "section": "0-1",
+      "topic": "Course Description and Scope",
+      "type": "concept",
+      "summary": "The course covers digital systems from binary fundamentals through Boolean algebra, combinational and sequential circuits, up to a basic ALU/control unit and hardware description languages.",
+      "text": "This is the syllabus/orientation deck for 'Digital System Fundamentals' (พื้นฐานระบบดิจิตอล) with its companion lab course 'Digital System Fundamentals In Practice' (ปฏิบัติการพื้นฐานระบบดิจิตอล). The course description states the topic sequence: Introduction to Digital Systems; Binary Systems; Boolean Algebra and Simplification; Combinational Circuits; Sequential Components (latches, flip-flops, registers, counters); Sequential Circuits; a Basic ALU (Arithmetic and Logic Unit) and Control Unit; and Hardware Description Language (HDL). This same order is followed by the Tocci textbook chapters used in this corpus: Ch.1 (intro concepts), Ch.2 (number systems/codes), Ch.3 (describing logic circuits/Boolean algebra), Ch.4+ (combinational logic), and later chapters on flip-flops, counters, and HDL-based design leading into the lab's top-down FPGA design flow (Lab 6, Lab 7).",
+      "keywords": [
+        "course syllabus",
+        "digital systems",
+        "boolean algebra",
+        "sequential circuits",
+        "ALU",
+        "HDL",
+        "course description"
+      ],
+      "pages": [
+        1,
+        2,
+        6
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "intro-0-2-instructional-methods-and-grading",
+      "section": "0-2",
+      "topic": "Instructional Methods and Grading Criteria",
+      "type": "definition",
+      "summary": "Teaching combines lecture, child-centered/time-constrained activity, and assignments; theory is graded final-exam-heavy while lab is graded on punctuality, lab submission, and a lab exam.",
+      "text": "Teaching and learning activities (กิจกรรมการเรียนการสอนและวิธีสอน) consist of: classroom lecture (การบรรยายในห้องเรียน), a child-centered approach constrained by time (Child center + Time constrain), and assignments. Theory evaluation (การประเมินผลทฤษฎี) is: final exam 75%, and an optional project/piece of work (ชิ้นงาน) 25%, totaling 100%. Lab evaluation (การประเมินผลปฏิบัติ) is: arriving to lab on time 20%, submitting lab work 50%, and a lab exam 30%, totaling 100%. This means lab performance is graded primarily on deliverables (lab reports/submissions) rather than a single exam, unlike the theory course which is exam-weighted.",
+      "keywords": [
+        "grading",
+        "evaluation criteria",
+        "final exam",
+        "lab exam",
+        "course policy"
+      ],
+      "pages": [
+        7,
+        8,
+        9
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "intro-0-3-textbook-and-channels",
+      "section": "0-3",
+      "topic": "Textbook and Communication Channels",
+      "type": "concept",
+      "summary": "The reference textbook is Tocci/Widmer/Moss 'Digital Systems: Principles and Applications' (Pearson); a QR code is provided as the main communication channel for course announcements.",
+      "text": "The prescribed textbook (ตำราเรียน) is 'Digital Systems: Principles and Applications', published by Pearson Education, Inc. — this is the Tocci, Widmer, and Moss textbook (11th edition) whose slide decks form the basis of Chapters 1-12 in this course's content corpus. The main communication channel (ช่องทางหลัก) for the course is given as a QR code (likely linking to a LINE group, Google Classroom, or similar platform) rather than plain text, so students are expected to scan it during orientation to join the course's official channel.",
+      "keywords": [
+        "textbook",
+        "Tocci",
+        "Digital Systems Principles and Applications",
+        "course communication"
+      ],
+      "pages": [
+        10,
+        11
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 10 states the textbook title 'Digital Systems: Principles and Applications, Pearson Education, Inc.' (the Tocci/Widmer/Moss textbook). Page 11 shows a QR code under the heading 'ช่องทางหลัก' (main channel) for students to scan and join the course's communication channel; the QR's destination cannot be read from the image alone.",
+      "related_labs": []
+    },
+    {
+      "id": "intro-0-4-lab-hardware-old-and-new-fpga-boards",
+      "section": "0-4",
+      "topic": "Lab Partners and FPGA Board Hardware",
+      "type": "concept",
+      "summary": "Labs are done in pairs, one group per section, each pair issued one old FPGA board and one new FPGA board so students learn both platforms.",
+      "text": "Lab partnering rules: one group is formed 'from each sec' (section), with 2 people per group, and each group receives 1 New FPGA board and 1 Old FPGA board. The slide shows photographs of both boards: the 'Old board' is a green PCB labeled 'FPGA SERVEYOR-6 XC6SLX9' (a Xilinx Spartan-6 XC6SLX9-based board) made by Apex Instrument Co., Ltd., featuring a DIP switch bank, push-buttons (PB1-PB6), slide switches (SW0-SW7), LEDs, and 4-digit seven-segment displays, with ribbon-cable headers for expansion. The 'New board' is a white PCB labeled 'SPARTAN 7 ...EDGE' (a Xilinx/AMD Spartan-7 based board), which additionally integrates a camera module (OV-series), a small TFT/LCD display, push-buttons, slide switches, seven-segment displays, a buzzer, USB and VGA/DB9 connectors, and what appears to be a Bluetooth/RF module — a substantially more capable I/O set than the old board. This matches the project's target device family (Spartan-7 XC7S15) noted in the ecosystem's architecture decisions.",
+      "keywords": [
+        "FPGA board",
+        "Spartan-6",
+        "Spartan-7",
+        "lab hardware",
+        "XC6SLX9",
+        "XC7S15",
+        "lab groups"
+      ],
+      "pages": [
+        12,
+        13
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 12 shows side-by-side photos: left is the 'Old board' (green PCB, Xilinx Spartan-6 XC6SLX9, DIP switches, push-buttons PB1-PB6, slide switches SW0-SW7, LEDs, 4-digit 7-segment display, ribbon headers, labeled 'FPGA SERVEYOR-6 XC6SLX9' by Apex Instrument Co., Ltd.); right is the 'New board' (white PCB, Xilinx Spartan-7, with a camera module, small color LCD, push-buttons, slide switches, 7-segment display, buzzer, USB, VGA/DB9 connector, and an RF/Bluetooth module).",
+      "related_labs": [
+        "Lab0"
+      ]
+    },
+    {
+      "id": "intro-0-5-top-down-design-labs-6-7",
+      "section": "0-5",
+      "topic": "Top-Down Design (Lab 6, Lab 7)",
+      "type": "concept",
+      "summary": "Labs 6 and 7 introduce top-down digital design methodology, which the course allows to be done either by hand or by computer (i.e., HDL/tool-assisted).",
+      "text": "The final orientation slide previews Labs 6 and 7 as covering 'Top-Down Design', explicitly noting the design work in these labs can be done 'By Hand or By Computer'. This foreshadows the later shift in the course from manual gate-level/Boolean design (Ch.3-Ch.7 style) to HDL- and tool-based design flows (VHDL/AHDL, schematic capture, or synthesis tools), which is consistent with the course description's final topics of Hardware Description Language and the ecosystem's own AI-driven, engine-agnostic drawing/synthesis pipeline for the Spartan-7 target.",
+      "keywords": [
+        "top-down design",
+        "HDL",
+        "Lab6",
+        "Lab7",
+        "design methodology"
+      ],
+      "pages": [
+        14
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab6",
+        "Lab7"
+      ]
+    }
+  ]
+}

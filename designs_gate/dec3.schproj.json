@@ -1,0 +1,3963 @@
+{
+  "version": 2,
+  "workspace": {
+    "projects": {
+      "prj2": {
+        "name": "my_project",
+        "topId": "sch1",
+        "schematics": {
+          "sch1": {
+            "id": "sch1",
+            "name": "top",
+            "components": [
+              {
+                "id": "c3",
+                "type": "IN",
+                "x": 88,
+                "y": 110,
+                "params": {
+                  "name": "a",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c4",
+                "type": "IN",
+                "x": 88,
+                "y": 132,
+                "params": {
+                  "name": "b",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c5",
+                "type": "XOR",
+                "x": 264,
+                "y": 110,
+                "params": {
+                  "inputs": 2
+                }
+              },
+              {
+                "id": "c6",
+                "type": "AND",
+                "x": 264,
+                "y": 220,
+                "params": {
+                  "inputs": 2
+                }
+              },
+              {
+                "id": "c7",
+                "type": "OUT",
+                "x": 484,
+                "y": 121,
+                "params": {
+                  "name": "sum",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c8",
+                "type": "OUT",
+                "x": 484,
+                "y": 231,
+                "params": {
+                  "name": "cout",
+                  "width": 1
+                }
+              },
+              {
+                "id": "c15",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 126,
+                "params": {
+                  "axis": "h"
+                }
+              },
+              {
+                "id": "c19",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 148,
+                "params": {
+                  "axis": "h"
+                }
+              }
+            ],
+            "wires": [
+              {
+                "id": "w13",
+                "from": {
+                  "cid": "c5",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c7",
+                  "pid": "i"
+                },
+                "name": "sum_w",
+                "width": 1
+              },
+              {
+                "id": "w14",
+                "from": {
+                  "cid": "c6",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c8",
+                  "pid": "i"
+                },
+                "name": "carry",
+                "width": 1
+              },
+              {
+                "id": "w16",
+                "from": {
+                  "cid": "c3",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c15",
+                  "pid": "j"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w17",
+                "from": {
+                  "cid": "c15",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c5",
+                  "pid": "i0"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w18",
+                "from": {
+                  "cid": "c15",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c6",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w20",
+                "from": {
+                  "cid": "c4",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c19",
+                  "pid": "j"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w21",
+                "from": {
+                  "cid": "c19",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c5",
+                  "pid": "i1"
+                },
+                "name": "",
+                "width": 1
+              },
+              {
+                "id": "w22",
+                "from": {
+                  "cid": "c19",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c6",
+                  "pid": "i1"
+                },
+                "name": ""
+              }
+            ]
+          },
+          "sch75": {
+            "id": "sch75",
+            "name": "dec3to8",
+            "components": [
+              {
+                "id": "a0",
+                "type": "IN",
+                "x": 66,
+                "y": 803,
+                "params": {
+                  "name": "a0",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "a1",
+                "type": "IN",
+                "x": 66,
+                "y": 902,
+                "params": {
+                  "name": "a1",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "a2",
+                "type": "IN",
+                "x": 66,
+                "y": 1001,
+                "params": {
+                  "name": "a2",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g1",
+                "type": "NOT",
+                "x": 264,
+                "y": 66,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g2",
+                "type": "NOT",
+                "x": 264,
+                "y": 165,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g3",
+                "type": "AND",
+                "x": 462,
+                "y": 66,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g4",
+                "type": "NOT",
+                "x": 264,
+                "y": 264,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g5",
+                "type": "AND",
+                "x": 660,
+                "y": 77,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y0",
+                "type": "OUT",
+                "x": 858,
+                "y": 88,
+                "params": {
+                  "name": "y0",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g6",
+                "type": "NOT",
+                "x": 264,
+                "y": 1331,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g7",
+                "type": "AND",
+                "x": 462,
+                "y": 880,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g8",
+                "type": "NOT",
+                "x": 264,
+                "y": 1430,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g9",
+                "type": "AND",
+                "x": 660,
+                "y": 803,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y1",
+                "type": "OUT",
+                "x": 858,
+                "y": 814,
+                "params": {
+                  "name": "y1",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g10",
+                "type": "NOT",
+                "x": 264,
+                "y": 363,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g11",
+                "type": "AND",
+                "x": 462,
+                "y": 209,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g12",
+                "type": "NOT",
+                "x": 264,
+                "y": 484,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g13",
+                "type": "AND",
+                "x": 660,
+                "y": 198,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y2",
+                "type": "OUT",
+                "x": 858,
+                "y": 209,
+                "params": {
+                  "name": "y2",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g14",
+                "type": "AND",
+                "x": 264,
+                "y": 583,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g15",
+                "type": "NOT",
+                "x": 264,
+                "y": 704,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g16",
+                "type": "AND",
+                "x": 462,
+                "y": 352,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y3",
+                "type": "OUT",
+                "x": 858,
+                "y": 319,
+                "params": {
+                  "name": "y3",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g17",
+                "type": "NOT",
+                "x": 264,
+                "y": 803,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g18",
+                "type": "NOT",
+                "x": 264,
+                "y": 902,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g19",
+                "type": "AND",
+                "x": 462,
+                "y": 473,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g20",
+                "type": "AND",
+                "x": 660,
+                "y": 440,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y4",
+                "type": "OUT",
+                "x": 858,
+                "y": 451,
+                "params": {
+                  "name": "y4",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g21",
+                "type": "NOT",
+                "x": 264,
+                "y": 1551,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g22",
+                "type": "AND",
+                "x": 462,
+                "y": 1023,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g23",
+                "type": "AND",
+                "x": 660,
+                "y": 924,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y5",
+                "type": "OUT",
+                "x": 858,
+                "y": 935,
+                "params": {
+                  "name": "y5",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g24",
+                "type": "NOT",
+                "x": 264,
+                "y": 1023,
+                "params": {
+                  "inputs": 1,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g25",
+                "type": "AND",
+                "x": 462,
+                "y": 616,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g26",
+                "type": "AND",
+                "x": 660,
+                "y": 561,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y6",
+                "type": "OUT",
+                "x": 858,
+                "y": 572,
+                "params": {
+                  "name": "y6",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g27",
+                "type": "AND",
+                "x": 264,
+                "y": 1166,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "_g28",
+                "type": "AND",
+                "x": 462,
+                "y": 759,
+                "params": {
+                  "inputs": 2,
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "y7",
+                "type": "OUT",
+                "x": 858,
+                "y": 682,
+                "params": {
+                  "name": "y7",
+                  "width": 1
+                },
+                "label": ""
+              },
+              {
+                "id": "c143",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 819,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c144",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 786,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c145",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 599,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c146",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 379,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c147",
+                "type": "JUNCTION",
+                "x": 445,
+                "y": 896,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c148",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 1039,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c163",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 918,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c164",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 654,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c165",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 621,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c166",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 247,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c167",
+                "type": "JUNCTION",
+                "x": 236,
+                "y": 1204,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c168",
+                "type": "JUNCTION",
+                "x": 247,
+                "y": 1347,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c183",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 1017,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c184",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 775,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c185",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 720,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c186",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 500,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c187",
+                "type": "JUNCTION",
+                "x": 225,
+                "y": 456,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c188",
+                "type": "JUNCTION",
+                "x": 621,
+                "y": 456,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              },
+              {
+                "id": "c189",
+                "type": "JUNCTION",
+                "x": 621,
+                "y": 599,
+                "params": {
+                  "axis": "v",
+                  "fixed": true
+                }
+              }
+            ],
+            "wires": [
+              {
+                "id": "w115",
+                "from": {
+                  "cid": "_g1",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g3",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w116",
+                "from": {
+                  "cid": "_g2",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g3",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 187
+                  },
+                  {
+                    "x": 451,
+                    "y": 110
+                  }
+                ]
+              },
+              {
+                "id": "w117",
+                "from": {
+                  "cid": "_g3",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g5",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w118",
+                "from": {
+                  "cid": "_g4",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g5",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 286
+                  },
+                  {
+                    "x": 649,
+                    "y": 121
+                  }
+                ]
+              },
+              {
+                "id": "w119",
+                "from": {
+                  "cid": "_g5",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y0",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w120",
+                "from": {
+                  "cid": "_g6",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g7",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 1353
+                  },
+                  {
+                    "x": 451,
+                    "y": 924
+                  }
+                ]
+              },
+              {
+                "id": "w121",
+                "from": {
+                  "cid": "_g7",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g9",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 913
+                  },
+                  {
+                    "x": 649,
+                    "y": 825
+                  }
+                ]
+              },
+              {
+                "id": "w122",
+                "from": {
+                  "cid": "_g8",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g9",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 638,
+                    "y": 1452
+                  },
+                  {
+                    "x": 638,
+                    "y": 847
+                  }
+                ]
+              },
+              {
+                "id": "w123",
+                "from": {
+                  "cid": "_g9",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y1",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w124",
+                "from": {
+                  "cid": "_g10",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g11",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 385
+                  },
+                  {
+                    "x": 451,
+                    "y": 231
+                  }
+                ]
+              },
+              {
+                "id": "w125",
+                "from": {
+                  "cid": "_g11",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g13",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 638,
+                    "y": 242
+                  },
+                  {
+                    "x": 638,
+                    "y": 220
+                  }
+                ]
+              },
+              {
+                "id": "w126",
+                "from": {
+                  "cid": "_g12",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g13",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 440,
+                    "y": 506
+                  },
+                  {
+                    "x": 440,
+                    "y": 297
+                  },
+                  {
+                    "x": 638,
+                    "y": 297
+                  },
+                  {
+                    "x": 638,
+                    "y": 242
+                  }
+                ]
+              },
+              {
+                "id": "w127",
+                "from": {
+                  "cid": "_g13",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y2",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w128",
+                "from": {
+                  "cid": "_g14",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g16",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 429,
+                    "y": 616
+                  },
+                  {
+                    "x": 429,
+                    "y": 374
+                  }
+                ]
+              },
+              {
+                "id": "w129",
+                "from": {
+                  "cid": "_g15",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g16",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 726
+                  },
+                  {
+                    "x": 451,
+                    "y": 396
+                  }
+                ]
+              },
+              {
+                "id": "w130",
+                "from": {
+                  "cid": "_g16",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y3",
+                  "pid": "i"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 847,
+                    "y": 385
+                  },
+                  {
+                    "x": 847,
+                    "y": 341
+                  }
+                ]
+              },
+              {
+                "id": "w131",
+                "from": {
+                  "cid": "_g17",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g19",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 418,
+                    "y": 825
+                  },
+                  {
+                    "x": 418,
+                    "y": 495
+                  }
+                ]
+              },
+              {
+                "id": "w132",
+                "from": {
+                  "cid": "_g18",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g19",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 440,
+                    "y": 924
+                  },
+                  {
+                    "x": 440,
+                    "y": 517
+                  }
+                ]
+              },
+              {
+                "id": "w133",
+                "from": {
+                  "cid": "_g19",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g20",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 506
+                  },
+                  {
+                    "x": 649,
+                    "y": 462
+                  }
+                ]
+              },
+              {
+                "id": "w134",
+                "from": {
+                  "cid": "_g20",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y4",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w135",
+                "from": {
+                  "cid": "_g21",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g22",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 440,
+                    "y": 1573
+                  },
+                  {
+                    "x": 440,
+                    "y": 1067
+                  }
+                ]
+              },
+              {
+                "id": "w136",
+                "from": {
+                  "cid": "_g22",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g23",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 1056
+                  },
+                  {
+                    "x": 649,
+                    "y": 968
+                  }
+                ]
+              },
+              {
+                "id": "w137",
+                "from": {
+                  "cid": "_g23",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y5",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w138",
+                "from": {
+                  "cid": "_g24",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g25",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 429,
+                    "y": 1045
+                  },
+                  {
+                    "x": 429,
+                    "y": 660
+                  }
+                ]
+              },
+              {
+                "id": "w139",
+                "from": {
+                  "cid": "_g25",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g26",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 649,
+                    "y": 649
+                  },
+                  {
+                    "x": 649,
+                    "y": 583
+                  }
+                ]
+              },
+              {
+                "id": "w140",
+                "from": {
+                  "cid": "_g26",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y6",
+                  "pid": "i"
+                },
+                "name": ""
+              },
+              {
+                "id": "w141",
+                "from": {
+                  "cid": "_g27",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "_g28",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 407,
+                    "y": 1199
+                  },
+                  {
+                    "x": 407,
+                    "y": 803
+                  }
+                ]
+              },
+              {
+                "id": "w142",
+                "from": {
+                  "cid": "_g28",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "y7",
+                  "pid": "i"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 847,
+                    "y": 792
+                  },
+                  {
+                    "x": 847,
+                    "y": 704
+                  }
+                ]
+              },
+              {
+                "id": "w149",
+                "from": {
+                  "cid": "a0",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c143",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w150",
+                "from": {
+                  "cid": "c143",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c144",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w151",
+                "from": {
+                  "cid": "c143",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g17",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w152",
+                "from": {
+                  "cid": "c143",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c148",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w153",
+                "from": {
+                  "cid": "c144",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c145",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w154",
+                "from": {
+                  "cid": "c144",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c147",
+                  "pid": "j"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 792
+                  }
+                ]
+              },
+              {
+                "id": "w155",
+                "from": {
+                  "cid": "c145",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c146",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w156",
+                "from": {
+                  "cid": "c145",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g14",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w157",
+                "from": {
+                  "cid": "c146",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g1",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 253,
+                    "y": 88
+                  }
+                ]
+              },
+              {
+                "id": "w158",
+                "from": {
+                  "cid": "c146",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g10",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w159",
+                "from": {
+                  "cid": "c147",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g7",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w160",
+                "from": {
+                  "cid": "c147",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g22",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 451,
+                    "y": 924
+                  },
+                  {
+                    "x": 440,
+                    "y": 924
+                  },
+                  {
+                    "x": 440,
+                    "y": 1045
+                  }
+                ]
+              },
+              {
+                "id": "w161",
+                "from": {
+                  "cid": "c148",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g24",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w162",
+                "from": {
+                  "cid": "c148",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g27",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 253,
+                    "y": 1188
+                  }
+                ]
+              },
+              {
+                "id": "w169",
+                "from": {
+                  "cid": "a1",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c163",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w170",
+                "from": {
+                  "cid": "c163",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c164",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w171",
+                "from": {
+                  "cid": "c163",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c167",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w172",
+                "from": {
+                  "cid": "c163",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g18",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w173",
+                "from": {
+                  "cid": "c164",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c165",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w174",
+                "from": {
+                  "cid": "c164",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g25",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 429,
+                    "y": 660
+                  },
+                  {
+                    "x": 429,
+                    "y": 638
+                  }
+                ]
+              },
+              {
+                "id": "w175",
+                "from": {
+                  "cid": "c165",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c166",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w176",
+                "from": {
+                  "cid": "c165",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g14",
+                  "pid": "i1"
+                },
+                "name": ""
+              },
+              {
+                "id": "w177",
+                "from": {
+                  "cid": "c166",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g2",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 242,
+                    "y": 187
+                  }
+                ]
+              },
+              {
+                "id": "w178",
+                "from": {
+                  "cid": "c166",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g11",
+                  "pid": "i1"
+                },
+                "name": ""
+              },
+              {
+                "id": "w179",
+                "from": {
+                  "cid": "c167",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c168",
+                  "pid": "j"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 242,
+                    "y": 1353
+                  }
+                ]
+              },
+              {
+                "id": "w180",
+                "from": {
+                  "cid": "c167",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g27",
+                  "pid": "i1"
+                },
+                "name": ""
+              },
+              {
+                "id": "w181",
+                "from": {
+                  "cid": "c168",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g6",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w182",
+                "from": {
+                  "cid": "c168",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g21",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 253,
+                    "y": 1573
+                  }
+                ]
+              },
+              {
+                "id": "w190",
+                "from": {
+                  "cid": "a2",
+                  "pid": "o"
+                },
+                "to": {
+                  "cid": "c183",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w191",
+                "from": {
+                  "cid": "c183",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c184",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w192",
+                "from": {
+                  "cid": "c183",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g8",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 231,
+                    "y": 1452
+                  }
+                ]
+              },
+              {
+                "id": "w193",
+                "from": {
+                  "cid": "c184",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c185",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w194",
+                "from": {
+                  "cid": "c184",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g28",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w195",
+                "from": {
+                  "cid": "c185",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c186",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w196",
+                "from": {
+                  "cid": "c185",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g15",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w197",
+                "from": {
+                  "cid": "c186",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c187",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w198",
+                "from": {
+                  "cid": "c186",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g12",
+                  "pid": "i0"
+                },
+                "name": ""
+              },
+              {
+                "id": "w199",
+                "from": {
+                  "cid": "c187",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g4",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 231,
+                    "y": 286
+                  }
+                ]
+              },
+              {
+                "id": "w200",
+                "from": {
+                  "cid": "c187",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c188",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w201",
+                "from": {
+                  "cid": "c188",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g20",
+                  "pid": "i1"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 638,
+                    "y": 462
+                  },
+                  {
+                    "x": 638,
+                    "y": 484
+                  }
+                ]
+              },
+              {
+                "id": "w202",
+                "from": {
+                  "cid": "c188",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "c189",
+                  "pid": "j"
+                },
+                "name": ""
+              },
+              {
+                "id": "w203",
+                "from": {
+                  "cid": "c189",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g23",
+                  "pid": "i0"
+                },
+                "name": "",
+                "pts": [
+                  {
+                    "x": 627,
+                    "y": 946
+                  }
+                ]
+              },
+              {
+                "id": "w204",
+                "from": {
+                  "cid": "c189",
+                  "pid": "j"
+                },
+                "to": {
+                  "cid": "_g26",
+                  "pid": "i1"
+                },
+                "name": ""
+              }
+            ],
+            "locked": true
+          }
+        },
+        "customs": {},
+        "id": "prj2",
+        "openTabs": [
+          "sch1",
+          "sch75"
+        ],
+        "activeId": "sch75"
+      }
+    },
+    "activeId": "prj2"
+  },
+  "project": {
+    "name": "my_project",
+    "topId": "sch1",
+    "schematics": {
+      "sch1": {
+        "id": "sch1",
+        "name": "top",
+        "components": [
+          {
+            "id": "c3",
+            "type": "IN",
+            "x": 88,
+            "y": 110,
+            "params": {
+              "name": "a",
+              "width": 1
+            }
+          },
+          {
+            "id": "c4",
+            "type": "IN",
+            "x": 88,
+            "y": 132,
+            "params": {
+              "name": "b",
+              "width": 1
+            }
+          },
+          {
+            "id": "c5",
+            "type": "XOR",
+            "x": 264,
+            "y": 110,
+            "params": {
+              "inputs": 2
+            }
+          },
+          {
+            "id": "c6",
+            "type": "AND",
+            "x": 264,
+            "y": 220,
+            "params": {
+              "inputs": 2
+            }
+          },
+          {
+            "id": "c7",
+            "type": "OUT",
+            "x": 484,
+            "y": 121,
+            "params": {
+              "name": "sum",
+              "width": 1
+            }
+          },
+          {
+            "id": "c8",
+            "type": "OUT",
+            "x": 484,
+            "y": 231,
+            "params": {
+              "name": "cout",
+              "width": 1
+            }
+          },
+          {
+            "id": "c15",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 126,
+            "params": {
+              "axis": "h"
+            }
+          },
+          {
+            "id": "c19",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 148,
+            "params": {
+              "axis": "h"
+            }
+          }
+        ],
+        "wires": [
+          {
+            "id": "w13",
+            "from": {
+              "cid": "c5",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c7",
+              "pid": "i"
+            },
+            "name": "sum_w",
+            "width": 1
+          },
+          {
+            "id": "w14",
+            "from": {
+              "cid": "c6",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c8",
+              "pid": "i"
+            },
+            "name": "carry",
+            "width": 1
+          },
+          {
+            "id": "w16",
+            "from": {
+              "cid": "c3",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c15",
+              "pid": "j"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w17",
+            "from": {
+              "cid": "c15",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c5",
+              "pid": "i0"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w18",
+            "from": {
+              "cid": "c15",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c6",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w20",
+            "from": {
+              "cid": "c4",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c19",
+              "pid": "j"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w21",
+            "from": {
+              "cid": "c19",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c5",
+              "pid": "i1"
+            },
+            "name": "",
+            "width": 1
+          },
+          {
+            "id": "w22",
+            "from": {
+              "cid": "c19",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c6",
+              "pid": "i1"
+            },
+            "name": ""
+          }
+        ]
+      },
+      "sch75": {
+        "id": "sch75",
+        "name": "dec3to8",
+        "components": [
+          {
+            "id": "a0",
+            "type": "IN",
+            "x": 66,
+            "y": 803,
+            "params": {
+              "name": "a0",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "a1",
+            "type": "IN",
+            "x": 66,
+            "y": 902,
+            "params": {
+              "name": "a1",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "a2",
+            "type": "IN",
+            "x": 66,
+            "y": 1001,
+            "params": {
+              "name": "a2",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g1",
+            "type": "NOT",
+            "x": 264,
+            "y": 66,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g2",
+            "type": "NOT",
+            "x": 264,
+            "y": 165,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g3",
+            "type": "AND",
+            "x": 462,
+            "y": 66,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g4",
+            "type": "NOT",
+            "x": 264,
+            "y": 264,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g5",
+            "type": "AND",
+            "x": 660,
+            "y": 77,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y0",
+            "type": "OUT",
+            "x": 858,
+            "y": 88,
+            "params": {
+              "name": "y0",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g6",
+            "type": "NOT",
+            "x": 264,
+            "y": 1331,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g7",
+            "type": "AND",
+            "x": 462,
+            "y": 880,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g8",
+            "type": "NOT",
+            "x": 264,
+            "y": 1430,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g9",
+            "type": "AND",
+            "x": 660,
+            "y": 803,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y1",
+            "type": "OUT",
+            "x": 858,
+            "y": 814,
+            "params": {
+              "name": "y1",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g10",
+            "type": "NOT",
+            "x": 264,
+            "y": 363,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g11",
+            "type": "AND",
+            "x": 462,
+            "y": 209,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g12",
+            "type": "NOT",
+            "x": 264,
+            "y": 484,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g13",
+            "type": "AND",
+            "x": 660,
+            "y": 198,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y2",
+            "type": "OUT",
+            "x": 858,
+            "y": 209,
+            "params": {
+              "name": "y2",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g14",
+            "type": "AND",
+            "x": 264,
+            "y": 583,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g15",
+            "type": "NOT",
+            "x": 264,
+            "y": 704,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g16",
+            "type": "AND",
+            "x": 462,
+            "y": 352,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y3",
+            "type": "OUT",
+            "x": 858,
+            "y": 319,
+            "params": {
+              "name": "y3",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g17",
+            "type": "NOT",
+            "x": 264,
+            "y": 803,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g18",
+            "type": "NOT",
+            "x": 264,
+            "y": 902,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g19",
+            "type": "AND",
+            "x": 462,
+            "y": 473,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g20",
+            "type": "AND",
+            "x": 660,
+            "y": 440,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y4",
+            "type": "OUT",
+            "x": 858,
+            "y": 451,
+            "params": {
+              "name": "y4",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g21",
+            "type": "NOT",
+            "x": 264,
+            "y": 1551,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g22",
+            "type": "AND",
+            "x": 462,
+            "y": 1023,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g23",
+            "type": "AND",
+            "x": 660,
+            "y": 924,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y5",
+            "type": "OUT",
+            "x": 858,
+            "y": 935,
+            "params": {
+              "name": "y5",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g24",
+            "type": "NOT",
+            "x": 264,
+            "y": 1023,
+            "params": {
+              "inputs": 1,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g25",
+            "type": "AND",
+            "x": 462,
+            "y": 616,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g26",
+            "type": "AND",
+            "x": 660,
+            "y": 561,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y6",
+            "type": "OUT",
+            "x": 858,
+            "y": 572,
+            "params": {
+              "name": "y6",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g27",
+            "type": "AND",
+            "x": 264,
+            "y": 1166,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "_g28",
+            "type": "AND",
+            "x": 462,
+            "y": 759,
+            "params": {
+              "inputs": 2,
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "y7",
+            "type": "OUT",
+            "x": 858,
+            "y": 682,
+            "params": {
+              "name": "y7",
+              "width": 1
+            },
+            "label": ""
+          },
+          {
+            "id": "c143",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 819,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c144",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 786,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c145",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 599,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c146",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 379,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c147",
+            "type": "JUNCTION",
+            "x": 445,
+            "y": 896,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c148",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 1039,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c163",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 918,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c164",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 654,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c165",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 621,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c166",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 247,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c167",
+            "type": "JUNCTION",
+            "x": 236,
+            "y": 1204,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c168",
+            "type": "JUNCTION",
+            "x": 247,
+            "y": 1347,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c183",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 1017,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c184",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 775,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c185",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 720,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c186",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 500,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c187",
+            "type": "JUNCTION",
+            "x": 225,
+            "y": 456,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c188",
+            "type": "JUNCTION",
+            "x": 621,
+            "y": 456,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          },
+          {
+            "id": "c189",
+            "type": "JUNCTION",
+            "x": 621,
+            "y": 599,
+            "params": {
+              "axis": "v",
+              "fixed": true
+            }
+          }
+        ],
+        "wires": [
+          {
+            "id": "w115",
+            "from": {
+              "cid": "_g1",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g3",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w116",
+            "from": {
+              "cid": "_g2",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g3",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 187
+              },
+              {
+                "x": 451,
+                "y": 110
+              }
+            ]
+          },
+          {
+            "id": "w117",
+            "from": {
+              "cid": "_g3",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g5",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w118",
+            "from": {
+              "cid": "_g4",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g5",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 286
+              },
+              {
+                "x": 649,
+                "y": 121
+              }
+            ]
+          },
+          {
+            "id": "w119",
+            "from": {
+              "cid": "_g5",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y0",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w120",
+            "from": {
+              "cid": "_g6",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g7",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 1353
+              },
+              {
+                "x": 451,
+                "y": 924
+              }
+            ]
+          },
+          {
+            "id": "w121",
+            "from": {
+              "cid": "_g7",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g9",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 913
+              },
+              {
+                "x": 649,
+                "y": 825
+              }
+            ]
+          },
+          {
+            "id": "w122",
+            "from": {
+              "cid": "_g8",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g9",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 638,
+                "y": 1452
+              },
+              {
+                "x": 638,
+                "y": 847
+              }
+            ]
+          },
+          {
+            "id": "w123",
+            "from": {
+              "cid": "_g9",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y1",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w124",
+            "from": {
+              "cid": "_g10",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g11",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 385
+              },
+              {
+                "x": 451,
+                "y": 231
+              }
+            ]
+          },
+          {
+            "id": "w125",
+            "from": {
+              "cid": "_g11",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g13",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 638,
+                "y": 242
+              },
+              {
+                "x": 638,
+                "y": 220
+              }
+            ]
+          },
+          {
+            "id": "w126",
+            "from": {
+              "cid": "_g12",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g13",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 440,
+                "y": 506
+              },
+              {
+                "x": 440,
+                "y": 297
+              },
+              {
+                "x": 638,
+                "y": 297
+              },
+              {
+                "x": 638,
+                "y": 242
+              }
+            ]
+          },
+          {
+            "id": "w127",
+            "from": {
+              "cid": "_g13",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y2",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w128",
+            "from": {
+              "cid": "_g14",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g16",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 429,
+                "y": 616
+              },
+              {
+                "x": 429,
+                "y": 374
+              }
+            ]
+          },
+          {
+            "id": "w129",
+            "from": {
+              "cid": "_g15",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g16",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 726
+              },
+              {
+                "x": 451,
+                "y": 396
+              }
+            ]
+          },
+          {
+            "id": "w130",
+            "from": {
+              "cid": "_g16",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y3",
+              "pid": "i"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 847,
+                "y": 385
+              },
+              {
+                "x": 847,
+                "y": 341
+              }
+            ]
+          },
+          {
+            "id": "w131",
+            "from": {
+              "cid": "_g17",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g19",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 418,
+                "y": 825
+              },
+              {
+                "x": 418,
+                "y": 495
+              }
+            ]
+          },
+          {
+            "id": "w132",
+            "from": {
+              "cid": "_g18",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g19",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 440,
+                "y": 924
+              },
+              {
+                "x": 440,
+                "y": 517
+              }
+            ]
+          },
+          {
+            "id": "w133",
+            "from": {
+              "cid": "_g19",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g20",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 506
+              },
+              {
+                "x": 649,
+                "y": 462
+              }
+            ]
+          },
+          {
+            "id": "w134",
+            "from": {
+              "cid": "_g20",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y4",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w135",
+            "from": {
+              "cid": "_g21",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g22",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 440,
+                "y": 1573
+              },
+              {
+                "x": 440,
+                "y": 1067
+              }
+            ]
+          },
+          {
+            "id": "w136",
+            "from": {
+              "cid": "_g22",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g23",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 1056
+              },
+              {
+                "x": 649,
+                "y": 968
+              }
+            ]
+          },
+          {
+            "id": "w137",
+            "from": {
+              "cid": "_g23",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y5",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w138",
+            "from": {
+              "cid": "_g24",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g25",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 429,
+                "y": 1045
+              },
+              {
+                "x": 429,
+                "y": 660
+              }
+            ]
+          },
+          {
+            "id": "w139",
+            "from": {
+              "cid": "_g25",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g26",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 649,
+                "y": 649
+              },
+              {
+                "x": 649,
+                "y": 583
+              }
+            ]
+          },
+          {
+            "id": "w140",
+            "from": {
+              "cid": "_g26",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y6",
+              "pid": "i"
+            },
+            "name": ""
+          },
+          {
+            "id": "w141",
+            "from": {
+              "cid": "_g27",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "_g28",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 407,
+                "y": 1199
+              },
+              {
+                "x": 407,
+                "y": 803
+              }
+            ]
+          },
+          {
+            "id": "w142",
+            "from": {
+              "cid": "_g28",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "y7",
+              "pid": "i"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 847,
+                "y": 792
+              },
+              {
+                "x": 847,
+                "y": 704
+              }
+            ]
+          },
+          {
+            "id": "w149",
+            "from": {
+              "cid": "a0",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c143",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w150",
+            "from": {
+              "cid": "c143",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c144",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w151",
+            "from": {
+              "cid": "c143",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g17",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w152",
+            "from": {
+              "cid": "c143",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c148",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w153",
+            "from": {
+              "cid": "c144",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c145",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w154",
+            "from": {
+              "cid": "c144",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c147",
+              "pid": "j"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 792
+              }
+            ]
+          },
+          {
+            "id": "w155",
+            "from": {
+              "cid": "c145",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c146",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w156",
+            "from": {
+              "cid": "c145",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g14",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w157",
+            "from": {
+              "cid": "c146",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g1",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 253,
+                "y": 88
+              }
+            ]
+          },
+          {
+            "id": "w158",
+            "from": {
+              "cid": "c146",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g10",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w159",
+            "from": {
+              "cid": "c147",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g7",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w160",
+            "from": {
+              "cid": "c147",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g22",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 451,
+                "y": 924
+              },
+              {
+                "x": 440,
+                "y": 924
+              },
+              {
+                "x": 440,
+                "y": 1045
+              }
+            ]
+          },
+          {
+            "id": "w161",
+            "from": {
+              "cid": "c148",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g24",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w162",
+            "from": {
+              "cid": "c148",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g27",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 253,
+                "y": 1188
+              }
+            ]
+          },
+          {
+            "id": "w169",
+            "from": {
+              "cid": "a1",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c163",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w170",
+            "from": {
+              "cid": "c163",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c164",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w171",
+            "from": {
+              "cid": "c163",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c167",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w172",
+            "from": {
+              "cid": "c163",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g18",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w173",
+            "from": {
+              "cid": "c164",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c165",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w174",
+            "from": {
+              "cid": "c164",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g25",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 429,
+                "y": 660
+              },
+              {
+                "x": 429,
+                "y": 638
+              }
+            ]
+          },
+          {
+            "id": "w175",
+            "from": {
+              "cid": "c165",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c166",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w176",
+            "from": {
+              "cid": "c165",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g14",
+              "pid": "i1"
+            },
+            "name": ""
+          },
+          {
+            "id": "w177",
+            "from": {
+              "cid": "c166",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g2",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 242,
+                "y": 187
+              }
+            ]
+          },
+          {
+            "id": "w178",
+            "from": {
+              "cid": "c166",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g11",
+              "pid": "i1"
+            },
+            "name": ""
+          },
+          {
+            "id": "w179",
+            "from": {
+              "cid": "c167",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c168",
+              "pid": "j"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 242,
+                "y": 1353
+              }
+            ]
+          },
+          {
+            "id": "w180",
+            "from": {
+              "cid": "c167",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g27",
+              "pid": "i1"
+            },
+            "name": ""
+          },
+          {
+            "id": "w181",
+            "from": {
+              "cid": "c168",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g6",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w182",
+            "from": {
+              "cid": "c168",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g21",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 253,
+                "y": 1573
+              }
+            ]
+          },
+          {
+            "id": "w190",
+            "from": {
+              "cid": "a2",
+              "pid": "o"
+            },
+            "to": {
+              "cid": "c183",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w191",
+            "from": {
+              "cid": "c183",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c184",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w192",
+            "from": {
+              "cid": "c183",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g8",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 231,
+                "y": 1452
+              }
+            ]
+          },
+          {
+            "id": "w193",
+            "from": {
+              "cid": "c184",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c185",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w194",
+            "from": {
+              "cid": "c184",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g28",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w195",
+            "from": {
+              "cid": "c185",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c186",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w196",
+            "from": {
+              "cid": "c185",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g15",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w197",
+            "from": {
+              "cid": "c186",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c187",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w198",
+            "from": {
+              "cid": "c186",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g12",
+              "pid": "i0"
+            },
+            "name": ""
+          },
+          {
+            "id": "w199",
+            "from": {
+              "cid": "c187",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g4",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 231,
+                "y": 286
+              }
+            ]
+          },
+          {
+            "id": "w200",
+            "from": {
+              "cid": "c187",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c188",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w201",
+            "from": {
+              "cid": "c188",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g20",
+              "pid": "i1"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 638,
+                "y": 462
+              },
+              {
+                "x": 638,
+                "y": 484
+              }
+            ]
+          },
+          {
+            "id": "w202",
+            "from": {
+              "cid": "c188",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "c189",
+              "pid": "j"
+            },
+            "name": ""
+          },
+          {
+            "id": "w203",
+            "from": {
+              "cid": "c189",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g23",
+              "pid": "i0"
+            },
+            "name": "",
+            "pts": [
+              {
+                "x": 627,
+                "y": 946
+              }
+            ]
+          },
+          {
+            "id": "w204",
+            "from": {
+              "cid": "c189",
+              "pid": "j"
+            },
+            "to": {
+              "cid": "_g26",
+              "pid": "i1"
+            },
+            "name": ""
+          }
+        ],
+        "locked": true
+      }
+    },
+    "customs": {},
+    "id": "prj2",
+    "openTabs": [
+      "sch1",
+      "sch75"
+    ],
+    "activeId": "sch75"
+  },
+  "activeId": "sch75",
+  "openTabs": [
+    "sch1",
+    "sch75"
+  ]
+}

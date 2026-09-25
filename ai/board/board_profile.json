@@ -1,0 +1,1405 @@
+{
+  "part": "xc7s15ftgb196-1",
+  "board": "EDGE Spartan-7",
+  "clock": {
+    "port": "clk",
+    "pin": "H11",
+    "freq_hz": 50000000
+  },
+  "signals": {
+    "clk": {
+      "pin": "H11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Clock signal",
+      "bus": "clk",
+      "index": null,
+      "pulldown": false
+    },
+    "sw[0]": {
+      "pin": "K11",
+      "iostandard": "LVCMOS33",
+      "note": "LSB",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 0,
+      "pulldown": false
+    },
+    "sw[1]": {
+      "pin": "M11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 1,
+      "pulldown": false
+    },
+    "sw[2]": {
+      "pin": "N14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 2,
+      "pulldown": false
+    },
+    "sw[3]": {
+      "pin": "P12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 3,
+      "pulldown": false
+    },
+    "sw[4]": {
+      "pin": "N10",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 4,
+      "pulldown": false
+    },
+    "sw[5]": {
+      "pin": "P10",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 5,
+      "pulldown": false
+    },
+    "sw[6]": {
+      "pin": "M10",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 6,
+      "pulldown": false
+    },
+    "sw[7]": {
+      "pin": "N4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 7,
+      "pulldown": false
+    },
+    "sw[8]": {
+      "pin": "L2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 8,
+      "pulldown": false
+    },
+    "sw[9]": {
+      "pin": "P3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 9,
+      "pulldown": false
+    },
+    "sw[10]": {
+      "pin": "N1",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 10,
+      "pulldown": false
+    },
+    "sw[11]": {
+      "pin": "M2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 11,
+      "pulldown": false
+    },
+    "sw[12]": {
+      "pin": "L1",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 12,
+      "pulldown": false
+    },
+    "sw[13]": {
+      "pin": "J3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 13,
+      "pulldown": false
+    },
+    "sw[14]": {
+      "pin": "K3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 14,
+      "pulldown": false
+    },
+    "sw[15]": {
+      "pin": "J1",
+      "iostandard": "LVCMOS33",
+      "note": "MSB",
+      "group": "Switches",
+      "bus": "sw",
+      "index": 15,
+      "pulldown": false
+    },
+    "led[0]": {
+      "pin": "K12",
+      "iostandard": "LVCMOS33",
+      "note": "LSB",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 0,
+      "pulldown": false
+    },
+    "led[1]": {
+      "pin": "M12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 1,
+      "pulldown": false
+    },
+    "led[2]": {
+      "pin": "M14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 2,
+      "pulldown": false
+    },
+    "led[3]": {
+      "pin": "P13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 3,
+      "pulldown": false
+    },
+    "led[4]": {
+      "pin": "N11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 4,
+      "pulldown": false
+    },
+    "led[5]": {
+      "pin": "P11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 5,
+      "pulldown": false
+    },
+    "led[6]": {
+      "pin": "L5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 6,
+      "pulldown": false
+    },
+    "led[7]": {
+      "pin": "M4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 7,
+      "pulldown": false
+    },
+    "led[8]": {
+      "pin": "J4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 8,
+      "pulldown": false
+    },
+    "led[9]": {
+      "pin": "L3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 9,
+      "pulldown": false
+    },
+    "led[10]": {
+      "pin": "P4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 10,
+      "pulldown": false
+    },
+    "led[11]": {
+      "pin": "K4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 11,
+      "pulldown": false
+    },
+    "led[12]": {
+      "pin": "P2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 12,
+      "pulldown": false
+    },
+    "led[13]": {
+      "pin": "J2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 13,
+      "pulldown": false
+    },
+    "led[14]": {
+      "pin": "M3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 14,
+      "pulldown": false
+    },
+    "led[15]": {
+      "pin": "M1",
+      "iostandard": "LVCMOS33",
+      "note": "MSB",
+      "group": "LEDs",
+      "bus": "led",
+      "index": 15,
+      "pulldown": false
+    },
+    "pb[0]": {
+      "pin": "J13",
+      "iostandard": "LVCMOS33",
+      "note": "Button-top",
+      "group": "Push Button",
+      "bus": "pb",
+      "index": 0,
+      "pulldown": true
+    },
+    "pb[1]": {
+      "pin": "L13",
+      "iostandard": "LVCMOS33",
+      "note": "Button-bottom",
+      "group": "Push Button",
+      "bus": "pb",
+      "index": 1,
+      "pulldown": true
+    },
+    "pb[2]": {
+      "pin": "J14",
+      "iostandard": "LVCMOS33",
+      "note": "Button-left",
+      "group": "Push Button",
+      "bus": "pb",
+      "index": 2,
+      "pulldown": true
+    },
+    "pb[3]": {
+      "pin": "J11",
+      "iostandard": "LVCMOS33",
+      "note": "Button-right",
+      "group": "Push Button",
+      "bus": "pb",
+      "index": 3,
+      "pulldown": true
+    },
+    "pb[4]": {
+      "pin": "J12",
+      "iostandard": "LVCMOS33",
+      "note": "Button-center",
+      "group": "Push Button",
+      "bus": "pb",
+      "index": 4,
+      "pulldown": true
+    },
+    "digit[0]": {
+      "pin": "H4",
+      "iostandard": "LVCMOS33",
+      "note": "LSB",
+      "group": "7-segment display",
+      "bus": "digit",
+      "index": 0,
+      "pulldown": false
+    },
+    "digit[1]": {
+      "pin": "H3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "7-segment display",
+      "bus": "digit",
+      "index": 1,
+      "pulldown": false
+    },
+    "digit[2]": {
+      "pin": "H2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "7-segment display",
+      "bus": "digit",
+      "index": 2,
+      "pulldown": false
+    },
+    "digit[3]": {
+      "pin": "H1",
+      "iostandard": "LVCMOS33",
+      "note": "MSB",
+      "group": "7-segment display",
+      "bus": "digit",
+      "index": 3,
+      "pulldown": false
+    },
+    "Seven_Segment[7]": {
+      "pin": "L3",
+      "iostandard": "LVCMOS33",
+      "note": "A",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 7,
+      "pulldown": false
+    },
+    "Seven_Segment[6]": {
+      "pin": "P4",
+      "iostandard": "LVCMOS33",
+      "note": "B",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 6,
+      "pulldown": false
+    },
+    "Seven_Segment[5]": {
+      "pin": "P2",
+      "iostandard": "LVCMOS33",
+      "note": "C",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 5,
+      "pulldown": false
+    },
+    "Seven_Segment[4]": {
+      "pin": "M3",
+      "iostandard": "LVCMOS33",
+      "note": "D",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 4,
+      "pulldown": false
+    },
+    "Seven_Segment[3]": {
+      "pin": "M1",
+      "iostandard": "LVCMOS33",
+      "note": "E",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 3,
+      "pulldown": false
+    },
+    "Seven_Segment[2]": {
+      "pin": "J4",
+      "iostandard": "LVCMOS33",
+      "note": "F",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 2,
+      "pulldown": false
+    },
+    "Seven_Segment[1]": {
+      "pin": "K4",
+      "iostandard": "LVCMOS33",
+      "note": "G",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 1,
+      "pulldown": false
+    },
+    "Seven_Segment[0]": {
+      "pin": "J2",
+      "iostandard": "LVCMOS33",
+      "note": "DP",
+      "group": "7-segment display",
+      "bus": "Seven_Segment",
+      "index": 0,
+      "pulldown": false
+    },
+    "data[0]": {
+      "pin": "M4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 0,
+      "pulldown": false
+    },
+    "data[1]": {
+      "pin": "L5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 1,
+      "pulldown": false
+    },
+    "data[2]": {
+      "pin": "P11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 2,
+      "pulldown": false
+    },
+    "data[3]": {
+      "pin": "N11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 3,
+      "pulldown": false
+    },
+    "data[4]": {
+      "pin": "P13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 4,
+      "pulldown": false
+    },
+    "data[5]": {
+      "pin": "M14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 5,
+      "pulldown": false
+    },
+    "data[6]": {
+      "pin": "M12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 6,
+      "pulldown": false
+    },
+    "data[7]": {
+      "pin": "K12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "data",
+      "index": 7,
+      "pulldown": false
+    },
+    "lcd_e": {
+      "pin": "P5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "lcd_e",
+      "index": null,
+      "pulldown": false
+    },
+    "lcd_rs": {
+      "pin": "M5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "2x16 LCD",
+      "bus": "lcd_rs",
+      "index": null,
+      "pulldown": false
+    },
+    "tft_sck": {
+      "pin": "N11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI TFT 1.8 inch",
+      "bus": "tft_sck",
+      "index": null,
+      "pulldown": false
+    },
+    "tft_sdi": {
+      "pin": "P13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI TFT 1.8 inch",
+      "bus": "tft_sdi",
+      "index": null,
+      "pulldown": false
+    },
+    "tft_dc": {
+      "pin": "M14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI TFT 1.8 inch",
+      "bus": "tft_dc",
+      "index": null,
+      "pulldown": false
+    },
+    "tft_reset": {
+      "pin": "M12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI TFT 1.8 inch",
+      "bus": "tft_reset",
+      "index": null,
+      "pulldown": false
+    },
+    "tft_cs": {
+      "pin": "K12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI TFT 1.8 inch",
+      "bus": "tft_cs",
+      "index": null,
+      "pulldown": false
+    },
+    "Buzzer": {
+      "pin": "B14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Buzzer",
+      "bus": "Buzzer",
+      "index": null,
+      "pulldown": false
+    },
+    "SCK": {
+      "pin": "F1",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI DAC",
+      "bus": "SCK",
+      "index": null,
+      "pulldown": false
+    },
+    "CS": {
+      "pin": "D2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI DAC",
+      "bus": "CS",
+      "index": null,
+      "pulldown": false
+    },
+    "DIN": {
+      "pin": "G4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI ADC",
+      "bus": "DIN",
+      "index": null,
+      "pulldown": false
+    },
+    "DOUT": {
+      "pin": "C1",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI ADC",
+      "bus": "DOUT",
+      "index": null,
+      "pulldown": false
+    },
+    "MOSI": {
+      "pin": "E2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "SPI DAC",
+      "bus": "MOSI",
+      "index": null,
+      "pulldown": false
+    },
+    "usb_uart_txd": {
+      "pin": "F2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "USB UART",
+      "bus": "usb_uart_txd",
+      "index": null,
+      "pulldown": false
+    },
+    "usb_uart_rxd": {
+      "pin": "G1",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "USB UART",
+      "bus": "usb_uart_rxd",
+      "index": null,
+      "pulldown": false
+    },
+    "wifi_txd": {
+      "pin": "A12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "WiFi",
+      "bus": "wifi_txd",
+      "index": null,
+      "pulldown": false
+    },
+    "wifi_rxd": {
+      "pin": "A10",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "WiFi",
+      "bus": "wifi_rxd",
+      "index": null,
+      "pulldown": false
+    },
+    "Bluetooth_txd": {
+      "pin": "F3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Bluetooth",
+      "bus": "Bluetooth_txd",
+      "index": null,
+      "pulldown": false
+    },
+    "Bluetooth_rxd": {
+      "pin": "D4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Bluetooth",
+      "bus": "Bluetooth_rxd",
+      "index": null,
+      "pulldown": false
+    },
+    "Audio_L": {
+      "pin": "A13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Audio Jack",
+      "bus": "Audio_L",
+      "index": null,
+      "pulldown": false
+    },
+    "Audio_R": {
+      "pin": "B13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "Audio Jack",
+      "bus": "Audio_R",
+      "index": null,
+      "pulldown": false
+    },
+    "PS2_CLK": {
+      "pin": "E11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "USB PS2",
+      "bus": "PS2_CLK",
+      "index": null,
+      "pulldown": false
+    },
+    "PS2_DATA": {
+      "pin": "C12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "USB PS2",
+      "bus": "PS2_DATA",
+      "index": null,
+      "pulldown": false
+    },
+    "vga_hsync": {
+      "pin": "C4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_hsync",
+      "index": null,
+      "pulldown": false
+    },
+    "vga_vsync": {
+      "pin": "E4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_vsync",
+      "index": null,
+      "pulldown": false
+    },
+    "vga_r[0]": {
+      "pin": "B6",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_r",
+      "index": 0,
+      "pulldown": false
+    },
+    "vga_r[1]": {
+      "pin": "D3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_r",
+      "index": 1,
+      "pulldown": false
+    },
+    "vga_r[2]": {
+      "pin": "C3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_r",
+      "index": 2,
+      "pulldown": false
+    },
+    "vga_r[3]": {
+      "pin": "A4",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_r",
+      "index": 3,
+      "pulldown": false
+    },
+    "vga_g[0]": {
+      "pin": "A3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_g",
+      "index": 0,
+      "pulldown": false
+    },
+    "vga_g[1]": {
+      "pin": "B3",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_g",
+      "index": 1,
+      "pulldown": false
+    },
+    "vga_g[2]": {
+      "pin": "A2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_g",
+      "index": 2,
+      "pulldown": false
+    },
+    "vga_g[3]": {
+      "pin": "B5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_g",
+      "index": 3,
+      "pulldown": false
+    },
+    "vga_b[0]": {
+      "pin": "A5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_b",
+      "index": 0,
+      "pulldown": false
+    },
+    "vga_b[1]": {
+      "pin": "B2",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_b",
+      "index": 1,
+      "pulldown": false
+    },
+    "vga_b[2]": {
+      "pin": "B1",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_b",
+      "index": 2,
+      "pulldown": false
+    },
+    "vga_b[3]": {
+      "pin": "C5",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "VGA 12-bit",
+      "bus": "vga_b",
+      "index": 3,
+      "pulldown": false
+    },
+    "ov7670_sioc": {
+      "pin": "L14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_sioc",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_siod": {
+      "pin": "M13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_siod",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_vsync": {
+      "pin": "H14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_vsync",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_href": {
+      "pin": "H13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_href",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_pclk": {
+      "pin": "F11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_pclk",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_xclk": {
+      "pin": "G11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_xclk",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_data[7]": {
+      "pin": "C14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 7,
+      "pulldown": false
+    },
+    "ov7670_data[6]": {
+      "pin": "D14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 6,
+      "pulldown": false
+    },
+    "ov7670_data[5]": {
+      "pin": "E13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 5,
+      "pulldown": false
+    },
+    "ov7670_data[4]": {
+      "pin": "F13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 4,
+      "pulldown": false
+    },
+    "ov7670_data[3]": {
+      "pin": "F14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 3,
+      "pulldown": false
+    },
+    "ov7670_data[2]": {
+      "pin": "G14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 2,
+      "pulldown": false
+    },
+    "ov7670_data[1]": {
+      "pin": "D13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 1,
+      "pulldown": false
+    },
+    "ov7670_data[0]": {
+      "pin": "D12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_data",
+      "index": 0,
+      "pulldown": false
+    },
+    "ov7670_reset": {
+      "pin": "E12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_reset",
+      "index": null,
+      "pulldown": false
+    },
+    "ov7670_pwdn": {
+      "pin": "F12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "CMOS Camera (J5 CONNECTOR)",
+      "bus": "ov7670_pwdn",
+      "index": null,
+      "pulldown": false
+    },
+    "pin5": {
+      "pin": "L14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin5",
+      "index": null,
+      "pulldown": false
+    },
+    "pin6": {
+      "pin": "M13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin6",
+      "index": null,
+      "pulldown": false
+    },
+    "pin7": {
+      "pin": "H14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin7",
+      "index": null,
+      "pulldown": false
+    },
+    "pin8": {
+      "pin": "H13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin8",
+      "index": null,
+      "pulldown": false
+    },
+    "pin9": {
+      "pin": "F11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin9",
+      "index": null,
+      "pulldown": false
+    },
+    "pin10": {
+      "pin": "G11",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin10",
+      "index": null,
+      "pulldown": false
+    },
+    "pin11": {
+      "pin": "C14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin11",
+      "index": null,
+      "pulldown": false
+    },
+    "pin12": {
+      "pin": "D14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin12",
+      "index": null,
+      "pulldown": false
+    },
+    "pin13": {
+      "pin": "E13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin13",
+      "index": null,
+      "pulldown": false
+    },
+    "pin14": {
+      "pin": "F13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin14",
+      "index": null,
+      "pulldown": false
+    },
+    "pin15": {
+      "pin": "F14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin15",
+      "index": null,
+      "pulldown": false
+    },
+    "pin16": {
+      "pin": "G14",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin16",
+      "index": null,
+      "pulldown": false
+    },
+    "pin17": {
+      "pin": "D13",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin17",
+      "index": null,
+      "pulldown": false
+    },
+    "pin18": {
+      "pin": "D12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin18",
+      "index": null,
+      "pulldown": false
+    },
+    "pin19": {
+      "pin": "E12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin19",
+      "index": null,
+      "pulldown": false
+    },
+    "pin20": {
+      "pin": "F12",
+      "iostandard": "LVCMOS33",
+      "note": "",
+      "group": "20 pin expansion connector (J5 CONNECTOR)",
+      "bus": "pin20",
+      "index": null,
+      "pulldown": false
+    }
+  },
+  "groups": {
+    "clk": [
+      "clk"
+    ],
+    "sw": [
+      "sw[0]",
+      "sw[1]",
+      "sw[2]",
+      "sw[3]",
+      "sw[4]",
+      "sw[5]",
+      "sw[6]",
+      "sw[7]",
+      "sw[8]",
+      "sw[9]",
+      "sw[10]",
+      "sw[11]",
+      "sw[12]",
+      "sw[13]",
+      "sw[14]",
+      "sw[15]"
+    ],
+    "led": [
+      "led[0]",
+      "led[1]",
+      "led[2]",
+      "led[3]",
+      "led[4]",
+      "led[5]",
+      "led[6]",
+      "led[7]",
+      "led[8]",
+      "led[9]",
+      "led[10]",
+      "led[11]",
+      "led[12]",
+      "led[13]",
+      "led[14]",
+      "led[15]"
+    ],
+    "pb": [
+      "pb[0]",
+      "pb[1]",
+      "pb[2]",
+      "pb[3]",
+      "pb[4]"
+    ],
+    "digit": [
+      "digit[0]",
+      "digit[1]",
+      "digit[2]",
+      "digit[3]"
+    ],
+    "Seven_Segment": [
+      "Seven_Segment[0]",
+      "Seven_Segment[1]",
+      "Seven_Segment[2]",
+      "Seven_Segment[3]",
+      "Seven_Segment[4]",
+      "Seven_Segment[5]",
+      "Seven_Segment[6]",
+      "Seven_Segment[7]"
+    ],
+    "data": [
+      "data[0]",
+      "data[1]",
+      "data[2]",
+      "data[3]",
+      "data[4]",
+      "data[5]",
+      "data[6]",
+      "data[7]"
+    ],
+    "lcd_e": [
+      "lcd_e"
+    ],
+    "lcd_rs": [
+      "lcd_rs"
+    ],
+    "tft_sck": [
+      "tft_sck"
+    ],
+    "tft_sdi": [
+      "tft_sdi"
+    ],
+    "tft_dc": [
+      "tft_dc"
+    ],
+    "tft_reset": [
+      "tft_reset"
+    ],
+    "tft_cs": [
+      "tft_cs"
+    ],
+    "Buzzer": [
+      "Buzzer"
+    ],
+    "SCK": [
+      "SCK",
+      "SCK"
+    ],
+    "CS": [
+      "CS",
+      "CS"
+    ],
+    "DIN": [
+      "DIN"
+    ],
+    "DOUT": [
+      "DOUT"
+    ],
+    "MOSI": [
+      "MOSI"
+    ],
+    "usb_uart_txd": [
+      "usb_uart_txd"
+    ],
+    "usb_uart_rxd": [
+      "usb_uart_rxd"
+    ],
+    "wifi_txd": [
+      "wifi_txd"
+    ],
+    "wifi_rxd": [
+      "wifi_rxd"
+    ],
+    "Bluetooth_txd": [
+      "Bluetooth_txd"
+    ],
+    "Bluetooth_rxd": [
+      "Bluetooth_rxd"
+    ],
+    "Audio_L": [
+      "Audio_L"
+    ],
+    "Audio_R": [
+      "Audio_R"
+    ],
+    "PS2_CLK": [
+      "PS2_CLK"
+    ],
+    "PS2_DATA": [
+      "PS2_DATA"
+    ],
+    "vga_hsync": [
+      "vga_hsync"
+    ],
+    "vga_vsync": [
+      "vga_vsync"
+    ],
+    "vga_r": [
+      "vga_r[0]",
+      "vga_r[1]",
+      "vga_r[2]",
+      "vga_r[3]"
+    ],
+    "vga_g": [
+      "vga_g[0]",
+      "vga_g[1]",
+      "vga_g[2]",
+      "vga_g[3]"
+    ],
+    "vga_b": [
+      "vga_b[0]",
+      "vga_b[1]",
+      "vga_b[2]",
+      "vga_b[3]"
+    ],
+    "ov7670_sioc": [
+      "ov7670_sioc"
+    ],
+    "ov7670_siod": [
+      "ov7670_siod"
+    ],
+    "ov7670_vsync": [
+      "ov7670_vsync"
+    ],
+    "ov7670_href": [
+      "ov7670_href"
+    ],
+    "ov7670_pclk": [
+      "ov7670_pclk"
+    ],
+    "ov7670_xclk": [
+      "ov7670_xclk"
+    ],
+    "ov7670_data": [
+      "ov7670_data[0]",
+      "ov7670_data[1]",
+      "ov7670_data[2]",
+      "ov7670_data[3]",
+      "ov7670_data[4]",
+      "ov7670_data[5]",
+      "ov7670_data[6]",
+      "ov7670_data[7]"
+    ],
+    "ov7670_reset": [
+      "ov7670_reset"
+    ],
+    "ov7670_pwdn": [
+      "ov7670_pwdn"
+    ],
+    "pin5": [
+      "pin5"
+    ],
+    "pin6": [
+      "pin6"
+    ],
+    "pin7": [
+      "pin7"
+    ],
+    "pin8": [
+      "pin8"
+    ],
+    "pin9": [
+      "pin9"
+    ],
+    "pin10": [
+      "pin10"
+    ],
+    "pin11": [
+      "pin11"
+    ],
+    "pin12": [
+      "pin12"
+    ],
+    "pin13": [
+      "pin13"
+    ],
+    "pin14": [
+      "pin14"
+    ],
+    "pin15": [
+      "pin15"
+    ],
+    "pin16": [
+      "pin16"
+    ],
+    "pin17": [
+      "pin17"
+    ],
+    "pin18": [
+      "pin18"
+    ],
+    "pin19": [
+      "pin19"
+    ],
+    "pin20": [
+      "pin20"
+    ]
+  }
+}

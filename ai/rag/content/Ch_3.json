@@ -1,0 +1,503 @@
+{
+  "source": "Ch_3.pdf",
+  "group": "content",
+  "chapter": "3",
+  "title": "Describing Logic Circuits",
+  "chunks": [
+    {
+      "id": "ch3-3-1-boolean-constants-variables",
+      "section": "3-1",
+      "topic": "Boolean Constants and Variables",
+      "type": "definition",
+      "summary": "Boolean algebra allows only two values, 0 and 1, each with several equivalent readings (false/off/low/no/open vs true/on/high/yes/closed); OR, AND, and NOT are the three basic logic operations.",
+      "text": "Boolean algebra allows only two values: 0 and 1. Logic 0 can be read/interpreted as false, off, low, no, or an open switch; logic 1 can be read as true, on, high, yes, or a closed switch -- the specific wording depends on context, but the underlying value is always one of exactly two states. The three basic logic operations from which every Boolean expression and every logic circuit can be built are OR, AND, and NOT.",
+      "keywords": [
+        "Boolean algebra",
+        "logic 0",
+        "logic 1",
+        "OR AND NOT"
+      ],
+      "pages": [
+        3
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2"
+      ]
+    },
+    {
+      "id": "ch3-3-2-truth-tables",
+      "section": "3-2",
+      "topic": "Truth Tables",
+      "type": "definition",
+      "summary": "A truth table lists every input combination of a logic circuit and the resulting output; an n-input table has 2^n rows (2 inputs = 4 rows, 3 inputs = 8 rows, 4 inputs = 16 rows).",
+      "text": "A truth table describes the relationship between the inputs and output of a logic circuit by exhaustively listing every possible input combination alongside the corresponding output value. The number of rows (entries) in a truth table is 2^n, where n is the number of inputs: a 2-input table has 2^2 = 4 rows, a 3-input table has 2^3 = 8 rows, and a 4-input table has 2^4 = 16 rows. Example 2-input truth table (generic circuit with inputs A, B and output x): A=0,B=0 -> x=1; A=0,B=1 -> x=0; A=1,B=0 -> x=1; A=1,B=1 -> x=0 (this particular pattern happens to be the NAND function of A,B, i.e. x = (AB)'). Example 3-input truth table (inputs A,B,C, output x): 000->0, 001->1, 010->1, 011->0, 100->0, 101->0, 110->0, 111->1 (this is the odd-parity/XOR-style pattern across 3 inputs, since x=1 exactly when the number of 1s among A,B,C is odd). The standard row ordering convention is to count up in binary from 000 to 111 (or 0000 to 1111 for 4 inputs), treating the leftmost input column as the MSB, which guarantees every combination is listed exactly once and in a predictable order.",
+      "keywords": [
+        "truth table",
+        "input combinations",
+        "2^n rows"
+      ],
+      "pages": [
+        4,
+        5
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 5 shows three example truth tables side by side: (a) a 2-input block diagram with unlabeled function '?' feeding output x; (b) a filled 2-input table (A,B -> x) with pattern 1,0,1,0 reading top to bottom, i.e. a NAND-like function; (c) a filled 3-input table (A,B,C -> x) with pattern 0,1,1,0,0,0,0,1 (odd-parity/XOR pattern); and a 4-input table (A,B,C,D -> x) whose x column is hand-annotated with student pen marks in the source scan and cannot be reliably read.",
+      "related_labs": [
+        "Lab2"
+      ]
+    },
+    {
+      "id": "ch3-3-3-or-operation",
+      "section": "3-3",
+      "topic": "OR Operation and OR Gates",
+      "type": "concept",
+      "summary": "The OR operation, written X = A + B, produces 1 whenever any input is 1 (the '+' does not mean arithmetic addition, so 1+1=1 not 2); an OR gate implements this for two or more inputs.",
+      "text": "The Boolean expression for the OR operation is X = A + B, read as 'X equals A OR B'. The '+' sign here does NOT stand for ordinary arithmetic addition -- it stands for the OR operation, so when A=1 and B=1 the OR operation gives 1+1=1, not 1+1=2. In an expression like x = A + B + C, x is true (1) whenever A is true OR B is true OR C is true (i.e., whenever at least one input is 1). An OR gate is a circuit with two or more inputs whose output equals the OR combination of all its inputs, i.e., the output is HIGH (1) if any single input is HIGH. Two-input OR truth table: A=0,B=0->X=0; A=0,B=1->X=1; A=1,B=0->X=1; A=1,B=1->X=1. For a three-input OR gate the output is 0 only for the single case where all three inputs are 0, and 1 for every other one of the 8 combinations. A classic application example is an alarm system where several independent sensor signals (e.g., door, window, motion sensor) are each fed into an OR gate, so the alarm output goes HIGH if ANY sensor trips -- exactly the semantics needed for 'trigger on any condition'.",
+      "keywords": [
+        "OR gate",
+        "OR operation",
+        "Boolean addition",
+        "alarm system example"
+      ],
+      "pages": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2"
+      ]
+    },
+    {
+      "id": "ch3-3-4-and-operation",
+      "section": "3-4",
+      "topic": "AND Operation and AND Gates",
+      "type": "concept",
+      "summary": "The AND operation, written X = A . B . C (or juxtaposition ABC), produces 1 only when every input is 1, analogous to multiplication; an AND gate implements this for two or more inputs.",
+      "text": "The Boolean expression for the AND operation is X = A . B . C (or simply ABC), read as 'X equals A AND B AND C'. The AND operation is similar to ordinary multiplication: x is true (1) only when A AND B AND C are all simultaneously true (1); if any one input is 0, the AND output is 0 (just like multiplying by zero). Two-input AND truth table: A=0,B=0->X=0; A=0,B=1->X=0; A=1,B=0->X=0; A=1,B=1->X=1. For a three-input AND gate, the output is 1 only for the single case where all three inputs are 1, and 0 for every other combination -- the output goes HIGH only when ALL inputs are HIGH, which is the defining behavior of the AND symbol on any logic diagram, in contrast to the OR symbol, whose output goes HIGH when ANY input is HIGH.",
+      "keywords": [
+        "AND gate",
+        "AND operation",
+        "Boolean multiplication"
+      ],
+      "pages": [
+        10,
+        11,
+        12
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2"
+      ]
+    },
+    {
+      "id": "ch3-3-5-not-operation",
+      "section": "3-5",
+      "topic": "NOT Operation and the Inverter",
+      "type": "concept",
+      "summary": "The NOT operation (complement/inverse) is written as an overbar (A-bar) or a prime (A'); a NOT circuit (INVERTER) has a single input and its output is always the opposite logic level of that input.",
+      "text": "The Boolean expression for the NOT operation is read as 'X equals NOT A' / 'X equals the inverse of A' / 'X equals the complement of A', and is written with an overbar (X = A-bar, i.e. A with a bar over it meaning 'not A') or equivalently with a prime symbol (A'); both notations represent the same NOT operation. NOT truth table: A=0 -> output=1; A=1 -> output=0, i.e., the output is always the opposite of the input. A NOT circuit is commonly called an INVERTER: it always has exactly one input, and its output logic level is always the opposite of that input's logic level, at every point in time (this holds continuously on a waveform too -- whenever the input is 0 the output is 1, and vice versa, at every instant). A typical application example given is a pushbutton circuit whose Boolean expression is designed to be true precisely when the button is NOT pressed (i.e., the inverter flips a 'pressed=1' signal into a 'not pressed=1' signal used elsewhere in the circuit).",
+      "keywords": [
+        "NOT operation",
+        "INVERTER",
+        "complement",
+        "overbar notation",
+        "prime notation"
+      ],
+      "pages": [
+        13,
+        14,
+        15,
+        16
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2"
+      ]
+    },
+    {
+      "id": "ch3-3-6-describing-circuits-algebraically",
+      "section": "3-6",
+      "topic": "Describing Logic Circuits Algebraically",
+      "type": "method",
+      "summary": "In a mixed AND/OR expression without parentheses, AND is evaluated before OR (like multiplication before addition); an inverter's output is written as its input with a bar over it, and this rule composes for arbitrarily nested gate networks.",
+      "text": "When a Boolean expression contains both AND and OR operations, the AND operation is always performed first, unless parentheses in the expression specify a different order -- exactly analogous to the standard algebraic rule that multiplication precedes addition. Whenever an INVERTER is present at some point in a circuit, its output is written as its input expression with a bar placed over the whole thing: e.g., input A through an inverter produces output A-bar (A'). Two worked circuit-to-expression examples: (1) A four-input circuit combines an inverted A with B and C into a 3-input AND gate producing A'BC, while A (uninverted) is ORed with D to produce (A+D), which then passes through an inverter to give (A+D)', and finally A'BC is ANDed with (A+D)' to give the overall output x = A'BC * (A+D)'. (2) A five-input circuit ORs A and B to get (A+B), ANDs that with C to get (A+B)C, inverts it to get [(A+B)C]', ORs that with D to get D + [(A+B)C]', and finally ANDs that whole expression with E to give the overall output x = [D + ((A+B)C)'] * E. These examples illustrate the general method: trace signals stage by stage from the primary inputs toward the output, writing the algebraic expression for each gate's output in terms of its own inputs, until the final output expression is built up.",
+      "keywords": [
+        "Boolean expression from circuit",
+        "operator precedence",
+        "AND before OR",
+        "inverter overbar"
+      ],
+      "pages": [
+        18,
+        19,
+        20,
+        21
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 20 shows a 4-input gate network (A,B,C,D) where A is inverted to A-bar, ANDed with B and C to form A'BC; separately A (uninverted) is ORed with D to form (A+D), which is then inverted to (A+D)-bar; a final AND gate combines A'BC with (A+D)-bar to produce output x = A'BC*(A+D)'. Page 21 shows a 5-input network (A,B,C,D,E) where A and B are ORed to (A+B), ANDed with C to (A+B)C, inverted to [(A+B)C]', ORed with D to D+[(A+B)C]', and finally ANDed with E to give x = [D+((A+B)C)']*E. Both figures are reproduced exactly in the text field above.",
+      "related_labs": [
+        "Lab2",
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-7-evaluating-circuit-outputs",
+      "section": "3-7",
+      "topic": "Evaluating Logic Circuit Outputs",
+      "type": "method",
+      "summary": "To evaluate a Boolean expression: invert single terms first, then evaluate parentheses, then AND before OR (unless parentheses override); the systematic way to analyze a multi-gate circuit is to build a truth table one intermediate node column at a time.",
+      "text": "Rules for evaluating a Boolean expression, in order: (1) perform all inversions of single terms first; (2) perform all operations that are inside parentheses; (3) perform AND operations before OR operations, unless parentheses indicate a different order; (4) if an entire expression has a bar over it (a 'grouped' inversion), first perform all the operations inside that expression, and only then invert the combined result. The most reliable way to analyze a circuit built from multiple gates is to construct a truth table one intermediate signal (node) at a time rather than trying to evaluate the whole expression at once: (1) list every combination of the primary inputs as usual; (2) add one truth-table column per intermediate node, filling each one in based only on the node's own immediate inputs -- e.g., if node u = A', its column is simply the complement of A's column; (3) continue outward: e.g., if node v = A.B (using u=A' if applicable), fill v's column as HIGH exactly when both of its inputs are HIGH simultaneously; if node w = B.C, fill it as HIGH exactly when B AND C are both HIGH; (4) finally, combine the intermediate columns to get the output, e.g., if x = v + w, then x is HIGH whenever v is HIGH OR w is HIGH. This method (a) lets you analyze one gate or logic combination at a time instead of the whole circuit at once, (b) lets you easily double-check your work column by column, and (c) leaves you with a complete node-by-node truth table that is extremely useful later for troubleshooting the physical circuit (you can probe any internal node and compare its measured value against the table's predicted value for the current input combination). An alternative, more manual technique used by technicians is to determine logic levels directly on the circuit diagram itself: given a specific input combination, write the resulting logic level directly on each gate's output wire on the schematic, working left-to-right (input side toward output side) until the final output value is found; this is faster for checking one specific input case but does not produce a reusable table like the node-by-node method does.",
+      "keywords": [
+        "evaluating Boolean expressions",
+        "node-by-node truth table",
+        "circuit analysis",
+        "troubleshooting"
+      ],
+      "pages": [
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2",
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-8-implementing-circuits-from-expressions",
+      "section": "3-8",
+      "topic": "Implementing Circuits From Boolean Expressions",
+      "type": "method",
+      "summary": "Draw a logic circuit directly from a Boolean SOP expression by giving each ANDed product term its own AND gate and ORing the product terms together with an OR gate sized to the number of terms.",
+      "text": "It is important to be able to go the opposite direction from section 3-6/3-7: given a Boolean expression, draw the logic circuit that implements it. Simple examples: the expression X = A.B.C can be drawn directly as a single three-input AND gate; the expression X = A' + B would be drawn as a two-input OR gate with an INVERTER placed on the A input before it reaches the OR gate. For a sum-of-products (SOP) expression such as y = AC + BC + ABC, which contains three terms ORed together, you need a three-input OR gate (one input per term), and each OR-gate input is itself an AND product term (AC, BC, ABC respectively), each generated by its own AND gate with the appropriate inputs feeding it. A more complex worked example: the expression x = (A+B)(B+C) is implemented with two 2-input OR gates -- one computing (A+B) and one computing (B+C) -- whose outputs then feed a 2-input AND gate to produce the final output x. This general pattern (OR gate per term, AND gate per parenthesized sub-expression, feeding into further gates matching each operator in the expression) scales to arbitrarily complex Boolean expressions by simply mapping each operator (AND, OR, NOT) in the expression to its corresponding gate and wiring gate outputs to gate inputs exactly as the expression's parenthesization dictates.",
+      "keywords": [
+        "implement circuit from expression",
+        "sum of products",
+        "SOP circuit"
+      ],
+      "pages": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2",
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-9-nand-nor-gates",
+      "section": "3-9",
+      "topic": "NAND Gates and NOR Gates",
+      "type": "concept",
+      "summary": "NAND is an inverted AND (output X = (AB)'), NOR is an inverted OR (output X = (A+B)'); each gate's truth table is the exact complement of its non-inverted counterpart's truth table, shown symbolically with an inversion bubble at the output.",
+      "text": "NAND and NOR gates combine the basic AND, OR, and NOT operations into a single gate, which simplifies both circuit diagrams and the writing of Boolean expressions. The output of a NAND or NOR gate can always be found by first determining what the output of the corresponding AND or OR gate would be, and then inverting that result; correspondingly, the truth tables for NOR and NAND gates are exactly the bitwise complement of the truth tables for OR and AND gates respectively. The NOR gate is an inverted OR gate: an inversion 'bubble' is drawn at the output of an OR-gate symbol, giving the Boolean expression X = (A+B)'. Two-input NOR truth table: 00->1, 01->0, 10->0, 11->0 (the exact complement of OR's 0,1,1,1). The NAND gate is an inverted AND gate: an inversion bubble is drawn at the output of an AND-gate symbol, giving X = (AB)'. Two-input NAND truth table: 00->1, 01->1, 10->1, 11->0 (the exact complement of AND's 0,0,0,1). A combined worked example shows the expression x = AB . (C+D)' implemented using only NAND and NOR gates: an AND gate computes AB, an OR gate computes C+D which is then inverted (or equivalently, a NOR gate computes (C+D)' directly), and a final AND-type gate combines AB with (C+D)' to produce x.",
+      "keywords": [
+        "NAND gate",
+        "NOR gate",
+        "inversion bubble",
+        "complement of AND/OR"
+      ],
+      "pages": [
+        34,
+        35,
+        36,
+        37,
+        38,
+        39
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab2",
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-10-boolean-theorems",
+      "section": "3-10",
+      "topic": "Boolean Theorems (Single- and Multi-Variable)",
+      "type": "theorem",
+      "summary": "Single-variable theorems (x.0=0, x.1=x, x.x=x, x.x'=0, x+0=x, x+1=1, x+x=x, x+x'=1) plus multivariable commutative, associative, and distributive laws, plus two theorems unique to Boolean algebra with no ordinary-algebra counterpart (x+xy=x and x+x'y=x+y).",
+      "text": "The Boolean theorems (laws) may involve one or more variables and can each be proved by checking all possible cases for the variables involved (since Boolean variables only take values 0 or 1, exhaustive case-checking is always a valid proof technique). Single-variable theorems: (1) x.0 = 0 -- ANDing any variable with 0 always gives 0. (2) x.1 = x -- ANDing with 1 leaves the variable unchanged (like ordinary multiplication by 1). (3) x.x = x -- proved by checking both cases: if x=0, 0.0=0; if x=1, 1.1=1; so x.x=x always. (4) x.x' = 0 -- a variable ANDed with its own complement is always 0, since x and x' are never both 1 at the same time. (5) x+0 = x -- ORing with 0 never changes the value, just as adding 0 doesn't in ordinary arithmetic. (6) x+1 = 1 -- ORing any variable with 1 always gives 1 (check: 0+1=1 and 1+1=1). (7) x+x = x -- check: 0+0=0 and 1+1=1, so x+x=x always. (8) x+x' = 1 -- a variable ORed with its own complement is always 1, since one of x or x' is always 1. Multivariable theorems: commutative laws (x+y = y+x, and xy = yx -- order doesn't matter); associative laws (x+(y+z) = (x+y)+z, and x(yz) = (xy)z -- grouping doesn't matter); the distributive law (x(y+z) = xy + xz, exactly like ordinary algebra's distributive property). Two further multivariable theorems have NO counterpart in ordinary algebra and must be proved by exhaustively checking all cases for x and y: theorem (14) x + xy = x (absorption: if x is already true, ORing in the extra term xy adds nothing new, since xy can only be true when x is already true) -- this can also be shown by factoring x out of x + xy = x(1+y) = x.1 = x using theorem (6) and theorem (2); and theorem (15) x + x'y = x + y (if x is true the left side is true via x; if x is false then x' is true so x'y=y, giving the left side = y; either way the left side always equals x+y).",
+      "keywords": [
+        "Boolean theorems",
+        "absorption law",
+        "distributive law",
+        "commutative law",
+        "associative law"
+      ],
+      "pages": [
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-11-demorgans-theorems",
+      "section": "3-11",
+      "topic": "DeMorgan's Theorems",
+      "type": "theorem",
+      "summary": "Theorem 16: (x+y)' = x'.y' (inverting an OR sum equals ANDing the individually-inverted variables). Theorem 17: (xy)' = x'+y' (inverting an AND product equals ORing the individually-inverted variables). Both are extremely useful for simplifying inverted sum/product expressions and for converting between NAND/NOR representations.",
+      "text": "DeMorgan's theorems are extremely useful for simplifying Boolean expressions in which a sum or product of variables is inverted as a whole. Theorem (16): (x+y)' = x'.y' -- inverting the OR-sum of two variables is the same as inverting each variable individually and then ANDing the inverted variables together. Theorem (17): (xy)' = x' + y' -- inverting the AND-product of two variables is the same as inverting each variable individually and then ORing the inverted variables together. Both theorems can be proved by checking all four possible combinations of x and y (0,0 / 0,1 / 1,0 / 1,1) and confirming both sides give the same result in every case. Theorem (16) implies an equivalent-circuit identity: a NOR gate (OR-then-invert) is logically equivalent to a circuit that first inverts both inputs and then ANDs them (an AND gate with bubbles on both of its inputs) -- this equivalence is the basis for the 'alternate symbol' for the NOR function used in section 3-13. Theorem (17) implies the mirror-image identity: a NAND gate (AND-then-invert) is logically equivalent to a circuit that first inverts both inputs and then ORs them (an OR gate with bubbles on both of its inputs) -- the basis for the alternate NAND symbol.",
+      "keywords": [
+        "DeMorgan's theorem",
+        "NAND NOR equivalence",
+        "inverted sum",
+        "inverted product"
+      ],
+      "pages": [
+        45,
+        46,
+        47
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-12-universality-of-nand-nor",
+      "section": "3-12",
+      "topic": "Universality of NAND and NOR Gates",
+      "type": "concept",
+      "summary": "NAND-only or NOR-only gate networks can implement any of OR, AND, and INVERT, and therefore any Boolean function whatsoever -- demonstrated with a worked example x = AB + CD built two ways, entirely from 74LS08/74LS32 (AND/OR ICs) versus entirely from 74LS00 (NAND ICs).",
+      "text": "NAND gates alone, or NOR gates alone, can be wired together to reproduce all three basic logic operations -- OR, AND, and INVERT -- which means any Boolean expression whatsoever can be implemented using only NAND gates, or entirely using only NOR gates, with no other gate type required. This universality gives designers flexibility, e.g., stocking only one gate type (NAND) can still implement arbitrary logic. A running worked example throughout this section is a circuit that should output x = AB + CD (i.e., signal x goes HIGH whenever conditions A AND B exist simultaneously, OR whenever conditions C AND D exist simultaneously). 'Possible Implementation #1' realizes this the straightforward way using standard AND/OR ICs: two 74LS08 quad-2-input-AND-gate chips each provide one 2-input AND gate (one computing A.B, the other C.D), and a 74LS32 quad-2-input-OR-gate chip provides the final OR gate combining AB and CD into x = AB+CD; each 74-series IC shown is a 'quad' package containing four identical gates, of which only the needed gates are used. 'Possible Implementation #2' instead realizes the exact same function x = AB+CD using ONLY NAND gates (74LS00 quad-2-input-NAND chips), demonstrating universality directly: two NAND gates compute (AB)' and (CD)' respectively, and a third NAND gate combines these two NANDed signals; by DeMorgan's theorem this final NAND-of-NANDs structure, NAND(NAND(A,B), NAND(C,D)) = ((AB)'(CD)')' = AB + CD, algebraically collapses back to exactly AB+CD -- so the same physical function is achieved with three NAND gates and no AND or OR gate is needed at all. The general recipe for building OR, AND, and INVERT from NAND gates alone (or symmetrically from NOR gates alone) is covered by the 'combinations of NANDs/NORs' reference diagram: an inverter is a NAND (or NOR) gate with both inputs tied together (or tied to the same signal); an AND function is built from a NAND gate followed by a NAND-as-inverter; an OR function is built from NAND gates with DeMorganized (inverted) inputs, following exactly the (xy)'=x'+y' identity from section 3-11.",
+      "keywords": [
+        "universal gates",
+        "NAND-only implementation",
+        "NOR-only implementation",
+        "74LS00",
+        "74LS08",
+        "74LS32",
+        "x=AB+CD"
+      ],
+      "pages": [
+        48,
+        49,
+        50,
+        51,
+        52,
+        53
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 52 ('Possible Implementations #1') shows two 74LS08 (quad 2-input AND) ICs each contributing one AND gate (A.B and C.D), feeding a 74LS32 (quad 2-input OR) IC's OR gate to produce x=AB+CD, with full IC pin numbers shown (pins 1,2->3 and 4,5->6 on the AND chips feed pins 1,2 and 9,10 -> 8 or similar on the OR chip). Page 53 ('Possible Implementations #2') shows the same function built entirely from three gates of 74LS00 (quad 2-input NAND) ICs: NAND(A,B) on pins (1,2)->3, NAND(C,D) on pins (4,5)->6, and a final NAND gate combining pins (9,10)->8 of a third 74LS00 to produce x=AB+CD, with full pin numbering shown, verifying that only NAND gates (no AND, OR, or dedicated NOT gate) are required.",
+      "related_labs": [
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-13-alternate-gate-representations",
+      "section": "3-13",
+      "topic": "Alternate Logic-Gate Representations",
+      "type": "concept",
+      "summary": "Any standard gate symbol has an equivalent alternate symbol obtained by inverting every input and output (adding bubbles where absent, removing them where present); NAND/NOR (inverting gates) get one bubble either way, while AND/OR (noninverting gates) get bubbles on all three ports in their alternate form.",
+      "text": "To convert a standard gate symbol to its alternate symbol: invert every input and every output of the standard symbol -- add an inversion bubble anywhere one is currently absent, and remove a bubble anywhere one currently exists. Key properties: this equivalence extends to gates with any number of inputs (not just 2); none of the standard gate symbols have bubbles on their inputs, while all of the alternate symbols do; the standard and alternate symbols for a given gate always represent the exact same physical circuit/IC (choosing one drawing convention over the other never changes the hardware). NAND and NOR gates are inverting gates, so both their standard symbol and their alternate symbol will have exactly one bubble somewhere -- either on the output (standard) or spread across the inputs (alternate). AND and OR gates are noninverting gates, so their alternate symbols end up with bubbles on both inputs AND the output (three bubbles total), since a noninverting gate's alternate form must invert everything to compensate. Active-HIGH describes an input or output that has no inversion bubble; active-LOW describes an input or output that does have an inversion bubble -- this terminology (rather than plain 0/1) is used throughout section 3-14.",
+      "keywords": [
+        "alternate gate symbol",
+        "active-HIGH",
+        "active-LOW",
+        "inverting vs noninverting gates"
+      ],
+      "pages": [
+        54,
+        55,
+        56,
+        57,
+        58
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-14-which-gate-representation-to-use",
+      "section": "3-14",
+      "topic": "Which Gate Representation to Use / Asserted Signals",
+      "type": "method",
+      "summary": "Choosing standard vs. alternate gate symbols to match how a signal is actually used makes a schematic self-documenting; a signal is 'asserted' when active and 'unasserted' when inactive, and the design rule is to connect bubble outputs to bubble inputs (and nonbubble to nonbubble) wherever possible.",
+      "text": "Proper use of alternate gate symbols in a circuit diagram can make the circuit's actual operation much clearer to a reader than always sticking to standard symbols. A worked example shows one NAND-gate circuit redrawn in three equivalent ways: the original using standard NAND symbols throughout; an equivalent version chosen so output Z appears active-HIGH; and another equivalent version chosen so output Z appears active-LOW -- all three represent the identical physical circuit, but each drawing communicates the intended active state of Z at a glance. When a logic signal is in its active state (whether that active state is defined as HIGH or as LOW for that particular signal) it is said to be asserted; when it is in the opposite, inactive state it is said to be unasserted. Convention: a bar drawn over a signal name means that signal is asserted (active) when LOW (e.g., RD-bar); the absence of a bar means the signal is asserted when HIGH. Some output signals meaningfully do two different jobs depending on which state they're in -- a common example is a combined Read/Write control line labeled RD/WR-bar: when this signal is HIGH, a read operation (RD) is performed, and when it is LOW, a write operation (WR) is performed; such dual-purpose signals are customarily labeled so BOTH active states are visible in the name. The general design guideline: whenever possible, choose gate symbols (standard vs. alternate) so that bubble outputs connect to bubble inputs, and nonbubble outputs connect to nonbubble inputs, rather than mixing a bubble output into a nonbubble input or vice versa. A worked example: a logic circuit that activates an alarm when output Z goes HIGH is redrawn by changing a NOR gate to its alternate symbol (which has a nonbubble/active-HIGH output) specifically so that its output's nonbubble form matches the nonbubble (active-HIGH) input of the downstream AND gate it feeds -- after this change, the circuit's nonbubble outputs are all connected to nonbubble inputs, making the signal flow and active states easy to read directly off the diagram.",
+      "keywords": [
+        "asserted signal",
+        "active state",
+        "bubble matching",
+        "RD/WR signal",
+        "schematic readability"
+      ],
+      "pages": [
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab3"
+      ]
+    },
+    {
+      "id": "ch3-3-15-propagation-delay",
+      "section": "3-15",
+      "topic": "Propagation Delay",
+      "type": "definition",
+      "summary": "Propagation delay is the time between a logic circuit receiving an input and producing the corresponding output; it determines circuit speed and is specified on a part's datasheet to confirm it meets an application's timing requirements.",
+      "text": "Propagation delay is defined as the time it takes for a logic system to produce its output after it has received a corresponding input; the speed of a logic circuit is directly related to its propagation delay (lower delay = faster circuit). Every physical part used to implement logic circuits has a datasheet that states its propagation delay value(s) (often given separately for low-to-high and high-to-low transitions); designers use this specification to confirm that a given part/circuit can operate fast enough for their particular application's timing requirements.",
+      "keywords": [
+        "propagation delay",
+        "circuit speed",
+        "datasheet timing"
+      ],
+      "pages": [
+        64
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch3-3-17-hdl-vs-programming-languages",
+      "section": "3-17",
+      "topic": "Hardware Description Languages vs. Programming Languages",
+      "type": "concept",
+      "summary": "AHDL and VHDL are hardware description languages used to configure programmable logic; unlike a computer's sequential instruction execution, a logic circuit continuously and concurrently monitors all its inputs, so its speed is limited only by circuit propagation delay rather than instruction-execution time.",
+      "text": "Hardware Description Languages (HDLs) allow logic circuits to be represented using a rigidly defined formal language. AHDL (Altera Hardware Description Language) was developed by Altera specifically to configure Altera's own Programmable Logic Devices (PLDs); it was not intended as a universal language for describing arbitrary logic circuits on any vendor's hardware. VHDL (Very High Speed Integrated Circuit Hardware Description Language) was developed by the U.S. Department of Defense, later standardized by IEEE, and is widely used across the industry to translate circuit designs into the bit patterns that configure real programmable devices. It is important to distinguish HDLs from ordinary programming languages, even though both are technically 'a language used to program a device': a computer executes a program as a sequential list of instructions, each of which must complete in order, so its overall speed is determined by how fast it can execute each instruction one after another. A digital logic circuit, in contrast, is limited in speed only by how quickly its own circuitry can physically change its outputs in response to changes in its inputs (i.e., by propagation delay, section 3-15) -- it is monitoring ALL of its inputs concurrently at every instant and responding to any change immediately, rather than working through a sequential instruction list. A worked comparison: implementing y = AB as (a) a single AND gate versus (b) a short computer program. As a gate, output y goes HIGH within about 10 nanoseconds of the moment A and B are both simultaneously HIGH, and returns LOW within about 10 nanoseconds after either input goes LOW -- a single, near-instant, concurrent physical response. As a computer program, the equivalent decision must run through a flowchart of separate instructions (e.g., check A, check B, combine, set output); if each instruction takes about 20 nanoseconds, the program needs a minimum of two or three sequential instructions (40-60 nanoseconds total) just to respond to a change in its inputs -- several times slower than the dedicated hardware gate, illustrating why custom/programmable logic hardware is used when raw response speed matters.",
+      "keywords": [
+        "HDL",
+        "AHDL",
+        "VHDL",
+        "hardware vs software speed",
+        "concurrent execution",
+        "propagation delay comparison"
+      ],
+      "pages": [
+        65,
+        66,
+        67,
+        68
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab6",
+        "Lab7"
+      ]
+    },
+    {
+      "id": "ch3-3-18-plds",
+      "section": "3-18",
+      "topic": "Implementing Logic Circuits With PLDs",
+      "type": "definition",
+      "summary": "Programmable Logic Devices (PLDs) contain a grid of internal row/column wire intersections that can each be electronically connected (1) or left unconnected (0); an HDL compiler translates a design description into the pattern of connections that configures the device.",
+      "text": "Programmable Logic Devices (PLDs) are devices that can be configured, electronically, in many different ways to perform a wide range of logic functions; their internal connections are made electronically rather than by physically wiring discrete gates together. Internally, a PLD's programmable wiring can be thought of as a large grid of thousands of potential connections: each intersection of a horizontal row wire and a vertical column wire is a single programmable connection point, which is either connected (representing a logic 1 at that junction) or not connected (representing a logic 0). A hardware description language is used to define which of these thousands of connections should be made; the HDL source is translated (compiled) into the actual bit pattern that gets loaded into the device to physically realize those connections. This higher-level HDL approach makes programming a PLD far easier than trying to specify the same design directly via raw Boolean algebra, hand-drawn schematics, or manually filled-in truth tables -- the compiler handles that translation automatically.",
+      "keywords": [
+        "PLD",
+        "programmable logic device",
+        "programmable interconnect grid",
+        "HDL compiler"
+      ],
+      "pages": [
+        69,
+        70,
+        71
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": [
+        "Lab6",
+        "Lab7"
+      ]
+    },
+    {
+      "id": "ch3-3-19-hdl-format-and-syntax",
+      "section": "3-19",
+      "topic": "HDL Format and Syntax (AHDL and VHDL)",
+      "type": "definition",
+      "summary": "HDL files define a named circuit block's inputs/outputs (ports, with mode and bit-width type) plus its operation as a set of concurrently-evaluated statements; AHDL uses SUBDESIGN/BEGIN/END and symbolic operators (& # ! $), while VHDL uses ENTITY/PORT/ARCHITECTURE/BEGIN/END and keyword operators (AND OR NOT XOR).",
+      "text": "Any language interpreted by a computer or compiler must follow strict rules of syntax, meaning a strictly defined order of elements. An HDL file's format defines: a name for the circuit being described, its inputs and outputs (ports) with a mode (input, output, or bidirectional) and a type (the number of bits and how they are grouped/interpreted -- a single-bit input can only be 0 or 1, while a 4-bit binary value can be any one of 16 possible values 0000-1111), and the actual operation of the circuit as a body of statements. In AHDL: the keyword SUBDESIGN gives a name to the circuit block (e.g., SUBDESIGN and_gate), and by convention the source filename must match that name (and_gate.tdf); the input/output definition is enclosed in parentheses after SUBDESIGN, with input variable names separated by commas and followed by the keyword :INPUT;, and the output variable followed by the keyword :OUTPUT; -- AHDL assumes a single-bit type unless a variable is explicitly declared as multi-bit. The circuit's operation is written as a set of statements between the keywords BEGIN and END (with END followed by a semicolon); the order in which these statements are listed makes no difference to their meaning, because all statements between BEGIN and END are evaluated constantly and concurrently, not sequentially -- this concurrency is the key conceptual difference from an ordinary programming language, matching the 'monitors all inputs concurrently' idea from section 3-17. AHDL's basic Boolean operators use symbols rather than keywords: & means AND, # means OR, ! means NOT, and $ means XOR. In VHDL: the keyword ENTITY gives a name to the circuit block (e.g., ENTITY and_gate); by compiler convention, variable names should be lowercase. The keyword PORT introduces the list of inputs and outputs for that entity; a BIT type declaration after each port name tells the compiler that variable holds a single bit. Every ENTITY must have at least one associated ARCHITECTURE declaration, which describes the actual operation of everything inside that entity's block; within the architecture's body (the statements between its own BEGIN and END), the circuit's behavior is described using VHDL's Boolean keyword operators AND, OR, NOT, and XOR (as opposed to AHDL's symbolic &, #, !, $).",
+      "keywords": [
+        "AHDL syntax",
+        "VHDL syntax",
+        "SUBDESIGN",
+        "ENTITY",
+        "PORT",
+        "ARCHITECTURE",
+        "concurrent statements",
+        "HDL operators"
+      ],
+      "pages": [
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 78 shows a reference box mapping AHDL's four symbolic Boolean operators to their meaning: '&' = AND, '#' = OR, '!' = NOT, '$' = XOR -- reproduced exactly in the text field above.",
+      "related_labs": [
+        "Lab6",
+        "Lab7"
+      ]
+    },
+    {
+      "id": "ch3-3-20-intermediate-signals",
+      "section": "3-20",
+      "topic": "Intermediate Signals (Buried Nodes / Local Signals)",
+      "type": "example",
+      "summary": "HDLs let you name internal 'buried node' signals for readability and reuse; in VHDL this is done with the SIGNAL keyword, illustrated by a worked example y = m OR c where m = a AND b is computed once as a named intermediate signal.",
+      "text": "In many designs there is a need to define named signal points 'inside' the circuit block that are not primary inputs or outputs -- these are called buried nodes or local signals, and they act as convenient reference points for describing a circuit's internal structure. In VHDL, a local (intermediate) signal is declared with the keyword SIGNAL followed by its name and its type, e.g., SIGNAL m : BIT; (declared inside the ARCHITECTURE, before its BEGIN); a double-dash '--' starts a documentation-only comment that has no effect on the compiled behavior. Worked example (VHDL, entity fig3_51, inputs a,b,c and output y): the entity declares PORT(a, b, c : IN BIT; y : OUT BIT); its architecture 'ckt' first declares SIGNAL m : BIT; as a buried/intermediate signal, then in the BEGIN..END body executes two concurrent assignment statements: m <= a AND b; (m is assigned the AND of a and b -- a 'buried product term') and y <= m OR c; (the final output y is assigned the OR of the intermediate signal m with input c -- generating the sum on the output). This corresponds to a circuit with a first-stage AND gate combining inputs a and b to produce the named internal signal m, whose output then feeds one input of a second-stage OR gate together with input c to produce the final output y. Naming m explicitly makes the two-stage structure of the circuit (AND-then-OR) explicit and readable in the HDL source, exactly mirroring how a schematic would show a labeled wire between the AND gate's output and the OR gate's input.",
+      "keywords": [
+        "buried node",
+        "local signal",
+        "VHDL SIGNAL keyword",
+        "intermediate signal example"
+      ],
+      "pages": [
+        83,
+        84,
+        85
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 85 shows the full VHDL listing for entity fig3_51 (ports a,b,c:IN BIT, y:OUT BIT; architecture ckt with SIGNAL m:BIT; body statements m<=a AND b; y<=m OR c;) alongside a matching two-gate schematic: inputs a and b feed a first AND gate whose output is labeled 'm' (the intermediate signal), which together with input c feeds a second OR gate producing output y -- reproduced exactly in the text field above, including the source comments crediting 'Digital Systems 11th ed, NS Widmer, MAY 24, 2010' and referencing the textbook's Figure 3-49/3-51.",
+      "related_labs": [
+        "Lab6",
+        "Lab7"
+      ]
+    }
+  ]
+}

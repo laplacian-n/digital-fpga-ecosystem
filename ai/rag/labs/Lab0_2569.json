@@ -1,0 +1,59 @@
+{
+  "source": "Lab0_2569.pdf",
+  "group": "labs",
+  "lab": "0",
+  "title": "การใช้งานบอร์ด FPGA และโปรแกรม Vivado 2025.2",
+  "objectives": [
+    "เพื่อให้นักศึกษาติดตั้งและฝึกการใช้งานบอร์ด FPGA",
+    "เพื่อให้นักศึกษาฝึกการใช้งานโปรแกรม Vivado 2025.2"
+  ],
+  "items": [
+    {
+      "id": "lab0-1",
+      "question": "วิธีการติดตั้งโปรแกรม Vivado 2025.2 สำหรับใช้งานกับบอร์ด FPGA ตระกูล Spartan-7 (ขั้นตอนที่ 1-18)",
+      "params": null,
+      "subtasks": [
+        "1. ดาวน์โหลด 'AMD Unified Installer for FPGAs & Adaptive SoCs 2025.2: Windows Self Extracting Web Installer' จากเว็บไซต์ AMD (ต้องมีพื้นที่ว่างอย่างน้อย 50 GB)",
+        "2. สร้างหรือเข้าสู่ระบบ AMD Account",
+        "3-4. กรอกข้อมูลส่วนตัว กด Download แล้วเปิดไฟล์ติดตั้งจากโฟลเดอร์ Downloads",
+        "5-6. หน้า Installation กด Next, กรอกอีเมล/รหัสผ่าน AMD Account แล้วเลือก 'Download and Install Now'",
+        "7. เลือกผลิตภัณฑ์ 'Vivado' แล้วกด Next",
+        "8. เลือก Edition เป็น 'Vivado ML Standard' (รุ่นไม่มีค่าใช้จ่าย จำกัดอุปกรณ์) แล้วกด Next",
+        "9. ติ๊กเลือกตระกูลชิป 'Spartan-7 FPGAs'",
+        "10. ติ๊ก 'I Agree' ทุกช่อง แล้วกด Next",
+        "11-12. เลือกตำแหน่งติดตั้ง แล้วกด Install รอจนติดตั้งเสร็จ",
+        "13-14. เปิด Vivado License Manager อัตโนมัติ (หรือ Get License > Obtain License) เลือก 'Get My Full or Purchased Certificate-Based License' กด Connect Now แล้วกรอกข้อมูลอีกครั้ง กด Submit",
+        "15-16. แท็บ 'Create New Licenses' เลือกผลิตภัณฑ์ 'Vivado Design Suite: HL WebPACK 2015 and Earlier License' (No Charge) กด 'Generate Node-Locked License' แล้วกด Next ไปเรื่อย ๆ",
+        "17. ดาวน์โหลดไฟล์ไลเซนส์ (.lic) ที่ถูกส่งไปยังอีเมลที่ลงทะเบียน",
+        "18. กลับไปที่ Vivado License Manager > Get License > Load License > Copy License แล้วเลือกไฟล์ .lic เพื่อติดตั้งไลเซนส์"
+      ],
+      "topic": "fpga|vivado|tool-setup",
+      "solution": null,
+      "verify": null,
+      "related_content": []
+    },
+    {
+      "id": "lab0-2",
+      "question": "วิธีสร้างโปรเจกต์ Vivado ใหม่ เขียนวงจร VHDL กำหนด pin ด้วยไฟล์ XDC สร้าง Bitstream และดาวน์โหลดวงจรลงบอร์ด FPGA Spartan-7 (ขั้นตอนที่ 1-19)",
+      "params": "ชิปเป้าหมายที่ใช้ในการทดลอง: Spartan-7 รุ่น xc7s15ftgb196-1 (ตัวอย่างชิปที่เลือกในขั้นตอนที่ 5)",
+      "subtasks": [
+        "1-2. เปิด Vivado กด 'Create Project' จากหน้า Quick Start แล้วกด Next ที่หน้าต้อนรับ",
+        "3. ตั้งชื่อโปรเจกต์ (Project name) และตำแหน่งเก็บไฟล์ (Project location)",
+        "4. เลือกชนิดโปรเจกต์เป็น 'RTL Project' และติ๊ก 'Do not specify sources at this time'",
+        "5. หน้า Default Part เลือกชิป Spartan-7 รุ่น xc7s15ftgb196-1 (สามารถกด '-' เพื่อลบ port ที่ไม่ต้องการ)",
+        "6. กด Finish เพื่อสร้างโปรเจกต์",
+        "7-8. Project Manager > Add Sources > Add or create design sources > Next > Create File > เลือก File type 'VHDL' ตั้งชื่อไฟล์ > OK",
+        "9-10. หน้า Define Module กำหนดชื่อ Entity และรายการ I/O Port (Port Name, Direction, Bus) แล้ว OK; ไฟล์ VHDL (Top_layer.vhd) จะถูกสร้างและเปิดขึ้นให้เขียนวงจรดิจิทัล",
+        "11-12. สร้างไฟล์ Constraint: Add Sources > Add or create constraints > Next > Create File > เลือก File type 'XDC' ตั้งชื่อไฟล์ (เช่น port) > OK",
+        "13-14. ไฟล์ XDC (port.xdc) ใช้กำหนดขา (pin) ของบอร์ดให้ตรงกับ port ของวงจร; ที่ Flow Navigator ส่วน PROGRAM AND DEBUG กด 'Generate Bitstream' (Vivado รัน Synthesis และ Implementation ให้อัตโนมัติ)",
+        "15-16. เปิด 'Open Hardware Manager' > Open Target คลิกขวาเลือก 'Auto Connect' เพื่อเชื่อมต่อบอร์ด แล้วเลือก 'Program Device' และเลือกชิปเป้าหมาย (เช่น xc7s15_0)",
+        "17. หน้าต่าง Program Device เลือกไฟล์ Bitstream (.bit) แล้วกด Program",
+        "18-19. สร้างไฟล์ .mcs ได้จากหน้าต่าง 'Bitstream Generation Completed' เลือก 'Generate Memory Configuration File' หรือจากเมนู Tools > Generate Memory Configuration File จากนั้นตั้งค่า Format เป็น 'MCS' เลือก Memory Part, Interface, ตั้งชื่อไฟล์ และเลือกไฟล์ Bitstream แล้วกด OK"
+      ],
+      "topic": "fpga|vivado|toolflow",
+      "solution": null,
+      "verify": null,
+      "related_content": []
+    }
+  ]
+}

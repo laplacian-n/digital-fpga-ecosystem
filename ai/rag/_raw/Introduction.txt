@@ -1,0 +1,146 @@
+===== PAGE 1 =====
+Digital System Fundamentals
+พื้นฐานระบบดิจิตอล
+Tong+
+1
+06
+/
+2026
+
+===== PAGE 2 =====
+Digital System Fundamentals
+In Practice
+ปฏิบัติการพื้นฐานระบบดิจิตอล
+Tong+
+2
+06
+/
+2026
+
+===== PAGE 3 =====
+อาจารย์ผู้สอน
+• รศ. ดร.เจริญ วงษ์ชุ่มเย็น
+• Assoc. Prof. Dr. Charoen Vongchumyen
+• Email : charoen.vo@kmitl.ac.th
+• Tel : 081-692-xxxx
+• Age : 25 tomorrow
+Tong+
+3
+06
+/
+2026
+
+===== PAGE 4 =====
+Goal
+Tong+
+4
+06
+/
+2026
+
+===== PAGE 5 =====
+Ultimate Goal
+Tong+
+5
+06
+/
+2026
+
+===== PAGE 6 =====
+Course Description
+Introduction to Digital Systems; Binary Systems;
+Boolean Algebra and Simplification;Combinational
+Circuit; Sequential Components i.e. latches, flip-
+flops, registers and counters; Sequential Circuits;
+Basic ALU (Arithmetic and Logic Unit) and Control
+Unit; Hardware Description Language;
+Tong+
+6
+06
+/
+2026
+
+===== PAGE 7 =====
+กิจกรรมการเรียนการสอนและวิธีสอน
+• การบรรยายในห้องเรียน
+• Child center + Time constrain
+• Assignment
+Tong+
+7
+06
+/
+2026
+
+===== PAGE 8 =====
+การประเมินผลทฤษฎี
+1. สอบปลายภาค  75%
+2. ชิ้นงาน   25%(Optional)
+  ทฤษฎี รวม   100%
+Tong+
+8
+06
+/
+2026
+
+===== PAGE 9 =====
+การประเมินผลปฏิบัติ
+1. เข้าแลปตรงต่อเวลา  20%
+2. ส่งแลป  50%
+3. สอบแลป   30%
+แลป รวม   100%
+Tong+
+9
+06
+/
+2026
+
+===== PAGE 10 =====
+ต าราเรียน
+Tong+
+10
+06
+/
+2026
+
+===== PAGE 11 =====
+ช่องทางหลัก
+Tong+
+11
+ 06
+/
+2026
+
+===== PAGE 12 =====
+Lab Partners
+Tong+
+12
+ 06
+/
+2026
+Old board       &      New board
+
+===== PAGE 13 =====
+Lab Partners
+Tong+
+13
+ 06
+/
+2026
+1 From each sec
+2 person/Group
+1 New FPGA & 1 Old FPGA
+
+===== PAGE 14 =====
+Lab
+6
+,
+7
+Top
+-
+Down Design
+Tong+
+14
+ 06
+/
+2026
+By Hand or By Computer

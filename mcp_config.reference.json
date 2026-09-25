@@ -1,0 +1,13 @@
+{
+  "_comment": "MCP servers for the digital ecosystem. Merge the two entries under 'mcpServers' into your Claude Desktop config at %APPDATA%\\Claude\\claude_desktop_config.json (create the file if it doesn't exist), then FULLY restart Claude Desktop (quit from tray, reopen). Both run with --serve so the editors' 'Sync' buttons work: topdown on :8765, schematic (gate) on :8766.",
+  "mcpServers": {
+    "top-down-schematic": {
+      "command": "C:\\Users\\dinuc\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "args": ["C:\\Users\\dinuc\\OneDrive\\เอกสาร\\digital\\topdown\\topdown_mcp.py", "--serve"]
+    },
+    "schematic-studio": {
+      "command": "C:\\Users\\dinuc\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "args": ["C:\\Users\\dinuc\\OneDrive\\เอกสาร\\digital\\schematic_mcp.py", "--serve"]
+    }
+  }
+}

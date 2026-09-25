@@ -1,0 +1,414 @@
+===== PAGE 1 =====
+
+
+===== PAGE 2 =====
+Chapter 6 – Digital Arithmetic: Operations & Circuits
+
+===== PAGE 3 =====
+• Selected areas covered in this chapter:
+– Binary addition, subtraction, multiplication, division.
+– Differences between binary addition and OR addition.
+– Advantages & disadvantages among three different
+systems of representing signed binary numbers.
+– Basic operation of an arithmetic/logic unit.
+– Operation of a parallel adder/subtractor circuit.
+– ALU integrated circuits for various logic and
+arithmetic operations on input data.
+– Digital functions from libraries to implement more
+complex circuits.
+– Boolean equation description to perform operations
+on entire sets of bits.
+Chapter 6 Objectives
+
+===== PAGE 4 =====
+6-1 Binary Addition & Subtraction
+• Binary numbers are added like decimal numbers.
+– In decimal, when numbers sum more than 9,
+a carry results.
+– In binary when numbers sum more than 1,
+a carry takes place.
+• Addition is the basic arithmetic operation used by
+digital devices for subtraction, multiplication &
+division.
+
+===== PAGE 5 =====
+6-1 Binary Addition & Subtraction
+• Binary subtraction is performed just like the
+subtraction of decimal numbers.
+Four possible situations when subtracting one bit from
+another in any position of a binary number.
+
+===== PAGE 6 =====
+6-2 Representing Signed Numbers
+• Since it is only possible to show magnitude with
+a binary number, the sign (+) or (-) is shown by
+adding an extra “sign” bit.
+– A sign bit of 0 indicates a positive number.
+– A sign bit of 1 indicates a negative number.
+
+===== PAGE 7 =====
+6-2 Representing Signed Numbers
+• The 2’s complement system is the most commonly
+used way to represent signed numbers.
+• To change a binary number to 2’s complement it
+must first be changed to 1’s complement.
+– Change each bit to its complement (opposite).
+– To convert 1’s complement to 2’s complement,
+add 1 to the 1’s complement.
+• A number is negated when converted to the
+opposite sign.
+– A binary number can be negated by taking
+the 2’s complement of it.
+
+===== PAGE 8 =====
+6-3 Addition in the 2’s Complement System
+• Perform normal binary addition of magnitudes.
+– The sign bits are added with the magnitude bits.
+• If addition results in a carry of the sign bit, the
+carry bit is ignored.
+– If the result is positive, it is in pure binary form.
+– If the result is negative, it is in 2’s complement form.
+
+===== PAGE 9 =====
+6-4 Subtraction in the 2’s Complement System
+• Subtraction using the 2’s-complement system
+actually involves the operation of addition.
+– The number subtracted (subtrahend) is negated.
+– The result is added to the minuend.
+– The answer represents the difference.
+
+===== PAGE 10 =====
+6-4 Subtraction in the 2’s Complement System
+• Overflow can occur only when two positive or two
+negative numbers are being added—which always
+produces an incorrect result.
+– If the answer exceeds the number of magnitude bits,
+an overflow results.
+
+===== PAGE 11 =====
+6-4 Subtraction in the 2’s Complement System
+Using a number circle to add.
+Start at the value of the augend.
+Advance around the number
+circle clockwise by the
+number of spaces
+in the addend.
+The most apparent
+way to subtract is to move
+counterclockwise around the circle
+Any subtraction operation between
+four-bit numbers of opposite sign
+producing a result greater than
+7 or less than -8 is an overflow.
+
+===== PAGE 12 =====
+6-5 Multiplication of Binary Numbers
+• Similar to multiplication of decimal numbers.
+– Each bit in the multiplier is multiplied by the
+multiplicand.
+• Results are shifted as we move from LSB to MSB
+in the multiplier.
+– All of the results are added to obtain the final product.
+
+===== PAGE 13 =====
+6-6 Binary Division
+• Similar to decimal long division—simpler, as only
+1 or 0 are possible.
+• The subtraction part of the operation is done
+using 2’s complement subtraction.
+– If the signs of the dividend & divisor are the same…
+• The answer will be positive.
+– If the signs of the dividend & divisor are different…
+• The answer will be negative.
+
+===== PAGE 14 =====
+6-7 BCD Addition
+• When the sum of each decimal digit is less
+than 9, the operation is the same as normal
+binary addition.
+• When the sum of each decimal digit is greater
+than 9, a binary 6 is added.
+– This will always cause a carry.
+
+===== PAGE 15 =====
+6-8 Hexadecimal Arithmetic
+• Hex addition:
+– Add the hex digits in decimal.
+– If the sum is 15 or less—express directly in hex digits.
+– If the sum is greater than 15—subtract 16 and carry 1
+to the next position.
+• Hex subtraction—use the same method as for
+binary numbers.
+– When the MSD in a hex number is 8 or greater, the
+number is negative.
+– When the MSD is 7 or less, the number is positive.
+
+===== PAGE 16 =====
+6-9 Arithmetic Circuits
+An arithmetic/logic unit (ALU) accepts data stored
+in memory, and executes arithmetic and logic
+operations as instructed by the control unit.
+
+===== PAGE 17 =====
+6-9 Arithmetic Circuits
+The control unit is instructed to add a specific
+number from a memory location to a number
+stored in the accumulator register.
+
+===== PAGE 18 =====
+6-9 Arithmetic Circuits
+The number is transferred from
+memory to the B register.
+
+===== PAGE 19 =====
+6-9 Arithmetic Circuits
+The number in B register and accumulator
+register are added in the logic circuit,
+with sum sent to accumulator for storage.
+
+===== PAGE 20 =====
+6-9 Arithmetic Circuits
+The new number remains in the accumulator
+for further operations—or can be transferred
+to memory for storage
+
+===== PAGE 21 =====
+6-10 Parallel Binary Adder
+• Computers and calculators perform the addition
+operation on two binary numbers at a time.
+– Each binary number can have several binary digits.
+
+===== PAGE 22 =====
+6-10 Parallel Binary Adder
+Block diagram of a five-bit parallel
+adder circuit using full adders.
+
+===== PAGE 23 =====
+6-11 Design of a Full Adder
+• Construct a truth table…
+– 3 inputs (2 numbers to be added and carry in).
+– 2 outputs (sum and carry out).
+
+===== PAGE 24 =====
+6-11 Design of a Full Adder
+• Use algebraic methods or K-maps to simplify
+the resulting SOP form.
+– The result is the logic circuit shown here.
+
+===== PAGE 25 =====
+6-12 Complete Parallel Adder With Registers
+Four-bit parallel adder circuit,
+including the storage registers.
+
+===== PAGE 26 =====
+6-12 Complete Parallel Adder With Registers
+• Adding binary 1001 and 0101 using the circuit:
+– A CLR pulse is applied at t1 .
+– The first binary number 1001 is transferred
+from memory to the B register at t2 .
+– The sum of 1001 and 0000 is transferred
+to the A register at t3 .
+– 0101 is transferred from memory to B register at t4 .
+– Sum outputs are transferred to the A register at t5.
+– The sum of the two numbers is now present in the
+accumulator.
+
+===== PAGE 27 =====
+6-12 Complete Parallel Adder With Registers
+• Brackets indicate the contents of a register:
+–[A]=1011  is the same as  A3=1,A2=0,A1=1,A0=1
+• The contents of register A.
+• Transfer of data to or from a register is indicated
+with an arrow [B][A].
+– “…the contents of register B have been transferred to
+register A.”
+
+===== PAGE 28 =====
+6-13 Carry Propagation
+• Parallel adder speed is limited by carry
+propagation—also called carry ripple.
+– Results from having to wait for the carry bits to
+“ripple” through the device.
+• Additional bits will introduce more delay.
+• The look-ahead carry scheme is commonly used
+in high speed devices to reduce the delay.
+
+===== PAGE 29 =====
+6-14 Integrated Circuit Parallel Adder
+• The most common parallel adder is a 4 bit device.
+– 4 interconnected FAs, and look-ahead carry circuits.
+• 7483A, 74LS83A, 74LS283, and 74HC283 are all
+four-bit parallel-adder chips.
+
+===== PAGE 30 =====
+6-14 Integrated Circuit Parallel Adder
+• The A and B lines each represent 4 bit numbers
+to be added.
+– C0 is the carry-in, C4 is the carry-out,  is the sum.
+
+===== PAGE 31 =====
+6-14 Integrated Circuit Parallel Adder
+Parallel adders may be cascaded together to add
+larger numbers, in this case two 8 bit numbers.
+
+===== PAGE 32 =====
+6-15 2’s Complement System
+• Addition of negative & positive numbers with
+adders is done by placing the negative number
+into 2’s complement form, then normal addition.
+
+===== PAGE 33 =====
+6-15 2’s Complement System
+• An adder can be used to perform subtraction by
+designing a way to take the 2’s complement for
+subtraction—as shown.
+
+===== PAGE 34 =====
+6-15 2’s Complement System
+• The adder/subtractor circuit is controlled by
+the two control signals ADD and SUB.
+– When ADD is HIGH, the circuit performs addition
+of numbers stored in the A and B registers.
+– When SUB is HIGH, the circuit subtracts the
+B-register number from the A-register number.
+
+===== PAGE 35 =====
+6-15 2’s Complement System
+Parallel
+adder/subtractor
+using the 2’s-
+complement
+system.
+
+===== PAGE 36 =====
+6-16 ALU Integrated Circuits
+• ALUs can perform different arithmetic and logic
+functions as determined by a binary code on the
+function select inputs.
+
+===== PAGE 37 =====
+6-16 ALU Integrated Circuits
+The 74LS382 (TTL) and
+HC382 (CMOS) is a typical
+device with 8 functions.
+
+===== PAGE 38 =====
+6-17 Troubleshooting Case Study
+• Determine the most likely fault…
+Mode 1:
+ADD = 0, SUB = 0.
+The sum outputs are always
+equal to the number in the A
+register plus one.
+
+===== PAGE 39 =====
+6-17 Troubleshooting Case Study
+• Determine the most likely fault…
+Mode 2:
+ADD = 1, SUB = 0.
+The sum is always 1
+more than it should be.
+
+===== PAGE 40 =====
+6-17 Troubleshooting Case Study
+• Determine the most likely fault…
+Mode 3:
+ADD = 0, SUB = 1.
+The  outputs are
+always equal to [A] - [B].
+
+===== PAGE 41 =====
+6-18 Using TTL Library Functions with ALTERA
+• Altera offers pre-defined logic circuits in
+macrofunctions.
+– ALUs may be defined graphically.
+Graphic description may
+seem intuitive, but it is
+often easier to define a
+device using text and
+macrofunctions.
+
+===== PAGE 42 =====
+6-19 Logical Operations on Bit Arrays
+• Two main areas of HDL techniques require
+understanding:
+– Specifying groups of bits in arrays
+– Using logical operations to combine arrays using
+Boolean expressions
+• HDLs use arrays of bits—a method similar to
+register notation—to describe signals.
+• The four-bit signal named d is defined as…
+– AHDL:
+– VHDL:
+VARIABLE d[3..0]  :NODE
+SIGNAL d:BIT_VECTOR (3 DOWNTO 1)
+
+===== PAGE 43 =====
+6-20 HDL Adders
+• 8-bit parallel adder circuit using HDL languages.
+– Will add 8-bit values A[8..1] and B[8..1] to produce
+the 9-bit sum.
+• AHDL
+
+===== PAGE 44 =====
+6-20 HDL Adders
+• 8-bit parallel adder circuit using HDL languages.
+– Will add 8-bit values A[8..1] and B[8..1] to produce
+the 9-bit sum.
+• VHDL
+
+===== PAGE 45 =====
+6-21 Parameterizing the Bit Capacity of a Circuit
+• Constants are fixed numbers represented by
+a name (symbol).
+– Define a symbol (name) at the top of the source code.
+• Assign the value for the total number of bits.
+– Use this symbol (name) throughout the code.
+• To modify or expand the circuit, only one line of
+code needs to be changed.
+
+===== PAGE 46 =====
+6-21 Parameterizing the Bit Capacity of a Circuit
+• Add a constant feature to the HDL code for an
+adder/subtractor circuit.
+– A single input bit named add_sub will control the
+adder/subtractor’s function.
+See complete HDL code on pgs. 360 - 361
+Add the two operands
+when add_sub = 0.
+Subtract b from a
+when add_sub = 1.
+
+===== PAGE 47 =====
+6-21 Parameterizing the Bit Capacity of a Circuit
+• Add a constant feature to the HDL code for an
+adder/subtractor circuit.
+– AHDL—Keyword CONSTANT is followed by the
+symbolic name and value assigned.
+See complete HDL code on pgs. 360 - 361
+Check for overflow
+for a signed
+number operation.
+
+===== PAGE 48 =====
+See complete HDL code on pgs. 360 - 361
+6-21 Parameterizing the Bit Capacity of a Circuit
+• Add a constant feature to the HDL code for an
+adder/subtractor circuit.
+– VHDL—Keyword CONSTANT is followed by the
+symbolic name, type, and the value to be assigned.
+The VHDL generate
+statement can be
+used to concisely
+replicate several
+components that are
+cascaded together.
+
+===== PAGE 49 =====
+6-21 Parameterizing the Bit Capacity of a Circuit
+• Altera offers a library of parameterized modules
+(LPMs) which offer generic solutions for the
+various logic circuits used in digital systems.
+
+===== PAGE 50 =====
+END

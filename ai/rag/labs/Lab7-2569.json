@@ -1,0 +1,147 @@
+{
+  "source": "Lab7-2569.pdf",
+  "group": "labs",
+  "lab": "7",
+  "title": "การออกแบบวงจรนับเวลาถอยหลัง (Countdown Timer) ด้วยวิธี Schematic โดยกระบวนการ Top-Down Design",
+  "objectives": [
+    "เข้าใจการออกแบบวงจรดิจิตอลด้วยวิธี Schematic",
+    "สามารถออกแบบวงจรดิจิตอลโดยกระบวนการ Top-Down Design",
+    "ออกแบบวงจรนับที่มีการโหลดค่าเริ่มต้นและควบคุมการทำงานด้วยปุ่มกดหลายปุ่ม"
+  ],
+  "items": [
+    {
+      "id": "lab7-1",
+      "question": "สร้างวงจรนับเวลาถอยหลัง (Countdown Timer) รูปแบบ mm.ss (00.00-99.59) บนบอร์ด EDGE Spartan-7: อินพุต SW[15:0] กำหนดเวลาเริ่มต้น (BCD, SW[15:12]/[11:8]/[7:4]/[3:0] = หลักสิบนาที/หลักหน่วยนาที/หลักสิบวินาที/หลักหน่วยวินาที), ปุ่ม SET (โหลดค่า), START/STOP (toggle นับ), RESET (ล้างเป็น 00.00); นับถอยหลังทีละ 1 วินาทีที่ 1 Hz โดยยืมค่าข้ามหลักนาที-วินาทีตามฐานเวลาจริง, หยุดที่ 00.00 พร้อมติด LED Time-up, และมี LED Error เมื่อค่าที่ป้อนไม่ใช่ BCD ที่ถูกต้องหรือหลักสิบวินาทีเกิน 5 ให้ออกแบบด้วย Top-Down Design แล้วสร้างจริงด้วย Schematic",
+      "params": "ตัวอย่างค่าคงที่ที่ใช้ในคำตอบ: ความถี่บอร์ด 50 MHz, ความถี่นับถอยหลัง 1 Hz; ตัวอย่างเวลาเริ่มต้นที่ใช้ทดสอบ = 02.30 (SW[15:12]=0,SW[11:8]=2,SW[7:4]=3,SW[3:0]=0)",
+      "subtasks": [
+        "ออกแบบ Block diagram แบบ Top-Down",
+        "ออกแบบวงจรหารความถี่ 50MHz -> 1Hz",
+        "ออกแบบ Edge Detector + Toggle (T Flip-Flop) สำหรับปุ่ม START/STOP",
+        "ออกแบบ BCD Down-Counter 4 หลัก (mm.ss) ที่มี Load (จาก SW), Clear (RESET), Enable, และ borrow ข้ามหลักนาที-วินาทีตามฐาน 60",
+        "ออกแบบวงจรตรวจ Zero (00.00) เพื่อหยุดนับอัตโนมัติและติด LED Time-up",
+        "ออกแบบวงจรตรวจสอบ error (BCD ไม่ถูกต้อง / วินาทีเกิน 59)",
+        "ออกแบบวงจรแสดงผล 7-segment 4 หลักแบบ Multiplex พร้อมจุดทศนิยมที่หลักที่ 2"
+      ],
+      "topic": "fpga",
+      "solution": {
+        "steps": "Top-Down decomposition:\nLEVEL 0: Countdown_Timer(SW[15:0], BTN_SET, BTN_START_STOP, BTN_RESET, clk_50MHz) -> {SEG[6:0], DIGIT[3:0], DP, LED_error, LED_timeup}\nLEVEL 1 (บล็อกย่อยตาม hint ในโจทย์):\n  1) Edge_Detector x3: ตรวจขอบขาขึ้นของ SET, START/STOP, RESET แยกกัน (แต่ละปุ่มกด 1 ครั้ง = 1 พัลส์ ตามข้อบังคับ 1.6.4)\n  2) Toggle_FF (T Flip-Flop): รับพัลส์จาก Edge_Detector ของ START/STOP เป็น T; เอาต์พุต run_flag; ถูก synchronous-clear เป็น 0 โดย RESET หรือเมื่อถึง 00.00 (Time-up) หรือเมื่อ error=1 (ป้องกันไม่ให้เริ่มนับตอน error หรือค่าเป็น 0)\n  3) Clock_Divider (MOD-N, N=50,000,000/1=50,000,000): สร้าง tick_1hz จาก clk 50MHz\n  4) BCD_Down_Counter (4 หลัก mm.ss, Load/Clear/Enable): Load เมื่อพัลส์ SET (โหลดค่าจาก SW[15:0] เฉพาะเมื่อ error=0); Clear เป็น 00.00 เมื่อพัลส์ RESET; Enable (นับลง 1 step) เมื่อ (run_flag AND tick_1hz AND NOT time_up). การนับลงมีตรรกะ borrow ตามฐานเวลาจริง: ถ้าหลักวินาที=00 แล้วต้องลดอีก ให้หลักวินาทีวนเป็น 59 และยืม 1 จากหลักนาที (BCD borrow, ไม่ใช่ binary borrow ธรรมดา); หลักนาทีเองก็ borrow ข้ามหลักสิบ-หน่วยแบบ BCD เช่นกัน\n  5) Zero_Detector: time_up = 1 เมื่อค่าทั้ง 4 หลัก = 0000,0000,0000,0000 (mm.ss=00.00); ใช้หยุด run_flag และติด LED_timeup; time_up จะเคลียร์เมื่อกด SET (โหลดค่าใหม่ที่ไม่ใช่ 0)\n  6) Error_Checker: BCD_invalid(แต่ละ 4 หลักจาก SW) OR SecTens_gt5(SW[7:4]) -> LED_error (ทำงานตลอดเวลา ตามข้อ 1.6.6); เมื่อ error=1 ปุ่ม SET จะไม่ถูกรับ (SET ถูก mask/inhibit ด้วย error)\n  7) Display_Driver: BCD_to_7seg x4 หลัก (active-low, Common Anode) + Digit_Multiplexer (สแกน >=1kHz, DP ติดเฉพาะขณะสแกนหลักที่ 2 ตามภาคผนวก)\nลำดับความสำคัญของสัญญาณควบคุม (priority, จากมากไปน้อย): RESET > SET > (Zero_detect หยุดนับอัตโนมัติ) > START/STOP toggle ปกติ",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": "N_divider = 50,000,000/1 = 50,000,000; LED_error = BCD_invalid(mm_tens) OR BCD_invalid(mm_units) OR BCD_invalid(ss_tens) OR BCD_invalid(ss_units) OR SecTens_gt5(ss_tens); time_up = (mm.ss == 00.00)",
+        "intent_json": null,
+        "notes": "งานออกแบบระดับระบบ (Top-Down) — เช่นเดียวกับ lab6-1 ไม่ออก intent_json รวมทั้งระบบ (มี flip-flop/counter/mux ซึ่งไม่ใช่ primitive gate). บล็อกย่อย combinational ล้วน (BCD_invalid, SecTens_gt5) แยกให้ intent_json ในข้อ lab7-2; ตรรกะ borrow ระหว่างหลักตรวจสอบแยกในข้อ lab7-3",
+        "board_pins_reference": "SW[0..15]->K11,M11,N14,P12,N10,P10,M10,N4,L2,P3,N1,M2,L1,J3,K3,J1 ; SET(SW14)->J14 ; START/STOP(SW16)->J13 ; RESET(SW18)->J12 ; LED_error(D2)->K12 ; LED_timeup(D3)->M12 ; DIGIT1..4->H4,H3,H2,H1 ; Segment A..G,DP->L3,P4,P2,M3,M1,J4,K4,J2 (Common Anode active-low, ถอด jumper J9, เสียบ jumper J4->GND)"
+      },
+      "verify": "ไม่ใช่งาน combinational ล้วน จึงตรวจสอบเชิงตรรกะแยกส่วน: (1) N=50,000,000 ตรวจด้วยเลขคณิต 50,000,000/1; (2) ตรรกะ borrow mm.ss ตรวจด้วยการ enumerate ทุกค่าวินาทีรวม 1..5999 ใน lab7-3; (3) ตัวตรวจ error ตรวจด้วยการ enumerate ครบทุกกรณีใน lab7-2",
+      "related_content": [
+        "lab5-1",
+        "lab6-1"
+      ]
+    },
+    {
+      "id": "lab7-2",
+      "question": "ออกแบบวงจรย่อย (สำหรับข้อ 1.5): ตรวจสอบว่าเวลาที่ป้อนจาก Slide Switch (4 หลัก BCD) ถูกต้องหรือไม่ กล่าวคือ (ก) แต่ละหลักต้องเป็นรหัส BCD ที่ถูกต้อง (ไม่เกิน 9) และ (ข) หลักสิบของวินาที (SW[7:4]) ต้องไม่เกิน 5",
+      "params": "ตัวแปรอินพุตของแต่ละหลัก W X Y Z (W=MSB) คือ 4 บิตของหนึ่งหลัก BCD; SW[7:4] คือหลักสิบของวินาทีซึ่งต้องอยู่ในช่วง 0-5 เท่านั้น (เพราะวินาทีสูงสุดคือ 59)",
+      "subtasks": [
+        "ใช้ BCD_invalid (จาก lab6-2) ตรวจทั้ง 4 หลัก (mm_tens, mm_units, ss_tens, ss_units)",
+        "ออกแบบวงจรตรวจ SW[7:4] > 5 (ss_tens ต้องอยู่ 0-5)",
+        "รวมผลทั้งหมดด้วย OR เป็น LED_error"
+      ],
+      "topic": "boolean-simplification",
+      "solution": {
+        "steps": "ใช้ BCD_invalid = W*X + W*Y (จาก lab6-2) กับทั้ง 4 หลักของเวลา (SW[15:12],SW[11:8],SW[7:4],SW[3:0]).\nสำหรับ SW[7:4] (หลักสิบวินาที) ต้องตรวจเพิ่มว่าค่ามากกว่า 5 หรือไม่ (มินเทอม 6-15 ทั้งหมด, W X Y Z แทน SW[7],SW[6],SW[5],SW[4]) เนื่องจากวินาทีสูงสุดคือ 59 หลักสิบวินาทีจึงมีค่าได้แค่ 0-5",
+        "truth_table": "W X Y Z (ค่า 0-15) | invalid(>5)\n0-5 (0000-0101) | 0\n6-15 (0110-1111) | 1",
+        "kmap": "มินเทอม 6-15 จัดกลุ่มได้เป็น W=1 (มินเทอม 8-15) รวมกับ (X=1,Y=1) (มินเทอม 6,7,14,15) ซึ่งครอบคลุมมินเทอม 6,7 ที่ W=0 ด้วย",
+        "final_expression": "SecTens_gt5 = W + X*Y   (W,X,Y,Z = บิตของ SW[7:4], W=MSB)\nLED_error = BCD_invalid(SW[15:12]) + BCD_invalid(SW[11:8]) + BCD_invalid(SW[7:4]) + BCD_invalid(SW[3:0]) + SecTens_gt5(SW[7:4])",
+        "intent_json": {
+          "module": "sec_tens_gt5",
+          "components": [
+            {
+              "id": "W",
+              "type": "IN",
+              "name": "W"
+            },
+            {
+              "id": "X",
+              "type": "IN",
+              "name": "X"
+            },
+            {
+              "id": "Y",
+              "type": "IN",
+              "name": "Y"
+            },
+            {
+              "id": "Z",
+              "type": "IN",
+              "name": "Z"
+            },
+            {
+              "id": "and1",
+              "type": "AND"
+            },
+            {
+              "id": "or1",
+              "type": "OR"
+            },
+            {
+              "id": "invalid",
+              "type": "OUT",
+              "name": "invalid"
+            }
+          ],
+          "nets": [
+            {
+              "from": "X",
+              "to": "and1"
+            },
+            {
+              "from": "Y",
+              "to": "and1"
+            },
+            {
+              "from": "W",
+              "to": "or1"
+            },
+            {
+              "from": "and1",
+              "to": "or1"
+            },
+            {
+              "from": "or1",
+              "to": "invalid"
+            }
+          ]
+        },
+        "notes": "intent_json ที่แนบเป็นของบล็อก SecTens_gt5 (โมดูล sec_tens_gt5) เท่านั้น; BCD_invalid นำมาใช้ซ้ำจาก lab6-2 (โมดูล bcd_digit_invalid) เรียกใช้ 4 ครั้งสำหรับ 4 หลัก แล้ว OR รวมกับ SecTens_gt5 อีกหนึ่งครั้งสำหรับหลักสิบวินาทีโดยเฉพาะ"
+      },
+      "verify": "สคริปต์ Python: สร้างมินเทอมของ SecTens_gt5 จาก v>5 สำหรับ v=0..15, ลดรูปด้วย sympy SOPform ได้ W|(X&Y), substitute กลับทั้ง 16 ค่าเทียบกับ v>5 — ผลคือ 'verified SecTens_invalid over all 16 rows: True'. BCD_invalid ใช้ผลตรวจสอบเดียวกับ lab6-2 (verified over all 16 rows: True)",
+      "related_content": [
+        "lab6-2",
+        "lab7-1"
+      ]
+    },
+    {
+      "id": "lab7-3",
+      "question": "ออกแบบตรรกะการนับถอยหลัง 1 วินาที ของเวลารูปแบบ mm.ss ที่ต้องยืมค่า (borrow) ข้ามหลักนาที-วินาทีตามฐานเวลาจริง (ไม่ใช่ฐาน 10 ธรรมดา): เมื่อหลักวินาทีเป็น 00 แล้วต้องนับลงอีกหนึ่งครั้ง ให้หลักวินาทีวนกลับเป็น 59 และยืมค่าจากหลักนาที 1 หน่วย",
+      "params": "แทนเวลาด้วยคู่ (mm, ss) โดย mm=0..99, ss=0..59; พิจารณาเป็นวินาทีรวม total = mm*60+ss เพื่อสะดวกในการตรวจสอบ",
+      "subtasks": [
+        "กำหนดกฎการลดค่า 1 หน่วยของ (mm,ss)",
+        "ตรวจสอบว่า borrow ทำงานถูกต้องทุกกรณี (ss=00 กับ ss!=00)"
+      ],
+      "topic": "counter",
+      "solution": {
+        "steps": "กฎการนับถอยหลัง 1 วินาที ของ (mm,ss):\n- ถ้า ss != 00: ss = ss - 1 (นับถอยหลักวินาทีปกติ, ไม่กระทบ mm) — ในระดับ BCD คือถ้าหลักหน่วยวินาที != 0 ให้ลดหลักหน่วยลง 1; ถ้าหลักหน่วยวินาที = 0 (แต่หลักสิบวินาที != 0) ให้หลักหน่วยวนเป็น 9 และยืม 1 จากหลักสิบวินาที\n- ถ้า ss == 00 (ทั้งสองหลักวินาทีเป็น 0) และ mm > 0: ss วนกลับเป็น 59 (หลักสิบ=5,หลักหน่วย=9) และ mm = mm-1 (ใช้กฎ borrow ระดับ BCD ของ mm เอง เหมือนกับ ss)\n- ถ้า mm==0 และ ss==00 (คือ 00.00 พอดี): ไม่ลดต่อ (Zero_Detector หยุดนับไปแล้วตามที่ระบุในโจทย์ข้อ 1.4.4)\nกฎนี้ทำให้ค่าที่แสดงผลเดินตามฐานเวลาจริง (60 วินาทีต่อ 1 นาที) ไม่ใช่การนับลงฐาน 10 ธรรมดาที่จะวนที่ 00 ทุกหลักอิสระต่อกัน",
+        "truth_table": "ตัวอย่าง: 02.30 -> 02.29 -> ... -> 02.01 -> 02.00 -> 01.59 (borrow: ss 00->59, mm 2->1) -> 01.58 -> ... -> 00.01 -> 00.00 (หยุด)",
+        "kmap": null,
+        "final_expression": "decrement(mm,ss) = (mm, ss-1) ถ้า ss>0 ; (mm-1, 59) ถ้า ss=0 และ mm>0 ; (0,0) ถ้า mm=0,ss=0 (หยุดนับ)",
+        "intent_json": null,
+        "notes": "เป็นตรรกะของวงจรนับลง BCD หลายหลักที่มี borrow ข้ามคู่หลัก ไม่ใช่ combinational gate เดี่ยว ๆ ที่เหมาะกับ Intent-JSON (ต้องใช้ synchronous down-counter พร้อม borrow-out/borrow-in ต่อกันเป็นลูกโซ่ระหว่าง FF ของแต่ละหลัก) จึงไม่ออก intent_json ให้ข้อนี้"
+      },
+      "verify": "สคริปต์ Python: จำลอง decrement(mm,ss) ตามกฎข้างต้นสำหรับทุกค่า total วินาทีตั้งแต่ 1 ถึง 5999 (mm 0-99,ss 0-59) แล้วตรวจว่า mm*60+ss ของผลลัพธ์เท่ากับ total-1 เสมอ — ผลคือ 'Lab7 mm.ss borrow-decrement verified for all total seconds 1..5999: True'",
+      "related_content": [
+        "lab7-1"
+      ]
+    }
+  ]
+}

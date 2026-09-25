@@ -1,0 +1,215 @@
+{
+  "source": "Lab4-2569.pdf",
+  "group": "labs",
+  "lab": "4",
+  "title": "วงจรบวก-ลบเลขฐานสอง 8 บิต แสดงผลฐานสิบหกบน 7-Segment ด้วย Schematic บน FPGA (EDGE Spartan-7)",
+  "objectives": [
+    "ออกแบบวงจรเลขคณิตบวก/ลบด้วย schematic",
+    "เข้าใจ Two's Complement",
+    "ออกแบบตัวถอดรหัส HEX -> 7-Segment",
+    "เข้าใจ time-multiplexed display + การหารความถี่",
+    "ออกแบบแบบ hierarchical (สร้างบล็อกย่อยเรียกซ้ำ)",
+    "ใช้บอร์ด FPGA EDGE Spartan-7 XC7S15"
+  ],
+  "items": [
+    {
+      "id": "lab4-1",
+      "question": "ออกแบบตัวถอดรหัส HEX -> 7-Segment (0-F). อินพุต D3D2D1D0, เอาต์พุต 7 เส้น a-g. จอเป็น Common-Anode ทำงาน Active-LOW (เซกเมนต์สว่างเมื่อได้ลอจิก 0). งาน: 1.1 truth table, 1.2 K-Map -> SOP ของ a-g, 1.3 วงจร, 1.4 ทดสอบด้วย SW22,21,19,17 = D3..D0.",
+      "params": "สมการด้านล่างเป็น SOP ของ 'เซกเมนต์สว่าง' (lit). บนบอร์ด Common-Anode ต้องกลับค่า: ขาขับจริง = (สมการ lit)' (Active-LOW)",
+      "subtasks": [
+        "1.1 Truth Table 0-F",
+        "1.2 K-Map -> SOP a..g",
+        "1.3 วงจร",
+        "1.4 ทดสอบบนบอร์ด"
+      ],
+      "topic": "combinational-design|kmap|seven-segment",
+      "solution": {
+        "steps": "สร้าง truth table จากรูปเลข 0-F มาตรฐาน (ฟอนต์ 7-seg) กำหนดว่าเซกเมนต์ใดสว่างในแต่ละเลข แล้วลดรูปแต่ละเซกเมนต์เป็น SOP",
+        "truth_table": "0-F, 7 เซกเมนต์ (a-g) ตามฟอนต์ 7-seg มาตรฐาน",
+        "kmap": "ลดรูปทีละเซกเมนต์ (4 ตัวแปร D3..D0)",
+        "final_expression": "a = D1*D2 + D1*D3' + D3*D0' + D0'*D2' + D0*D2*D3' + D3*D1'*D2' ; b = D0'*D2' + D2'*D3' + D0*D1*D3' + D0*D3*D1' + D0'*D1'*D3' ; c = D0*D1' + D0*D3' + D2*D3' + D3*D2' + D1'*D3' ; d = D3*D1' + D0*D1*D2' + D0*D2*D1' + D1*D2*D0' + D0'*D2'*D3' ; e = D1*D3 + D2*D3 + D1*D0' + D0'*D2' ; f = D1*D3 + D2*D0' + D3*D2' + D0'*D1' + D2*D1'*D3' ; g = D0*D3 + D1*D0' + D1*D2' + D3*D2' + D2*D1'*D3'  (สมการของเซกเมนต์ 'สว่าง'; ขาขับ Common-Anode = ค่านี้กลับด้าน)",
+        "intent_json": null,
+        "notes": "D3=MSB..D0=LSB. Active-LOW: seg_drive = lit'. โครงสร้างวงจร gate-level แบบเดียวกับ golden design ใน lab5-1 (BCD/HEX->7seg, ผ่าน validate)"
+      },
+      "verify": "enumerate 16 ค่า: SOP แต่ละเซกเมนต์ตรงกับฟอนต์ 7-seg ทุกค่า (verify=True ครบ a-g)",
+      "related_content": [
+        "ch4-truth-table-design",
+        "ch4-karnaugh-map",
+        "ch9-decoders"
+      ]
+    },
+    {
+      "id": "lab4-2",
+      "question": "วาด Full Adder 1 บิต: อินพุต A,B,Cin เอาต์พุต S,Cout. S = A xor B xor Cin ; Cout = A·B + (A xor B)·Cin. บันทึกเป็นสัญลักษณ์ชื่อ FA1 เพื่อเรียกใช้ซ้ำ.",
+      "params": "ใช้เอาต์พุตของ XOR ตัวแรก (A xor B) ร่วมกันทั้ง S และ Cout -> ใช้เกตเพียง 5 ตัว",
+      "subtasks": [
+        "วาด FA1",
+        "จำลอง truth table 8 แถว",
+        "บันทึกเป็น symbol FA1"
+      ],
+      "topic": "combinational-design|adder",
+      "solution": {
+        "steps": "x1=A^B; S=x1^Cin; Cout=(A&B)|(x1&Cin). 5 เกต (XOR2, AND2, OR1... รวม x1,x2,a1,a2,o1)",
+        "truth_table": "A B Cin -> S Cout : 000->00,001->10,010->10,011->01,100->10,101->01,110->01,111->11",
+        "kmap": null,
+        "final_expression": "S = A^B^Cin ; Cout = A*B + (A^B)*Cin",
+        "intent_json": {
+          "module": "full_adder_1bit",
+          "components": [
+            {
+              "id": "A",
+              "type": "IN",
+              "name": "A"
+            },
+            {
+              "id": "B",
+              "type": "IN",
+              "name": "B"
+            },
+            {
+              "id": "Cin",
+              "type": "IN",
+              "name": "Cin"
+            },
+            {
+              "id": "x1",
+              "type": "XOR"
+            },
+            {
+              "id": "x2",
+              "type": "XOR"
+            },
+            {
+              "id": "a1",
+              "type": "AND"
+            },
+            {
+              "id": "a2",
+              "type": "AND"
+            },
+            {
+              "id": "o1",
+              "type": "OR"
+            },
+            {
+              "id": "S",
+              "type": "OUT",
+              "name": "S"
+            },
+            {
+              "id": "Cout",
+              "type": "OUT",
+              "name": "Cout"
+            }
+          ],
+          "nets": [
+            {
+              "from": "A",
+              "to": "x1"
+            },
+            {
+              "from": "B",
+              "to": "x1"
+            },
+            {
+              "from": "x1",
+              "to": "x2"
+            },
+            {
+              "from": "Cin",
+              "to": "x2"
+            },
+            {
+              "from": "A",
+              "to": "a1"
+            },
+            {
+              "from": "B",
+              "to": "a1"
+            },
+            {
+              "from": "x1",
+              "to": "a2"
+            },
+            {
+              "from": "Cin",
+              "to": "a2"
+            },
+            {
+              "from": "a1",
+              "to": "o1"
+            },
+            {
+              "from": "a2",
+              "to": "o1"
+            },
+            {
+              "from": "x2",
+              "to": "S"
+            },
+            {
+              "from": "o1",
+              "to": "Cout"
+            }
+          ]
+        },
+        "notes": "golden design full_adder_1bit; ตรงกับ full_adder ที่ยืนยันชั้นครูใน designs_gate/"
+      },
+      "verify": "S/Cout ตรงกับผลบวกเลขคณิตครบ 8 แถว (True). intent_json ผ่าน validate ok=True",
+      "related_content": [
+        "ch6-full-adder",
+        "ch6-parallel-adder"
+      ]
+    },
+    {
+      "id": "lab4-3",
+      "question": "ต่อ FA1 จำนวน 8 ตัวเป็น Ripple-Carry Adder 8 บิต (A[7:0]=SW22,21,19,17,15,13,12,11 ; B[7:0]=SW10,9,8,7,6,5,4,2). เพิ่ม XOR 8 ตัวกลับบิต B ด้วยสัญญาณ SUB และป้อน SUB เข้า Cin ของบิตต่ำสุด -> ได้วงจรบวก/ลบด้วย Two's Complement. จำลองตามตารางทดสอบ.",
+      "params": "SUB=0 บวก, SUB=1 ลบ (A + B' + 1 = A - B). MSB อยู่ซ้ายสุดของแต่ละกลุ่มสวิตช์",
+      "subtasks": [
+        "ต่อ 8-bit ripple adder",
+        "เพิ่ม XOR + SUB เป็น adder/subtractor",
+        "จำลองตารางทดสอบ 10 ข้อ"
+      ],
+      "topic": "combinational-design|adder|twos-complement",
+      "solution": {
+        "steps": "แต่ละบิต: Bx_i = B_i XOR SUB ; ป้อน Cin0 = SUB. ผลลัพธ์ 8 บิต + carry. ลบทำได้เพราะ A + (~B) + 1 = A - B (two's complement)",
+        "truth_table": "0F + 01 = 0x10\n5A + 25 = 0x7F\nFF + 01 = 0x00 (carry=1)\nFF + FF = 0xFE (carry=1)\n00 + 00 = 0x00\n0A - 05 = 0x05\n05 - 0A = 0xFB (=-5)\n00 - 01 = 0xFF (=-1)\n7F - FF = 0x80 (=-128)\n80 - 80 = 0x00",
+        "kmap": null,
+        "final_expression": "sum_i = A_i ^ (B_i^SUB) ^ c_i ; c_{i+1} = A_i*(B_i^SUB) + (A_i^(B_i^SUB))*c_i ; c_0 = SUB",
+        "intent_json": null,
+        "notes": "hierarchical: FA1 x8 + XOR x8. ผลจำลองตรวจด้วยเลขคณิต 8 บิต mod 256 ครบ 10 ข้อ"
+      },
+      "verify": "จำลอง add/sub 8 บิตครบ 10 ข้อในตาราง ตรงกับผลที่คาดหวัง (เช่น 0F+01=10, 0A-05=05, 05-0A=FB=-5, 00-01=FF=-1)",
+      "related_content": [
+        "ch6-parallel-adder",
+        "ch6-twos-complement",
+        "ch6-adder-subtractor"
+      ]
+    },
+    {
+      "id": "lab4-4",
+      "question": "1.7-1.8 คำนวณและสร้างวงจรหารความถี่สำหรับ time-multiplexed display: บอร์ดมีออสซิลเลเตอร์ 50 MHz (ขา H11) ต้องหารลงให้สแกน 4 หลักเร็วพอที่ตาเห็นเป็นภาพต่อเนื่อง (>~15 Hz ต่อหลัก). 9. อธิบายว่าทำไม 4 หลักแสดงเลขต่างกันพร้อมกันไม่ได้ และ time-multiplex แก้อย่างไร.",
+      "params": "ใช้ ripple counter (toggle FF ต่อกัน) หาร 2 ต่อสเตจ; ตาคนแยกกระพริบไม่ออกที่ ~15 Hz",
+      "subtasks": [
+        "1.7 คำนวณความถี่สแกน",
+        "1.8 สร้างวงจรหารความถี่",
+        "9. อธิบาย time-multiplex"
+      ],
+      "topic": "frequency-divider|display|sequential",
+      "solution": {
+        "steps": "หาร 50 MHz ด้วย 2^n. เลือก n=17: fscan = 50e6/2^17 = 381.5 Hz, ต่อหลัก = 381.5/4 = 95.4 Hz (>15 Hz พอ, ไม่กระพริบ). ใช้ตัวนับ ripple ดึงบิตสูงมาเป็นสัญญาณสแกน + ตัวนับ 2 บิตเลือกหลัก DIGIT[1:0].\n9. จอ 4 หลักใช้เส้น a-g ร่วมกัน (common) จึงส่งได้ทีละรูปแบบ; time-multiplex เปิดทีละหลักเร็วมากสลับกัน อาศัยการเห็นภาพติดตา (persistence of vision) ทำให้ดูเหมือน 4 หลักติดพร้อมกัน",
+        "truth_table": null,
+        "kmap": null,
+        "final_expression": "n=17 -> fscan=50MHz/2^17=381.5Hz, per-digit=95.4Hz (2^16 และ 2^18 ก็อยู่ในช่วงใช้ได้)",
+        "intent_json": null,
+        "notes": "เป็นวงจร sequential (FF/counter) จึงไม่มี intent_json (schema Intent-JSON รองรับเฉพาะ gate combinational)"
+      },
+      "verify": "คำนวณ 50e6/2^n: n=16->190.7Hz/หลัก, n=17->95.4Hz/หลัก, n=18->47.7Hz/หลัก ทั้งหมด >15Hz (ผ่าน)",
+      "related_content": [
+        "ch7-ripple-counter",
+        "ch7-frequency-division",
+        "ch5-flip-flops"
+      ]
+    }
+  ]
+}

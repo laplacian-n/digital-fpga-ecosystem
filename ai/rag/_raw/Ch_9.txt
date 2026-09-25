@@ -1,0 +1,547 @@
+===== PAGE 1 =====
+
+
+===== PAGE 2 =====
+Chapter 9 – MSI Logic Circuits
+
+===== PAGE 3 =====
+• Selected areas covered in this chapter:
+– Analyzing/using decoders & encoders in circuits.
+– Advantages and disadvantages of LEDs and LCDs.
+– Observation/analysis techniques to troubleshoot
+digital circuits.
+– Operation of multiplexers and demultiplexers
+in circuit applications.
+– Comparing two binary numbers by using the
+magnitude comparator circuit.
+– Function and operation of code converters.
+– Precautions when connecting digital circuits using
+the data bus concept.
+– Using HDL to implement MSI logic circuits equivalents.
+Chapter 9 Objectives
+
+===== PAGE 4 =====
+• Digital systems obtain data and information
+continuously operated on in some manner:
+– Decoding/encoding.
+– Multiplexing/demultiplexing,.
+– Comparison; Code conversion; Data busing.
+• These and other operations have been facilitated
+by the availability of numerous ICs in the MSI
+(medium-scale-integration) category.
+Chapter 9
+
+===== PAGE 5 =====
+• Decoders are used when an output or a group of
+outputs is to be activated only on the occurrence
+of a specific combination of input levels.
+– Often provided by outputs of a counter or a register.
+9-1 Decoders
+
+===== PAGE 6 =====
+9-1 Decoders
+• A decoder accepts a set of inputs that represents
+a binary number—activating only the output that
+corresponds to the input number.
+For each of these
+input combinations,
+only one of the M
+outputs will be active
+(HIGH); all the other
+outputs are LOW.
+Many decoders are designed to produce active-LOW outputs,
+where only the selected output is LOW while all others are HIGH.
+
+===== PAGE 7 =====
+9-1 Decoders
+Circuitry for a decoder with three inputs and 8 outputs.
+It uses all AND gates, so
+outputs are active-HIGH
+Output O6 goes HIGH only
+when CBA 1102 = 610.
+
+===== PAGE 8 =====
+9-1 Decoders
+Circuitry for a decoder with three inputs and 8 outputs.
+This can be called a 3-line-to-8-
+line decoder—it has three input
+lines and eight output lines.
+Also called a binary-to-octal
+decoder or converter—taking
+three-bit binary input code
+and activating one of eight
+(octal) outputs.
+Also referred to as a 1-of-8
+decoder—only 1 of the 8
+outputs is activated at one time.
+
+===== PAGE 9 =====
+9-1 Decoders
+• Some decoders have one or more enable inputs
+used to control the operation of the decoder.
+– The decoder is enabled only if ENABLE is HIGH.
+• With common ENABLE line connected to a fourth
+input of each gate:
+– If ENABLE is HIGH, the decoder functions normally.
+• A, B, C input will determine which output is HIGH.
+– If ENABLE is LOW, all outputs will be forced LOW.
+• Regardless of the levels at the A, B, C inputs.
+
+===== PAGE 10 =====
+9-1 Decoders
+The 74ALS138 decoder.
+ENABLE
+inputs
+
+===== PAGE 11 =====
+9-1 Decoders
+7442
+BCD-to-decimal
+decoder.
+This decoder
+does not have
+an enable input.
+
+===== PAGE 12 =====
+9-1 Decoders
+7445 BCD-to-decimal decoder/driver.
+Suitable for directly
+driving loads such
+as indicator LEDs
+or lamps, relays,
+or dc motors.
+Termed a driver because this IC
+has open-collector outputs that
+operate at higher current/voltage
+limits than a normal TTL output.
+
+===== PAGE 13 =====
+• The 7-segment display is a common way to
+display decimal or hexadecimal characters.
+– One common arrangement uses light emitting diodes
+(LEDs) for each segment.
+9-2 BCD-to-7 Segment Decoder/Drivers
+Diodes allow current to flow in one direction,
+but block flow in the other direction.
+When the LED anode is more positive than the
+cathode by approximately 2 V, the LED will light up.
+
+===== PAGE 14 =====
+• The 7-segment display is a common way to
+display decimal or hexadecimal characters.
+– One common arrangement uses light emitting diodes
+(LEDs) for each segment.
+9-2 BCD-to-7 Segment Decoder/Drivers
+By controlling current through each LED,
+some segments are turned on & emit
+light, while others are turned off, which
+generates the desired character pattern.
+
+===== PAGE 15 =====
+9-2 BCD-to-7 Segment Decoder/Drivers
+BCD-to-7-segment decoder/driver.
+The 7446/47
+activates specific
+segment patterns
+in response to
+input codes
+
+===== PAGE 16 =====
+9-2 BCD-to-7 Segment Decoder/Drivers
+BCD-to-7-segment decoder/driver.
+This is a common-
+anode LED display.
+The anodes all of
+segments are tied
+together to VCC .
+Another type uses a common-cathode method, with
+each segment requiring 10 to 20 mA of current.
+TTL/CMOS devices are normally not used to drive a common-
+cathode display directly—a transistor interface circuit is often used
+
+===== PAGE 17 =====
+9-3 Liquid Crystal Displays
+• A liquid-crystal display (LCD) controls reflection
+of available light.
+– The light may be ambient (room, sun) light.
+• Reflective LCDs use ambient light.
+– Available light might be provided by a small light
+source—part of the display unit.
+• Backlit LCDs use this method.
+• LCDs have gained wide acceptance due to their
+very low power consumption—compared to LEDs.
+– LEDs have the advantage of a much brighter display
+that is easily visible in dark or poorly lit areas.
+
+===== PAGE 18 =====
+9-3 Liquid Crystal Displays
+Liquid-crystal display.
+Zero voltage turns the segment OFF.
+Basic
+arrangement.
+Applying voltage between the
+segment and the backplane
+turns the segment ON.
+
+===== PAGE 19 =====
+9-3 Liquid Crystal Displays
+Driving a 7-
+segment display.
+It is common to produce
+required ac voltage by
+applying out-of-phase
+square waves to the
+segment and the
+backplane.
+
+===== PAGE 20 =====
+9-3 Liquid Crystal Displays
+• Liquid crystals are available as multidigit 7-
+segment decimal numeric displays.
+– Alphanumeric LCD modules are available in
+many formats—up to 4 lines by 40 characters.
+• Other LCD modules allow the user to create a
+graphical display by controlling individual dots on
+the screen called pixels.
+• Larger LCD panels can be scanned at a high rate,
+producing high quality video motion pictures.
+– Control lines are arranged in rows & columns.
+• A digital system must activate a matrix row/column
+to control the amount of light at each pixel.
+
+===== PAGE 21 =====
+9-3 Liquid Crystal Displays
+• Each pixel on a color display is made up of three
+subpixels, which control light passing through a
+red, green, or blue filter to produce pixel color.
+A 640 x 480 LCD screen would
+have 640 x 3 connections for
+columns and 480 connections
+for rows—a total of 2400
+connections to the LCD.
+
+===== PAGE 22 =====
+9-3 Liquid Crystal Displays
+• Older screens are called Twisted Nematic (TN)
+or Super Twisted Nematic (STN).
+– Referred to as passive LCDs.
+• Newer displays are called active matrix TFT LCDs.
+– An active element on the display is used to switch
+pixels on and off.
+• Other display technologies—vacuum fluorescent,
+gas discharge plasma, and electroluminescence.
+– Optical physics for each of these displays varies.
+• The means of controlling all of them is the same.
+
+===== PAGE 23 =====
+9-4 Encoders
+• Most decoders accept an input code & produce a
+HIGH (or LOW) at one and only one output line.
+– A decoder identifies, recognizes, or detects a
+particular code.
+9-4 Encoders
+
+===== PAGE 24 =====
+9-4 Encoders
+• The opposite of decoding process is encoding.
+– Performed by a logic circuit called an encoder.
+9-4 Encoders
+An encoder has a number of
+input lines, only one of which
+is activated at a given time.
+Shown is an encoder with M
+inputs and N outputs.
+Inputs are active-HIGH,
+which means that they
+are normally LOW.
+It produces an N-bit output
+code, depending on which
+input is activated.
+
+===== PAGE 25 =====
+9-4 Encoders
+• An octal-to-binary encoder (8-line-to-3-line
+encoder) accepts eight input lines, producing a
+three-bit output code corresponding to the input.
+Logic circuit for an octal-to-binary (8-line-to-3-line) encoder.
+Only one input should be active at one time.
+
+===== PAGE 26 =====
+9-4 Encoders
+• A priority encoder ensures that when two or
+more inputs are activated, the output code will
+correspond to the highest-numbered input.
+It has nine active-LOW inputs represent decimal digits
+1 through 9, producing inverted BCD code corresponding
+to the highest-numbered activated input.
+
+===== PAGE 27 =====
+9-4 Encoders
+• A switch encoder can be used when BCD data
+must be entered manually into a digital system.
+– The 10 switches might be the keyboard switches
+on a calculator—representing digits 0 through 9.
+
+===== PAGE 28 =====
+9-4 Encoders
+The switches are of the
+normally open type, so
+the encoder inputs are
+all normally HIGH.
+BCD output is 0000.
+When a key is depressed,
+the circuit will produce the
+BCD code for that digit.
+The 74LS147 is a priority
+encoder, so simultaneous
+key depressions produce
+the BCD code for the
+higher-numbered key.
+
+===== PAGE 29 =====
+9-5 Troubleshooting
+• More complex circuitry increases possible reasons
+for failure
+– Applying observation and analysis will narrow the
+focus and simplify testing
+• After using observation and analysis to determine
+the possible faults, repeatedly use the divide and
+conquer technique to reduce possible causes by
+half.
+
+===== PAGE 30 =====
+9-6 Multiplexers (Data Selectors)
+• A multiplexer (MUX) selects 1 of N input data
+sources and transmits the selected data to a
+single output—called multiplexing.
+– A digital multiplexer or data selector is a logic circuit
+that performs the same task.
+Routing control of desired data
+input to output by SELECT
+inputs—referred to as
+ADDRESS inputs.
+
+===== PAGE 31 =====
+9-6 Multiplexers (Data Selectors)
+• A two-input MUX could be used in a digital system
+that uses two different MASTER CLOCK signals.
+– A high-speed clock in one mode and a slow-speed
+clock for the other.
+
+===== PAGE 32 =====
+9-6 Multiplexers (Data Selectors)
+• Two-, four-, eight-, and 16-input multiplexers are
+available in the TTL and CMOS logic families.
+– These basic ICs can be combined for multiplexing
+a larger number of inputs.
+
+===== PAGE 33 =====
+9-6 Multiplexers (Data Selectors)
+The 74ALS157 contains four two-input multiplexers
+
+===== PAGE 34 =====
+9-7 Multiplexer Applications
+• Multiplexer circuits find numerous and varied
+applications in digital systems of all types.
+– Data selection/routing, parallel-to-serial conversion.
+– Operation sequencing.
+– Waveform/logic-function generation.
+
+===== PAGE 35 =====
+9-7 Multiplexer Applications
+System for
+displaying
+two multidigit
+BCD counters
+one at a time.
+
+===== PAGE 36 =====
+9-7 Multiplexer Applications
+Parallel-to-serial converter.
+Waveforms for
+X7X6X5X4X3X2X1X0
+10110101
+
+===== PAGE 37 =====
+9-7 Multiplexer Applications
+Multiplexer used to implement a logic
+ function described by the truth table.
+
+===== PAGE 38 =====
+9-8 Demultiplexers (Data Distributors)
+• A demultiplexer (DEMUX) takes a single input
+and distributes it over several outputs.
+– The select input code determines to which output
+the DATA input will be transmitted.
+
+===== PAGE 39 =====
+9-8 Demultiplexers (Data Distributors)
+A 1 line to 8 line
+demultiplexer.
+
+===== PAGE 40 =====
+The system shown
+can handle eight
+doors, but can be
+expanded to
+any number.
+The door switches
+are data inputs
+to the MUX.
+They produce a
+HIGH when a door
+is open and a LOW
+when it is closed.
+9-8 Demultiplexers (Data Distributors)
+Security monitoring system using the 74ALS138.
+
+===== PAGE 41 =====
+9-8 Demultiplexers (Data Distributors)
+A synchronous data
+transmission system that
+is used to transmit four,
+four-bit words serially
+from a transmitter to a
+remote receiver.
+
+===== PAGE 42 =====
+9-8 Demultiplexers (Data Distributors)
+Synchronous data
+transmission system
+receiver block
+
+===== PAGE 43 =====
+9-8 Demultiplexers (Data Distributors)
+This timing diagram shows the parallel data loaded into the
+transmitter, the serial data stream, and distribution/storage
+of the four data values in the receiver registers.
+
+===== PAGE 44 =====
+9-9 More Troubleshooting
+Apply observation and analysis to this example:
+A test on the circuit
+yields the result shown.
+What is the probable
+circuit fault?
+
+===== PAGE 45 =====
+9-10 Magnitude Comparator
+• Another useful MSI is a magnitude comparator.
+– A combinational logic circuit that compares two input
+binary quantities and generates outputs to indicate
+which one has the greater magnitude.
+Megafunction
+symbol.
+Cascading inputs are not necessary
+on a megafunction—simply specify
+larger data input ports.
+
+===== PAGE 46 =====
+9-10 Magnitude Comparator
+• Another useful MSI is a magnitude comparator.
+– A combinational logic circuit that compares two input
+binary quantities and generates outputs to indicate
+which one has the greater magnitude.
+
+===== PAGE 47 =====
+9-10 Magnitude Comparator
+Magnitude comparator used in a digital thermostat.
+
+===== PAGE 48 =====
+9-11 Code Converters
+• A code converter is a logic circuit that changes
+data presented in one type of binary code to
+another type of binary code.
+Basic idea
+of a two-digit
+BCD-to-binary
+converter.
+
+===== PAGE 49 =====
+9-11 Code Converters
+• The bits in a BCD representation have decimal
+weights that are 8, 4, 2, 1 within each code group.
+– That differ by a factor of 10 from one code group
+(decimal digit) to the next.
+The decimal weight
+of each bit in the
+BCD representation
+can be converted to
+its binary equivalent.
+
+===== PAGE 50 =====
+9-11 Code Converters
+One way to implement
+the logic circuit that
+performs conversion
+process is to use binary
+adder circuits.
+
+===== PAGE 51 =====
+9-12 Data Busing
+• In computers, transfer of data takes place over a
+common set of connecting lines called a data bus.
+– Devices tied to the data bus will often have tri-state
+outputs, or be tied to the data bus by tristate buffers.
+• Devices commonly connected to a data bus:
+– Microprocessors; Semiconductor memory chips.
+– Digital-to-analog and analog-to-digital converters.
+
+===== PAGE 52 =====
+9-12 Data Busing
+Three different devices
+can transmit eight-bit data
+over an eight-line data bus
+to a microprocessor.
+Only one device at a time
+is enabled—so bus
+contention is avoided.
+
+===== PAGE 53 =====
+9-13 The 74ALS173/HC173 Tristate Register
+• The devices connected to a data bus will contain
+registers (usually flip-flops) that hold device data.
+– Outputs of these registers are usually connected to
+tristate buffers allowing them to be tied to a data bus.
+
+===== PAGE 54 =====
+9-13 The 74ALS173/HC173 Tristate Register
+TTL 74ALS173 tristate register.
+
+===== PAGE 55 =====
+9-14 Data Bus Operation
+Tristate registers
+connected to a data bus.
+The contents of any one of the
+three registers can be parallel-
+transferred over the data bus
+to one of the other registers
+through proper application
+of logic levels to the
+register enable inputs.
+
+===== PAGE 56 =====
+9-14 Data Bus Operation
+• The timing diagram shows various signals
+involved in the transfer of the data 1011
+from register A to register C.
+
+===== PAGE 57 =====
+9-14 Data Bus Operation
+Simplified representation of bus arrangement.
+Simplified way to show signal
+activity on data bus lines.
+
+===== PAGE 58 =====
+9-14 Data Bus Operation
+• Manufacturers have developed ICs that connect
+inputs & outputs internal to the chip.
+– To reduce the number of IC pins & bus connections.
+Each I/O line will function
+as an input or an output
+depending on the states
+of the enable inputs—
+bidirectional data lines.
+
+===== PAGE 59 =====
+END

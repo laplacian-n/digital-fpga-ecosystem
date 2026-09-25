@@ -1,0 +1,642 @@
+===== PAGE 1 =====
+Chapter 7 – Counters and Registers
+
+===== PAGE 2 =====
+• Selected areas covered in this chapter:
+– Operation & characteristics of synchronous and
+asynchronous counters.
+– Analyzing and evaluating various types of counters.
+– Schemes used to decode different types of counters.
+– Counter circuits using different levels of abstraction
+in HDL.
+– Operation of various types of IC registers.
+– Shift registers and shift register counters using HDL.
+– Troubleshooting techniques used for combinational
+logic systems to troubleshoot sequential logic
+systems.
+Chapter 7 Objectives
+
+===== PAGE 3 =====
+7-1 Asynchronous (Ripple) Counters
+• Review of four bit counter operation:
+– Clock is applied only CLK input to FF A.
+• J & K are HIGH in all FFs.
+– Output of FF A is CLK of FF B, etc.
+• FF outputs D, C, B, and A, are a 4-bit binary
+number with D as the MSB.
+
+===== PAGE 4 =====
+7-1 Asynchronous (Ripple) Counters
+An asynchronous counter—state is not
+changed in exact synchronism with the clock.
+• Review of four bit counter operation:
+– After the NGT of the 15th clock pulse, the counter
+FFs are recycled back to 0000.
+
+===== PAGE 5 =====
+7-1 Asynchronous (Ripple) Counters – MOD Number
+• MOD number is equal to the number of states
+the counter goes through before recycling.
+Adding FFs will increase the MOD number.
+
+===== PAGE 6 =====
+7-1 Asynchronous (Ripple) Counters – MOD Number
+• Frequency division – each FF will have an output
+frequency of 1/2 the input.
+Output frequency of the last counter FF will be
+clock frequency divided by MOD of the counter.
+
+===== PAGE 7 =====
+7-1 Asynchronous (Ripple) Counters – Signal Flow
+• Schematics are normally drawn from left to right.
+– Counters will be drawn from right to left so that the
+MSB and LSB appear in the appropriate positions.
+
+===== PAGE 8 =====
+7-2 Propagation Delay in Ripple Counters
+• Ripple counters are simple—requiring the fewest
+components to produce a given operation.
+– Cumulative propagation delay can cause problems
+at high frequencies.
+• If the period between input pulses is made longer
+than the total propagation delay of the counter,
+problems can be avoided
+– For proper operation: Tclock  N x tpd
+– Maximum frequency: Fmax=1/N x tpd
+
+===== PAGE 9 =====
+7-2 Propagation Delay in Ripple Counters
+• Asynchronous counters are not useful at very high
+frequencies—especially for counters with large
+numbers of bits.
+– Erroneous count patterns can generate glitches
+• Signals produced by systems using asynchronous
+counters.
+
+===== PAGE 10 =====
+7-3 Synchronous (Parallel) Counters
+• In synchronous or parallel counters, all FFs are
+triggered simultaneously (in parallel) by the clock.
+Synchronous counters can operate at much
+higher frequencies than asynchronous counters.
+
+===== PAGE 11 =====
+7-3 Synchronous (Parallel) Counters
+• Each FF has J & K inputs which are HIGH only
+when outputs of all lower-order FFs are HIGH.
+The total propagation delay will be
+the same for any number of FFs.
+
+===== PAGE 12 =====
+7-3 Synchronous (Parallel) Counters
+For this circuit to count properly,
+on a given NGT of the clock, only
+those FF that are supposed to
+toggle on that NGT should have
+J = K = 1 when NGT occurs.
+
+===== PAGE 13 =====
+• The basic synchronous counter shown is limited
+to MOD numbers that are equal to 2N.
+– Where N is the number of FFs.
+7-4 Counters with MOD Number <2N
+
+===== PAGE 14 =====
+MOD-6 counter produced by clearing a MOD-8
+counter when a count of six (110) occurs.
+7-4 Counters with MOD Number <2N
+• The basic counter can be modified to produce
+MOD numbers less than 2N.
+– By allowing the counter to skip states that are
+normally part of the counting sequence.
+7-4 Counters with MOD Number <2N
+
+===== PAGE 15 =====
+• Changing the MOD number.
+– Find the smallest MOD required so that 2N is less
+than or equal to the requirement.
+– Connect a NAND gate to the asynchronous CLEAR
+inputs of all FFs.
+7-4 Counters with MOD Number <2N
+Determine which FFs are
+HIGH at the desired count and
+connect the outputs of these
+FFs to the NAND gate inputs.
+
+===== PAGE 16 =====
+7-4 Counters with MOD Number < 2N
+State transition diagram for the MOD-6 counter
+7-4 Counters with MOD Number <2N
+Each circle represents one of
+the possible counter states.
+Arrows indicate how one state
+changes to another—in response
+to an input clock pulse.
+There is no arrow to the 111
+state as the counter can never
+advance to that state.
+The 111 state can occur
+on power-up when the FFs
+come up in random states.
+
+===== PAGE 17 =====
+7-4 Counters with MOD Number < 2N
+Display of counter
+states is often done
+with an LED
+The MOD-6 counter
+lights the LED on
+HIGH output.
+7-4 Counters with MOD Number <2N
+
+===== PAGE 18 =====
+• Decade counters are widely used for counting
+events, and displaying results in decimal form.
+– A decade counter is any counter with 10 distinct
+states, regardless of the sequence.
+– A BCD counter is a decade counter that counts from
+binary 0000 to 1001.
+7-4 Counters with MOD Number <2N
+Any MOD-10
+counter is a
+decade
+counter.
+
+===== PAGE 19 =====
+Mod-60 Counter
+7-4 Counters with MOD Number <2N
+
+===== PAGE 20 =====
+7-5 Synchronous Down and Up/Down Counters
+• A synchronous down counter is constructed in a
+similar manner to an up counter.
+– It uses the inverted FF outputs to control the higher-
+order J, K inputs.
+Synchronous, MOD-16,
+down counter and
+output waveforms.
+
+===== PAGE 21 =====
+7-5 Synchronous Down and Up/Down Counters
+• In a parallel up/down counter, the control input
+controls the values fed to the J and K inputs of
+the successive FFs.
+– The normal FF outputs or the inverted FF outputs.
+
+===== PAGE 22 =====
+• For the first five clock pulses,
+– The counter counts up.
+Up/Down = 1.
+7-5 Synchronous Down and Up/Down Counters
+• For the last five pulses,
+– The counter counts down.
+Up/Down = 0.
+
+===== PAGE 23 =====
+7-5 Synchronous Down and Up/Down Counters
+• Note that there are two arrows leaving each
+state’s bubble—a conditional transition.
+The next state for this
+counter is dependent upon
+the logic level applied to the
+control input.
+
+===== PAGE 24 =====
+7-6 Presettable Counters
+• A presettable counter can be set to any desired
+starting point—synchronously or asynchronously.
+– Preset is also called parallel loading the counter.
+Synchronous
+counter with
+asynchronous
+parallel load.
+Parallel data inputs
+
+===== PAGE 25 =====
+7-7 IC Asynchronous Counters
+Counter contains four FFs.
+FFs are triggered by a PGT
+at the CLK input.
+Active-low asynchronous CLEAR input.
+Can be preset to any value by
+applying an active-low LOAD
+input to the A, B, C, and D inputs .
+
+===== PAGE 26 =====
+7-7 IC Asynchronous Counters
+This series of IC counter chips has
+one more output pin—RCO—an
+active-HIGH output is to detect
+(decode) the last or terminal
+state of the counter.
+Very useful in connecting two
+or more counter chips in a
+multistage arrangement to
+create larger counters.
+
+===== PAGE 27 =====
+7-7 IC Asynchronous Counters
+TTL 74ALS160 – 74ALS163 Function Table
+
+===== PAGE 28 =====
+7-7 IC Asynchronous Counters
+74ALS190 and 74ALS191 series ICs
+are recycling, four-bit counters.
+
+===== PAGE 29 =====
+7-7 IC Asynchronous Counters
+• Many standard IC counters have been designed to
+make it easy to connect multiple chips to create
+circuits with a higher counting range.
+– A multistage or cascading arrangement.
+74ALS163s in a two-stage arrangement to extend the maximum counting range.
+
+===== PAGE 30 =====
+• Digital counters are often used in applications
+where the count represented by FF states must
+somehow be determined or displayed.
+– One of the simplest means for displaying contents
+of a counter is connecting the FF output to an LED.
+7-8 Decoding a Counter
+Active-HIGH
+decoder output.
+The LED method becomes inconvenient as the
+size (number of bits) of the counter increases.
+It is much harder to decode the display mentally.
+
+===== PAGE 31 =====
+• Decoding is the conversion of a binary output to
+a decimal value—a form immediately recognized.
+– The active-HIGH decoder shown can be used to light
+an LED representing each decimal number 0 to 7.
+7-8 Decoding a Counter
+
+===== PAGE 32 =====
+7-8 Decoding a Counter
+MOD-8
+Active-HIGH
+decoder output.
+• Decoding is the conversion of a binary output to
+a decimal value—a form immediately recognized.
+
+===== PAGE 33 =====
+The active-HIGH decoder shown can
+be changed to an active-LOW type.
+7-8 Decoding a Counter
+Active-LOW decoding is obtained by
+replacing the AND gates with NAND gates.
+The decoder outputs now produce a normally
+HIGH signal, which goes LOW only when
+the number being decoded occurs.
+
+===== PAGE 34 =====
+7-8 Decoding a Counter
+• A BCD counter has 10 states, decoded to provide
+10 outputs corresponding to decimal digits 0 – 9.
+– Represented by the states of the counter FFs.
+Instead of 10 separate LEDs,
+BCD counters usually have
+their count displayed on
+a single display device.
+– The 10 outputs can control 10 individual indicator
+LEDs for a visual display.
+
+===== PAGE 35 =====
+7-9  Analyzing Synchronous Counters
+Synchronous up counter.
+Control input
+expressions.
+
+===== PAGE 36 =====
+7-9  Analyzing Synchronous Counters
+• Synchronous counters can be custom-designed
+to generate any desired count sequence.
+Synchronous
+up-counter.
+Control input
+expressions.
+
+===== PAGE 37 =====
+7-9  Analyzing Synchronous Counters
+• Analyze counter designs of this type by predicting
+FF control inputs for each state of the counter.
+– A PRESENT state/NEXT state table is very useful
+for this purpose.
+
+===== PAGE 38 =====
+7-9  Analyzing Synchronous Counters
+Synchronous up counter state
+transition diagram and waveform.
+Highlighted information
+indicates this counter
+design is self-correcting.
+
+===== PAGE 39 =====
+7-9  Analyzing Synchronous Counters
+Synchronous counter built using D-type FFs.
+Control circuitry will typically
+be more complex than an
+equivalent JK-type counter,
+The number of
+synchronous
+inputs to control
+is reduced by half
+
+===== PAGE 40 =====
+7-10 Synchronous Counter Design
+• Common design method using J-K flip-flops in
+a synchronous counter configuration.
+– Determine the desired number of bits (FFs) and the
+desired counting sequence.
+– Draw the state transition diagram showing all possible
+states—including those not part of the desired
+counting sequence.
+– Use the state transition diagram to set up a table that
+lists all PRESENT states and their NEXT states.
+– Add a column for each J and K input & indicate levels
+required to produce transition to the NEXT state.
+– Design the logic circuits to generate levels required at
+each input, and implement the final expressions.
+
+===== PAGE 41 =====
+7-10 Synchronous Counter Design
+• A stepper motor rotates in steps, not continuous
+motion—typically 15 degrees per step.
+– A practical application of synchronous counter design.
+• Reversible, depending on output level.
+
+===== PAGE 42 =====
+7-10 Synchronous Counter Design
+• A stepper motor rotates in steps, not continuous
+motion—typically 15 degrees per step.
+– A practical application of synchronous counter design.
+• Reversible, depending on output level.
+
+===== PAGE 43 =====
+7-11 Altera Library Functions for Counters
+• The Quartus Block Editor can program a PLD with
+any counter using flip-flops and gates.
+– These macro-functions are in the maxplus2 library.
+A full-featured MOD-16 up/down counter.
+
+===== PAGE 44 =====
+7-11 Altera Library Functions for Counters
+Digital clock hours counter—block diagram,
+MegaWizard settings & simulation results.
+
+===== PAGE 45 =====
+7-12 HDL Counters
+• Methods to describe counter circuits using HDL
+primarily use synchronous techniques.
+– All flip-flops update simultaneously in response to
+the same clock event.
+– All bits in a count sequence go from their PRESENT
+state to their prescribed NEXT state simultaneously,
+• State Transition Description Methods
+– The PRESENTstate/NEXT state table is the
+equivalent of the truth table.
+
+===== PAGE 46 =====
+7-12 HDL Counters
+• State descriptions in AHDL
+– The first important step is to declare the counter
+output pins properly— as a bit array.
+
+===== PAGE 47 =====
+7-12 HDL Counters
+• State descriptions in AHDL
+The current state of the counter is evaluated (count[ ].q)
+on line 11, and if it is less than the highest desired count
+value, it uses the description count[ ].d count.q + 1 (line 12).
+
+===== PAGE 48 =====
+7-12 HDL Counters
+• State descriptions in AHDL
+When the counter has reached the highest desired state
+(or higher), the IF statement test will be false, resulting in a
+NEXT-state input value of zero, which recycles the counter.
+
+===== PAGE 49 =====
+7-13 Wiring HDL Modules Together
+• Designing large digital systems is much easier if
+the system is subdivided into smaller, manageable
+modules that are interconnected.
+– The essence of the concept of hierarchical design.
+• Consider a recycling, MOD-100 BCD counter
+with a synchronous clear.
+– Creating a MOD-10 BCD counter module, cascading
+synchronously two of thesein a higher-level design
+file is the easiest way to do this.
+
+===== PAGE 50 =====
+7-13 Wiring HDL Modules Together
+Block diagram design and simulation
+results for MOD-100 BCD counter design.
+
+===== PAGE 51 =====
+7-13 Wiring HDL Modules Together
+• Decoding the AHDL MOD-5 counter
+
+===== PAGE 52 =====
+7-14 State Machines
+• The term state machine refers to a circuit that
+sequences through a set of predetermined states.
+– Controlled by a clock and other input signals.
+• The term counter is used for sequential circuits
+that have a regular numeric count sequence.
+– The things that are counted are actually clock pulses.
+• But the pulses may represent many kinds of events.
+• The general distinction between the two terms:
+– A counter is commonly used to count events,
+– A state machine is commonly used to control events.
+
+===== PAGE 53 =====
+7-14 State Machines
+Block diagram for counters and state machines.
+
+===== PAGE 54 =====
+7-14 State Machines
+Traffic light controller state machine.
+
+===== PAGE 55 =====
+7-15 Register Data Transfer
+• The various types of registers can be classified
+according to…
+– The manner in which data can be entered into the
+register for storage.
+– The manner in which data are outputted from the
+register.
+• Serial data flow through a register is generally
+called shifting—either to the left or to the right.
+– Serial output data fed back to the input of the same
+register is called a data rotate.
+• Parallel inputting of data is often described as a
+register load.
+
+===== PAGE 56 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS174/74HC174
+Parallel in/parallel out (PIPO)
+A group of flip-flops that can store multiple
+bits simultaneously and in which all bits of
+the stored binary value are directly available.
+
+===== PAGE 57 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS174/74HC174
+
+===== PAGE 58 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS166/74HC166
+Serial in/serial out (SISO)
+Data loaded one bit at a time moves one bit at a time,
+with each clock pulse through the flip-flops toward
+the other end of the register, and exit one bit at
+a time in the same order as originally loaded.
+
+===== PAGE 59 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS166/74HC166
+Circuit Diagram
+
+===== PAGE 60 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS166/74HC166
+Logic
+Symbol
+Function
+Table
+
+===== PAGE 61 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS165/74HC165
+8-bit parallel in/serial out (PISO)
+Serial shifting is always synchronous, as the clock is
+required to ensure the input data moves only one
+bit at a time with each appropriate clocking edge.
+
+===== PAGE 62 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS165/74HC165
+8-bit parallel in/serial out (PISO)
+
+===== PAGE 63 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS164/74HC164
+8-bit serial in/parallel out (SIPO)
+
+===== PAGE 64 =====
+7-15  & 16 Register Data Transfer / Integrated-Circuit Registers
+74ALS164/74HC164
+8-bit serial in/parallel out (SIPO)
+
+===== PAGE 65 =====
+7-17 Shift Register Counters
+• Shift-register counters use feedback—the output
+of the last FF in the register is connected back to
+the first FF in some way.
+
+===== PAGE 66 =====
+7-17 Shift Register Counters
+• A ring counter is a circulating shift register
+connected so the last FF shifts its value to the first.
+
+===== PAGE 67 =====
+7-17 Shift Register Counters
+• To operate properly, a ring counter must start off
+with only one FF in the 1 state and all the others in
+the 0 state.
+– As power-up starting states will be unpredictable, the
+counter is preset before clock pulses are applied.
+Circuit for ensuring the
+ring counter starts in the
+1000 state on power-up.
+
+===== PAGE 68 =====
+7-17 Shift Register Counters
+• In the Johnson or twisted-ring counter inverted
+output of the last FF is connected to the input of
+the first FF.
+
+===== PAGE 69 =====
+7-17 Shift Register Counters
+• For a given MOD number, a Johnson counter
+requires only half the FFs a ring counter requires.
+– It requires decoding gates—a ring counter does not.
+• A Johnson counter uses one logic gate to decode
+for each count.
+– Each gate requires only two inputs, regardless of
+the number of FFs in the counter.
+
+===== PAGE 70 =====
+7-17 Shift Register Counters
+• Very few ring counters or Johnson counters are
+available as ICs.
+– It is relatively simple to wire a shift-register IC as
+either a ring counter or a Johnson counter.
+• Some of the CMOS Johnson-counter ICs include
+the complete decoding circuitry on the same chip
+as the counter.
+– (74HC4017, 74HC4022)
+
+===== PAGE 71 =====
+7-18 Troubleshooting
+• Flip-flops, counters, and registers are the major
+components in sequential logic system.
+– Sequential systems suffer from the same types of
+failures as do combinational systems.
+• Open circuits, shorts, internal IC faults, etc.
+• Basic troubleshooting procedures still apply.
+– Observe system operation.
+– Use analytical reasoning to determine possible
+causes.
+– Use test equipment to isolate the exact fault.
+
+===== PAGE 72 =====
+7-20 HDL Registers
+• HDL techniques use bit arrays to describe register
+data & transfer the data in parallel or serial format.
+• Concatenation—grouping together in a specific
+sequence—of desired set of data bits can be used
+to describe data movement for serial shifting.
+
+===== PAGE 73 =====
+7-20 HDL Registers
+Four flip-flops performing transfer operations
+of parallel load, shift right, shift left, and hold data.
+Bits are transferred synchronously, which means
+they all move simultaneously on a single clock edge.
+
+===== PAGE 74 =====
+7-21 HDL Ring Counters
+• A ring counter is a shift register that circulates
+a single active logic level through all its FFs.
+– Modulus is equal to the number of FFS in the register.
+• There are always many unused and invalid states.
+• With planning, we can ensure the counter reaches
+the desired sequence—no matter the initial state.
+– Regardless of the state to which the counter initializes,
+it eventually fills with zeros.
+• At which time, logic shifts in a HIGH to start the ring
+sequence.
+
+===== PAGE 75 =====
+7-21 HDL Ring Counters
+• In the AHDL code shown, lines 11 & 12 control
+the serial input using the strategy just described.
+– The (==) operator evaluates whether the expressions
+on each side are equal or not.
+
+===== PAGE 76 =====
+7-22 HDL One-Shots
+• The concept of a counter can be applied to
+implement a digital one-shot using HDL.
+– A nonretriggerable one-shot ignores the trigger
+input pulse output is still active.
+– A retriggerable one-shot starts a pulse in response
+to a trigger.
+• Internal pulse timer restarts each time a subsequent
+trigger edge occurs before the pulse is complete.
+
+===== PAGE 77 =====
+END

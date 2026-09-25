@@ -1,0 +1,821 @@
+{
+  "source": "Ch_12.pdf",
+  "group": "content",
+  "chapter": "12",
+  "title": "Memory Devices",
+  "chunks": [
+    {
+      "id": "ch12-12-1-memory-terminology-overview",
+      "section": "12-1",
+      "topic": "Memory Systems Overview: Main Memory vs Auxiliary Memory",
+      "type": "concept",
+      "summary": "Digital data can be stored as capacitor charge for high-density, low-power storage; semiconductor RAM/ROM form a computer's fast main memory, while auxiliary (mass) storage devices like magnetic disk and CD hold large amounts of data without needing power.",
+      "text": "Digital data can be stored as charges on capacitors; this technique is used by an important semiconductor memory type (dynamic RAM) to achieve high-density storage at low power requirements. Semiconductor memories are used as the main memory of a computer where fast operation is important. RAM and ROM make up main memory: a computer's main memory (its working memory) is in constant communication with the central processing unit (CPU) as a program of instructions is executed. Another form of storage is auxiliary memory, which is separate from main memory. Common auxiliary memory devices are magnetic disk and compact disc (CD), the latter accessed optically. Auxiliary memory is also called mass storage because it has the capacity to store massive amounts of data without needing continuous power.",
+      "keywords": [
+        "main memory",
+        "auxiliary memory",
+        "mass storage",
+        "semiconductor memory",
+        "capacitor storage",
+        "RAM",
+        "ROM"
+      ],
+      "pages": [
+        4,
+        5,
+        6
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-1-memory-terminology-basic-terms",
+      "section": "12-1",
+      "topic": "Basic Memory Terminology: Cell, Word, Byte, Capacity, Density, Address",
+      "type": "definition",
+      "summary": "Defines the fundamental vocabulary of memory systems: memory cell, memory word, byte, capacity, density, and address, including a worked example of an 8-word memory with 3-bit addresses.",
+      "text": "Memory Cell: a device or electrical circuit used to store a single bit (0 or 1); examples include a flip-flop, a charged capacitor, or a single spot on magnetic tape or disk. Memory Word: a group of bits (cells) in memory that together represent an instruction or a piece of data; word sizes in computers typically range from 8 to 64 bits depending on the size of the computer. Byte: a special term for a group of exactly eight bits. Capacity: a way of specifying how many bits can be stored in a memory device or system. Density: another term for capacity — a memory device with greater density can store more bits in a given amount of physical space. Address: a number that identifies the location of a word in memory; addresses always exist in the digital system as binary numbers, although octal, hex, and decimal are often used for convenience when representing an address. Example: a small memory of eight words has each word given a specific address represented by a three-bit number ranging from 000 to 111 (0 to 7 decimal); to refer to a specific word location in memory, its address code is used to identify it.",
+      "keywords": [
+        "memory cell",
+        "memory word",
+        "byte",
+        "capacity",
+        "density",
+        "address",
+        "binary address"
+      ],
+      "pages": [
+        7,
+        8,
+        9
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide (page 9) shows a diagram of a small 8-word memory with each of the 8 rows/words labeled with its 3-bit address (000 through 111). Could not render the PDF page as an image in this environment (poppler/pdftoppm unavailable); description here is inferred from the slide's caption/body text only, not a direct visual transcription.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-1-memory-terminology-read-write-access",
+      "section": "12-1",
+      "topic": "Read Operation, Write Operation, and Access Time",
+      "type": "definition",
+      "summary": "Defines the read (fetch) operation, write (store) operation, and access time — the key speed measure of a memory device.",
+      "text": "Read Operation: the binary word stored in a specific memory location (address) is sensed and then transferred to another device; often called a fetch operation because a word is being fetched from memory. Write Operation: the operation whereby a new word is placed into a particular memory location; also referred to as a store operation, because it replaces the word that was previously stored there. Access Time: a measure of memory device speed — the time between the memory receiving a new address input and the data becoming available at the output.",
+      "keywords": [
+        "read operation",
+        "fetch",
+        "write operation",
+        "store operation",
+        "access time"
+      ],
+      "pages": [
+        10
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-1-volatile-random-sequential-access",
+      "section": "12-1",
+      "topic": "Volatile Memory, RAM, and Sequential-Access Memory",
+      "type": "definition",
+      "summary": "Distinguishes volatile from nonvolatile memory, defines random-access memory (RAM) as memory with constant access time regardless of address, and contrasts it with sequential-access memory (SAM) which must be searched sequentially.",
+      "text": "Volatile Memory: any memory that requires the application of electrical power to store information; if power is removed, all information stored in the memory is lost. Random-Access Memory (RAM): memory in which the actual physical location of a memory word has no effect on how long it takes to read from, or write into, that location — access time is the same for any address in memory. Most semiconductor memories are RAMs. Sequential-Access Memory (SAM): a type of memory in which access time is not constant but varies depending on the address location; a stored word is found by sequencing through all address locations until the desired address is reached, giving access times far longer than random-access memory (e.g., magnetic tape).",
+      "keywords": [
+        "volatile memory",
+        "RAM",
+        "random-access memory",
+        "sequential-access memory",
+        "SAM",
+        "access time"
+      ],
+      "pages": [
+        11,
+        12
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-1-rwm-rom-static-dynamic",
+      "section": "12-1",
+      "topic": "Read/Write Memory, ROM, Static vs Dynamic Memory Devices",
+      "type": "definition",
+      "summary": "Defines read/write memory (RWM) and read-only memory (ROM) by their read/write ratio, and distinguishes static memory (data persists as long as power is applied) from dynamic memory (data must be periodically refreshed even with power applied).",
+      "text": "Read/Write Memory (RWM): any memory that can be read from or written into with equal ease. Read-Only Memory (ROM): a broad class of semiconductor memories designed for applications with a high ratio of read operations to write operations. Static Memory Devices: semiconductor memory devices in which stored data remains permanently stored as long as power is applied, without needing to periodically rewrite the data. Dynamic Memory Devices: semiconductor memory in which stored data will not remain permanently stored even with power applied, unless the data are periodically rewritten into memory — this periodic rewriting is called a refresh operation. Main Memory is a computer's working memory, storing the instructions and data the CPU is currently working on.",
+      "keywords": [
+        "read/write memory",
+        "RWM",
+        "ROM",
+        "static memory",
+        "dynamic memory",
+        "refresh operation",
+        "main memory"
+      ],
+      "pages": [
+        12,
+        13
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-1-cache-auxiliary-memory",
+      "section": "12-1",
+      "topic": "Cache Memory and Auxiliary Memory",
+      "type": "definition",
+      "summary": "Cache memory is a high-speed memory block between the CPU and slower main memory that speeds up the computer; auxiliary memory is slower, nonvolatile mass storage external to main memory.",
+      "text": "Cache Memory: a high-speed block of memory that operates between slower main memory and the CPU to optimize the speed of the computer; it is physically located in the CPU, on the motherboard, or both. Auxiliary Memory: referred to as mass storage because it stores massive amounts of information external to the main memory; it is slower than main memory and is always nonvolatile.",
+      "keywords": [
+        "cache memory",
+        "auxiliary memory",
+        "mass storage",
+        "nonvolatile"
+      ],
+      "pages": [
+        14
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-2-general-memory-operation-io-lines",
+      "section": "12-2",
+      "topic": "General Memory Operation: Required I/O Lines",
+      "type": "concept",
+      "summary": "Lists the sequence of I/O line functions every memory system requires to perform a read or write: applying the address, enabling control inputs, moving data, and deactivating controls when done.",
+      "text": "Every memory system requires I/O lines to: apply the binary address of the memory location that is to be accessed; enable memory devices to respond to control inputs; and place data stored in the specified address on the outputs, or accept data to be stored. In a read operation, the tristate outputs are enabled so that data is applied to the output pins. In a write operation, data to be stored is applied to the data input pins and the write operation is enabled, causing the data to be stored at the specified location. Finally, the read or write controls are deactivated when done reading or writing, and the memory IC is disabled.",
+      "keywords": [
+        "memory I/O lines",
+        "read operation",
+        "write operation",
+        "tristate outputs",
+        "address lines"
+      ],
+      "pages": [
+        15
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-2-32x4-memory-example",
+      "section": "12-2",
+      "topic": "32 x 4 Memory Example: Address Inputs, WE, and OE",
+      "type": "example",
+      "summary": "Worked example of a 32-word by 4-bit memory: it needs 5 address inputs (A0-A4) to address 32 locations (00000-11111), a WE (write enable, active-low) input to control storing data, and an OE (output enable) input to control the tristate output buffers.",
+      "text": "A 32 x 4 memory has 32 different storage locations, each holding a 4-bit word, requiring 32 different binary addresses from 00000 to 11111 (0 to 31 decimal). This requires five address inputs, A0 through A4. In general, N address inputs are required for a memory with a capacity of 2^N words. To access a memory location for read or write, the five-bit address code is applied to the address inputs. The WE (write enable) input is activated to allow the memory to store data; the overbar on WE indicates that the write operation takes place when WE = 0 (active low). The OE (output enable) pin is activated to enable the tristate output buffer, and deactivated to place the buffers in the high-impedance (Hi-Z) state; a control signal connected to OE is active only when the bus is ready to receive data from the memory.",
+      "keywords": [
+        "32x4 memory",
+        "address inputs",
+        "write enable",
+        "WE",
+        "output enable",
+        "OE",
+        "tristate",
+        "high impedance"
+      ],
+      "pages": [
+        16,
+        17,
+        18,
+        19,
+        20
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides show a block diagram of a 32 x 4 memory chip with 5 address input pins (A0-A4), 4 data I/O pins, a WE (write enable, active-low) pin, and an OE (output enable) pin, alongside a conceptual array of 32 rows x 4-bit words showing how the address selects one word. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-3-cpu-memory-connections-buses",
+      "section": "12-3",
+      "topic": "CPU Memory Connections: Address Bus, Data Bus, Control Bus",
+      "type": "concept",
+      "summary": "Main memory interfaces to the CPU through three buses: a unidirectional address bus, a bidirectional data bus, and a control bus, which together allow the CPU to read from and write to memory.",
+      "text": "Main memory is interfaced to the CPU through three buses: the address bus, the data bus, and the control bus. These three buses play a necessary part in allowing the CPU to write data into memory and to read data from memory. Address Bus: a unidirectional bus that carries binary address outputs from the CPU to the memory ICs, used to select one memory location. Data Bus: a bidirectional bus that carries data between the CPU and the memory ICs. Control Bus: carries control signals, such as RD (read) or WR (write), from the CPU to the memory ICs.",
+      "keywords": [
+        "address bus",
+        "data bus",
+        "control bus",
+        "CPU memory interface",
+        "RD",
+        "WR"
+      ],
+      "pages": [
+        21,
+        24
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-3-write-read-operation-sequence",
+      "section": "12-3",
+      "topic": "CPU Write and Read Operation Sequences",
+      "type": "method",
+      "summary": "Step-by-step sequence of signal activity for a CPU write operation (place address, activate chip select, place data, activate WR) and a CPU read operation (place address, activate chip select, activate RD, retrieve data from data bus).",
+      "text": "Write operation process: (1) The CPU supplies the binary address of the memory location where data are to be stored, placing this address on the address bus lines. (2) An address decoder activates the memory device's enable input (CE or CS). (3) The CPU places the data to be stored on the data bus lines. (4) The CPU activates the appropriate control signal line for the memory write operation (WR or R/W). (5) The memory IC internally decodes the binary address to determine the selected storage location. (6) The data on the data bus are transferred into the selected memory location. Read operation process: (1) The CPU supplies the binary address of the memory location from which data are to be retrieved, placing it on the address bus lines. (2) An address decoder activates the memory device's enable input (CE or CS). (3) The CPU activates the appropriate control signal line for the memory read operation (RD or R/W). (4) The memory IC internally decodes the binary address to determine which location is being read. (5) The memory places the data from that location onto the data bus, from which it is transferred to the CPU.",
+      "keywords": [
+        "CPU write operation",
+        "CPU read operation",
+        "chip select",
+        "CE",
+        "CS",
+        "WR",
+        "RD",
+        "address decoder"
+      ],
+      "pages": [
+        22,
+        23
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-4-read-only-memory-intro",
+      "section": "12-4",
+      "topic": "Read-Only Memory (ROM): Purpose and Programming",
+      "type": "concept",
+      "summary": "ROM is nonvolatile semiconductor memory designed to hold data that is permanent or rarely changes; some types can be reprogrammed and others cannot, and the act of loading data into a ROM is called programming or burning.",
+      "text": "Read-only memory is semiconductor memory designed to hold data that are permanent or will not change frequently. Some ROMs cannot have their data changed once programmed; others can be erased and reprogrammed as often as desired. The process of entering data into a ROM is called programming or burning the ROM. A major use of ROMs is storage of programs in microcomputers — because ROMs are nonvolatile, programs are not lost when electrical power is turned off. To read a data word from ROM requires applying the appropriate address inputs and activating the control inputs.",
+      "keywords": [
+        "ROM",
+        "read-only memory",
+        "nonvolatile",
+        "programming",
+        "burning a ROM"
+      ],
+      "pages": [
+        25,
+        26,
+        27
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 26: 'Typical ROM' diagram. A block labeled '16 x 8 ROM' has four address inputs A3-A0 on the left and eight tristate data outputs D7-D0 on the right (tristate marked with a triangle symbol), plus two control inputs at the bottom: CS (chip select) and OE (output enable, active-low, drawn with a bar). Below the block are two example address/data tables for a 16-word x 8-bit ROM: the left table lists word (row) 0-15 with the 4-bit address A3..A0 and the corresponding 8-bit stored data D7..D0 in binary; the right table shows the same 16 words with addresses in hex (0-E) and data shown as 2-digit hex bytes (e.g. word 0 = DE, word 1 = 3A, word 4 = 19, etc.), illustrating that each address selects one fixed pre-programmed data word.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-5-rom-architecture",
+      "section": "12-5",
+      "topic": "ROM Internal Architecture: Register Array, Decoders, Output Buffers",
+      "type": "concept",
+      "summary": "A ROM IC's internal architecture has four basic parts: the register array (stores programmed data), row/column address decoders that select one register, and output buffers that pass the selected data to the external outputs.",
+      "text": "The internal architecture of a ROM IC is complex but consists of four basic parts. Register array: stores the data programmed into the ROM; each register contains several memory cells equal to the word size. Address decoders: row and column decoders such that only one register is selected by both the row and column decode of the address inputs, and this one register is enabled. Output buffers: pass data to the external data outputs — the register enabled by the address inputs places its data on an internal data bus, which feeds into the output buffers that pass the data to the external data output pins. Example: a 16 x 8 ROM architecture, where each of the 16 registers stores one eight-bit word.",
+      "keywords": [
+        "ROM architecture",
+        "register array",
+        "row decoder",
+        "column decoder",
+        "output buffers",
+        "16x8 ROM"
+      ],
+      "pages": [
+        28,
+        29
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 29 shows the internal block diagram of a 16 x 8 ROM: a register array of 16 registers (each 8 bits wide) fed by row and column address decoders, with output buffers connecting the selected register to 8 data output lines. Could not render the PDF page as an image in this environment (poppler/pdftoppm unavailable); description is inferred from the slide caption and body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-6-rom-timing",
+      "section": "12-6",
+      "topic": "ROM Timing: Access Time (tACC) and Output Enable Time (tOE)",
+      "type": "definition",
+      "summary": "ROM read operations have propagation delay characterized by access time (tACC), the delay from address input to valid data output, and output enable time (tOE), which is always shorter than access time.",
+      "text": "There is propagation delay between the application of a ROM's inputs and the appearance of valid data at the outputs during a read operation. This delay is called access time (tACC), and is a measure of the ROM's operating speed. Another important timing parameter is output enable time (tOE), the delay between the output-enable input being activated and valid data appearing at the output. Values for tOE are always shorter than access time.",
+      "keywords": [
+        "ROM timing",
+        "access time",
+        "tACC",
+        "output enable time",
+        "tOE",
+        "propagation delay"
+      ],
+      "pages": [
+        30,
+        31
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 30-31 show timing diagrams illustrating tACC (from address change to valid data output) and tOE (from output-enable assertion to valid data output) on a ROM read cycle. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide captions and body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-7-mask-programmed-rom",
+      "section": "12-7",
+      "topic": "Types of ROMs: Mask-Programmed ROM (MROM)",
+      "type": "concept",
+      "summary": "Mask-programmed ROM (MROM) has its data permanently stored during IC manufacturing, using a custom mask to selectively connect or disconnect transistors in a rectangular array; it is economical only for high-volume production of identical ROMs.",
+      "text": "Mask-programmed ROM (MROM) has data stored at the time the IC is manufactured. ROMs are made up of a rectangular array of transistors, and information is stored by either connecting or disconnecting the source of a transistor to its output column. The last step in manufacturing forms all these conducting paths (connections); this process uses a 'mask' to deposit metal on the silicon in the pattern that determines where connections form. The mask is very precise and expensive, and must be custom-made for the customer with the correct binary information, making MROM economical only when many ROMs are being made with exactly the same information.",
+      "keywords": [
+        "mask-programmed ROM",
+        "MROM",
+        "manufacturing mask",
+        "transistor array"
+      ],
+      "pages": [
+        32,
+        33,
+        34
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 32-33 show a rectangular array of transistors representing ROM storage cells, illustrating how a source connection to the output column (present or absent) encodes a stored bit, and how the manufacturing mask determines these connections. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-7-prom-eprom-eeprom",
+      "section": "12-7",
+      "topic": "Types of ROMs: PROM, EPROM, and EEPROM",
+      "type": "concept",
+      "summary": "PROM is a one-time user-programmable fusible-link ROM (OTP); EPROM can be user-programmed and UV-erased for reprogramming but must be removed from the circuit and takes up to 20 minutes to erase the whole chip; EEPROM is electrically erasable/rewritable byte-by-byte but has slower write speed.",
+      "text": "For lower-volume applications, user-programmable fusible-link PROMs are available; they are custom-programmed by the user and cannot be erased and reprogrammed, so if the information in the PROM is faulty or must be changed, the device must be discarded. PROMs are often referred to as 'one-time programmable' (OTP) ROMs. An EPROM (erasable PROM) can be user-programmed, erased, and reprogrammed as often as desired; once programmed, it is a nonvolatile memory that holds its stored data indefinitely, and a UV light is used to clear (erase) the device. Major disadvantages of UV EPROMs: they must be removed from the circuit to be programmed and erased; the erase operation erases the entire chip (not selective bytes); and the erase operation takes up to 20 minutes. The major characteristic of electrically erasable PROM (EEPROM) is electrical erasability, including the ability to erase and rewrite individual bytes in the memory array (unlike UV EPROM's whole-chip erase). Because the internal process of storing a data value in an EEPROM is quite slow, the speed of the data transfer operation is also slower; EEPROM devices are commonly available in eight-pin packages interfaced to a two- or three-wire serial bus.",
+      "keywords": [
+        "PROM",
+        "fusible link",
+        "one-time programmable",
+        "OTP",
+        "EPROM",
+        "UV erase",
+        "EEPROM",
+        "electrically erasable",
+        "byte erase"
+      ],
+      "pages": [
+        35,
+        36,
+        37,
+        38
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 36 depicts a UV EPROM package with a transparent quartz window through which UV light is shone to erase the chip. Could not render the PDF page as an image in this environment (poppler/pdftoppm unavailable); description is inferred from the slide body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-8-flash-memory-overview",
+      "section": "12-8",
+      "topic": "Flash Memory: Cell Structure and the Command Register",
+      "type": "concept",
+      "summary": "A flash memory cell resembles a single-transistor EPROM cell but costs considerably less than EEPROM; devices like the 28F256A CMOS flash IC use an internal command register and state control logic to control chip operations.",
+      "text": "A flash memory cell is like the simple single-transistor EPROM cell, with a cost considerably less than for EEPROM. The unique feature of the 28F256A CMOS flash memory IC is its command register: command codes are written into this register to control which operations take place inside the chip. State control logic examines the contents of the command register and generates the internal logic and control signals needed to carry out that operation.",
+      "keywords": [
+        "flash memory",
+        "flash memory cell",
+        "command register",
+        "state control logic",
+        "28F256A"
+      ],
+      "pages": [
+        39,
+        40,
+        41
+      ],
+      "needs_figure": true,
+      "figure_note": "Page 41: 'Functional diagram of a flash memory chip.' Inputs VCC, VSS, and RESET feed a central 'State control' block containing an internal 'Command register' and an 'Integrated program/erase stop timer'. State control connects to: a 'Sector switches' block and 'Erase voltage generator' block (for bulk/sector erase), a 'PGM voltage generator' block (for programming/write voltage), and a 'Chip enable / Output enable logic' block driven by CE-bar and OE-bar inputs. Address lines feed an 'Address latch' which splits into a 'Y-decoder' and 'X-decoder' driving the 'Cell matrix' through 'Y-Gating'. Data flows between external 'Data lines' and 'Input/output buffers', through a 'Data latch', into/out of the Y-Gating/cell matrix, with WE-bar (write enable) feeding State control's command register (thick pink arrow shows the command path from I/O buffers back to State control). This shows how a command word (via WE-bar) rather than a special high programming voltage on a pin is used to control erase/program operations in flash devices.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-8-nor-vs-nand-flash",
+      "section": "12-8",
+      "topic": "NOR Flash vs NAND Flash",
+      "type": "concept",
+      "summary": "NOR flash behaves logically like a NOR gate, allowing each transistor to be read/written independently with fast random access, making it suited to program storage; NAND flash trades random access for higher density, requiring block-based access via activation of other word lines, and is used for mass storage.",
+      "text": "The first flash devices, created to improve on EEPROM, used NOR flash technology, whose circuit functions logically like a NOR gate; each transistor can be read or written independently of the status of other transistors in the group. NOR flash offers quick read access time and random access, and is usually used for things like storing program instructions for the microcontroller in a cell phone or PDA. Attempts to improve the density of mass-storage flash devices resulted in NAND flash: data must be accessed in conjunction with the other word lines being activated by a control gate voltage large enough to turn on the other transistors, regardless of the amount of charge on the floating gate of the transistor being read. NAND flash circuits offer fast erase and program time, but the data must be dealt with in blocks. NAND flash is used for mass storage of pictures, music, and other files in devices like digital cameras, MP3 players, and USB flash drives.",
+      "keywords": [
+        "NOR flash",
+        "NAND flash",
+        "floating gate",
+        "block access",
+        "random access",
+        "mass storage"
+      ],
+      "pages": [
+        42,
+        43,
+        44,
+        45
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-9-rom-applications",
+      "section": "12-9",
+      "topic": "Common ROM Applications",
+      "type": "concept",
+      "summary": "Common ROM application areas include embedded microcontroller program memory, data transfer/portability devices, bootstrap memory, fixed data tables, code converters, and function generators (using a ROM lookup table plus DAC).",
+      "text": "Common ROM application areas include: Embedded microcontroller program memory, used in automotive automatic braking systems, cell phones, digital camcorders, microwave ovens, etc. Data transfer and portability, e.g., cell phones, digital cameras, flash drives, and MP3 players. Bootstrap memory: a relatively small program stored in ROM that loads the operating system programs from mass storage (disk) into a computer's main internal memory at startup. Data tables: tables of data that do not change, like trigonometric tables and code-conversion tables. Data converter: data expressed in one code is converted to an output expressed in another code, such as BCD to 7-segment LED readouts. Function generator: produces waveforms such as sine, sawtooth, triangle, and square waves; a ROM look-up table together with a DAC (digital-to-analog converter) is used to generate a sine-wave output signal.",
+      "keywords": [
+        "ROM applications",
+        "bootstrap memory",
+        "data tables",
+        "code converter",
+        "function generator",
+        "DAC"
+      ],
+      "pages": [
+        46,
+        47,
+        48
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 48 shows a block diagram of a ROM look-up table feeding a DAC to produce a sine-wave analog output signal (a stepped waveform approximating a sine wave). Could not render the PDF page as an image in this environment (poppler/pdftoppm unavailable); description is inferred from the slide caption and body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-10-semiconductor-ram",
+      "section": "12-10",
+      "topic": "Semiconductor RAM Overview",
+      "type": "concept",
+      "summary": "RAM allows any memory address to be accessed equally quickly for both reading and writing, is used for temporary program/data storage requiring fast cycle times, and is volatile (though some CMOS RAM can be battery-backed).",
+      "text": "RAM (random-access memory) means any memory address location is as easily accessible as any other. It is used in computers for temporary storage of programs and data, requiring fast read/write cycle times to avoid slowing computer operation; RAM can be written into and read from rapidly with equal ease. RAM is volatile and will lose all stored information if power is interrupted or turned off, though some CMOS RAMs can be powered from batteries when main power is interrupted, preserving their contents.",
+      "keywords": [
+        "RAM",
+        "random-access memory",
+        "volatile memory",
+        "battery-backed CMOS RAM"
+      ],
+      "pages": [
+        49
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-11-ram-architecture-chip-select-io",
+      "section": "12-11",
+      "topic": "RAM Architecture: Chip Select and Common I/O Pins",
+      "type": "concept",
+      "summary": "RAM is organized as a set of addressable registers; a CHIP SELECT (CS) input enables or disables the entire chip (all outputs Hi-Z when disabled), and many chips combine data input and output onto common I/O pins to save package pins.",
+      "text": "It is helpful to think of RAM as consisting of a number of registers, each storing a single data word and each having a unique address. Most memory chips have one or more CHIP SELECT (CS) inputs used to enable the entire chip or disable it completely; in disabled mode, all data inputs/outputs are placed in the high-impedance (Hi-Z) state, and neither a read nor a write can take place. In order to conserve pins on an IC package, manufacturers often combine the data input and output functions using common input/output (I/O) pins.",
+      "keywords": [
+        "RAM architecture",
+        "chip select",
+        "CS",
+        "common I/O pins",
+        "Hi-Z"
+      ],
+      "pages": [
+        50
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-11-ram-read-write-control",
+      "section": "12-11",
+      "topic": "RAM Read and Write Control Signal Requirements",
+      "type": "method",
+      "summary": "To read from a selected RAM register, WE (write enable) must be HIGH (1) and CS must be active (with input buffers disabled); to write, WE must be LOW (0) and CS must also be LOW, with tristate output buffers placed in Hi-Z.",
+      "text": "To READ the contents of a selected register in RAM: the write enable input (WE or R/W) must be a 1, and the CHIP SELECT input must also be activated; input buffers are disabled during a data read (so writes cannot occur). To WRITE a word (e.g., a four-bit word) to a selected register: the write enable input (WE or R/W) must be a 0, and the CHIP SELECT input must also be a 0; the tristate output buffers are placed in the Hi-Z state during a data write so that the output does not conflict with the input data.",
+      "keywords": [
+        "RAM read cycle",
+        "RAM write cycle",
+        "write enable",
+        "chip select",
+        "tristate buffers"
+      ],
+      "pages": [
+        51,
+        52
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 51-52 show internal block diagrams of a RAM register array with control logic illustrating which gates/buffers are active during a READ (input buffers disabled, output buffers active) versus a WRITE (output buffers Hi-Z, input buffers active), gated by WE and CS. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-12-static-ram-sram",
+      "section": "12-12",
+      "topic": "Static RAM (SRAM): Cell Structure and Timing",
+      "type": "concept",
+      "summary": "SRAM memory cells are essentially flip-flops that hold their state indefinitely as long as power is applied; SRAM is available in bipolar, MOS, and BiCMOS variants (CMOS dominates today), and has well-defined READ and WRITE timing cycles.",
+      "text": "Static-RAM memory cells are essentially flip-flops that stay in a given state (storing a bit) indefinitely, provided power to the circuit is not interrupted. SRAM is available in bipolar, MOS, and BiCMOS variations, with the majority of applications today using CMOS RAMs. A complete READ cycle and a complete WRITE cycle for a typical SRAM chip each follow a defined timing diagram governing address setup, chip-select/write-enable timing, and data valid windows. An example real device is the MCM6264C, a CMOS 8K x 8 RAM with read- and write-cycle times of 12 ns and standby power consumption of only 100 mW. Industry standards created by the Joint Electronic Device Engineering Council (JEDEC) have led to memory devices that are interchangeable across manufacturers.",
+      "keywords": [
+        "SRAM",
+        "static RAM",
+        "flip-flop memory cell",
+        "CMOS RAM",
+        "MCM6264C",
+        "JEDEC"
+      ],
+      "pages": [
+        53,
+        54,
+        55,
+        56,
+        57
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 54-55 show timing diagrams for a complete SRAM READ cycle and a complete SRAM WRITE cycle, showing the relative timing of address, chip-select, write-enable/output-enable, and data signals. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide captions only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-13-dynamic-ram-dram-overview",
+      "section": "12-13",
+      "topic": "Dynamic RAM (DRAM): Capacitor Storage and Refresh Need",
+      "type": "concept",
+      "summary": "DRAM stores data as charge on capacitors that gradually leaks away, requiring periodic refresh (recharging) typically every 2, 4, or 8 ms; DRAM's much larger capacity and lower power make it the memory of choice where size, cost, and power matter most.",
+      "text": "Dynamic RAM stores data as charges on capacitors, which gradually disappear due to capacitor discharge (leakage). It is therefore necessary to refresh the data periodically by recharging the capacitors, typically every 2, 4, or 8 ms. DRAM's much larger capacities and much lower power consumption (compared to SRAM) make DRAM the memory of choice where the most important design considerations are keeping down size, cost, and power.",
+      "keywords": [
+        "DRAM",
+        "dynamic RAM",
+        "capacitor storage",
+        "refresh cycle",
+        "leakage"
+      ],
+      "pages": [
+        58
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-14-dram-structure-operation",
+      "section": "12-14",
+      "topic": "DRAM Structure and Operation: Cell Array and Basic Read/Write",
+      "type": "concept",
+      "summary": "DRAM's internal architecture is an array of single-bit cells (e.g., a 16K x 1 DRAM has 16,384 cells); a simplified read/write model uses switches SW1 and SW2, where writing closes both switches and reading closes all switches except SW1.",
+      "text": "The dynamic RAM's internal architecture can be visualized as an array of single-bit cells; for example, in a 16K x 1 dynamic RAM, the cell arrangement totals 16,384 cells. A simplified architecture of a typical DRAM shows the essential ideas involved in writing to and reading from a DRAM cell: during a WRITE operation, switches SW1 and SW2 are closed (connecting the data input to the storage capacitor); during a READ operation, all switches are closed except SW1 (isolating the input while sensing the stored charge).",
+      "keywords": [
+        "DRAM architecture",
+        "16K x 1 DRAM",
+        "DRAM cell array",
+        "DRAM read/write switches"
+      ],
+      "pages": [
+        59,
+        60,
+        61
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 59-61 show: (59) the cell arrangement of a 16K x 1 DRAM as a grid of single-bit cells; (60) a simplified block architecture of a typical DRAM with row/column decoders, sense amps, and the cell array; (61) a simplified single-cell read/write circuit with switches SW1 and SW2 and a storage capacitor. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide captions and body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-14-dram-address-multiplexing",
+      "section": "12-14",
+      "topic": "DRAM Address Multiplexing: RAS and CAS",
+      "type": "method",
+      "summary": "High-capacity DRAM reduces pin count by multiplexing each address pin to carry two different address bits: the row address (latched by RAS) followed by the column address (latched by CAS).",
+      "text": "In order to reduce the number of pins, high-capacity DRAM utilizes address multiplexing, where each address input pin can accommodate two different address bits. In multiplexed addressing, the full address is applied in two parts — the row address, then the column address. The address lines are connected directly to both the row and column address registers: the row register stores the upper part of the address, and the column register stores the lower part. The row address strobe (RAS) stores the contents of the address inputs into the row address register. The column address strobe (CAS) stores the contents of the address inputs into the column address register. When the CPU wants to access a particular memory location, it generates the complete address and places it on the address lines that make up the address bus; this address is then split into row and column parts for the DRAM via RAS and CAS.",
+      "keywords": [
+        "address multiplexing",
+        "RAS",
+        "row address strobe",
+        "CAS",
+        "column address strobe",
+        "DRAM addressing"
+      ],
+      "pages": [
+        62,
+        63,
+        64
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-15-dram-read-write-cycles",
+      "section": "12-15",
+      "topic": "DRAM Read/Write Cycle Signal Timing",
+      "type": "concept",
+      "summary": "Describes the signal activity (RAS, CAS, address, data, WE) that occurs during a complete DRAM read operation and during a complete DRAM write operation.",
+      "text": "A DRAM READ operation involves a specific sequence of signal activity on the RAS, CAS, address, and data lines: the row address is placed on the address bus and latched by RAS, then the column address is placed and latched by CAS, after which valid data appears at the output. A DRAM WRITE operation follows a similar sequence for RAS/CAS/address timing, but with WE asserted and the data to be written placed on the data lines during the appropriate window.",
+      "keywords": [
+        "DRAM read cycle",
+        "DRAM write cycle",
+        "RAS",
+        "CAS",
+        "timing diagram"
+      ],
+      "pages": [
+        65,
+        66
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 65-66 show timing diagrams for a DRAM READ operation and a DRAM WRITE operation, depicting the relative timing of RAS, CAS, address (row then column), WE, and data lines. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide captions only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-16-dram-refreshing",
+      "section": "12-16",
+      "topic": "DRAM Refreshing: Burst vs Distributed, RAS-Only Refresh",
+      "type": "method",
+      "summary": "DRAM refresh restores every row's charge within the required time limit; burst refresh suspends normal operation to refresh all rows in succession, while distributed refresh interleaves refresh with normal operation. RAS-only refresh (strobing a row address with RAS while CAS and WE stay HIGH) is the most universal refresh method, often handled by a dedicated DRAM controller.",
+      "text": "When a read operation is performed on a cell, all of the cells in that row are refreshed as a side effect. Refresh control logic is used to make sure each row is refreshed within the required time limit. In burst refresh mode, normal memory operation is suspended, and each row is refreshed in succession until all rows have been refreshed. In distributed refresh, row refreshing is interspersed with the normal operations of the memory, avoiding a long pause. RAS-only refresh is performed by strobing in a row address with RAS while CAS and WE remain HIGH, and is the most universal method for refreshing a DRAM. A dynamic RAM (DRAM) controller is often used to perform address multiplexing and to generate the refresh count sequence automatically.",
+      "keywords": [
+        "DRAM refresh",
+        "burst refresh",
+        "distributed refresh",
+        "RAS-only refresh",
+        "DRAM controller"
+      ],
+      "pages": [
+        67,
+        68
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-17-dram-memory-modules",
+      "section": "12-17",
+      "topic": "DRAM Technology: Memory Modules (SIMM, DIMM, SODIMM, RIMM)",
+      "type": "definition",
+      "summary": "Standard memory interface connectors let memory be installed as removable modules: SIMM (72 shared contacts), DIMM (168-240 independent pins per side), SODIMM (compact form for laptops), and RIMM (Rambus proprietary module for DRDRAM).",
+      "text": "Standard memory interface connectors are used so that memory modules — small printed circuit cards with contact points on both sides of the card edge — can be easily installed and replaced. Memory module types include: SIMM (single in-line memory module), a circuit card with 72 functionally equivalent contacts on both sides (the two sides are electrically tied together). DIMM (dual in-line memory module), which has from 168 to 240 functionally unique pins on each side (the two sides are electrically independent). SODIMM (small-outline DIMM), a compact version for space-constrained applications such as laptop computers. RIMM (Rambus In-line Memory Module), a proprietary package that holds Direct Rambus DRAM (DRDRAM).",
+      "keywords": [
+        "memory modules",
+        "SIMM",
+        "DIMM",
+        "SODIMM",
+        "RIMM",
+        "DRDRAM"
+      ],
+      "pages": [
+        69
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-17-dram-technology-fpm-edo-sdram-ddr",
+      "section": "12-17",
+      "topic": "DRAM Technology Evolution: FPM, EDO, SDRAM, DDR SDRAM",
+      "type": "concept",
+      "summary": "Traces the evolution of DRAM speed techniques: FPM DRAM speeds up same-page accesses; EDO DRAM lets the next address be decoded while current data is still on the output; SDRAM synchronizes bursts to the clock using multiple internal banks; DDR/DDR2/DDR3 SDRAM transfer data on both clock edges for progressively higher throughput, though latency remains the ultimate speed limit.",
+      "text": "FPM DRAM (fast page mode) allows quicker access to random memory locations within the current 'page' — a page is a range of memory addresses sharing identical upper address bit values, so only the lower address lines must change to move within the page. EDO DRAM (extended data output) offers a minor improvement over FPM: for accesses on a given page, the data value at the current memory location is sensed and latched onto the output pins; while this data remains present on the outputs, a new address on the current page can be decoded and the data path circuitry reset for the next access. This allows the memory controller to output the next address while the current word is still being read. SDRAM (synchronous DRAM) is designed to transfer data in rapid-fire bursts across several sequential memory locations; the first location accessed is the slowest due to the overhead (latency) of latching the row and column address, after which subsequent data values are clocked out by the bus system. SDRAMs are organized in two or more internal banks, allowing data to be read out at a very fast rate by alternately accessing each bank. Self-refresh mode allows the memory device to perform all necessary refresh functions on its own. DDR SDRAM (Double Data Rate SDRAM) achieves higher data rates by transferring data on both the rising and falling edges of the system clock, giving burst transfer rates twice as fast as standard SDRAM. DDR2 uses buffering techniques to produce I/O data rates four times faster than SDRAM, and DDR3 transfers data eight times faster. Simply speeding up the system clock offers only marginal performance improvement, since SDRAM latency is the ultimate limiting factor on maximum speed.",
+      "keywords": [
+        "FPM DRAM",
+        "fast page mode",
+        "EDO DRAM",
+        "SDRAM",
+        "DDR SDRAM",
+        "DDR2",
+        "DDR3",
+        "memory latency",
+        "memory banks"
+      ],
+      "pages": [
+        70,
+        71,
+        72,
+        73
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-18-other-memory-magnetic-optical",
+      "section": "12-18",
+      "topic": "Other Memory Techniques: Magnetic Tape/Disk, Magnetic Core, MRAM, and Optical Discs",
+      "type": "concept",
+      "summary": "Surveys non-semiconductor storage technologies: magnetic tape (early long-term storage), rigid magnetic disks with a moving read/write head, magnetic-core memory (early nonvolatile random-access technology, revived as MRAM), and optical discs (CD, DVD, Blu-ray) which share the same underlying technology but differ in format and density.",
+      "text": "The first method of magnetic storage of digital information involved reels of magnetic tape for long-term storage and retrieval of programs and data. The next improvement involved coating rigid (hard) disks with magnetic media and rotating the disks while moving a magnetic read/write head radially across the disk surface. High-speed, random-access, nonvolatile magnetic storage was also tried in the early days of computers using 'magnetic core' technology — rows and columns of tiny electromagnets (ferrite cores) that could be polarized in either direction to represent a bit. This basic technology has been brought back recently in the form of magnetoresistive random access memory (MRAM). The optical disc is a very significant digital storage memory technology: digital audio compact discs (CDs) became available in the early 1980s, followed by digital video discs (DVD) and Blu-Ray Discs (BD). All optical storage formats use essentially the same underlying technology, differing largely in format and density.",
+      "keywords": [
+        "magnetic tape",
+        "magnetic disk",
+        "magnetic core memory",
+        "MRAM",
+        "optical disc",
+        "CD",
+        "DVD",
+        "Blu-ray"
+      ],
+      "pages": [
+        74,
+        75,
+        76,
+        77
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-19-expanding-word-size-capacity",
+      "section": "12-19",
+      "topic": "Expanding Word Size and Capacity by Combining Memory Chips",
+      "type": "method",
+      "summary": "When a single memory chip cannot meet a required capacity or word size, multiple chips are combined into a memory module; word size is expanded by placing chips in parallel (each contributing bits), while capacity is expanded via address decoding across chips, including incomplete decoding for mixed-device systems.",
+      "text": "In many applications, the required RAM or ROM memory capacity or word size cannot be satisfied by a single memory chip, so several chips must be combined to provide the needed capacity and/or word size. For example, combining two smaller RAM chips can act like a single wider memory (e.g., forming a 16 x 8 memory module from two 16 x 4 chips). To expand word size, chips are placed in parallel with each chip contributing some of the output bits — for instance, eight 2125A (1K x 1) chips can be arranged together as a 1K x 8 memory. Incomplete address decoding is useful when different memory devices of different sizes are used together in the same system, allowing simpler decode logic at the cost of duplicate (aliased) address ranges. DRAM ICs with narrow word sizes (1-4 bits) must similarly be combined in parallel to form memory modules with larger word sizes.",
+      "keywords": [
+        "memory expansion",
+        "word size expansion",
+        "capacity expansion",
+        "address decoding",
+        "incomplete decoding",
+        "memory module"
+      ],
+      "pages": [
+        78,
+        79,
+        80,
+        81
+      ],
+      "needs_figure": true,
+      "figure_note": "Slides 78-81 show block diagrams: (78) two RAM chips combined into a 16 x 8 memory module; (79) eight 2125A (1K x 1) chips arranged in parallel to form a 1K x 8 memory, each chip supplying one output bit; (80) an incomplete address-decoding scheme where multiple differently-sized memory devices share an address space with some aliasing; (81) multiple narrow-word DRAM ICs (1-4 bits each) combined in parallel to form a wider memory module. Could not render the PDF pages as images in this environment (poppler/pdftoppm unavailable); description is inferred from the slide captions only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-20-special-memory-functions",
+      "section": "12-20",
+      "topic": "Special Memory Functions: Power-Down Storage and Cache Levels",
+      "type": "concept",
+      "summary": "Special memory applications include power-down storage (retaining critical parameters/state across power cycles, e.g. in industrial process control) and multi-level cache memory (L1 on the CPU die, L2 as external SRAM).",
+      "text": "Special functions performed by memory devices in various applications include: Power-down storage — retaining critical operating parameters that are applied when a system is powered back up, such as in industrial process control systems that must retain memory of where they are in a process under all conditions (including power loss). Cache memory — high-speed memory that communicates directly with the CPU; Level 1 (L1) cache is located on the CPU chip itself, while Level 2 (L2) cache is typically SRAM external to the CPU.",
+      "keywords": [
+        "power-down storage",
+        "nonvolatile memory retention",
+        "cache memory",
+        "L1 cache",
+        "L2 cache"
+      ],
+      "pages": [
+        82
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-20-fifo-circular-buffer",
+      "section": "12-20",
+      "topic": "Special Memory Functions: FIFO and Circular Buffers",
+      "type": "concept",
+      "summary": "FIFO (first-in-first-out) memory reads data out in the same order it was written and acts as a rate-matching buffer between systems with different data rates; a circular buffer instead stores only the last n values, overwriting the oldest entry and wrapping the address counter around at the highest address.",
+      "text": "First-in-first-out (FIFO) memory: data written into RAM storage are read out in the same order that they were written in. FIFOs are useful as a buffer between systems that operate at different data rates. Data rate buffers (FIFOs) are often referred to as linear buffers: as soon as all the locations in the buffer are full, no more entries are made until the buffer is emptied. A similar memory system is the circular buffer, used to store the last n values entered, where n is the number of buffer memory locations. Each time a new value is written to a circular buffer, it overwrites (replaces) the oldest value. When the highest address is reached, the address counter 'wraps around' so the next location written is the lowest address again.",
+      "keywords": [
+        "FIFO",
+        "first-in-first-out",
+        "linear buffer",
+        "circular buffer",
+        "rate buffering",
+        "address wraparound"
+      ],
+      "pages": [
+        83,
+        84
+      ],
+      "needs_figure": true,
+      "figure_note": "Slide 83 shows a FIFO memory diagram illustrating data entering at one end and being read out from the other in the same order (write pointer and read pointer). Could not render the PDF page as an image in this environment (poppler/pdftoppm unavailable); description is inferred from the slide caption and body text only.",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-21-troubleshooting-ram",
+      "section": "12-21",
+      "topic": "Troubleshooting RAM Systems",
+      "type": "method",
+      "summary": "RAM faults can cause unreliable operation or crashes; decoding logic can be tested by signal injection or forced addressing, while the full RAM array is tested by writing/reading alternating 1/0 patterns to every location, though pattern testing cannot catch every possible fault.",
+      "text": "Faults in RAM can cause unreliable system performance or 'crashes.' In order to determine if RAM is working properly, one must know how it normally operates. The decoding logic can be tested using signal injection, or by forcing a certain address onto the bus to obtain a known decoder output. To test the complete RAM system, patterns of 1s and 0s are written to and read from each memory location; by alternating the patterns, each bit can be checked for correct read/write of both 1s and 0s. However, pattern checking does not catch all errors — some errors occur only with certain specific patterns. A memory check is commonly run automatically when a system is powered up (POST).",
+      "keywords": [
+        "RAM troubleshooting",
+        "signal injection",
+        "address decoding test",
+        "memory pattern test",
+        "power-on self test"
+      ],
+      "pages": [
+        85,
+        86
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    },
+    {
+      "id": "ch12-12-22-testing-rom",
+      "section": "12-22",
+      "topic": "Testing ROM",
+      "type": "method",
+      "summary": "ROM contents can be tested by printing out and comparing memory contents against a reference ROM, or by computing and comparing checksums.",
+      "text": "Test options for verifying ROM contents include: printing out a listing of the memory contents and comparing it to a reference ROM known to be correctly programmed; and using checksums, where a computed checksum of the ROM's contents is compared against the expected checksum value to detect corruption or programming errors.",
+      "keywords": [
+        "ROM testing",
+        "checksum",
+        "reference ROM comparison"
+      ],
+      "pages": [
+        87
+      ],
+      "needs_figure": false,
+      "figure_note": "",
+      "related_labs": []
+    }
+  ]
+}

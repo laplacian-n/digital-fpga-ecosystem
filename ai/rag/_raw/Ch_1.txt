@@ -1,0 +1,363 @@
+===== PAGE 1 =====
+Chapter 1 – Introductory Concepts-skipped Dr. Xu
+
+===== PAGE 2 =====
+• Selected areas covered in this chapter:
+– Analog & digital representations.
+• How information is represented using two states.
+– Advantages/drawbacks of digital/analog techniques.
+• Analog-to-digital and digital-to-analog converters.
+– Basic characteristics of the binary number system.
+• Convert binary numbers to decimal equivalents.
+– Identify typical digital signals & a timing diagram.
+– Differences between parallel & serial transmission.
+– Major parts of a digital computer, their functions.
+• Properties of memory.
+– Distinguish among microcomputers, micro-processors,
+and micro-controllers.
+Chapter 1 Objectives
+
+===== PAGE 3 =====
+A telegraph system consisted of a battery, a code key (normally open,
+momentary contact switch), a telegraph wire, and an electromagnetic “clacker.”
+1-1 Introduction to Digital 1s and 0s
+• A large part of the worldwide telecommunications
+system falls in the category of “digital systems.”
+– It started as a simple digital system that used only
+two states to represent information.
+
+===== PAGE 4 =====
+1-1 Introduction to Digital 1s and 0s
+• The telegraph system used two distinct “symbols”
+to transmit any word or number.
+– Short & long electric pulses, the dots & dashes of
+Morse code—a  digital representation of information.
+• The electric signal is either on or off at all times.
+– This relates to modern digital systems that use
+electrical signals to represent 1s and 0s.
+
+===== PAGE 5 =====
+1-1 Introduction to Digital 1s and 0s
+• A timing diagram shows which state (1 or 0) the
+system is in at any point in time.
+– And shows the time when a change in state occurs.
+
+===== PAGE 6 =====
+1-1 Introduction to Digital 1s and 0s
+• By displaying one or more digital signals using test
+instruments such as an oscilloscope, we can
+compare actual signals to expected operation.
+
+===== PAGE 7 =====
+1-2 Numerical Representations
+• Physical systems use quantities which must be
+manipulated arithmetically.
+• Quantities may be represented numerically in
+either analog or digital form.
+
+===== PAGE 8 =====
+1-2 Numerical Representations
+• Analog Representation—a continuously variable,
+proportional indicator.
+– Sound through a microphone causes voltage
+changes.
+– Automobile speedometer changes with speed.
+– Mercury thermometer varies over a range of values
+with temperature.
+
+===== PAGE 9 =====
+1-2 Numerical Representations
+• In 1875, Alexander Graham Bell figured out how
+to change his voice into a continuously variable
+electrical signal, send it through a wire, and
+change it back to sound energy at the other end.
+Today, the device that converts
+sound energy to an analog voltage
+signal is known as a microphone.
+
+===== PAGE 10 =====
+1-2 Numerical Representations
+• Digital Representation—varies in discrete
+(separate) steps.
+– Passing time is shown as a change in the display
+on a digital clock at one minute intervals.
+– A change in temperature is shown on a digital
+display only when the temperature changes
+at least one degree.
+
+===== PAGE 11 =====
+1-3 Digital and Analog Systems
+• Digital system:
+– A combination of devices that manipulate values
+represented in digital form.
+• Analog system:
+– A combination of devices that manipulate values
+represented in analog form.
+
+===== PAGE 12 =====
+1-3 Digital and Analog Systems
+• Advantages of digital:
+– Ease of design
+– Well suited for storing information.
+– Accuracy and precision are easier to maintain.
+– Programmable operation.
+– Less affected by noise.
+– Ease of fabrication on IC chips.
+
+===== PAGE 13 =====
+1-3 Digital and Analog Systems
+• There are limits to digital techniques:
+– The analog nature of the world requires a time
+consuming conversion process:
+1. Convert the physical variable to an electrical signal
+(analog).
+2. Convert the analog signal to digital form.
+3. Process (operate on) the digital information.
+4. Convert the digital output back to real-world analog form.
+
+===== PAGE 14 =====
+1-3 Digital and Analog Systems
+• A digital system is a combination of devices
+designed to manipulate logical information or
+physical quantities represented in digital form.
+– Quantities can take on only discrete values.
+• An analog system manipulates physical quantities
+represented in analog form.
+– Quantities can vary over a continuous range
+of values.
+
+===== PAGE 15 =====
+1-3 Digital and Analog Systems
+• Party-line callers encoded a person’s ID by the
+way they cranked their telephone.
+The signaling (rings) used digital representation,
+but voice communication was purely analog.
+
+===== PAGE 16 =====
+1-3 Digital and Analog Systems
+• The rotary-dial phone used a series of pulses,
+representing the ten decimal digits.
+• In “touch-tone” phones, digital switching
+information is sent using analog tone signals.
+
+===== PAGE 17 =====
+1-3 Digital and Analog Systems
+The cell phone has digital
+& analog components, and
+uses both types of signals.
+
+===== PAGE 18 =====
+1-3 Digital and Analog Systems
+Temperature-regulation system
+using an analog-to-digital converter.
+
+===== PAGE 19 =====
+1-3 Digital and Analog Systems
+• Chief reasons for the shift to digital technology:
+– Digital systems are generally easier to design.
+– Information storage is easy.
+– Accuracy and precision are easier to maintain
+throughout the system.
+– Operations can be programmed.
+– Digital circuits are less affected by noise.
+– More digital circuitry can be fabricated on IC chips.
+There have been remarkable recent
+advances in digital technology.
+Advances will continue as digital
+technology expands and improves.
+
+===== PAGE 20 =====
+1-4 Digital Number Systems
+• Understanding digital systems requires an
+understanding of the decimal, binary, octal,
+and hexadecimal numbering systems.
+– Decimal – 10 symbols (base 10)
+– Hexadecimal – 16 symbols (base 16)
+– Octal – 8 symbols (base 8)
+– Binary – 2 symbols (base 2)
+
+===== PAGE 21 =====
+Most significant digit (MSD) & least significant digit (LSD).
+Positional value may be stated as a digit multiplied by a power of 10.
+1-4 Digital Number Systems
+• The Decimal (base 10) System
+– 10 symbols: 0, 1, 2, 3, 4, 5, 6 , 7, 8, 9.
+• Each number is a digit (from Latin for finger).
+
+===== PAGE 22 =====
+Decimal
+Counting
+1-4 Digital Number Systems
+
+===== PAGE 23 =====
+1-4 Digital Number Systems
+• The Binary (base 2) System
+– 2 symbols: 0,1
+• Lends itself to electronic circuit design since only
+two different voltage levels are required.
+Positional value may
+be stated as a digit
+multiplied by a
+power of 2.
+
+===== PAGE 24 =====
+1-4 Digital Number Systems
+Binary
+Counting
+
+===== PAGE 25 =====
+1-5 Representing Binary Quantities
+• Analog signals can be converted to digital by
+taking measurements or “samples” of the
+continuously varying signal at regular intervals.
+– Appropriate time between samples depends on
+the maximum rate of change of the analog signal.
+
+===== PAGE 26 =====
+1-5 Representing Binary Quantities
+• Air temperature is an analog quantity.
+– Recorded samples are discrete integer data.
+
+===== PAGE 27 =====
+1-5 Representing Binary Quantities
+Typical representation of the
+two states of a digital signal.
+A higher range of voltages
+represent a valid 1 and
+a lower range of voltages
+represent a valid 0.
+HIGH and LOW are often
+used to describe the states
+of a digital system—instead
+of “1” and “0”
+
+===== PAGE 28 =====
+1-5 Representing Binary Quantities
+• Two state devices:
+– Light bulb (off or on)
+– Diode (conducting or not conducting)
+– Relay (energized or not energized)
+– Transistor (cutoff or saturation)
+– Photocell (illuminated or dark)
+
+===== PAGE 29 =====
+1-5 Representing Binary Quantities
+• The oscilloscope and logic analyzer are used to
+produce timing diagrams.
+– Timing diagrams show voltage versus time.
+• Used to show how digital signals change with time,
+or  to compare two or more digital signals.
+Horizontal scale
+represents regular
+intervals, starting
+at time zero.
+
+===== PAGE 30 =====
+1-6 Digital Circuits/Logic Circuits
+• Digital circuits - produce & respond to predefined
+voltage ranges.
+– The term logic circuits is used interchangeably.
+
+===== PAGE 31 =====
+1-6 Digital Circuits/Logic Circuits
+A digital circuit responds to an input’s binary
+level of 0 or 1—not to its actual voltage.
+
+===== PAGE 32 =====
+1-7 Parallel and Serial Transmission
+• Parallel transmission – all bits in a binary number
+are transmitted simultaneously.
+– A separate line is required for each bit.
+
+===== PAGE 33 =====
+1-7 Parallel and Serial Transmission
+• Serial transmission – each bit in a binary number
+is transmitted, per some time interval.
+
+===== PAGE 34 =====
+1-7 Parallel and Serial Transmission
+Parallel transmission is faster but
+requires more paths.
+Serial is slower but requires a single path.
+
+===== PAGE 35 =====
+1-8 Memory
+• A circuit which retains a response to a momentary
+input is displaying memory.
+– Memory is important because it provides a way to
+store binary numbers temporarily or permanently.
+Memory elements: magnetic, optical, electronic latching circuits.
+
+===== PAGE 36 =====
+1-9 Digital Computers
+• A computer is a system of hardware that performs
+arithmetic operations, manipulates data, and
+makes decisions.
+– Performs operations based on instructions in the
+form of a program at high speed, and with a high
+degree of accuracy.
+
+===== PAGE 37 =====
+1-9 Digital Computers
+• Major parts of a computer:
+– Input unit—Processes instructions and data
+into the memory.
+– Memory unit—Stores data and instructions.
+– Control unit—Interprets instructions and sends
+appropriate signals to other units as instructed.
+– Arithmetic/logic unit—arithmetic calculations
+and logical decisions are performed.
+– Output unit—presents information from the
+memory to the operator or process.
+
+===== PAGE 38 =====
+1-9 Digital Computers
+The control and arithmetic/logic units are often treated
+as one and called the central processing unit (CPU).
+
+===== PAGE 39 =====
+1-9 Digital Computers
+• Types of computers:
+– Microcomputer.
+• Most common (desktop PCs).
+• Has become very powerful.
+– Minicomputer (workstation).
+– Mainframe.
+– Microcontroller.
+• Designed for a specific application.
+• Dedicated or embedded controllers.
+• Used in appliances, manufacturing processes, auto
+ignition systems, ABS systems, and many other
+applications.
+
+===== PAGE 40 =====
+1-9 Digital Computers
+• The basic functions of the digital subsystems of a
+cell phone—and all other built -in applications—are
+controlled by a complete microcomputer system
+embedded in each phone.
+
+===== PAGE 41 =====
+1-9 Digital Computers
+When you take a picture, the phone convert the brightness
+of individual spots in the CCD to binary numbers, and
+stores it in memory (row x, column x).
+Displaying the image on an LCD screen is the
+reverse process of storing an image in memory.
+
+===== PAGE 42 =====
+1-9 Digital Computers
+• When you speak into your phone, the voice signal
+is converted to a string of digital (binary) numbers.
+– Signals get separated and routed to the proper place
+by digital multiplexers and demultiplexers.
+
+===== PAGE 43 =====
+Digital Progress Today and Tomorrow
+• There are many needs in the world that digital
+technology can meet.
+– You will be able to become one of the pioneers on
+these new frontiers of technology.
+
+===== PAGE 44 =====
+END

@@ -1,0 +1,24 @@
+{
+  "board": "edge",
+  "ise": "C:/Users/dinuc/OneDrive/เอกสาร/digital/FPGA_Builder_Package/tools/ise_min/settings64.bat",
+  "vivado": "C:/vivado_min/bin/vivado.bat",
+  "ofl": "C:\\Users\\dinuc\\OneDrive\\เอกสาร\\digital\\FPGA_Builder_Package\\tools\\openFPGALoader\\openFPGALoader.exe",
+  "cable": "ft2232",
+  "vhdl": [
+    "C:/Users/dinuc/Downloads/20260921045904lab4all.vhd"
+  ],
+  "part": "xc7s15",
+  "speed": "-1",
+  "pkg": "ftgb196",
+  "top": "sch_4",
+  "period": "20",
+  "clk": "clk",
+  "pins": [
+    [
+      "",
+      "",
+      "LVCMOS33",
+      ""
+    ]
+  ]
+}

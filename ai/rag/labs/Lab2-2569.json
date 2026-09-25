@@ -1,0 +1,250 @@
+{
+  "source": "Lab2-2569.pdf",
+  "group": "labs",
+  "lab": "2",
+  "title": "ออกแบบวงจร Combinational Logic (สัญญาณไฟข้ามถนน)",
+  "objectives": [
+    "เข้าใจขั้นตอนการออกแบบวงจร combinational logic",
+    "เข้าใจขั้นตอนการแก้ปัญหา (debug) วงจร"
+  ],
+  "items": [
+    {
+      "id": "lab2-1",
+      "question": "ออกแบบวงจรสร้างสัญญาณไฟเตือนข้ามถนน. อินพุตจากเซนเซอร์: P=คนเดินเท้า, C=รถยนต์, R=ไฟแดง, E=รถฉุกเฉิน, S=คนสูงอายุ (1=มี/ติด, 0=ไม่มี/ไม่ติด). ไฟข้ามถนน (Walk) ติดเมื่อครบทุกเงื่อนไข: มีคนยืน (P) และ (ไม่มีรถ หรือ ไฟแดงติด = C' + R) และ ไม่มีรถฉุกเฉิน (E'). ไฟเตือนระมัดระวัง (Caution) ติดเมื่อครบทุกเงื่อนไข: (มีคนสูงอายุ หรือ รถฉุกเฉิน = S + E) และ (ไฟแดงติด หรือ มีคนเดินเท้าและรถพร้อมกัน = R + P·C).",
+      "params": "อินพุต P,C,R,E,S ผ่านสวิตช์โยกบน Logic Trainer, เอาต์พุต Walk/Caution เข้า Logic Monitor 2 ดวง",
+      "subtasks": [
+        "เขียนสมการบูลีนของ Walk และ Caution",
+        "วาดวงจรระบุเบอร์ IC และหมายเลขขา",
+        "ต่อวงจร + debug bugs ที่ผู้คุมวาง"
+      ],
+      "topic": "combinational-design",
+      "solution": {
+        "steps": "แปลงเงื่อนไขเป็นสมการโดยตรง:\nWalk = P · (C' + R) · E'  = P·R·E' + P·C'·E'  (กระจาย)\nCaution = (S + E) · (R + P·C) = E·R + R·S + C·E·P + C·P·S  (กระจาย)\nทั้งสองเป็น 2-level SOP ต่อด้วยเกต NOT/AND/OR ได้ตรง ๆ",
+        "truth_table": "ตรวจครบ 32 แถว (5 อินพุต) ด้วยสคริปต์; Walk เป็น 1 ที่ minterms {16,17,20,21,28,29}, Caution ที่ {5,6,7,13,14,15,21,22,23,25,26,27,29,30,31}",
+        "kmap": null,
+        "final_expression": "Walk = P*(C' + R)*E'  ;  Caution = (S + E)*(R + P*C)",
+        "intent_json": {
+          "walk": {
+            "module": "lab2_walk",
+            "components": [
+              {
+                "id": "P",
+                "type": "IN",
+                "name": "P"
+              },
+              {
+                "id": "C",
+                "type": "IN",
+                "name": "C"
+              },
+              {
+                "id": "R",
+                "type": "IN",
+                "name": "R"
+              },
+              {
+                "id": "E",
+                "type": "IN",
+                "name": "E"
+              },
+              {
+                "id": "nc",
+                "type": "NOT"
+              },
+              {
+                "id": "ne",
+                "type": "NOT"
+              },
+              {
+                "id": "t1",
+                "type": "AND"
+              },
+              {
+                "id": "t2",
+                "type": "AND"
+              },
+              {
+                "id": "w",
+                "type": "OR"
+              },
+              {
+                "id": "walk",
+                "type": "OUT",
+                "name": "walk"
+              }
+            ],
+            "nets": [
+              {
+                "from": "C",
+                "to": "nc"
+              },
+              {
+                "from": "E",
+                "to": "ne"
+              },
+              {
+                "from": "P",
+                "to": "t1"
+              },
+              {
+                "from": "R",
+                "to": "t1"
+              },
+              {
+                "from": "ne",
+                "to": "t1"
+              },
+              {
+                "from": "P",
+                "to": "t2"
+              },
+              {
+                "from": "nc",
+                "to": "t2"
+              },
+              {
+                "from": "ne",
+                "to": "t2"
+              },
+              {
+                "from": "t1",
+                "to": "w"
+              },
+              {
+                "from": "t2",
+                "to": "w"
+              },
+              {
+                "from": "w",
+                "to": "walk"
+              }
+            ]
+          },
+          "caution": {
+            "module": "lab2_caution",
+            "components": [
+              {
+                "id": "P",
+                "type": "IN",
+                "name": "P"
+              },
+              {
+                "id": "C",
+                "type": "IN",
+                "name": "C"
+              },
+              {
+                "id": "R",
+                "type": "IN",
+                "name": "R"
+              },
+              {
+                "id": "E",
+                "type": "IN",
+                "name": "E"
+              },
+              {
+                "id": "S",
+                "type": "IN",
+                "name": "S"
+              },
+              {
+                "id": "t1",
+                "type": "AND"
+              },
+              {
+                "id": "t2",
+                "type": "AND"
+              },
+              {
+                "id": "t3",
+                "type": "AND"
+              },
+              {
+                "id": "t4",
+                "type": "AND"
+              },
+              {
+                "id": "o",
+                "type": "OR"
+              },
+              {
+                "id": "caution",
+                "type": "OUT",
+                "name": "caution"
+              }
+            ],
+            "nets": [
+              {
+                "from": "E",
+                "to": "t1"
+              },
+              {
+                "from": "R",
+                "to": "t1"
+              },
+              {
+                "from": "R",
+                "to": "t2"
+              },
+              {
+                "from": "S",
+                "to": "t2"
+              },
+              {
+                "from": "C",
+                "to": "t3"
+              },
+              {
+                "from": "E",
+                "to": "t3"
+              },
+              {
+                "from": "P",
+                "to": "t3"
+              },
+              {
+                "from": "C",
+                "to": "t4"
+              },
+              {
+                "from": "P",
+                "to": "t4"
+              },
+              {
+                "from": "S",
+                "to": "t4"
+              },
+              {
+                "from": "t1",
+                "to": "o"
+              },
+              {
+                "from": "t2",
+                "to": "o"
+              },
+              {
+                "from": "t3",
+                "to": "o"
+              },
+              {
+                "from": "t4",
+                "to": "o"
+              },
+              {
+                "from": "o",
+                "to": "caution"
+              }
+            ]
+          }
+        },
+        "notes": "' = NOT ผูกกับตัวแปรก่อนหน้า; มีสองเอาต์พุตจึงแยก intent_json เป็น walk/caution"
+      },
+      "verify": "enumerate ครบ 32 แถว: SOP ที่ได้ตรงกับนิยามเงื่อนไขทุกแถว (True). intent_json ทั้งสองผ่าน validate_intent ok=True",
+      "related_content": [
+        "ch4-truth-table-design",
+        "ch3-boolean-algebra"
+      ]
+    }
+  ]
+}
