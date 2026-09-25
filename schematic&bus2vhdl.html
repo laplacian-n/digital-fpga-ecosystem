@@ -436,6 +436,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <button data-act="duplicate">Duplicate<span class="kbd">Ctrl+D</span></button>
           <button data-act="delete-sel">Delete<span class="kbd">Del</span></button>
           <hr>
+          <button data-act="array-place">วางซ้ำเป็นชุด…</button>
+          <button data-act="cmdk">ค้นหาคำสั่ง…<span class="kbd">Ctrl+K</span></button>
+          <hr>
           <button data-act="clear-sch">Clear Schematic</button>
         </div></div>
       <div class="mi"><button data-menu="tools">Tools</button>
@@ -462,6 +465,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <button data-act="toggle-marks">แสดง/ซ่อนปัญหาบนผัง</button>
           <button data-act="welcome-open">หน้าต้อนรับ / เทมเพลตแลป…</button>
           <button data-act="tour-start">ทัวร์ 1 นาที</button>
+          <button data-act="shortcuts">คีย์ลัด<span class="kbd">?</span></button>
         </div></div>
     </nav>
     <div class="grow"></div>
@@ -475,10 +479,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <button class="step" data-stage="upload" title="เตรียมไฟล์ลงบอร์ดจริง (VHDL + XDC สำหรับ Vivado)">ลงบอร์ด</button>
     </div>
     <div class="grow"></div>
-    <span style="font-size:11px;color:var(--muted)">Project:</span>
+    <button class="cmdk-btn" data-act="cmdk" title="ค้นหาทุกคำสั่ง (Ctrl+K) — พิมพ์ไทยหรืออังกฤษก็ได้">🔍 <span style="opacity:.75">Ctrl+K</span></button>
+    <span class="proj-lbl" style="font-size:11px;color:var(--muted)">Project:</span>
     <input class="proj-name" id="projectName" value="my_project" spellcheck="false">
     <button class="save-chip clean" id="saveChip" data-act="save-project" title="สถานะการบันทึก"><span class="dot"></span>…</button>
-    <button class="btn btn-ghost" data-act="history-open" title="ประวัติย้อนเวลา — กลับไปจุดที่เก็บไว้อัตโนมัติ">ประวัติ</button>
+    <button class="btn btn-ghost" data-act="history-open" title="ประวัติย้อนเวลา — กลับไปจุดที่เก็บไว้อัตโนมัติ">🕘<span class="lbl-wide"> ประวัติ</span></button>
     <button class="btn btn-ghost" data-act="sync-bridge" title="โหลดดีไซน์จาก MCP bridge (127.0.0.1:8766)">Sync</button>
     <button class="btn btn-ghost" data-act="open-manual" title="เปิดคู่มือการใช้งาน">คู่มือ</button>
     <button class="btn btn-ghost" data-act="synth" title="Run synthesis check (F7)">Check</button>
@@ -513,8 +518,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
             <button data-tool="select" class="active" title="เลือก / ย้าย  (Esc)">➤</button>
             <hr>
             <button data-tool="wire"     title="Add Wire (W) — คลิกพอร์ต→พอร์ต ต่อสาย, คลิกกลางสาย = แยกสาย">╱</button>
-            <button data-tool="netname"  title="Add Net Name (N) — คลิกสายเพื่อตั้งชื่อ · พิมพ์ data(7:0) เพื่อกำหนดบัส">ab</button>
-            <button data-tool="iomarker" title="Add I/O Marker (I) — คลิกขาที่ว่างเพื่อติด INPUT/OUTPUT">⇥</button>
+            <button data-tool="netname"  title="Add Net Name (Shift+N) — คลิกสายเพื่อตั้งชื่อ · พิมพ์ data(7:0) เพื่อกำหนดบัส">ab</button>
+            <button data-tool="iomarker" title="Add I/O Marker (Shift+I) — คลิกขาที่ว่างเพื่อติด INPUT/OUTPUT">⇥</button>
             <button data-tool="bustap"   title="Bus Tap (B) — ลากสายไว้ก่อน แล้วคลิกบนสายบัสตรงจุดที่สายมาเจอกัน">≣</button>
             <hr>
             <button data-tool="symbol"   title="Add Symbol — เปิดแผง Components">⊞</button>
@@ -792,8 +797,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <tbody>
             <tr><td class="k">➤ เลือก</td><td class="k">Esc</td><td>เลือกและลากย้ายชิ้นส่วน ลากคลุมเพื่อเลือกหลายชิ้น</td></tr>
             <tr><td class="k">╱ สาย</td><td class="k">W</td><td>ต่อสาย คลิกขา → คลิกขา หรือคลิกกลางสายเดิมเพื่อแตกสาย</td></tr>
-            <tr><td class="k">ab ชื่อ net</td><td class="k">N</td><td>คลิกที่สายเพื่อตั้งชื่อสัญญาณ</td></tr>
-            <tr><td class="k">⇥ I/O marker</td><td class="k">I</td><td>คลิกขาที่ว่างเพื่อแปะพอร์ต INPUT หรือ OUTPUT ให้ทันที</td></tr>
+            <tr><td class="k">ab ชื่อ net</td><td class="k">Shift+N</td><td>คลิกที่สายเพื่อตั้งชื่อสัญญาณ</td></tr>
+            <tr><td class="k">⇥ I/O marker</td><td class="k">Shift+I</td><td>คลิกขาที่ว่างเพื่อแปะพอร์ต INPUT หรือ OUTPUT ให้ทันที</td></tr>
             <tr><td class="k">≣ Bus Tap</td><td class="k">B</td><td>วางจุดแตก/รวมบิตบนสายบัส</td></tr>
             <tr><td class="k">⊞ Symbol</td><td class="k">—</td><td>เปิดแผง Components</td></tr>
             <tr><td class="k">🔓 ล็อกการจัดวาง</td><td class="k">—</td><td>ตรึงตำแหน่งทุกอย่างที่วางไว้ — ชิ้นส่วน สาย และจุดต่อ ขยับไม่ได้ทั้งโปรแกรมและผู้ใช้ แต่ยังเลือก ต่อสายเพิ่ม ตั้งชื่อ และลบได้ตามปกติ</td></tr>
@@ -1113,11 +1118,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <thead><tr><th>คีย์</th><th>ทำอะไร</th><th>คีย์</th><th>ทำอะไร</th></tr></thead>
           <tbody>
             <tr><td class="k">W</td><td>เครื่องมือสาย</td><td class="k">Ctrl+Z</td><td>ย้อนกลับ</td></tr>
-            <tr><td class="k">N</td><td>ตั้งชื่อ net</td><td class="k">Ctrl+Shift+Z / Ctrl+Y</td><td>ทำซ้ำที่ย้อน</td></tr>
+            <tr><td class="k">Shift+N</td><td>ตั้งชื่อ net</td><td class="k">Ctrl+Shift+Z / Ctrl+Y</td><td>ทำซ้ำที่ย้อน</td></tr>
             <tr><td class="k">B</td><td>Bus Tap</td><td class="k">Ctrl+A</td><td>เลือกทั้งแผ่น</td></tr>
-            <tr><td class="k">I</td><td>แปะ I/O marker</td><td class="k">Ctrl+C / Ctrl+V</td><td>คัดลอก / วาง (ข้ามแผ่นได้)</td></tr>
+            <tr><td class="k">Shift+I</td><td>แปะ I/O marker</td><td class="k">Ctrl+C / Ctrl+V</td><td>คัดลอก / วาง (ข้ามแผ่นได้)</td></tr>
             <tr><td class="k">R / Shift+R</td><td>หมุน 90° ตาม / ทวนเข็ม</td><td class="k">Ctrl+X</td><td>ตัด</td></tr>
             <tr><td class="k">M</td><td>พลิกซ้ายขวา</td><td class="k">Ctrl+D</td><td>ทำซ้ำ</td></tr>
+            <tr><td class="k">A / O / X / N</td><td>วาง AND / OR / XOR / NOT ที่เมาส์ (Shift = NAND / NOR / XNOR / BUF)</td><td class="k">Ctrl+K</td><td>ค้นหาคำสั่ง (ไทย/อังกฤษ)</td></tr>
+            <tr><td class="k">I / Q / D / C</td><td>วาง INPUT / OUTPUT / D-FF / CONST ที่เมาส์</td><td class="k">?</td><td>ตารางคีย์ลัด</td></tr>
             <tr><td class="k">Esc</td><td>ยกเลิก / กลับไปเครื่องมือเลือก</td><td class="k">Ctrl+S / Ctrl+O</td><td>บันทึก / เปิดโปรเจกต์</td></tr>
             <tr><td class="k">Delete</td><td>ลบสิ่งที่เลือก</td><td class="k">Ctrl+N</td><td>โปรเจกต์ใหม่</td></tr>
             <tr><td class="k">Enter</td><td>จบสายที่กำลังลาก</td><td class="k">Space + ลาก</td><td>เลื่อนจอ</td></tr>
@@ -12494,6 +12501,25 @@ init();
 .ex-i.err{border-color:color-mix(in srgb,var(--err) 50%,var(--line))}.ex-i.err .ex-ico{color:var(--err)}
 .ex-i.warn .ex-ico{color:var(--warn)}.ex-i.info .ex-ico{color:var(--info)}.ex-i.ok .ex-ico{color:var(--ok)}
 .ex-fix{color:var(--ok);margin-top:2px}
+.cmdk-bg{position:fixed;inset:0;background:#0006;z-index:2600;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+.cmdk{width:560px;max-width:92vw;background:var(--bg-1);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--sh-3);overflow:hidden}
+.cmdk-in{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:15px;padding:14px 16px;outline:none}
+.cmdk-list{max-height:52vh;overflow:auto;padding:6px}
+.cmdk-i{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px}
+.cmdk-i.on{background:var(--bg-3)}
+.cmdk-i span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdk-h{font-size:11px;color:var(--muted);white-space:nowrap}
+.cmdk-foot{font-size:11px;padding:6px 12px;border-top:1px solid var(--line)}
+.kbd-t{border-collapse:collapse;width:100%;font-size:12.5px}
+.kbd-t td{padding:4px 6px;border-bottom:1px solid var(--line)}
+.kbd-t kbd{font-family:"JetBrains Mono",Consolas,monospace;font-size:11.5px;background:var(--bg-2);border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+.ar-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
+.ar-shared{display:flex;flex-wrap:wrap;gap:10px;font-size:12px}
+.modal select,.modal input[type=number]{background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:inherit}
+.cmdk-btn{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:3px 9px;background:var(--bg-2);cursor:pointer;white-space:nowrap}
+.cmdk-btn:hover{color:var(--ink);border-color:var(--accent)}
+@media (max-width:1440px){ .proj-lbl,.lbl-wide{display:none} .topbar .proj-name{width:120px} .topbar .btn-ghost[data-act="sync-bridge"]{display:none} }
+@media (max-width:1300px){ .topbar .proj-name{width:96px} .save-chip{padding:3px 8px} }
 </style>
 <script>
 "use strict";
@@ -12536,9 +12562,9 @@ function uxSetDirty(d){
   const empty=!uxHasWork();
   chip.classList.toggle("dirty", d && !empty);
   chip.classList.toggle("clean", !d || empty);
-  if(d && !empty){ chip.innerHTML='<span class="dot"></span>ยังไม่บันทึกเป็นไฟล์'; chip.title="งานล่าสุดอยู่แค่ในเบราว์เซอร์ (autosave) — กดเพื่อบันทึกเป็นไฟล์ (Ctrl+S)"; }
+  if(d && !empty){ chip.innerHTML='<span class="dot"></span>ยังไม่บันทึก'; chip.title="งานล่าสุดอยู่แค่ในเบราว์เซอร์ (autosave) — กดเพื่อบันทึกเป็นไฟล์ (Ctrl+S)"; }
   else if(at){ const t=new Date(at); chip.innerHTML='<span class="dot"></span>บันทึกแล้ว '+t.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}); chip.title="บันทึกเป็นไฟล์ล่าสุด "+t.toLocaleString("th-TH"); }
-  else { chip.innerHTML='<span class="dot"></span>ยังไม่มีการเปลี่ยนแปลง'; chip.title="ยังไม่มีงานที่ต้องบันทึก"; }
+  else { chip.innerHTML='<span class="dot"></span>ไม่มีงานค้าง'; chip.title="ยังไม่มีงานที่ต้องบันทึก"; }
 }
 /* the editor opens on a demo half adder — that alone is not "work" worth a warning */
 function uxHasWork(){
@@ -13533,6 +13559,257 @@ document.addEventListener("click", ev=>{
   const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
   if(a.dataset.act==="explain-sim") openExplainSim();
 });
+
+/* =========================================================================
+   5. FASTER EVERYDAY WORK
+   ========================================================================= */
+function uxBusy(){   // a dialog / tour / palette owns the keyboard
+  return !!document.querySelector(".modal-bg, .tour-ov, .cmdk-bg") || (typeof manualOpen==="function" && manualOpen());
+}
+function uxTyping(){ const a=document.activeElement; return a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable); }
+function uxViewCenter(){ const r=canvas.getBoundingClientRect(); return {x:(r.width/2-state.view.x)/state.view.k, y:(r.height/2-state.view.y)/state.view.k}; }
+let UX_MOUSE_IN=false;
+canvas.addEventListener("mouseenter",()=>UX_MOUSE_IN=true);
+canvas.addEventListener("mouseleave",()=>UX_MOUSE_IN=false);
+/* place a part centred under the mouse (or mid-view when the mouse is elsewhere) */
+function uxPlace(type){
+  const at=UX_MOUSE_IN?state.mouse:uxViewCenter();
+  const td=TYPES[type]; let w=60,h=40; try{ const s=td.size(td.defaultParams||{}); w=s.w; h=s.h; }catch(_){}
+  const id=addComp(type, at.x-w/2, at.y-h/2);
+  if(id && type!=="IN" && type!=="OUT") setTool("select", true);
+  return id;
+}
+
+/* ---------- 5b. single-letter placement ---------- */
+const PLACE_KEYS = {
+  KeyA:["AND","NAND"], KeyO:["OR","NOR"], KeyX:["XOR","XNOR"], KeyN:["NOT","BUF"],
+  KeyI:["IN",null], KeyQ:["OUT",null], KeyD:["DFF",null], KeyC:["CONST",null],
+};
+window.addEventListener("keydown", ev=>{
+  if(uxTyping()) return;
+  const ctl=ev.ctrlKey||ev.metaKey;
+  if(ctl && (ev.code==="KeyK" || (ev.key||"").toLowerCase()==="k")){ ev.preventDefault(); ev.stopImmediatePropagation(); openCmdK(); return; }
+  if(ctl||ev.altKey||uxBusy()) return;
+  if(ev.code==="Slash" && ev.shiftKey){ ev.preventDefault(); ev.stopImmediatePropagation(); openShortcutHelp(); return; }
+  // the ISE-style tools that used N and I move to Shift+N / Shift+I
+  if(ev.shiftKey && ev.code==="KeyN"){ ev.preventDefault(); ev.stopImmediatePropagation(); setTool("netname"); return; }
+  if(ev.shiftKey && ev.code==="KeyI"){ ev.preventDefault(); ev.stopImmediatePropagation(); setTool("iomarker"); return; }
+  const pk=PLACE_KEYS[ev.code]; if(!pk) return;
+  if(state.pendingWire) return;                       // keys mean nothing mid-wire
+  const type=ev.shiftKey?pk[1]:pk[0]; if(!type||!TYPES[type]) return;
+  ev.preventDefault(); ev.stopImmediatePropagation();
+  uxPlace(type);
+}, true);
+function openShortcutHelp(){
+  const rows=[["A / Shift+A","AND / NAND"],["O / Shift+O","OR / NOR"],["X / Shift+X","XOR / XNOR"],["N / Shift+N","NOT / เครื่องมือตั้งชื่อสาย"],
+    ["I / Shift+I","INPUT / เครื่องมือ I/O marker"],["Q","OUTPUT"],["D","D flip-flop"],["C","ค่าคงที่ (CONST)"],["W","เครื่องมือสาย"],["B","Bus tap"],["R / M","หมุน / กลับด้าน"],
+    ["Ctrl+K","ค้นหาคำสั่ง"],["Ctrl+S","บันทึก"],["Ctrl+Z / Ctrl+Y","ย้อน / ทำซ้ำ"],["F7","ตรวจวงจร"],["Home","ย่อให้พอดีจอ"],["?","หน้านี้"]];
+  uxModal("⌨ คีย์ลัด", `<p class="muted" style="margin:0 0 8px">ตัวอักษรจะวางชิ้นส่วนตรงตำแหน่งเมาส์</p><table class="kbd-t">${rows.map(([k,v])=>`<tr><td><kbd>${esc(k)}</kbd></td><td>${esc(v)}</td></tr>`).join("")}</table>`,{width:460});
+}
+
+/* ---------- 5c. drag out of a free pin → a named INPUT/OUTPUT ---------- */
+const PINDRAG = { from:null };
+canvas.addEventListener("mousedown", ev=>{
+  PINDRAG.from=null;
+  const pg=ev.target.closest && ev.target.closest(".port"); if(!pg || ev.button!==0) return;
+  if(state.tool!=="select" && state.tool!=="wire") return;
+  setTimeout(()=>{   // after the editor's own handler has started the wire
+    const pw=state.pendingWire; if(!pw||pw.onWire) return;
+    PINDRAG.from={cid:pw.cid, pid:pw.pid, x:ev.clientX, y:ev.clientY};
+  },0);
+}, true);
+function uxNameForPin(sch, c, p, dir){
+  const taken=new Set(sch.components.filter(x=>x.type==="IN"||x.type==="OUT").map(x=>(x.params&&x.params.name)||""));
+  const generic=/^(i\d*|o\d*|y|a|b|d\d*|q|qn|in\d*|out\d*)$/i.test(p.id) && !String(c.type).startsWith("SCH:") && !String(c.type).startsWith("CUSTOM:");
+  let base = generic ? null : sanId(p.label||p.id);
+  if(PROBE_SEQ[c.type] && p.id==="clk") base="clk";
+  if(!base){
+    if(dir==="IN"){ for(let i=0;i<26;i++){ const n=String.fromCharCode(97+i); if(!taken.has(n)) return n; } base="in"; }
+    else base="y";
+  }
+  let n=base, k=1; while(taken.has(n)) n=base+(k++);
+  return n;
+}
+canvas.addEventListener("mouseup", ev=>{
+  const f=PINDRAG.from; PINDRAG.from=null;
+  if(!f || ev.button!==0) return;
+  const pw=state.pendingWire; if(!pw || pw.cid!==f.cid || pw.pid!==f.pid || (pw.pts&&pw.pts.length)) return;
+  if(Math.hypot(ev.clientX-f.x, ev.clientY-f.y)<28) return;             // a click, not a drag
+  if(ev.target.closest && ev.target.closest(".node,.port,.wire-group")) return;   // landed on something
+  const sch=activeSch(), c=comp(f.cid, sch); if(!c) return;
+  const p=getPort(c, f.pid); if(!p || (p.width||1)>1) return;
+  if(sch.wires.some(w=>(w.to.cid===c.id&&w.to.pid===p.id)||(w.from.cid===c.id&&w.from.pid===p.id))) return;   // only free pins
+  const dir=p.dir==="in"?"IN":"OUT";
+  const at=svgPoint(ev);
+  const nm=uxNameForPin(sch, c, p, dir);
+  const io={id:uid("c"), type:dir, x:0, y:0, params:{name:nm, width:1}, label:""};
+  const ip=getPorts(io)[0];
+  io.x=snap(at.x-ip.dx); io.y=snap(at.y-ip.dy);
+  sch.components.push(io);
+  const w = dir==="IN" ? {id:uid("w"), from:{cid:io.id,pid:ip.id}, to:{cid:c.id,pid:p.id}, name:""}
+                       : {id:uid("w"), from:{cid:c.id,pid:p.id}, to:{cid:io.id,pid:ip.id}, name:""};
+  sch.wires.push(w);
+  state.pendingWire=null; state.selection=new Set([io.id]);
+  try{ healLayout(sch, scopeOf(sch,{wires:[w]})); }catch(_){}
+  snapshot(); render(); renderInspector();
+  toast(`สร้าง ${dir==="IN"?"INPUT":"OUTPUT"} '${nm}' ต่อกับขา ${p.id} แล้ว — ดับเบิลคลิกเพื่อเปลี่ยนชื่อ`,"ok",2600);
+  ev.stopPropagation();
+}, true);
+
+/* ---------- 5d. place N copies in a row, optionally chained ---------- */
+function arrayTypeOptions(){
+  const o=[];
+  Object.values(state.project.schematics).forEach(s=>{ if(s.id!==state.activeId) o.push({v:"SCH:"+s.id, t:"บล็อก: "+s.name}); });
+  Object.keys(state.project.customs||{}).forEach(n=>o.push({v:"CUSTOM:"+n, t:"คอมโพเนนต์: "+n}));
+  ["DFF","JKFF","TFF","SRFF","AND","OR","XOR","NOT","MUX"].forEach(t=>{ if(TYPES[t]) o.push({v:t, t:TYPES[t].label}); });
+  return o;
+}
+function uxTypePorts(type){
+  const probe={id:"_probe", type, x:0, y:0, params:{}};
+  if(TYPES[type]) probe.params=JSON.parse(JSON.stringify(TYPES[type].defaultParams||{}));
+  try{ return getPorts(probe); }catch(_){ return []; }
+}
+function openArrayPlace(preset){
+  const opts=arrayTypeOptions();
+  if(!opts.length){ toast("ยังไม่มีบล็อกให้วางซ้ำ","warn"); return; }
+  const sel=(preset&&preset.type)||(opts.find(o=>o.v.startsWith("SCH:"))||opts[0]).v;
+  const m=uxModal("▦ วางซ้ำเป็นชุด", `
+    <div class="row"><label>ชิ้นที่จะวาง</label><select id="arType">${opts.map(o=>`<option value="${escA(o.v)}" ${o.v===sel?"selected":""}>${esc(o.t)}</option>`).join("")}</select></div>
+    <div class="row"><label>จำนวน</label><input id="arN" type="number" min="2" max="16" value="${(preset&&preset.n)||4}"></div>
+    <div class="row"><label>เรียง</label><select id="arDir"><option value="h">แนวนอน (ซ้าย → ขวา)</option><option value="v">แนวตั้ง (บน → ล่าง)</option></select></div>
+    <div class="row"><label>ต่อเป็นทอด</label><span class="ar-chain"><select id="arFrom"></select> <span class="muted">ของตัวที่ k →</span> <select id="arTo"></select> <span class="muted">ของตัวที่ k+1</span></span></div>
+    <div class="row"><label>ขาที่ต่อร่วมกัน</label><div id="arShared" class="ar-shared"></div></div>
+    <div class="muted" style="font-size:11.5px;margin-left:140px">เช่น mod_10 × 4: ต่อทอดจาก carry/clk_out → clk ของหลักถัดไป · ขาที่ติ๊ก = สร้าง INPUT หนึ่งตัวต่อเข้าทุกชิ้น (เช่น rst)</div>`,
+    {width:600, foot:'<button class="btn" id="arNo">ยกเลิก</button><button class="btn btn-primary" id="arOk">วาง</button>'});
+  const $m=s=>m.querySelector(s);
+  function fill(){
+    const ports=uxTypePorts($m("#arType").value), outs=ports.filter(p=>p.dir==="out"), ins=ports.filter(p=>p.dir==="in");
+    const pickOut=outs.find(p=>/carry|co|tc|clk_?out|cout|rco|q\d*$|^q$/i.test(p.id)) , pickIn=ins.find(p=>/clk|clock|cin|en/i.test(p.id));
+    $m("#arFrom").innerHTML='<option value="">— ไม่ต่อ —</option>'+outs.map(p=>`<option ${pickOut===p?"selected":""}>${escA(p.id)}</option>`).join("");
+    $m("#arTo").innerHTML='<option value="">—</option>'+ins.map(p=>`<option ${pickIn===p?"selected":""}>${escA(p.id)}</option>`).join("");
+    $m("#arShared").innerHTML=ins.map(p=>`<label><input type="checkbox" value="${escA(p.id)}" ${/^(rst|reset|clr|en)$/i.test(p.id)?"checked":""}> ${esc(p.id)}</label>`).join("")||'<span class="muted">—</span>';
+  }
+  $m("#arType").onchange=fill; fill();
+  $m("#arNo").onclick=()=>m.close();
+  $m("#arOk").onclick=()=>{
+    const type=$m("#arType").value, n=Math.max(2,Math.min(16,+$m("#arN").value||4)), dir=$m("#arDir").value;
+    const chain=[$m("#arFrom").value,$m("#arTo").value], shared=[...m.querySelectorAll("#arShared input:checked")].map(x=>x.value);
+    m.close(); arrayPlace(type, n, dir, chain[0]&&chain[1]?chain:null, shared);
+  };
+}
+function arrayPlace(type, n, dir, chain, shared){
+  const sch=activeSch(); if(!sch) return;
+  const start=UX_MOUSE_IN?state.mouse:uxViewCenter();
+  const before=new Set(sch.wires.map(w=>w.id)), made=[];
+  let sz={w:80,h:60};
+  for(let k=0;k<n;k++){
+    const id=addComp(type, start.x, start.y); if(!id) return;
+    const c=comp(id, sch); if(k===0) sz=getSize(c);
+    const gapX=sz.w+110, gapY=sz.h+66;
+    c.x=snap(start.x-(dir==="h"?((n-1)*gapX)/2:0)+(dir==="h"?k*gapX:0));
+    c.y=snap(start.y+(dir==="v"?k*gapY:0));
+    const base=String(type).startsWith("SCH:") ? (state.project.schematics[type.slice(4)]||{}).name : (TYPES[type]?TYPES[type].label:String(type).split(":").pop());
+    c.label=uniqueLabel(sch, sanId(base||"u")+"_"+(k+1), c);
+    made.push(c);
+  }
+  if(chain) for(let k=0;k<n-1;k++) sch.wires.push({id:uid("w"), from:{cid:made[k].id,pid:chain[0]}, to:{cid:made[k+1].id,pid:chain[1]}, name:""});
+  (shared||[]).forEach((pid,si)=>{
+    const p0=getPort(made[0],pid); if(!p0) return;
+    const taken=new Set(sch.components.filter(x=>x.type==="IN").map(x=>x.params.name));
+    let nm=sanId(pid), q=1; while(taken.has(nm)) nm=sanId(pid)+(q++);
+    const io={id:uid("c"), type:"IN", x:snap(made[0].x-160), y:snap(made[0].y+sz.h+44+si*44), params:{name:nm,width:1}, label:""};
+    sch.components.push(io);
+    made.forEach(c=>{ if(chain && pid===chain[1] && c!==made[0]) return;   // chained pin is taken by the cascade
+      sch.wires.push({id:uid("w"), from:{cid:io.id,pid:"o"}, to:{cid:c.id,pid}, name:""}); });
+  });
+  try{ normalizePortFanout(sch); }catch(_){}
+  const fresh=sch.wires.filter(w=>!before.has(w.id));
+  try{ healLayout(sch, scopeOf(sch,{wires:fresh})); }catch(_){}
+  state.selection=new Set(made.map(c=>c.id));
+  snapshot(); renderAll();
+  toast(`วาง ${n} ชิ้น${chain?` ต่อทอด ${chain[0]} → ${chain[1]}`:""}${shared&&shared.length?` · ขาร่วม: ${shared.join(", ")}`:""}`,"ok",3200);
+}
+
+/* ---------- 5a. Ctrl+K: search every command, Thai or English ---------- */
+const CMD_WORDS = {   // extra words people actually type
+  "auto-route":"จัดสาย จัดเส้น route auto wire", "relayout":"จัดสายใหม่", "export-vhdl":"ส่งออก vhdl export vhd โค้ด",
+  "export-all":"ส่งออก vhdl ทั้งหมด export all", "save-project":"บันทึก save เซฟ", "open-project":"เปิด open ไฟล์",
+  "new-project":"ใหม่ new project โปรเจกต์", "synth":"ตรวจ check synthesis error", "undo":"ย้อน undo", "redo":"ทำซ้ำ redo",
+  "probe":"ตรวจค่า probe 01 ค่า", "net-color":"สี color net", "topdown-open":"top-down ผังบล็อก block", "import-vhdl":"นำเข้า import vhdl",
+  "zoom-fit":"พอดีจอ fit zoom", "ai-chat":"ai แชต chat ผู้ช่วย", "history-open":"ประวัติ history ย้อนเวลา restore",
+  "clear-sch":"ล้าง clear", "welcome-open":"ต้อนรับ welcome เทมเพลต template แลป lab", "tour-start":"ทัวร์ tour สอน", "toggle-marks":"ปัญหา marker issue",
+  "explain-sim":"ทำไม why sim จำลอง ไม่ได้", "open-manual":"คู่มือ manual help ช่วย",
+};
+function cmdkCommands(){
+  const L=[], seen=new Set();
+  const add=(label, hint, run, words)=>{ const k=label+"|"+hint; if(seen.has(k)) return; seen.add(k); L.push({label, hint, run, hay:(label+" "+hint+" "+(words||"")).toLowerCase()}); };
+  document.querySelectorAll("#menu .dd button[data-act], .topbar > button[data-act], #canvasToolbar button[data-act]").forEach(b=>{
+    const act=b.dataset.act; if(act==="theme") return;
+    const kbd=b.querySelector(".kbd"); const label=(b.childNodes[0]&&b.childNodes[0].textContent||b.textContent).trim()||b.title;
+    const inBar=b.closest("#canvasToolbar"), shown=inBar ? ((b.title||"").split("—")[0].trim()||label) : label.replace(/…$/,"");
+    add(shown, kbd?kbd.textContent:(inBar?"แถบเครื่องมือ":"คำสั่ง"), ()=>b.click(), (CMD_WORDS[act]||"")+" "+act+" "+(b.title||""));
+  });
+  document.querySelectorAll("#canvasToolbar button[data-tool]").forEach(b=>add("เครื่องมือ: "+(b.title||b.dataset.tool).split("—")[0].trim(), "เครื่องมือ", ()=>setTool(b.dataset.tool), b.dataset.tool+" "+(b.title||"")));
+  [["draw","วาด"],["pins","เลือกขา pin mapping"],["sim","จำลอง sim simulate"],["upload","ลงบอร์ด upload xdc board"]].forEach(([s,w])=>add("ไปขั้น: "+w.split(" ")[0], "ขั้นตอน", ()=>setStage(s), w));
+  const keyOf={}; Object.entries(PLACE_KEYS).forEach(([code,[a,b]])=>{ keyOf[a]=code.slice(3); if(b) keyOf[b]="Shift+"+code.slice(3); });
+  Object.keys(TYPES).forEach(t=>{ const td=TYPES[t]; if(!td||["wire","custom","sch"].includes(td.category)) return;
+    add("วาง "+td.label, keyOf[t]||"ชิ้นส่วน", ()=>uxPlace(t), t+" "+td.category+" วาง place gate เกต"); });
+  Object.values(state.project.schematics).forEach(s=>{ if(s.id!==state.activeId) add("วางบล็อก "+s.name, "บล็อก", ()=>uxPlace("SCH:"+s.id), "block sub schematic"); });
+  GENERATORS.forEach(g=>add(g.name, "ตัวสร้างวงจร", g.run, g.desc+" generator สร้าง"));
+  LAB_TEMPLATES.forEach(T=>add("เทมเพลต "+T.lab+": "+T.title, "เทมเพลตแลป", ()=>startLabTemplate(T.id), "template lab "+T.desc));
+  EXAMPLES.forEach(e=>add("ตัวอย่าง: "+e.name, "ตัวอย่าง", e.run, "example "+e.desc));
+  add("วางซ้ำเป็นชุด…", "จัดวาง", ()=>openArrayPlace(), "array repeat ซ้ำ ชุด cascade ทอด mod");
+  add("ทำไมผลจำลองไม่เป็นอย่างที่คิด?", "ผู้ช่วย", ()=>openExplainSim(), CMD_WORDS["explain-sim"]);
+  add("คีย์ลัดทั้งหมด", "?", ()=>openShortcutHelp(), "shortcut keyboard คีย์");
+  Object.values(state.project.schematics).forEach(s=>add("เปิดแผ่น "+s.name, "แผ่น", ()=>openSchTab(s.id), "sheet tab open"));
+  return L;
+}
+function openCmdK(){
+  if(document.querySelector(".cmdk-bg")) return;
+  const cmds=cmdkCommands();
+  const bg=document.createElement("div"); bg.className="cmdk-bg";
+  bg.innerHTML='<div class="cmdk"><input class="cmdk-in" placeholder="พิมพ์คำสั่ง เช่น and, จัดสาย, ส่งออก vhdl, mod 10…" spellcheck="false"><div class="cmdk-list"></div><div class="cmdk-foot muted">↑↓ เลือก · Enter ทำ · Esc ปิด</div></div>';
+  document.body.appendChild(bg);
+  const inp=bg.querySelector(".cmdk-in"), list=bg.querySelector(".cmdk-list");
+  let hits=[], idx=0;
+  const close=()=>bg.remove();
+  function search(){
+    const q=inp.value.toLowerCase().trim(), toks=q.split(/\s+/).filter(Boolean);
+    hits=(toks.length?cmds.filter(c=>toks.every(t=>c.hay.includes(t))):cmds.slice())
+      .map(c=>({c, s:(c.label.toLowerCase().startsWith(q)?0:c.label.toLowerCase().includes(q)?1:2)+c.label.length/1000}))
+      .sort((a,b)=>a.s-b.s).slice(0,14).map(x=>x.c);
+    idx=0; draw();
+  }
+  function draw(){
+    list.innerHTML=hits.length?hits.map((c,i)=>`<div class="cmdk-i ${i===idx?"on":""}" data-i="${i}"><span>${esc(c.label)}</span><span class="cmdk-h">${esc(c.hint)}</span></div>`).join("")
+      :'<div class="muted" style="padding:12px">ไม่พบคำสั่ง</div>';
+    list.querySelectorAll(".cmdk-i").forEach(e=>{ e.onmousemove=()=>{ if(idx!==+e.dataset.i){ idx=+e.dataset.i; draw(); } }; e.onclick=()=>run(); });
+    const on=list.querySelector(".on"); if(on) on.scrollIntoView({block:"nearest"});
+  }
+  function run(){ const c=hits[idx]; close(); if(c) setTimeout(()=>{ try{ c.run(); }catch(e){ toast("ทำคำสั่งไม่ได้: "+e.message,"err"); } }, 0); }
+  inp.addEventListener("input", search);
+  inp.addEventListener("keydown", e=>{
+    if(e.key==="ArrowDown"){ idx=Math.min(hits.length-1, idx+1); draw(); e.preventDefault(); }
+    else if(e.key==="ArrowUp"){ idx=Math.max(0, idx-1); draw(); e.preventDefault(); }
+    else if(e.key==="Enter"){ run(); e.preventDefault(); }
+    else if(e.key==="Escape"){ close(); e.preventDefault(); }
+    e.stopPropagation();
+  });
+  bg.addEventListener("mousedown", e=>{ if(e.target===bg) close(); });
+  search(); inp.focus();
+}
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  if(a.dataset.act==="cmdk") openCmdK();
+  else if(a.dataset.act==="array-place") openArrayPlace();
+  else if(a.dataset.act==="shortcuts") openShortcutHelp();
+});
+/* the toolbar tooltips still said N / I for the old tools */
+{
+  const nn=document.querySelector('#canvasToolbar [data-tool="netname"]'); if(nn) nn.title=nn.title.replace("(N)","(Shift+N)");
+  const io=document.querySelector('#canvasToolbar [data-tool="iomarker"]'); if(io) io.title=io.title.replace("(I)","(Shift+I)");
+  if(typeof TOOL_INFO==="object"){ Object.values(TOOL_INFO).forEach(t=>{ if(t&&typeof t.hint==="string") t.hint=t.hint.replace(/\(N\)/g,"(Shift+N)").replace(/\(I\)/g,"(Shift+I)"); }); }
+}
 
 </script>
 <!-- UX-LAYER:END -->
