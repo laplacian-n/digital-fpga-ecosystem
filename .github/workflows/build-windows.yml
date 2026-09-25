@@ -1,0 +1,72 @@
+name: Build Windows app
+
+# Push a tag like v0.1.0 -> builds FPGAEcosystem-Setup-<ver>.exe + a portable zip
+# and attaches both to a GitHub Release. "Run workflow" builds without releasing
+# (download from the run's Artifacts).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Smoke-test the launcher server
+        shell: pwsh
+        run: |
+          $env:APPDATA = "$env:RUNNER_TEMP\appdata"
+          $p = Start-Process python -ArgumentList "launcher\app.py","--no-open","--port","18770" -PassThru
+          Start-Sleep 4
+          $s = Invoke-RestMethod http://127.0.0.1:18770/api/status
+          if (-not $s.backend) { throw "backend failed: $($s.backend_error)" }
+          $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:18770/chat -Body '{"message":"full adder"}'
+          if ($r.status -ne "VERIFIED") { throw "chat failed: $($r | ConvertTo-Json -Depth 3)" }
+          Stop-Process $p.Id
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") }
+          else { $v = (Select-String -Path launcher\app.py -Pattern '^VERSION = "(.+)"').Matches[0].Groups[1].Value }
+          "v=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File launcher\build_windows.ps1 -Version ${{ steps.ver.outputs.v }}
+
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist\FPGAEcosystem -DestinationPath dist\FPGAEcosystem-Portable-${{ steps.ver.outputs.v }}.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FPGAEcosystem-${{ steps.ver.outputs.v }}
+          path: |
+            dist/FPGAEcosystem-Setup-*.exe
+            dist/FPGAEcosystem-Portable-*.zip
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/FPGAEcosystem-Setup-*.exe
+            dist/FPGAEcosystem-Portable-*.zip
