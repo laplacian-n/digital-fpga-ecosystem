@@ -13078,7 +13078,7 @@ function buildTemplateSheet(sch, T){
 }
 function startLabTemplate(id){
   const T=LAB_TEMPLATES.find(x=>x.id===id); if(!T) return;
-  const p=addProject(sanId(T.title.replace(/[^\w฀-๿]+/g,"_"))||"lab");
+  const p=addProject("lab"+((T.lab.match(/[0-9-]+/)||[""])[0]).replace("-","_")+"_"+T.id);
   const sch=p.schematics[p.topId]; sch.name=uniqueSchName(sanId(T.id)||"top", sch.id);
   buildTemplateSheet(sch, T);
   openSchTab(sch.id); snapshot(); renderAll(); try{ zoomFit(); }catch(_){}
