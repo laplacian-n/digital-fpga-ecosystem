@@ -2411,7 +2411,12 @@ function schPortList(sch){
      the layout the control: arrange the port blocks on the sub-sheet top to bottom the
      way you want them on the symbol, and the symbol follows. Ids are unaffected, so
      nothing a parent has wired comes loose — the pins only move. */
-  const byPos = (a,b) => (a.y - b.y) || (a.x - b.x);
+  const byPos0 = (a,b) => (a.y - b.y) || (a.x - b.x);
+  // a generated sheet (sch.portOrder) keeps its declared order — q0..q3, not whatever the
+  // router's straight-line alignment left them in; hand-drawn sheets follow the drawing
+  const po = sch.portOrder, rk = c => { const L = po && (c.type==="IN" ? po.in : po.out); if(!L) return -1;
+    const n = String((c.params&&c.params.name)||"").toLowerCase(); return L.findIndex(o=>String(o).toLowerCase()===n); };
+  const byPos = (a,b) => { const ra=rk(a), rb=rk(b); return (ra>=0 && rb>=0 && ra!==rb) ? ra-rb : byPos0(a,b); };
   (sch.components||[]).filter(c=>c.type==="IN").slice().sort(byPos)
     .forEach(c=>out.push({cid:c.id, id:uq(c.params.name||"in"),  name:c.params.name, dir:"in",  width:c.params.width||1}));
   (sch.components||[]).filter(c=>c.type==="OUT").slice().sort(byPos)
@@ -4768,7 +4773,11 @@ function autoPlaceSheet(sch){
   // (dummies reserve a lane in the middle columns so long wires get a straight path
   //  and the gates they'd cross are pushed out of the way — classic Sugiyama).
   const node={}, inpC={}, outC={}; const layers=[]; for(let i=0;i<=maxL;i++) layers.push([]);
-  comps.forEach(c=>{ node[c.id]={id:c.id,h:getSize(c).h,comp:c}; inpC[c.id]=[]; outC[c.id]=[]; layers[layer[c.id]].push(c.id); });
+  // a generated sheet may pin its IN / OUT columns to the declared order (sch.portOrder):
+  // those nodes keep their rank while every other column is still median-ordered around them
+  const _po=sch.portOrder, _rk=c=>{ const L=_po&&(c.type==="IN"?_po.in:c.type==="OUT"?_po.out:null); if(!L) return null;
+    const n=String((c.params&&c.params.name)||"").toLowerCase(), i=L.findIndex(o=>String(o).toLowerCase()===n); return i<0?null:i; };
+  comps.forEach(c=>{ node[c.id]={id:c.id,h:getSize(c).h,comp:c,rk:_rk(c)}; inpC[c.id]=[]; outC[c.id]=[]; layers[layer[c.id]].push(c.id); });
   let dn=0;
   rawEdges.forEach(e=>{
     const Ld=layer[e.from], Ls=layer[e.to];
@@ -4785,7 +4794,8 @@ function autoPlaceSheet(sch){
       inpC[e.to].push({o:prev,d:-e.inDy}); outC[prev].push({o:e.to,d:e.inDy});
     }
   });
-  layers.forEach(col=>col.sort((A,B)=>((node[A].comp?node[A].comp.y:1e6)-(node[B].comp?node[B].comp.y:1e6))));
+  const _byRank=(a,b,f)=>{ const ra=node[a].rk, rb=node[b].rk; return (ra!=null&&rb!=null) ? ra-rb : f(a,b); };
+  layers.forEach(col=>col.sort((A,B)=>_byRank(A,B,(A,B)=>((node[A].comp?node[A].comp.y:1e6)-(node[B].comp?node[B].comp.y:1e6)))));
   const COLX=18*GRID, GAP=5*GRID, DGAP=2*GRID, X0=6*GRID, Y0=6*GRID;  // COLX=18: roomy columns (X-compression removed — wider channels = fewer crossings, easier to read)
   const H=id=>node[id].h, PADafter=id=>node[id].dummy?DGAP:GAP;
   layers.forEach(col=>{ let y=Y0; col.forEach(id=>{ node[id].y=y; y+=H(id)+PADafter(id); }); });
@@ -4795,7 +4805,7 @@ function autoPlaceSheet(sch){
       const col=layers[fwd?li:maxL-li];
       col.forEach(id=>{ const cn=fwd?inpC[id]:outC[id]; const ys=cn.map(k=>node[k.o].y+k.d);
         node[id]._w = ys.length ? (ys.sort((p,q)=>p-q), ys[(ys.length-1)>>1]) : node[id].y; });
-      col.sort((a,b)=>node[a]._w-node[b]._w);
+      col.sort((a,b)=>_byRank(a,b,(a,b)=>node[a]._w-node[b]._w));
       let bot=-1e9; col.forEach(id=>{ let y=Math.max(node[id]._w,bot); node[id].y=y; bot=y+H(id)+PADafter(id); });
     }
   }
@@ -12488,8 +12498,7 @@ init();
 .ux-gt .o{border-left:1px solid var(--line-2);font-weight:700}
 .ux-gt .v1,.ux-v.v1{color:var(--ok)}
 .ux-v{font-family:"JetBrains Mono",Consolas,monospace;font-size:14px}
-.ux-marks .ux-mp{fill:var(--err);stroke:var(--bg-0);stroke-width:1.5;cursor:help;opacity:.9}
-.ux-marks .ux-mp:hover{r:6}
+.ux-marks .ux-mp{fill:var(--err);stroke:var(--bg-0);stroke-width:1.5;opacity:.9;pointer-events:none}
 .ux-marks .ux-mw{fill:none;stroke:#f5a623;stroke-width:6;stroke-opacity:.55;stroke-linecap:round;cursor:help}
 .ux-marks .ux-mc{cursor:help}
 .ux-marks .ux-mc circle{stroke:var(--bg-0);stroke-width:1.5}
@@ -12883,6 +12892,7 @@ function openTruthTableTool(preset){
       <span class="muted">คลิกช่องเอาต์พุตเพื่อสลับ 0 → 1 → X (don't care)</span>
       <span style="flex:1"></span>
       <button class="btn" data-ttfill="0">ทั้งหมด 0</button><button class="btn" data-ttfill="1">ทั้งหมด 1</button>
+      <button class="btn" id="ttFromSheet" title="ใช้ชื่อ INPUT/OUTPUT ของแผ่นที่เปิดอยู่">ใช้พอร์ตจากแผ่นนี้</button>
     </div>
     <div id="ttGrid" class="tt-grid"></div>
     <div id="ttExpr" class="tt-expr"></div>`,
@@ -12934,16 +12944,25 @@ function openTruthTableTool(preset){
   m.querySelectorAll("[data-ttfill]").forEach(b=>b.onclick=()=>{ const v=b.dataset.ttfill;
     const outs=view==="kmap"?[kOut]:T.outputs; outs.forEach(o=>T.rows[o]=T.rows[o].map(()=>v)); draw(); });
   $m("#ttCancel").onclick=()=>m.close();
+  const here=uxSheetPortsForTT();
+  if(!here) $m("#ttFromSheet").style.display="none";
+  else $m("#ttFromSheet").onclick=()=>{ T.inputs=here.inputs.slice(0,6); T.outputs=here.outputs.slice(0,8);
+    $m("#ttIns").value=T.inputs.join(", "); $m("#ttOuts").value=T.outputs.join(", "); draw(); };
+  const updBuild=()=>{ const f=uxCanFillSheet(T); $m("#ttBuild").textContent=f?"สร้างลงแผ่นนี้":"สร้างวงจร (แผ่นใหม่)";
+    $m("#ttBuild").title=f?"พอร์ตตรงกับแผ่นที่เปิดอยู่ — วาดลงแผ่นนี้ ขาบอร์ดที่เลือกไว้ยังอยู่":"สร้างเป็นแผ่นใหม่"; };
+  m.addEventListener("change", updBuild); m.addEventListener("click", ()=>setTimeout(updBuild,0));
   $m("#ttBuild").onclick=()=>{
     T.module=sanId($m("#ttMod").value)||"my_logic";
     const res=ttToIntent(T.inputs, T.outputs, T.rows, T.module);
     if(res.error){ toast(res.error,"err"); return; }
+    if(uxCanFillSheet(T)){ uxFillSheet(activeSch(), res.intent); m.close();
+      toast(`วาดลงแผ่น "${activeSch().name}" แล้ว — ${T.outputs.map(o=>o+" = "+res.exprs[o]).join(" · ")}`,"ok",5200); return; }
     const dr=aiDrawIntent(res.intent);
     if(!dr||!dr.ok){ toast("วาดไม่ได้: "+((dr&&(dr.error||(dr.errors||[]).join(", ")))||"?"),"err",4000); return; }
     m.close();
     toast(`สร้าง "${dr.sch.name}" แล้ว — ${T.outputs.map(o=>o+" = "+res.exprs[o]).join(" · ")}`,"ok",5200);
   };
-  draw();
+  draw(); updBuild();
 }
 
 /* ---------- 2c. circuit generators, visible in the Components tab ---------- */
@@ -13011,6 +13030,30 @@ function runGenerator(id){ const g=GENERATORS.find(x=>x.id===id); if(g) g.run();
   try{ renderPalette(); }catch(_){}
 }
 
+/* the open sheet's ports, top to bottom, as the truth-table tool wants them */
+function uxSheetPortsForTT(){
+  const sch=activeSch(); if(!sch) return null;
+  const by=t=>(sch.components||[]).filter(c=>c.type===t&&((c.params&&c.params.width)||1)===1).sort((a,b)=>a.y-b.y).map(c=>c.params.name);
+  const i=by("IN"), o=by("OUT"); return (i.length&&o.length)?{inputs:i, outputs:o}:null;
+}
+/* a sheet that is only ports (a lab template) with the same names → draw the logic INTO it */
+function uxCanFillSheet(T){
+  const sch=activeSch(); if(!sch) return false;
+  if((sch.components||[]).some(c=>!["IN","OUT","GND","VCC","CONST","JUNCTION"].includes(c.type))) return false;
+  const low=a=>a.map(x=>String(x).toLowerCase()).sort().join(",");
+  const h=uxSheetPortsForTT(); return !!h && low(h.inputs)===low(T.inputs) && low(h.outputs)===low(T.outputs);
+}
+function uxFillSheet(sch, intent){
+  uxTimelineAdd("ก่อนวาดลงแผ่นจากตารางความจริง", true);
+  const keep={}; (sch.components||[]).forEach(c=>{ if(c.type==="IN"||c.type==="OUT") keep[String(c.params.name).toLowerCase()]=c.params.name; });
+  const order={in:(uxSheetPortsForTT()||{}).inputs||[], out:(uxSheetPortsForTT()||{}).outputs||[]};
+  const built=buildSchematicFromIntent(intent);
+  built.comps.forEach(c=>{ if((c.type==="IN"||c.type==="OUT") && keep[String(c.params.name).toLowerCase()]) c.params.name=keep[String(c.params.name).toLowerCase()]; });
+  sch.components=built.comps; sch.wires=built.wires; sch.portOrder=order;   // pinmap stays: keyed by port name
+  try{ normalizePortFanout(sch); autoRouteSheet(sch); }catch(e){ console.warn(e); }
+  snapshot(); renderAll(); try{ zoomFit(); }catch(_){}
+}
+
 /* =========================================================================
    3. GUIDING NEW USERS
    ========================================================================= */
@@ -13051,8 +13094,8 @@ function sheetPorts(sch){
   const _def=simDefaultPinmap;
   simDefaultPinmap=function(tt){
     const pm=_def.apply(this, arguments), own=(activeSch()||{}).pinmap||{};
-    tt.inputs.forEach(n=>{ const t=own[n]; if(t&&t.indexOf("sw:")===0) pm.inMap[n]=+t.slice(3); });
-    tt.outputs.forEach(n=>{ const t=own[n]; if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
+    tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.indexOf("sw:")===0) pm.inMap[n]=+t.slice(3); });
+    tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
     return pm;
   };
   const _pick=renderPinPicker;
@@ -13087,7 +13130,7 @@ function sheetPorts(sch){
 /* resolve a port to a board pin: sheet's own choice → sim page choice → name rule → order */
 function uxPinFor(name, dir, k){
   const own=(activeSch()||{}).pinmap||{};
-  let t=own[name];
+  let t=pmGet(own,name);
   if(!t && SIM_PINMAP){ if(dir==="in" && SIM_PINMAP.inMap[name]!=null) t="sw:"+SIM_PINMAP.inMap[name];
     else if(dir==="out" && SIM_PINMAP.outMap[name]) t=SIM_PINMAP.outMap[name]; }
   t=t||autoSpecialTarget(name, dir)||(dir==="in"?"sw:"+k:"led:"+k);
@@ -13133,9 +13176,9 @@ function buildTemplateSheet(sch, T){
   const G=typeof GRID==="number"?GRID:11, sn=v=>Math.round(v/G)*G;
   sch.components=[]; sch.wires=[]; sch.pinmap={};
   const mk=(type, x, y, params)=>{ const c={id:uid("c"), type, x:sn(x), y:sn(y), params, label:""}; sch.components.push(c); return c; };
-  T.ins.forEach(([n,t],i)=>{ mk("IN", 88, 110+i*66, {name:n, width:1}); sch.pinmap[n]=t; });
+  T.ins.forEach(([n,t],i)=>{ mk("IN", 88, 110+i*66, {name:n, width:1}); sch.pinmap[sanId(n)]=t; });
   T.outs.forEach(([n,t],i)=>{
-    const o=mk("OUT", 660, 110+i*66, {name:n, width:1}); sch.pinmap[n]=t;
+    const o=mk("OUT", 660, 110+i*66, {name:n, width:1}); sch.pinmap[sanId(n)]=t;
     const tie=T.tie&&T.tie[n];
     if(tie){ const s=mk(tie, 540, 110+i*66, JSON.parse(JSON.stringify((TYPES[tie]&&TYPES[tie].defaultParams)||{})));
       const sp=(getPorts(s).find(p=>p.dir==="out")||{}).id||"o", op=(getPorts(o).find(p=>p.dir==="in")||{}).id||"i";
@@ -13217,7 +13260,7 @@ function uxStepState(){
   const all=uxQuietIssues().filter(i=>!i.schId || i.schId===sch.id);
   const errs=all.filter(i=>i.lvl==="err"), warns=all.filter(i=>i.lvl==="warn");
   const ports=sheetPorts(sch), own=sch.pinmap||{};
-  const conf=ports.filter(p=>own[p.name]||autoSpecialTarget(p.name,p.dir));
+  const conf=ports.filter(p=>pmGet(own,p.name)||autoSpecialTarget(p.name,p.dir));
   const miss=ports.filter(p=>!conf.includes(p));
   const sig=sheetSig(sch);
   const empty=!(sch.components||[]).some(c=>c.type!=="JUNCTION");
@@ -13453,6 +13496,10 @@ canvas.addEventListener("mousemove", ev=>{
   if(state.drag||state.pan||state.wireDrag||state.pendingWire){ uxTipHide(); return; }
   const mk=ev.target.closest && ev.target.closest("[data-mk]");
   if(mk){ clearTimeout(UXTIP.t); const k=mk.dataset.mk; uxTipShow(uxMarkHtml(k), ev.clientX, ev.clientY, "mk"+k); return; }
+  // the pin dots let clicks through (so the pin can still be wired) — find them by distance
+  if(MARK.on && MARK.pins.length){ const w=svgPoint(ev), sch=activeSch(); let best=-1, bd=8/Math.max(.4,state.view.k);
+    MARK.pins.forEach((m,k)=>{ const c=comp(m.cid,sch); const pp=c&&portPos(c,m.pid); if(!pp) return; const d=Math.hypot(pp.x-w.x,pp.y-w.y); if(d<bd){ bd=d; best=k; } });
+    if(best>=0){ clearTimeout(UXTIP.t); uxTipShow(uxMarkHtml("p"+best), ev.clientX, ev.clientY, "mkp"+best); return; } }
   const wg=PROBE && ev.target.closest && ev.target.closest(".wire-group[data-wid]");
   const nd=!wg && ev.target.closest && ev.target.closest(".node[data-cid]");
   const key=wg?"w"+wg.dataset.wid : nd?"n"+nd.dataset.cid : null;
@@ -13643,7 +13690,11 @@ function uxNameForPin(sch, c, p, dir){
     if(dir==="IN"){ for(let i=0;i<26;i++){ const n=String.fromCharCode(97+i); if(!taken.has(n)) return n; } base="in"; }
     else base="y";
   }
-  let n=base, k=1; while(taken.has(n)) n=base+(k++);
+  if(!taken.has(base)) return base;
+  // taken (the same pin on another copy): prefix the block's label → mod10_2_q1, not q11
+  const pre=sanId(c.label||"");
+  let n=pre?`${pre}_${base}`:`${base}_2`, k=2; const root=n;
+  while(taken.has(n)) n=`${root}_${k++}`;
   return n;
 }
 canvas.addEventListener("mouseup", ev=>{
@@ -13661,13 +13712,14 @@ canvas.addEventListener("mouseup", ev=>{
   const io={id:uid("c"), type:dir, x:0, y:0, params:{name:nm, width:1}, label:""};
   const ip=getPorts(io)[0];
   io.x=snap(at.x-ip.dx); io.y=snap(at.y-ip.dy);
+  uxNudgeFree(sch, io);
   sch.components.push(io);
   const w = dir==="IN" ? {id:uid("w"), from:{cid:io.id,pid:ip.id}, to:{cid:c.id,pid:p.id}, name:""}
                        : {id:uid("w"), from:{cid:c.id,pid:p.id}, to:{cid:io.id,pid:ip.id}, name:""};
   sch.wires.push(w);
   state.pendingWire=null; state.selection=new Set([io.id]);
   try{ healLayout(sch, scopeOf(sch,{wires:[w]})); }catch(_){}
-  snapshot(); render(); renderInspector();
+  snapshot(); render(); renderInspector(); uxStepperSoon();
   toast(`สร้าง ${dir==="IN"?"INPUT":"OUTPUT"} '${nm}' ต่อกับขา ${p.id} แล้ว — ดับเบิลคลิกเพื่อเปลี่ยนชื่อ`,"ok",2600);
   ev.stopPropagation();
 }, true);
@@ -13721,7 +13773,7 @@ function arrayPlace(type, n, dir, chain, shared){
   for(let k=0;k<n;k++){
     const id=addComp(type, start.x, start.y); if(!id) return;
     const c=comp(id, sch); if(k===0) sz=getSize(c);
-    const gapX=sz.w+110, gapY=sz.h+66;
+    const gapX=sz.w+264, gapY=sz.h+110;     // room between copies for I/O markers and labels
     c.x=snap(start.x-(dir==="h"?((n-1)*gapX)/2:0)+(dir==="h"?k*gapX:0));
     c.y=snap(start.y+(dir==="v"?k*gapY:0));
     const base=String(type).startsWith("SCH:") ? (state.project.schematics[type.slice(4)]||{}).name : (TYPES[type]?TYPES[type].label:String(type).split(":").pop());
@@ -13827,6 +13879,26 @@ document.addEventListener("click", ev=>{
   if(typeof TOOL_INFO==="object"){ Object.values(TOOL_INFO).forEach(t=>{ if(t&&typeof t.hint==="string") t.hint=t.hint.replace(/\(N\)/g,"(Shift+N)").replace(/\(I\)/g,"(Shift+I)"); }); }
 }
 
+/* move a new part off anything it would sit on: try small vertical steps, then to the side */
+function uxNudgeFree(sch, nc){
+  const G=typeof GRID==="number"?GRID:11, M=G;
+  const box=c=>{ const z=getSize(c); return {x0:c.x-M, y0:c.y-M, x1:c.x+z.w+M, y1:c.y+z.h+M}; };
+  // existing wire segments too — a marker dropped on a passing wire reads as connected to it
+  const segs=[]; (sch.wires||[]).forEach(w=>{ const a=comp(w.from.cid,sch), b=comp(w.to.cid,sch); if(!a||!b) return;
+    const pa=portPos(a,w.from.pid), pb=portPos(b,w.to.pid); if(!pa||!pb) return;
+    const pts=[pa,...(w.pts||[]),pb]; for(let i=1;i<pts.length;i++) segs.push([pts[i-1],pts[i]]); });
+  const segHit=a=>segs.some(([p,q])=>{ const x0=Math.min(p.x,q.x), x1=Math.max(p.x,q.x), y0=Math.min(p.y,q.y), y1=Math.max(p.y,q.y);
+    return x0<a.x1-M && x1>a.x0+M && y0<a.y1-M && y1>a.y0+M; });
+  const hit=()=>{ const a=box(nc); return segHit(a) || (sch.components||[]).some(o=>o!==nc && o.type!=="JUNCTION" && (()=>{ const b=box(o); return a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0; })()); };
+  if(!hit()) return;
+  const x0=nc.x, y0=nc.y;
+  // stay on the pin's row first (a straight wire), moving away from the part: OUT → right, IN → left
+  const away=nc.type==="IN"?-1:1;
+  for(let k=1;k<=3;k++){ nc.y=y0; nc.x=x0+away*k*3*G; if(!hit()) return; }   // a little only — never past the next part
+  for(let k=1;k<=12;k++){ for(const d of [k,-k]){ nc.x=x0; nc.y=y0+d*4*G; if(!hit()) return; } }
+  nc.x=x0; nc.y=y0;
+}
+
 /* =========================================================================
    6. PIN PAGE FROM THE ENTITY PORTS (works for every sheet)
    The old picker was built from the truth table, so a top sheet with flip-flops,
@@ -13853,7 +13925,8 @@ function pinOptLabel(t){
 function uxPortBits(sch){
   sch=sch||activeSch(); if(!sch) return [];
   const out=[];
-  schPortList(sch).forEach(p=>{
+  // inputs first, then outputs, each in natural name order (q2 before q10) — easy to scan
+  schPortList(sch).slice().sort((a,b)=>(a.dir===b.dir?0:a.dir==="in"?-1:1)||natCmp(a.id,b.id)).forEach(p=>{
     const w=p.width||1;
     if(w===1) out.push({key:p.id, port:p.id, bit:null, dir:p.dir, vhdl:p.id, width:1});
     else for(let i=w-1;i>=0;i--) out.push({key:`${p.id}[${i}]`, port:p.id, bit:i, dir:p.dir, vhdl:`${p.id}[${i}]`, width:w});
@@ -13881,24 +13954,26 @@ function uxGuessTarget(b, used){
   return t;
 }
 function uxAutoPins(sch, onlyMissing){
-  const own=onlyMissing?Object.assign({},sch.pinmap||{}):{};
-  const bits=uxPortBits(sch), used=new Set(Object.values(own));
+  uxNormPinmap(sch);
+  const bits=uxPortBits(sch), keep=new Set(bits.map(b=>b.key));
+  const own={}; if(onlyMissing) Object.entries(sch.pinmap||{}).forEach(([k,v])=>{ if(keep.has(k)) own[k]=v; });   // ports that no longer exist free their pins
+  const used=new Set(Object.values(own));
   // buses low bit first so d[0] gets SW0, d[1] SW1 …
   bits.slice().sort((a,b)=>(a.port===b.port?(a.bit||0)-(b.bit||0):0)).forEach(b=>{
     if(own[b.key]) return; const t=uxGuessTarget(b, used); if(t){ own[b.key]=t; used.add(t); } });
-  const keep=new Set(bits.map(b=>b.key)); Object.keys(own).forEach(k=>{ if(!keep.has(k)) delete own[k]; });   // drop ports that no longer exist
   sch.pinmap=own;
 }
 /* keep the sim board (scalar ports on SW/LED/7-seg) in step with the sheet's map */
 function uxSyncSimPinmap(){
   if(!SIM_PINMAP || !UX.lastTT) return;
   const own=(activeSch()||{}).pinmap||{}, tt=UX.lastTT;
-  tt.inputs.forEach(n=>{ const t=own[n]; if(t&&t.startsWith("sw:")) SIM_PINMAP.inMap[n]=+t.slice(3); });
-  tt.outputs.forEach(n=>{ const t=own[n]; if(t&&(t.startsWith("led:")||/^seg:[a-g]$/.test(t)||t==="buzzer")) SIM_PINMAP.outMap[n]=t; });
+  tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.startsWith("sw:")) SIM_PINMAP.inMap[n]=+t.slice(3); });
+  tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.startsWith("led:")||/^seg:[a-g]$/.test(t)||t==="buzzer")) SIM_PINMAP.outMap[n]=t; });
   if(SIM_REDRAW) try{ SIM_REDRAW(); }catch(_){}
 }
 function uxRenderPinPage(){
   const host=$("#simPinPicker"), sch=activeSch(); if(!host||!sch) return;
+  uxNormPinmap(sch);
   const bits=uxPortBits(sch), own=sch.pinmap||{};
   const top=state.project.schematics[state.project.topId];
   const count={}; bits.forEach(b=>{ const t=own[b.key]; if(t) count[t]=(count[t]||0)+1; });
@@ -13967,14 +14042,15 @@ function uxRenderPinPage(){
   const _show=showSimPage;
   showSimPage=function(tab){ const r=_show.apply(this, arguments);
     if(tab==="board"||tab==="pins"){ const sch=activeSch();
-      if(sch && !Object.keys(sch.pinmap||{}).length && uxPortBits(sch).length){ uxAutoPins(sch, true); snapshot(); }   // first visit: a starting guess to edit
+      const bits=sch?uxPortBits(sch):[];
+      if(bits.length && !bits.some(b=>pmGet(sch.pinmap||{},b.key))){ uxAutoPins(sch, true); snapshot(); }   // nothing mapped yet: a starting guess to edit
       uxRenderPinPage(); }
     return r; };
 }
 /* pins resolved per BIT, for the .xdc and the upload dialog */
 function uxPinTarget(b, sch){
   const own=(sch||activeSch()||{}).pinmap||{};
-  return own[b.key] || (b.bit==null ? autoSpecialTarget(b.port, b.dir) : null);
+  return pmGet(own,b.key) || (b.bit==null ? autoSpecialTarget(b.port, b.dir) : null);
 }
 uxXdcBody=function(){
   const sch=activeSch(); let x="", clk=false; const miss=[];
@@ -14004,6 +14080,79 @@ sheetPorts=function(sch){ return uxPortBits(sch).map(b=>({name:b.key, dir:b.dir}
       const go=body.querySelector("[data-pp-go]"); if(go) go.onclick=()=>{ dlg.remove(); UX.highlightPins=miss; setStage("pins"); };
     }
     return r; };
+}
+
+/* pin maps are keyed by the VHDL port name (sanId: lower case). Older files and the first
+   lab templates used the name as typed ("P", "Walk") — read those too, and migrate on sight. */
+function pmGet(own, name){
+  if(!own||name==null) return undefined;
+  if(own[name]) return own[name];
+  const k=sanId(String(name).replace(/\[(\d+)\]$/,"")) + (String(name).match(/\[\d+\]$/)||[""])[0];
+  if(own[k]) return own[k];
+  const low=String(name).toLowerCase(); const hit=Object.keys(own).find(x=>x.toLowerCase()===low);
+  return hit?own[hit]:undefined;
+}
+function uxNormPinmap(sch){
+  const own=sch&&sch.pinmap; if(!own) return;
+  uxPortBits(sch).forEach(b=>{ if(own[b.key]) return; const v=pmGet(own,b.key); if(v){
+    Object.keys(own).forEach(x=>{ if(x!==b.key && x.toLowerCase()===b.key.toLowerCase()) delete own[x]; }); own[b.key]=v; } });
+}
+
+/* =========================================================================
+   7. TIDIER GENERATED DRAWINGS
+   ========================================================================= */
+/* Ports in the order they were declared. The placer orders the IN / OUT columns to
+   minimise crossings, which on a generated sheet scrambles them (b, cin, a · a, e, g, f …)
+   and reads badly. A sheet that carries sch.portOrder gets its IN and OUT columns put
+   back in that order (same slots, same column), then the router runs as usual. */
+{
+  // (the placer itself honours sch.portOrder — see autoPlaceSheet)
+  // every drawn intent remembers its declared port order
+  const _draw=drawIntent;
+  drawIntent=function(intent, opts){
+    const ord={in:[],out:[]};
+    (intent&&intent.components||[]).forEach(c=>{ if(c.type==="IN") ord.in.push(sanId(c.name||c.id)); else if(c.type==="OUT") ord.out.push(sanId(c.name||c.id)); });
+    const sort=intent&&intent._outNatural; if(sort) ord.out.sort(natCmp);
+    // stash on the intent so the sheet gets it before its first route
+    let A;
+    UX.pendingPortOrder=ord;
+    try{ A=_draw.apply(this, arguments); } finally { UX.pendingPortOrder=null; }
+    if(!A||!A.ok||(opts&&opts.noRoute)||ord.in.length+ord.out.length<3) return A;
+    const numbered=ord.out.length>1 && ord.out.every(n=>/^[a-z_]+\d+$/i.test(n)) && new Set(ord.out.map(n=>n.replace(/\d+$/,""))).size===1;
+    if(numbered) return A;   // q0..qN become a block's pins: keep them in order, no second try
+    // a pinned order can cost a lot on a dense sheet — draw it free as well, keep the ordered one
+    // unless it is clearly worse (longer wiring / taller / more crossings)
+    let B; try{ B=_draw.apply(this, arguments); }catch(_){ B=null; }
+    if(!B||!B.ok) return A;
+    const sa=uxLayoutScore(A.sch), sb=uxLayoutScore(B.sch);
+    const keepA = sa <= sb*1.12;   // q0..qN end up as a block's pins: order matters more there
+    const win=keepA?A:B, lose=keepA?B:A, name=A.sch.name;
+    delete state.project.schematics[lose.id];
+    win.sch.name=name; if(!keepA) delete win.sch.portOrder;
+    return win;
+  };
+  const _blank=blankSchematic;
+  blankSchematic=function(id, name){ const s=_blank.apply(this, arguments); if(UX.pendingPortOrder) s.portOrder=UX.pendingPortOrder; return s; };
+}
+function natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true}); }
+
+/* lower = tidier: Manhattan wire length + crossings between different nets + sheet height */
+function uxLayoutScore(sch){
+  const segs=[]; let len=0;
+  (sch.wires||[]).forEach(w=>{
+    const a=comp(w.from.cid,sch), b=comp(w.to.cid,sch); if(!a||!b) return;
+    const pa=portPos(a,w.from.pid)||{x:a.x+6,y:a.y+6}, pb=portPos(b,w.to.pid)||{x:b.x+6,y:b.y+6};
+    const pts=[pa, ...(w.pts||[]), pb];
+    for(let i=1;i<pts.length;i++){ const p=pts[i-1], q=pts[i]; len+=Math.abs(p.x-q.x)+Math.abs(p.y-q.y); segs.push({p,q,w}); }
+  });
+  let net={}; try{ (sch.wires||[]).forEach(w=>{ if(net[w.id]) return; const ids=netWires(sch,w); ids.forEach(id=>net[id]=w.id); }); }catch(_){}
+  let cross=0;
+  const H=segs.filter(s=>s.p.y===s.q.y&&s.p.x!==s.q.x), V=segs.filter(s=>s.p.x===s.q.x&&s.p.y!==s.q.y);
+  H.forEach(h=>{ const x0=Math.min(h.p.x,h.q.x), x1=Math.max(h.p.x,h.q.x);
+    V.forEach(v=>{ if(net[v.w.id]&&net[v.w.id]===net[h.w.id]) return; const y0=Math.min(v.p.y,v.q.y), y1=Math.max(v.p.y,v.q.y);
+      if(v.p.x>x0&&v.p.x<x1&&h.p.y>y0&&h.p.y<y1) cross++; }); });
+  const ys=(sch.components||[]).map(c=>c.y), hgt=ys.length?Math.max(...ys)-Math.min(...ys):0;
+  return len + cross*60 + hgt*2;
 }
 
 </script>
