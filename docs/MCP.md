@@ -24,6 +24,13 @@ You don't need to start anything else. The MCP server starts FPGA Ecosystem if i
 Schematic Studio window if none is open. A **Claude** chip in the editor's top bar shows the connection and
 flashes while Claude is working.
 
+Claude starts with `about`, which tells it:
+- which app and version it is talking to, and whether a newer version is out (with the release notes);
+- whether the board toolchain is ready (Vivado, openFPGALoader, the flash bridge, the USB driver);
+- the local AI model's state, the workspace and number of projects, and whether the editor window is open.
+
+The server also reports the app version as its own version when Claude connects.
+
 ## How it works
 ```
 Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (127.0.0.1) ──long-poll──▶ Schematic Studio page
@@ -47,6 +54,7 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 ## Tools
 | Group | Tools |
 |---|---|
+| The app | `about` (app + version, update available and what's new, workspace, editor open?, Vivado / openFPGALoader / USB driver / AI model ready?), `check_update`, `open_home` (Home / setup checklist / settings — the user clicks อัปเดตเลย there) |
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
 | Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
 | Edit | `add_component`, `connect`, `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
@@ -54,7 +62,8 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
 | Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation` |
 | Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc` |
-| Output | `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `list_projects`, `open_project` |
+| Output | `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `new_project`, `list_projects`, `open_project` |
+| Real board | `board_build` (Vivado → .bit), `board_program` (load into the FPGA, or `detect`), `board_status` (follow the job: log tail, Thai explanation of an error, does the .bit match the circuit). Writing the Flash stays the user's click. |
 | History | `undo`, `redo`, `checkpoint`, `list_checkpoints`, `restore_checkpoint` |
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
 | Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |

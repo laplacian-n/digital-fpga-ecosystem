@@ -595,6 +595,47 @@ def install_claude_desktop() -> dict:
     f.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
     return {"ok": True, "path": str(f)}
 
+def mcp_app(action: str, args: dict) -> dict:
+    """What Claude can ask the app itself (no editor window needed): who/what/which version
+    this is, whether an update is out, whether the board toolchain is ready; and open Home."""
+    if action in ("about", "check_update"):
+        up = update_check(force=(action == "check_update"))
+        upd = {"current": VERSION, "checked": bool(up.get("ok"))}
+        if up.get("ok"):
+            upd.update(available=bool(up.get("available")), latest=up.get("latest"),
+                       notes=(up.get("notes") or "")[:1500], page=up.get("url"),
+                       how="the user clicks 'อัปเดตเลย' on Home (open_home) — projects and settings are kept")
+        else:
+            upd["error"] = up.get("error") or ("update check is off in Settings" if up.get("disabled") else "")
+        if action == "check_update":
+            return {"ok": True, "update": upd}
+        sc = setup_check()
+        drv = sc["driver"].get("state")
+        return {"ok": True,
+                "app": {"name": APP_NAME, "version": VERSION, "installed": FROZEN,
+                        "install_dir": str(INSTALL_DIR), "platform": sys.platform},
+                "update": upd,
+                "workspace": {"folder": CFG["workspace"], "projects": str(projects_dir()),
+                              "count": len(list_projects())},
+                "editor_open": RELAY.live_client() is not None,
+                "board": {"name": board.BOARD["label"],
+                          "vivado": sc["vivado"]["path"] or None,
+                          "vivado_ok": bool(sc["vivado"]["path"]) and not sc["vivado"]["spaces"],
+                          "openfpgaloader": sc["openfpgaloader"]["path"] or None,
+                          "flash_bridge": bool(sc["openfpgaloader"].get("bridge")),
+                          "usb_driver": drv, "build_enabled": sc["fpga_enabled"]},
+                "ai_model": {"mode": sc["llm"]["mode"], "running": sc["llm"]["up"]},
+                "views": ["Schematic Studio (gate editor)", "simulation page", "ลงบอร์ด (build .bit + program)",
+                          "Top-Down (block diagrams for the lab report)", "Home (projects, settings, updates)"]}
+    if action == "open_home":
+        tab = str(args.get("tab") or "home")
+        if tab not in ("home", "setup", "settings"):
+            return {"ok": False, "error": f"unknown tab '{tab}'", "hint": "home | setup | settings"}
+        open_window("home", "tab=" + tab)
+        return {"ok": True, "opened": tab}
+    return {"ok": False, "error": f"unknown action '{action}'"}
+
+
 _LEGACY_MCP = ("topdown_mcp", "schematic_mcp", "top-down-schematic")
 
 
@@ -767,6 +808,11 @@ def make_handler():
                     return self._out(401, {"ok": False, "error": "bad token"})
                 return self._out(200, {"ok": True, "editor_connected": RELAY.live_client() is not None,
                                        "version": VERSION})
+            if path == "/api/mcp/app":
+                if not self._mcp_authorized():
+                    return self._out(401, {"ok": False, "error": "bad token"})
+                return self._out(200, mcp_app((q.get("action") or ["about"])[0],
+                                              {k: v[0] for k, v in q.items() if k != "action"}))
             if path == "/api/mcp/setup":
                 return self._out(200, {"command": mcp_command(), "desktop_config": str(claude_desktop_config_path()),
                                        "legacy": legacy_mcp()})

@@ -14826,6 +14826,59 @@ function mcpEvent(kind, data){ MCPB.events.push(Object.assign({seq:++MCPB.seq, t
     return r; };
 }
 
+/* ---------- projects ---------- */
+MCP_OPS.new_project = a=>{
+  const name=String(a.name||"").trim(); if(!name) mcpFail("name is required");
+  mcpBeforeChange("โปรเจกต์ใหม่");
+  const p=addProject(name); state.view={x:0,y:0,k:1};
+  const pn=$("#projectName"); if(pn) pn.value=p.name;
+  mcpCommit(null); try{ zoomFit(); }catch(_){}
+  mcpActivity("โปรเจกต์ใหม่ "+p.name);
+  return Object.assign({created:p.name, renamed: p.name!==sanId(name) ? "a project with that name exists — used "+p.name : undefined}, MCP_OPS.status());
+};
+
+/* ---------- the real board: the ลงบอร์ด page's own build / program, driven by Claude ----------
+   A Vivado build takes minutes, longer than an MCP client waits for one call, so board_build /
+   board_program start the job and board_status follows it (≤40 s per call). The page opens so
+   the user watches the same log. Writing the Flash (permanent) stays a click of the user's. */
+async function mcpBoardPage(){ try{ if(!$("#boardPage.show")) await openBoardPage(); }catch(_){} }
+MCP_OPS.board_build = async ()=>{
+  if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("building needs the FPGA Ecosystem app (the editor was opened from disk)");
+  const d=brdDesign(); if(!d) mcpFail("no top sheet");
+  if(d.missing.length) mcpFail(`${d.missing.length} port(s) have no board pin: ${d.missing.slice(0,8).join(", ")}`, "get_pins, then set_pins or auto_pins");
+  await mcpBoardPage();
+  const r=await brdPost("/api/board/build",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+  if(!r||!r.ok) mcpFail((r&&r.error)||"could not start the build");
+  try{ brdLog(true); brdPoll(false); }catch(_){}
+  mcpActivity("สร้าง .bit");
+  return {started:"build", top:d.top, folder:r.dir, next:"call board_status until state is not 'running' (Vivado takes ~1-3 min)"};
+};
+MCP_OPS.board_program = async a=>{
+  if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("programming needs the FPGA Ecosystem app");
+  const mode=a.mode||"sram", cable=a.cable||"ft2232";
+  await mcpBoardPage();
+  let r;
+  if(mode==="detect") r=await brdPost("/api/board/detect",{cable});
+  else { const d=brdDesign(); r=await brdPost("/api/board/program",{project:brdProject(), top:d.top, mode:"sram", cable}); }
+  if(!r||!r.ok) mcpFail((r&&r.error)||"could not start", "board_status shows the log; about → board shows what is installed");
+  try{ brdLog(true); brdPoll(false); }catch(_){}
+  mcpActivity(mode==="detect"?"ตรวจหาบอร์ด":"โหลดลงบอร์ด");
+  return {started:mode, next:"call board_status"};
+};
+MCP_OPS.board_status = async a=>{
+  const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
+  let s;
+  for(;;){ s=await (await fetch("/api/board/status")).json(); if(s.state!=="running" || Date.now()>until) break;
+    await new Promise(r=>setTimeout(r, 700)); }
+  const out={job:s.kind, state:s.state, seconds:s.elapsed, log_tail:(s.lines||[]).slice(-25).join("\n")};
+  if(s.hint) out.explain=s.hint;
+  if(s.result&&Object.keys(s.result).length) out.result=s.result;
+  if(s.state==="running") out.next="still running — call board_status again";
+  try{ const d=brdDesign(); const b=await brdPost("/api/board/bit",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+    if(b&&b.ok) out.bit=b.exists?{path:b.path, matches_circuit:b.current}:null; }catch(_){}
+  return out;
+};
+
 /* ---------- the lab workflow: schematic → simulate → the USER approves → Top-Down ----------
    Claude shows its summary in a card in the editor and the user answers there (อนุมัติ / ขอแก้).
    The approval is tied to the circuit as it was when approved (a fingerprint of every sheet's

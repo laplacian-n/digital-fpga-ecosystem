@@ -344,7 +344,10 @@ window.addEventListener("focus", () => loadProjects().catch(()=>{}));
   fetch("/api/ping").catch(()=>{});
   [CFG, ST] = await Promise.all([api("/api/config"), api("/api/status")]);
   fillSettings(); fillStatus(); loadProjects();
-  if(!CFG.setup_done) showTab("setup"); else loadSetup();
+  // ?tab=setup|settings (opened by Claude via MCP open_home, or a link)
+  const want=new URLSearchParams(location.search).get("tab");
+  if(want && document.getElementById("tab-"+want)){ showTab(want); if(want!=="setup") loadSetup(); }
+  else if(!CFG.setup_done) showTab("setup"); else loadSetup();
   checkUpdate(false);
 })();
 
