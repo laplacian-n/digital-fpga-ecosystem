@@ -54,3 +54,18 @@ test("Settings spots an old offline MCP server in Claude Desktop and removes it 
   j = await (await request.get(BASE + "/api/mcp/setup")).json();
   expect(j.legacy).toEqual([]);
 });
+
+test("Home: สร้าง opens the editor on the new project, saved into its folder; an empty folder opens too", async ({ page, request }) => {
+  await (await request.post(BASE + "/api/projects/new", { data: { name: "lab9" }, headers: { Origin: BASE } })).json();
+  await page.goto(BASE + "/");
+  await expect(page.locator("#projects .row", { hasText: "lab9" }).locator('[data-act="open"]')).toHaveCount(1);   // no file yet, still openable
+  await page.goto(BASE + "/studio.html?new=lab9");
+  await page.waitForFunction(() => typeof UX === "object" && state.project && state.project.name === "lab9");
+  await expect(page.locator("#projectName")).toHaveValue("lab9");
+  await expect.poll(async () => (await (await request.get(BASE + "/api/projects")).json()).projects.find(p => p.name === "lab9").main)
+    .toBe("lab9/lab9.schproj.json");
+  // opening it again does not make a second project
+  await page.goto(BASE + "/studio.html?new=lab9");
+  await page.waitForFunction(() => state.project && state.project.name === "lab9");
+  expect(await page.evaluate(() => Object.values(state.projects).filter(p => /^lab9/.test(p.name)).length)).toBe(1);
+});

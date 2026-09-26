@@ -228,3 +228,16 @@ test("Claude knows the app: about, projects, board readiness; new_project; board
   expect(r.error).toBe(false);
   expect(r.data).toHaveProperty("state");
 });
+
+test("the retired offline servers read the LIVE sheet, not their stale files", async () => {
+  // what the old schematic_mcp.py / topdown_mcp.py read_design now answers while the app runs
+  await mcp.tool("new_sheet", { name: "live_one" });
+  await mcp.tool("add_component", { type: "AND", name: "g_live" });
+  const { execFileSync } = require("child_process");
+  const out = execFileSync(PY, ["-c", "import legacy_live, sys; print(legacy_live.live_sheet('live_one')); print('---'); print(legacy_live.live_sheets())"],
+    { cwd: ROOT, env, encoding: "utf-8" });
+  const [sheet, sheets] = out.split("---");
+  expect(sheet).toContain("g_live");
+  expect(sheets).toContain("live_one");
+  expect(fs.readFileSync(path.join(ROOT, "schematic_mcp.py"), "utf-8")).toContain("legacy_live.live_sheet(name)");
+});

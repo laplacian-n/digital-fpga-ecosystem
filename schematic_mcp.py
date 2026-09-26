@@ -37,6 +37,12 @@ from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
+try:  # the running app's live editor state (see legacy_live.py)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import legacy_live
+except Exception:  # pragma: no cover - a copy without the repo around it
+    legacy_live = None
+
 DESIGN_DIR = Path(os.environ.get("SCHSTUDIO_DIR", Path(__file__).parent / "designs_gate"))
 DESIGN_DIR.mkdir(parents=True, exist_ok=True)
 BRIDGE_PORT = int(os.environ.get("SCHSTUDIO_PORT", "8766"))
@@ -397,12 +403,19 @@ def list_designs() -> str:
         except Exception:
             n = "?"
         out.append(f"{p.name}  ({n} sheet(s))")
-    return "\n".join(out) or "No designs saved yet."
+    saved = "\n".join(out) or "No designs saved yet."
+    now = legacy_live.live_sheets() if legacy_live else None
+    if now is not None:
+        return legacy_live.RETIRED + "\n\nOPEN IN THE EDITOR NOW (live):\n" + now + "\n\nOld saved files (may be out of date):\n" + saved
+    return saved
 
 
 @mcp.tool()
 def read_design(name: str) -> str:
-    """Return the JSON of a previously saved design so you can revise it."""
+    """Return a design: the sheet as it is on screen now when the app is running, else the saved file."""
+    now = legacy_live.live_sheet(name) if legacy_live else None
+    if now is not None:
+        return (legacy_live.RETIRED + "\n\nThis is the sheet AS IT IS ON SCREEN NOW (the user may have changed it since anything was saved):\n" + now)
     path = DESIGN_DIR / (_safe(name) + ".schproj.json")
     if not path.exists():
         return f"ERROR: {path.name} not found. Use list_designs()."

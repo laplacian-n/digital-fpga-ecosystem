@@ -528,6 +528,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
             <button data-tool="symbol"   title="Add Symbol — เปิดแผง Components">⊞</button>
             <hr>
             <button data-act="lock-layout" id="btnLockLayout" title="ล็อกการจัดวาง — สายและจุดจะอยู่กับที่ ไม่มีการจัดใหม่อัตโนมัติ">🔓</button>
+            <button data-act="wire-tidy" id="btnWireTidy" title="เก็บกวาดสาย — ลากเส้นใหม่จากการต่อเดิม ชิ้นส่วนอยู่ที่เดิม · เลือกสายไว้ = เฉพาะเน็ตนั้น, ไม่ได้เลือก = ทั้งแผ่น (Ctrl+Z ย้อนได้)">🧹</button>
+            <button data-act="ratsnest" id="btnRatsnest" title="โหมดจัดวาง (แบบ KiCad) — ซ่อนสาย เหลือเส้นสีโยงขาที่ต้องต่อกัน ลากชิ้นส่วนวางเอง แล้วกด “จัดสายให้”">🧲</button>
             <button data-act="auto-route" id="btnAutoRoute" title="จัดสายอัตโนมัติทั้งแผ่น — เส้นตั้งฉาก ไม่ทับกัน ไม่ลอด component (กด Ctrl+Z เพื่อย้อน)">🧭</button>
             <hr>
             <button data-act="debug-overlay" id="btnDebugOverlay" title="ดีบั๊กเส้น — ไฮไลท์: เน็ตเดียวกันทับ / ต่างเน็ตทับแนว / จุดครอสต่างเน็ต">🐞</button>
@@ -542,6 +544,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
             <label><input type="checkbox" id="dbgSelf" checked> <span class="sw" style="background:#e0245e"></span> เน็ตเดียวกันทับตัวเอง <b id="dbgSelfN">0</b></label>
             <label><input type="checkbox" id="dbgColl" checked> <span class="sw" style="background:#f5a623"></span> ต่างเน็ตทับแนวเดียว <b id="dbgCollN">0</b></label>
             <label><input type="checkbox" id="dbgCross" checked> <span class="sw" style="border:2px solid #8b5cf6"></span> จุดครอสต่างเน็ต <b id="dbgCrossN">0</b></label>
+            <div class="dbg-fix" id="dbgFix"></div>
             <div class="dbg-hint">แดง = เน็ตเดียวทับ · ส้ม = ต่างเน็ตทับแนว (ทั้งคู่ควรเป็น 0) · ม่วง = ครอสตั้งฉาก (ปกติ ยอมได้)</div>
           </div>
           <div class="canvas-hint" id="canvasHint">
@@ -2251,7 +2254,11 @@ function healJunctions(sch){
         sch.components = sch.components.filter(c=>c!==j);
         changed = true;
       } else if(total === 1 && j.params && j.params.endpoint){
-        // a deliberate free wire end (drawn into open space) — keep the stub
+        // a deliberate free wire end (drawn into open space) — keep the stub. But an end
+        // dropped exactly ON another dot is a connection: it looked joined, stayed a
+        // separate net, and the pin it fed read "ปลายลอย" ('0' in VHDL).
+        const twin = junctionTwinAt(sch, j);
+        if(twin && junctionNetsMayJoin(sch, j, twin)){ weldJunction(sch, twin, j); changed = true; }
         continue;
       } else if(total === 1){
         // The one wire left on this dot may be a REAL connection — a run landing on a
@@ -2307,22 +2314,109 @@ function healJunctions(sch){
           // CRITICAL: two coincident dots of DIFFERENT nets (both scalar) would weld
           // and SHORT the nets — silently wrong VHDL. Weld only when they are already
           // electrically one net: joined by the stub, or tracing to the same driver.
-          const drvKey = jj => { const wf = sch.wires.find(w=>w.from.cid===jj.id); if(!wf) return "solo:"+jj.id; const d = netDriverPort(sch, wf); return d ? d.cid+"."+d.pid : "solo:"+jj.id; };
           const joinedByStub = sch.wires.some(w=>(w.from.cid===j.id&&w.to.cid===twin.id)||(w.from.cid===twin.id&&w.to.cid===j.id));
-          const sameNet = joinedByStub || drvKey(j)===drvKey(twin);
-          if(sameNet){
-            sch.wires.forEach(w=>{
-              if(w.from.cid===twin.id) w.from = {cid:j.id, pid:"j"};
-              if(w.to.cid===twin.id)   w.to   = {cid:j.id, pid:"j"};
-            });
-            sch.components = sch.components.filter(c=>c!==twin);
-            sch.wires = sch.wires.filter(w=>w.from.cid!==w.to.cid);   // drop the collapsed stub
+          if(joinedByStub || junctionNetsMayJoin(sch, j, twin)){
+            weldJunction(sch, j, twin);
             changed = true;
           }
         }
       }
     }
   }
+  orientJunctionNets(sch);
+}
+/* Point every wire of a junction cluster AWAY from its driver. The generator, the sim
+   and the checks all trace a pin back by following w.from through the dots; one
+   dot-to-dot wire pointing the wrong way (after a weld, a drag, tied inputs) cut the
+   net in two there — the pin read "ปลายลอย" and got '0' although it was wired. */
+function orientJunctionNets(sch){
+  const isJ = cid => { const c = comp(cid, sch); return !!c && c.type==="JUNCTION"; };
+  const flip = w => { const f = w.from; w.from = w.to; w.to = f; if(w.pts) w.pts = w.pts.slice().reverse(); };
+  const done = new Set();
+  for(const j0 of sch.components){
+    if(j0.type!=="JUNCTION" || done.has(j0.id)) continue;
+    // the cluster: dots joined by wires, either direction
+    const dots = new Set([j0.id]), stack = [j0.id];
+    while(stack.length){
+      const id = stack.pop();
+      sch.wires.forEach(w=>{
+        const o = w.from.cid===id ? w.to.cid : w.to.cid===id ? w.from.cid : null;
+        if(o && isJ(o) && !dots.has(o)){ dots.add(o); stack.push(o); }
+      });
+    }
+    dots.forEach(id=>done.add(id));
+    const touch = sch.wires.filter(w=>dots.has(w.from.cid) || dots.has(w.to.cid));
+    // its drivers: a real port on the from side, or an OUTPUT pin a wire was drawn INTO
+    const feeds = touch.filter(w=>{
+      if(!isJ(w.from.cid)) return true;
+      if(isJ(w.to.cid)) return false;
+      const p = getPort(comp(w.to.cid, sch), w.to.pid);
+      return !!p && p.dir==="out";
+    });
+    if(feeds.length!==1) continue;            // undriven, or shorted — leave that to the checks
+    const feed = feeds[0];
+    if(isJ(feed.from.cid)) flip(feed);
+    // walk out from the dot the driver enters, turning dot-to-dot wires to point away
+    const root = feed.to.cid, seen = new Set([root]), q = [root];
+    while(q.length){
+      const id = q.shift();
+      touch.forEach(w=>{
+        if(w===feed) return;
+        const o = w.from.cid===id ? w.to.cid : w.to.cid===id ? w.from.cid : null;
+        if(!o || !isJ(o) || seen.has(o)) return;
+        if(w.from.cid!==id) flip(w);
+        seen.add(o); q.push(o);
+      });
+    }
+  }
+}
+/* Another dot sitting on exactly the same spot as j, if any. */
+function junctionTwinAt(sch, j){
+  const jp = portPos(j, "j");
+  return sch.components.find(k=>{
+    if(k===j || k.type!=="JUNCTION") return false;
+    const kp = portPos(k, "j");
+    return Math.abs(kp.x-jp.x)<2 && Math.abs(kp.y-jp.y)<2;
+  }) || null;
+}
+/* The real port driving the net through dot jj, or null while nothing drives it. */
+function junctionDriverKey(sch, jj){
+  const w = sch.wires.find(x=>x.from.cid===jj.id || x.to.cid===jj.id);
+  const d = w && netDriverPort(sch, w);
+  if(!d) return null;
+  const c = comp(d.cid, sch);
+  return (c && c.type!=="JUNCTION") ? d.cid+"."+d.pid : null;
+}
+/* Two coincident dots of DIFFERENT driven nets must never weld: that SHORTS the nets
+   and the VHDL is silently wrong. Welding is safe when they are already one net, or
+   when at most one side has a driver (an undriven stub simply joins the other net). */
+function junctionNetsMayJoin(sch, a, b){
+  const ka = junctionDriverKey(sch, a), kb = junctionDriverKey(sch, b);
+  return !ka || !kb || ka===kb;
+}
+/* Move every wire of dot `drop` onto dot `keep` and remove `drop`. */
+function weldJunction(sch, keep, drop){
+  sch.wires.forEach(w=>{
+    if(w.from.cid===drop.id) w.from = {cid:keep.id, pid:"j"};
+    if(w.to.cid===drop.id)   w.to   = {cid:keep.id, pid:"j"};
+  });
+  sch.components = sch.components.filter(c=>c!==drop);
+  sch.wires = sch.wires.filter(w=>w.from.cid!==w.to.cid);   // drop the collapsed stub
+  // A dot takes ONE incoming wire. If the weld brought in a second one, it came from an
+  // undriven side (junctionNetsMayJoin guarantees that) — point it away from the dot.
+  const ins = sch.wires.filter(w=>w.to.cid===keep.id);
+  if(ins.length > 1){
+    const real = ins.find(w=>{ const d = netDriverPort(sch, w), c = d && comp(d.cid, sch); return c && c.type!=="JUNCTION"; }) || ins[0];
+    ins.forEach(w=>{
+      if(w===real) return;
+      const fc = comp(w.from.cid, sch);
+      if(!fc || fc.type!=="JUNCTION") return;               // a real output: leave it for the checker
+      const f = w.from; w.from = w.to; w.to = f;
+      if(w.pts) w.pts = w.pts.slice().reverse();
+    });
+  }
+  if(keep.params && keep.params.endpoint && sch.wires.filter(w=>w.from.cid===keep.id||w.to.cid===keep.id).length>1)
+    delete keep.params.endpoint;                            // it is a branch point now
 }
 /* Re-seed the uid counter after loading external data so new ids never collide */
 /* Lift the uid counter above every id in p (default: the live project). Takes p so
@@ -6207,10 +6301,35 @@ function netHasDriver(sch, w, seen){
   const src = comp(w.from.cid, sch);
   if(!src) return false;
   if(src.type !== "JUNCTION") return true;              // a real port feeds it
-  if(seen.has(src.id)) return false;
+  if(seen.has(src.id)) return !!junctionClusterDriver(sch, src.id);
   seen.add(src.id);
   const up = sch.wires.find(x=>x.to.cid===src.id);
-  return up ? netHasDriver(sch, up, seen) : false;      // a dot with nothing coming in
+  if(up) return netHasDriver(sch, up, seen);
+  return !!junctionClusterDriver(sch, src.id);          // a dot with nothing coming in — unless a
+}                                                       // dot-to-dot wire just points the other way
+
+/* The real port driving the junction cluster around dot jid, found by walking the
+   dots UNDIRECTED. The directed walk above follows w.from back, which only works while
+   every dot-to-dot wire points away from the driver. Merging dots, dragging an end or
+   tying inputs together can leave one pointing the other way — J and K tied, the
+   driver entering at K, the AND's input hung off J — and then the net read as
+   floating (and the generator wrote '0') although it was plainly wired. */
+function junctionClusterDriver(sch, jid){
+  const seenJ = new Set([jid]), stack = [jid];
+  while(stack.length){
+    const id = stack.pop();
+    for(const w of sch.wires){
+      const ends = w.from.cid===id ? [w.to, "to"] : w.to.cid===id ? [w.from, "from"] : null;
+      if(!ends) continue;
+      const [ep, side] = ends, c = comp(ep.cid, sch);
+      if(!c) continue;
+      if(c.type==="JUNCTION"){ if(!seenJ.has(c.id)){ seenJ.add(c.id); stack.push(c.id); } continue; }
+      if(side==="from") return {cid:ep.cid, pid:ep.pid};
+      const port = getPort(c, ep.pid);
+      if(port && port.dir==="out") return {cid:ep.cid, pid:ep.pid};
+    }
+  }
+  return null;
 }
 
 function netDriverPort(sch, w, seen){
@@ -6218,10 +6337,11 @@ function netDriverPort(sch, w, seen){
   const src = comp(w.from.cid, sch);
   if(!src) return null;
   if(src.type!=="JUNCTION") return {cid:w.from.cid, pid:w.from.pid};
-  if(seen.has(src.id)) return null;
+  if(seen.has(src.id)) return junctionClusterDriver(sch, src.id);
   seen.add(src.id);
   const up = sch.wires.find(x=>x.to.cid===src.id);
-  return up ? netDriverPort(sch, up, seen) : {cid:src.id, pid:"j"};
+  if(up) return netDriverPort(sch, up, seen);
+  return junctionClusterDriver(sch, src.id) || {cid:src.id, pid:"j"};
 }
 /* start a branch FROM a wire without committing a junction yet. The dot is minted
    once the target is picked — AT THIS ANCHOR, the spot the user clicked, which
@@ -6530,7 +6650,7 @@ function render(){
       else { lx = r.kind==="z" ? r.mx : r.kind==="l" ? r.x1 : (r.x1+r.x2)/2;
              ly = (r.kind==="s" ? r.my : r.kind==="h" ? r.y1 : (r.y1+r.y2)/2) - 6; }
       const bw = Math.max(44, labText.length*6.5 + 10);   // fit the text
-      const bg = el("rect",{x:lx-bw/2,y:ly-10,width:bw,height:14,rx:3,fill:"var(--label-bg)","pointer-events":"none"});
+      const bg = el("rect",{class:"wire-label-bg",x:lx-bw/2,y:ly-10,width:bw,height:14,rx:3,fill:"var(--label-bg)","pointer-events":"none"});
       root.appendChild(bg);
       const lbl = txt(lx, ly, labText, {anchor:"middle", fill:"var(--ink-dim)", size:10});
       lbl.setAttribute("class","wire-label");
@@ -7193,7 +7313,10 @@ window.addEventListener("mouseup",ev=>{
       // moving a component/junction reroutes wires — re-slide branch junctions so
       // the connection square stays exactly where the wires diverge (not left
       // behind, and not stranded below a long shared stub of overlapping branches)
-      healLayout(activeSch(), scopeOf(activeSch(), {comps: movedComps}));
+      // re-route only the branches off what moved (UX layer); a locked sheet or a hand-
+      // dragged dot heals the old way
+      if(!(typeof wtAfterMove==="function" && wtAfterMove(activeSch(), movedComps)))
+        healLayout(activeSch(), scopeOf(activeSch(), {comps: movedComps}));
       snapshot();
     } else {
       state.drag = null;
@@ -7408,7 +7531,8 @@ window.addEventListener("keydown",ev=>{
       // dots are what's selected — nudging a mixed block isn't aiming at its dots.
       if(selComps.every(c=>c.type==="JUNCTION"))
         selComps.forEach(c=>{ (c.params || (c.params = {})).fixed = true; });
-      healLayout(activeSch(), scopeOf(activeSch(), {comps: selComps}));
+      if(!(typeof wtAfterMove==="function" && wtAfterMove(activeSch(), selComps)))
+        healLayout(activeSch(), scopeOf(activeSch(), {comps: selComps}));
       snapshot(); render();
     } else {
       // nothing selected → pan the view
@@ -12093,6 +12217,26 @@ function simDetectSeg(outs){ const n=outs.map(x=>x.toLowerCase()); const ord=['a
   const m=ord.map(s=>{ for(const nm of [s,'seg_'+s,'seg'+s,'s'+s,'seg_'+s.toUpperCase()]){ const i=n.indexOf(nm); if(i>=0) return i; } return null; });
   // require at least 4 of the 7 to look like a real 7-seg (avoids false hits on "s0","a" etc.)
   return m.filter(x=>x!=null).length>=4 ? m : null; }
+/* Which of the 4 digits (DOM order, 0 = leftmost) show the segments. The board picks a digit
+   with an:N — 0 is the RIGHTMOST, active-low (the hex7 lab ties an0 to GND to light it). The
+   sim used to paint every pattern on the leftmost digit, the mirror image of the real board.
+   No digit select on the sheet → the rightmost digit, as with an0 tied low. */
+function simSegDigits(names, vals){
+  const own=(activeSch()||{}).pinmap||{}, ans=[];
+  names.forEach((n,k)=>{
+    const t=(SIM_PINMAP&&SIM_PINMAP.outMap&&SIM_PINMAP.outMap[n])
+          || (typeof pmGet==="function" ? pmGet(own,n) : own[n])
+          || (typeof autoSpecialTarget==="function" ? autoSpecialTarget(n,"out") : null);
+    if(t && /^an:[0-3]$/.test(t)) ans.push({d:3-(+t.slice(3)), on:!vals[k]});
+  });
+  if(!ans.length) return [3];
+  return ans.filter(a=>a.on).map(a=>a.d);
+}
+function simPaintSeg(on){   // on: segment index 0..6 → lit?, painted on the selected digits
+  document.querySelectorAll('#simPcb .seg').forEach(el=>{ el.style.background='#d5d5d0'; el.style.boxShadow='none'; });
+  (on.digits||[]).forEach(d=>{ for(let s=0;s<7;s++){ if(!on[s]) continue;
+    const el=document.querySelector('#simPcb .seg[data-seg="'+d+'-'+s+'"]'); if(el){ el.style.background='#000'; el.style.boxShadow='0 0 5px 1px rgba(0,0,0,.6)'; } } });
+}
 function wireSimBoard(j){
   const msg=$("#simBoardMsg"); if(msg) msg.innerHTML="";
   document.querySelectorAll('#simPcb .swName').forEach(e=>{ e.textContent='sw['+e.dataset.swn+']'; e.parentElement.classList.remove('mapped'); });
@@ -12130,13 +12274,14 @@ function wireSimBoard(j){
     const key=tt.inputs.map(n=>SIM_SW[SIM_PINMAP.inMap[n]]||0);
     const out=lookup.get(key.join(''))||tt.outputs.map(()=>0);
     document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ d.style.background='#fff'; d.style.boxShadow='none'; });
-    for(let s=0;s<7;s++){ const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background='#d5d5d0'; el.style.boxShadow='none'; } }
+    const segOn={digits:simSegDigits(tt.outputs, out)};
     const bz=$("#simBuzzer"); if(bz){ bz.style.background='#fff'; bz.style.boxShadow='none'; }
     tt.outputs.forEach((n,k)=>{ if(!out[k]) return; const t=SIM_PINMAP.outMap[n]||'';
       if(t.slice(0,4)==='led:'){ const d=document.querySelector('#simPcb .ledDot[data-led="'+t.slice(4)+'"]'); if(d){ d.style.background='#222'; d.style.boxShadow='0 0 8px 3px rgba(0,0,0,.35)'; } }
-      else if(t.slice(0,4)==='seg:'){ const s=SEGL.indexOf(t.slice(4)); const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background='#000'; el.style.boxShadow='0 0 5px 1px rgba(0,0,0,.6)'; } }
+      else if(t.slice(0,4)==='seg:'){ const s=SEGL.indexOf(t.slice(4)); if(s>=0) segOn[s]=1; }
       else if(t==='buzzer' && bz){ bz.style.background='#ffe08a'; bz.style.boxShadow='0 0 10px 3px rgba(245,180,40,.6)'; }
     });
+    simPaintSeg(segOn);
     $("#simValbar").innerHTML='<b style="color:var(--ok)">IN</b> '+tt.inputs.map(n=>n+'='+(SIM_SW[SIM_PINMAP.inMap[n]]||0)).join(' ')+' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+tt.outputs.map((n,i)=>n+'='+out[i]).join(' ');
     document.querySelectorAll('#simBoardTable tr').forEach(r=>r.classList.remove('cur'));
     const cur=document.querySelector('#simBoardTable tr[data-key="'+key.join('')+'"]'); if(cur){ cur.classList.add('cur'); cur.scrollIntoView({block:"nearest"}); }
@@ -12151,7 +12296,8 @@ function wireSimBoard(j){
 let SIM_PINMAP=null, SIM_REDRAW=null;
 function simSwLabel(i){ return 'SW '+(SIM_SW_PINS[15-i]||'?'); }
 function simPinLabel(t){ t=t||''; if(t.slice(0,4)==='led:') return 'LED '+(SIM_LED_PINS[15-(+t.slice(4))]||'?');
-  if(t.slice(0,4)==='seg:') return '7SEG '+t.slice(4); if(t==='buzzer') return 'BUZZER B14'; return '—'; }
+  if(t.slice(0,4)==='seg:') return '7SEG '+t.slice(4); if(t.slice(0,3)==='an:') return 'หลัก '+t.slice(3)+(+t.slice(3)===0?' (ขวาสุด)':'');
+  if(t==='buzzer') return 'BUZZER B14'; return '—'; }
 function simDefaultPinmap(tt){
   const seg=simDetectSeg(tt.outputs), segOf={};
   if(seg) ['a','b','c','d','e','f','g'].forEach((L,s)=>{ if(seg[s]!=null) segOf[seg[s]]=L; });
@@ -12266,7 +12412,7 @@ function seqShow(i){
   SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+SIM_SEQ.swOf[k]+'"]'); if(u){ const th=u.querySelector('.swThumb'); th.style.top=ins[k]?'1px':'12px'; th.style.background=ins[k]?'#222':'#aaa'; }});
   const ledOn={}; SIM_SEQ.ledOf.forEach((l,k)=>{ if(l!=null && out[k]) ledOn[l]=1; });
   document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ const on=ledOn[+d.dataset.led]; d.style.background=on?'#222':'#fff'; d.style.boxShadow=on?'0 0 8px 3px rgba(0,0,0,.35)':'none'; });
-  if(segMap){ for(let s=0;s<7;s++){ const on=segMap[s]!=null?out[segMap[s]]:0; const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background=on?'#000':'#d5d5d0'; el.style.boxShadow=on?'0 0 5px 1px rgba(0,0,0,.6)':'none'; } } }
+  if(segMap){ const on={digits:simSegDigits(SIM_SEQ.outputs, out)}; for(let s=0;s<7;s++) on[s]=segMap[s]!=null?out[segMap[s]]:0; simPaintSeg(on); }
   $("#simValbar").innerHTML='<b style="color:var(--accent)">clock '+r[0]+'</b>'
     +(SIM_SEQ.inputs.length?(' &nbsp; <b style="color:var(--ok)">IN</b> '+SIM_SEQ.inputs.map((nm,i)=>esc(nm)+'='+ins[i]).join(' ')):'')
     +' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
@@ -12390,6 +12536,8 @@ document.addEventListener("click",ev=>{
                        : "🔓 ปลดล็อกการจัดวาง — ระบบจะช่วยจัดสายให้อีกครั้ง", "ok", 3000);
       break;
     }
+    case "wire-tidy": { if(typeof wtTidyCommand==="function") wtTidyCommand(); break; }
+    case "ratsnest":  { if(typeof wtRatsToggle==="function") wtRatsToggle(); break; }
     case "relayout": {
       const sch = activeSch(); if(!sch) return;
       healLayout(sch, null, true);       // one-shot, on request, even when locked
@@ -12752,6 +12900,17 @@ init();
 .mcp-approval textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical}
 .mcp-approval .mcp-ap-row{display:flex;gap:8px;align-items:center}
 .mcp-approval .grow{flex:1}
+
+/* ===== 12. wire tidy / ratsnest ===== */
+#canvas.wt-focus .wire-group:not(.net-hi):not(:hover){opacity:.28;transition:opacity .12s}
+#canvas.wt-rats .wire-group,#canvas.wt-rats .node.wt-j,#canvas.wt-rats .wire-label,#canvas.wt-rats .wire-label-bg{display:none}
+.wt-rats-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:8px;align-items:center;
+  background:var(--bg-1);border:1px solid var(--accent,#5b6cff);border-radius:10px;padding:7px 10px;box-shadow:0 6px 20px rgba(0,0,0,.18);font-size:13px;max-width:calc(100% - 32px);flex-wrap:wrap}
+.wt-rats-bar[hidden]{display:none}
+.wt-rats-bar button{border:1px solid var(--line,#ccd);background:var(--bg-0);border-radius:7px;padding:4px 10px;cursor:pointer;font:inherit}
+.wt-rats-bar .wt-go{background:var(--accent,#5b6cff);color:#fff;border-color:transparent;font-weight:600}
+.dbg-fix{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+.dbg-fix button{border:1px solid var(--line,#ccd);background:var(--bg-0);border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;font-size:12px}
 </style>
 <script>
 "use strict";
@@ -13294,7 +13453,7 @@ function sheetPorts(sch){
   simDefaultPinmap=function(tt){
     const pm=_def.apply(this, arguments), own=(activeSch()||{}).pinmap||{};
     tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.indexOf("sw:")===0) pm.inMap[n]=+t.slice(3); });
-    tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
+    tt.outputs.forEach(n=>{ const t=pmGet(own,n)||autoSpecialTarget(n,"out"); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||/^an:[0-3]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
     return pm;
   };
   const _pick=renderPinPicker;
@@ -13699,7 +13858,7 @@ canvas.addEventListener("mousemove", ev=>{
   if(MARK.on && MARK.pins.length){ const w=svgPoint(ev), sch=activeSch(); let best=-1, bd=8/Math.max(.4,state.view.k);
     MARK.pins.forEach((m,k)=>{ const c=comp(m.cid,sch); const pp=c&&portPos(c,m.pid); if(!pp) return; const d=Math.hypot(pp.x-w.x,pp.y-w.y); if(d<bd){ bd=d; best=k; } });
     if(best>=0){ clearTimeout(UXTIP.t); uxTipShow(uxMarkHtml("p"+best), ev.clientX, ev.clientY, "mkp"+best); return; } }
-  const wg=PROBE && ev.target.closest && ev.target.closest(".wire-group[data-wid]");
+  const wg=ev.target.closest && ev.target.closest(".wire-group[data-wid]");
   const nd=!wg && ev.target.closest && ev.target.closest(".node[data-cid]");
   const key=wg?"w"+wg.dataset.wid : nd?"n"+nd.dataset.cid : null;
   if(!key){ uxTipHide(); return; }
@@ -13708,10 +13867,10 @@ canvas.addEventListener("mousemove", ev=>{
   const x=ev.clientX, y=ev.clientY;
   UXTIP.t=setTimeout(()=>{
     let html="";
-    if(wg) html=probeWireHtml(wg.dataset.wid);
+    if(wg) html=PROBE ? probeWireHtml(wg.dataset.wid) : (typeof wtNetHtml==="function" ? wtNetHtml(wg.dataset.wid) : "");
     else { const c=comp(nd.dataset.cid); if(c) html=gateTableHtml(c); }
     if(html) uxTipShow(html, x, y, key);
-  }, wg?120:450);
+  }, wg?(PROBE?120:350):450);
 });
 canvas.addEventListener("mouseleave", uxTipHide);
 canvas.addEventListener("mousedown", uxTipHide);
@@ -14993,8 +15152,16 @@ function mcpShowChange(pre){
     }
   }
   // glow on what changed, for a moment
+  // (kept in MCPB.flash so a re-render inside that moment — which rebuilds every node — keeps it)
+  MCPB.flash={ids:new Set(cs.map(c=>c.id)), until:Date.now()+1800};
   requestAnimationFrame(()=>{ cs.forEach(c=>{ const el=document.querySelector('.node[data-cid="'+c.id+'"]'); if(el){ el.classList.remove("mcp-flash"); void el.getBoundingClientRect(); el.classList.add("mcp-flash"); } });
-    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")), 1800); });
+    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>{ MCPB.flash=null; document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")); }, 1800); });
+}
+{
+  const _render=render;
+  render=function(){ const r=_render.apply(this, arguments);
+    const f=MCPB.flash; if(f && Date.now()<f.until) f.ids.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"]'); if(el) el.classList.add("mcp-flash"); });
+    return r; };
 }
 
 /* ---------- transport: long-poll the launcher ---------- */
@@ -15354,6 +15521,491 @@ function uxIsTopdownProject(o){
     return _deserialize.apply(this, arguments);
   };
 }
+
+/* ===== 12. Wire tidy: re-route from the connection list, never from the old picture =====
+   "จัดต่อก็วุ่นวายมาพันยุ่งเหยิง จะลบลากใหม่ก็จำไม่ได้ว่าอันไหนต่ออันไหน จัดอยู่ดีๆสายก็เด้งไปที่อื่น"
+   The editor already knows every connection; what gets messy is only the PATH each wire takes.
+   Everything here keeps the connectivity exactly and redraws paths:
+     wtTidySheet(sch)          every net on the sheet, parts stay where they are
+     wtTidyNet(sch, wire)      the one net that wire belongs to
+     wtAfterMove(sch, comps)   after a part is moved: ONLY the branches that hang off it (and
+                               any wire it now sits on) — every other wire stays put
+   One router serves all three (the Top-Down engine's rules, on this editor's pin geometry):
+     * a net is ONE tree: each loose end is A*-routed to the part of the net already drawn,
+       and a dot is placed where it joins (never branching off at a pin);
+     * hard rules: no body, no foreign pin, never along another net's run, never a corner or
+       a pass through another net's corner / dot / end;
+     * costs: a bend 34, a crossing 28, running right next to another net 5 per grid;
+     * if the strict search finds nothing, a relaxed one (rules become big penalties); if even
+       that fails the wire is drawn plain — a connection is never dropped. */
+const WT = { BEND: 34, CROSS: 28, NEAR: 5, DIRS: [[1,0],[0,1],[-1,0],[0,-1]] };
+
+function wtIsJ(sch, cid){ const c = comp(cid, sch); return !!c && c.type==="JUNCTION"; }
+function wtReal(sch){ return sch.components.filter(c=>c.type!=="JUNCTION"); }
+/* the drawn corner list of a wire, rounded */
+function wtPoly(sch, w){
+  const p = drawnPoints(sch, w);
+  return p ? p.map(q=>({x:Math.round(q.x), y:Math.round(q.y)})) : null;
+}
+/* direction a wire leaves a pin in: away from the middle of the part (as globalRoute) */
+function wtExit(c, pp){
+  const b = compBBox(c), dx = pp.x-(b.x+b.w/2), dy = pp.y-(b.y+b.h/2);
+  return Math.abs(dx)>=Math.abs(dy) ? (dx>=0?0:2) : (dy>=0?1:3);
+}
+/* wire id → net key, for every net on the sheet (walks through dots, either direction) */
+function wtNetKeys(sch){
+  const key = new Map(); let n = 0;
+  sch.wires.forEach(w=>{ if(key.has(w.id)) return; const k = "n"+(n++); netWires(sch, w).forEach(id=>key.set(id, k)); });
+  return key;
+}
+
+/* ---------- the grid: every GRID line plus every pin / wire corner coordinate ---------- */
+function wtGrid(sch){
+  const G = GRID, reals = wtReal(sch);
+  const keepX = new Set(), keepY = new Set();
+  let x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+  const grow = (x,y)=>{ x0=Math.min(x0,x); y0=Math.min(y0,y); x1=Math.max(x1,x); y1=Math.max(y1,y); };
+  reals.forEach(c=>{ const b = compBBox(c); grow(b.x,b.y); grow(b.x+b.w,b.y+b.h);
+    getPorts(c).forEach(p=>{ const q = portPos(c,p.id); if(q){ keepX.add(Math.round(q.x)); keepY.add(Math.round(q.y)); } }); });
+  sch.wires.forEach(w=>{ const pl = wtPoly(sch,w); if(pl) pl.forEach(q=>{ keepX.add(q.x); keepY.add(q.y); grow(q.x,q.y); }); });
+  sch.components.forEach(c=>{ if(c.type!=="JUNCTION") return; const q = portPos(c,"j"); keepX.add(Math.round(q.x)); keepY.add(Math.round(q.y)); });
+  if(!isFinite(x0)) return null;
+  const PAD = 8*G;
+  x0 = Math.floor((x0-PAD)/G)*G; y0 = Math.floor((y0-PAD)/G)*G; x1 = Math.ceil((x1+PAD)/G)*G; y1 = Math.ceil((y1+PAD)/G)*G;
+  const kx = [...keepX], ky = [...keepY];
+  const xsS = new Set(kx), ysS = new Set(ky);
+  // a plain grid line hugging a pin row (closer than half a grid) would read as touching it
+  for(let x=x0; x<=x1; x+=G) if(!kx.some(k=>k!==x && Math.abs(k-x)<G/2)) xsS.add(x);
+  for(let y=y0; y<=y1; y+=G) if(!ky.some(k=>k!==y && Math.abs(k-y)<G/2)) ysS.add(y);
+  const xs = [...xsS].sort((a,b)=>a-b), ys = [...ysS].sort((a,b)=>a-b);
+  const NX = xs.length, NY = ys.length, N = NX*NY;
+  if(N > 600000) return null;
+  const xi = new Map(xs.map((v,i)=>[v,i])), yi = new Map(ys.map((v,i)=>[v,i]));
+  const g = { xs, ys, NX, NY, N, xi, yi,
+    id: (i,j)=>j*NX+i,
+    at: (x,y)=>{ const i = xi.get(Math.round(x)), j = yi.get(Math.round(y)); return (i==null||j==null) ? -1 : j*NX+i; },
+    near: (x,y)=>{ const i = wtNearest(xs,x), j = wtNearest(ys,y); return j*NX+i; },
+    blocked: new Uint8Array(N),
+    pin: new Map(),                 // cell → "cid pid"
+    hOwn: new Array(N).fill(null),  // edge (i,j)→(i+1,j) → net key
+    vOwn: new Array(N).fill(null),  // edge (i,j)→(i,j+1)
+    pOwn: new Array(N).fill(null),  // point on a net
+    pHard: new Array(N).fill(null)  // a corner / end / dot of a net
+  };
+  // bodies: everything inside a part's box, its edge included (its pins sit on that edge)
+  reals.forEach(c=>{ const b = compBBox(c);
+    const i0 = wtLo(xs, b.x), i1 = wtHi(xs, b.x+b.w), j0 = wtLo(ys, b.y), j1 = wtHi(ys, b.y+b.h);
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++) g.blocked[g.id(i,j)] = 1;
+    getPorts(c).forEach(p=>{ const q = portPos(c,p.id); if(!q) return; const k = g.at(q.x,q.y); if(k>=0) g.pin.set(k, c.id+" "+p.id); });
+  });
+  return g;
+}
+function wtNearest(a, v){ let lo=0, hi=a.length-1; while(lo<hi){ const m=(lo+hi)>>1; if(a[m]<v) lo=m+1; else hi=m; }
+  return (lo>0 && Math.abs(a[lo-1]-v)<=Math.abs(a[lo]-v)) ? lo-1 : lo; }
+function wtLo(a, v){ let i = wtNearest(a, v); if(a[i] < v-0.5 && i<a.length-1) i++; return i; }
+function wtHi(a, v){ let i = wtNearest(a, v); if(a[i] > v+0.5 && i>0) i--; return i; }
+
+/* grid cells a polyline passes through, in order */
+function wtCells(g, pl){
+  const out = [];
+  for(let a=1;a<pl.length;a++){
+    const i0 = wtNearest(g.xs,pl[a-1].x), j0 = wtNearest(g.ys,pl[a-1].y), i1 = wtNearest(g.xs,pl[a].x), j1 = wtNearest(g.ys,pl[a].y);
+    if(j0===j1){ const s = Math.sign(i1-i0)||1; for(let i=i0; i!==i1+s; i+=s) out.push(g.id(i,j0)); }
+    else if(i0===i1){ const s = Math.sign(j1-j0)||1; for(let j=j0; j!==j1+s; j+=s) out.push(g.id(i0,j)); }
+    else { out.push(g.id(i0,j0), g.id(i1,j1)); }       // a diagonal (never drawn by us) — mark its ends
+  }
+  return out.filter((k,n)=>n===0 || k!==out[n-1]);
+}
+/* record a net's path on the grid: its runs, its points, and its corners/ends as hard */
+function wtClaim(g, key, cells){
+  for(let a=0;a<cells.length;a++){
+    const k = cells[a]; g.pOwn[k] = g.pOwn[k] || key;
+    if(a===0 || a===cells.length-1) g.pHard[k] = g.pHard[k] || key;
+    else { const p = cells[a-1], n = cells[a+1]; if(((p%g.NX)===(k%g.NX)) !== ((n%g.NX)===(k%g.NX))) g.pHard[k] = g.pHard[k] || key; }
+    if(a){ const p = cells[a-1], pi = p%g.NX, pj = (p/g.NX)|0, i = k%g.NX, j = (k/g.NX)|0;
+      if(pj===j) g.hOwn[g.id(Math.min(pi,i),j)] = key; else if(pi===i) g.vOwn[g.id(i,Math.min(pj,j))] = key; }
+  }
+}
+
+/* A* from `sources` ([{k, d}] — d = the only way out of a pin, or -1 for any) to a cell
+   `goal(k)` accepts. Returns the cell path source … goal, or null. */
+function wtSearch(g, key, sources, goal, relax){
+  const {NX, NY, N, xs, ys} = g, D = WT.DIRS;
+  const S = N*4, gC = new Float64Array(S).fill(Infinity), from = new Int32Array(S).fill(-1);
+  const heap = [];
+  const push = (f,st)=>{ heap.push([f,st]); let c=heap.length-1; while(c){ const p=(c-1)>>1; if(heap[p][0]<=heap[c][0]) break; [heap[p],heap[c]]=[heap[c],heap[p]]; c=p; } };
+  const pop = ()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let c=0; for(;;){ const l=2*c+1, r=l+1; let m=c; if(l<heap.length&&heap[l][0]<heap[m][0]) m=l; if(r<heap.length&&heap[r][0]<heap[m][0]) m=r; if(m===c) break; [heap[m],heap[c]]=[heap[c],heap[m]]; c=m; } } return top; };
+  const fixedDir = new Map();
+  sources.forEach(s=>{ if(s.d>=0) fixedDir.set(s.k, s.d);
+    (s.d>=0 ? [s.d] : [0,1,2,3]).forEach(d=>{ const st = s.k*4+d; if(gC[st]>0){ gC[st]=0; push(0, st); } }); });
+  const near = (i, j, horiz)=>{
+    let c = 0;
+    for(const dd of [-1,1]){
+      if(horiz){ const jj=j+dd; if(jj<0||jj>=NY||Math.abs(ys[jj]-ys[j])>GRID+0.5) continue; const o=g.hOwn[g.id(i,jj)]; if(o&&o!==key) c++; }
+      else { const ii=i+dd; if(ii<0||ii>=NX||Math.abs(xs[ii]-xs[i])>GRID+0.5) continue; const o=g.vOwn[g.id(ii,j)]; if(o&&o!==key) c++; }
+    }
+    return c;
+  };
+  let iter = 0;
+  while(heap.length){
+    if(++iter > 400000) break;
+    const [, st] = pop(); const k = (st/4)|0, d = st%4, gc = gC[st];
+    if(from[st]>=0 || !fixedDir.has(k) || true){ /* keep going */ }
+    if(goal(k) && !sources.some(s=>s.k===k)){
+      const path = []; for(let s=st; s>=0; s=from[s]) path.push((s/4)|0);
+      return path.reverse().filter((c,n,a)=>n===0 || c!==a[n-1]);
+    }
+    const i = k%NX, j = (k/NX)|0;
+    for(let nd=0; nd<4; nd++){
+      if(nd===((d+2)%4)) continue;                            // no U-turn
+      if(fixedDir.has(k) && gC[st]===0 && nd!==fixedDir.get(k)) continue;   // leave a pin along its lead
+      const ni = i+D[nd][0], nj = j+D[nd][1];
+      if(ni<0||nj<0||ni>=NX||nj>=NY) continue;
+      const nk = g.id(ni,nj), isGoal = goal(nk);
+      const len = Math.abs(xs[ni]-xs[i]) + Math.abs(ys[nj]-ys[j]);
+      let cost = len;
+      if(nd!==d && gc>0){
+        if(g.pOwn[k] && g.pOwn[k]!==key){ if(!relax) continue; cost += 400; }   // a corner on another net reads as a join
+        cost += WT.BEND;
+      }
+      const pk = g.pin.get(nk);
+      if(g.blocked[nk] && !(isGoal && pk)){ if(!relax) continue; cost += 600; }
+      const horiz = nj===j, eo = horiz ? g.hOwn[g.id(Math.min(i,ni),j)] : g.vOwn[g.id(i,Math.min(j,nj))];
+      if(eo && eo!==key){ if(!relax) continue; cost += 300; }            // never along another net
+      const po = g.pOwn[nk];
+      if(po && po!==key){
+        if(g.pHard[nk] && g.pHard[nk]!==key){ if(!relax) continue; cost += 300; }
+        cost += WT.CROSS;
+      }
+      cost += WT.NEAR * near(horiz?Math.min(i,ni):i, horiz?j:Math.min(j,nj), horiz) * len / GRID;
+      const ns = nk*4+nd, ng = gc+cost;
+      if(ng < gC[ns]){ gC[ns]=ng; from[ns]=st; push(ng, ns); }
+    }
+  }
+  return null;
+}
+
+/* ---------- the endpoints of a new wire ---------- */
+/* what sits at grid cell k on net `key`: a pin, an existing dot, or a point on one of the
+   net's wires (a new dot is put there, splitting that wire) */
+function wtEndAt(sch, g, k, netIds){
+  const pk = g.pin.get(k);
+  const x = g.xs[k%g.NX], y = g.ys[(k/g.NX)|0];
+  if(pk){ const s = pk.indexOf(" "); return {cid:pk.slice(0,s), pid:pk.slice(s+1)}; }
+  const dot = sch.components.find(c=>{ if(c.type!=="JUNCTION") return false; const q = portPos(c,"j");
+    return Math.abs(q.x-x)<1 && Math.abs(q.y-y)<1 && sch.wires.some(w=>netIds.has(w.id) && (w.from.cid===c.id||w.to.cid===c.id)); });
+  if(dot) return {cid:dot.id, pid:"j"};
+  const host = sch.wires.find(w=>{ if(!netIds.has(w.id)) return false; const pl = wtPoly(sch,w); return pl && splitPolyAt(pl, {x,y}); });
+  if(!host) return null;
+  const j = { id: uid("c"), type:"JUNCTION", x: x-6, y: y-6, params:{ fixed:true } };
+  sch.components.push(j);
+  const before = new Set(sch.wires.map(w=>w.id));
+  splitWireThroughJunction(host, j, sch);
+  netIds.delete(host.id);
+  sch.wires.forEach(w=>{ if(!before.has(w.id)) netIds.add(w.id); });
+  return {cid:j.id, pid:"j"};
+}
+function wtPortDir(sch, ep){ const c = comp(ep.cid, sch); if(!c || c.type==="JUNCTION") return null; const p = getPort(c, ep.pid); return p ? p.dir : null; }
+/* corner points of a cell path, ends excluded */
+function wtCorners(g, path){
+  const P = path.map(k=>({x:g.xs[k%g.NX], y:g.ys[(k/g.NX)|0]}));
+  const out = [];
+  for(let a=1;a<P.length-1;a++){ const p=P[a-1], q=P[a], r=P[a+1]; if(!((p.x===q.x&&q.x===r.x)||(p.y===q.y&&q.y===r.y))) out.push(q); }
+  return out;
+}
+
+/* ---------- the core: delete some wires, then reconnect every net they belonged to ---------- */
+function wtReroute(sch, delIds, opts){
+  opts = opts || {};
+  if(!sch || !delIds.size) return {nets:0, relaxed:0, plain:0};
+  const netKey = wtNetKeys(sch);
+  const affected = new Set([...delIds].map(id=>netKey.get(id)).filter(Boolean));
+  // what each affected net must still join: its real pins and its deliberate free ends
+  const nets = new Map();
+  affected.forEach(k=>nets.set(k, {key:k, terms:new Map(), width:0, name:"", ids:new Set()}));
+  sch.wires.forEach(w=>{
+    const n = nets.get(netKey.get(w.id)); if(!n) return;
+    n.ids.add(w.id);
+    if(w.width && w.width>n.width) n.width = w.width;
+    if(w.name && !n.name) n.name = w.name;
+    [w.from, w.to].forEach(ep=>{ const c = comp(ep.cid, sch); if(!c) return;
+      if(c.type!=="JUNCTION" || (c.params && c.params.endpoint)) n.terms.set(ep.cid+" "+ep.pid, {cid:ep.cid, pid:ep.pid}); });
+  });
+  // 1. delete, then prune the stubs that now lead nowhere (a dot left with one wire)
+  const keptName = new Set();
+  sch.wires = sch.wires.filter(w=>{ if(!delIds.has(w.id)) return true; nets.get(netKey.get(w.id)).ids.delete(w.id); return false; });
+  for(let again=true; again; ){
+    again = false;
+    for(const j of sch.components){
+      if(j.type!=="JUNCTION" || (j.params && j.params.endpoint)) continue;
+      const ws = sch.wires.filter(w=>w.from.cid===j.id || w.to.cid===j.id);
+      if(ws.length>1) continue;
+      if(ws.length===1){ const n = nets.get(netKey.get(ws[0].id)); if(!n) continue; n.ids.delete(ws[0].id); }
+      sch.wires = sch.wires.filter(w=>!ws.includes(w));
+      sch.components = sch.components.filter(c=>c!==j);
+      again = true; break;
+    }
+  }
+  nets.forEach(n=>sch.wires.forEach(w=>{ if(n.ids.has(w.id) && w.name) keptName.add(n.key); }));
+  // 2. the grid, with every wire that is left claimed by its net
+  const g = wtGrid(sch);
+  if(!g) return {nets:0, relaxed:0, plain:0};
+  sch.wires.forEach(w=>{ const pl = wtPoly(sch,w); if(pl) wtClaim(g, netKey.get(w.id)||w.id, wtCells(g, pl)); });
+  // 3. nets in order: two-pin nets first, then by size; big fan-outs last (as Top-Down)
+  const order = [...nets.values()].filter(n=>n.terms.size>=2).sort((a,b)=>(a.terms.size-b.terms.size));
+  let relaxed = 0, plain = 0;
+  for(const n of order){
+    // fragments: groups of the net already joined by the wires that are left
+    const par = new Map(), find = x=>{ while(par.get(x)!==x){ par.set(x, par.get(par.get(x))); x = par.get(x); } return x; };
+    const add = x=>{ if(!par.has(x)) par.set(x,x); };
+    const uni = (a,b)=>{ add(a); add(b); const ra=find(a), rb=find(b); if(ra!==rb) par.set(ra,rb); };
+    const epKey = ep=>wtIsJ(sch, ep.cid) ? ep.cid : ep.cid+" "+ep.pid;
+    n.terms.forEach((t,tk)=>add(epKey(t)));
+    sch.wires.forEach(w=>{ if(n.ids.has(w.id)) uni(epKey(w.from), epKey(w.to)); });
+    const frag = new Map();   // root → {cells:Set, terms:[], pinOnly}
+    const fragOf = r=>frag.get(r) || frag.set(r, {cells:new Set(), pins:new Set(), size:0}).get(r);
+    n.terms.forEach((t,tk)=>{ const f = fragOf(find(epKey(t))); const c = wtIsJ(sch,t.cid) ? comp(t.cid,sch) : null;
+      const q = c ? portPos(c,"j") : portPos(comp(t.cid,sch), t.pid); if(!q) return;
+      const k = g.at(q.x,q.y); if(k<0) return; f.cells.add(k); if(!c) f.pins.add(k); f.size++; });
+    sch.wires.forEach(w=>{ if(!n.ids.has(w.id)) return; const f = fragOf(find(epKey(w.from))); const pl = wtPoly(sch,w);
+      if(pl) wtCells(g, pl).forEach(k=>f.cells.add(k)); f.size += 2; });
+    const frags = [...frag.values()].filter(f=>f.cells.size);
+    if(frags.length<2) continue;
+    // grow from the fragment holding the driver (an output pin), else the biggest one
+    const drives = f=>[...f.pins].some(k=>{ const pk = g.pin.get(k); const s = pk.indexOf(" "); return wtPortDir(sch, {cid:pk.slice(0,s), pid:pk.slice(s+1)})==="out"; });
+    frags.sort((a,b)=>(drives(b)-drives(a)) || (b.size-a.size));
+    const main = frags.shift();
+    const cx = k=>g.xs[k%g.NX], cy = k=>g.ys[(k/g.NX)|0];
+    const dist = f=>{ let best = Infinity; f.cells.forEach(a=>main.cells.forEach(b=>{ const d = Math.abs(cx(a)-cx(b))+Math.abs(cy(a)-cy(b)); if(d<best) best = d; })); return best; };
+    while(frags.length){
+      frags.sort((a,b)=>dist(a)-dist(b));
+      const f = frags.shift();
+      // never branch off at a pin: a pin is an end only while it is its fragment's only cell
+      const src = [...f.cells].filter(k=>!(f.pins.has(k) && f.cells.size>1))
+        .map(k=>{ const pk = g.pin.get(k); if(!pk || !f.pins.has(k)) return {k, d:-1};
+          const s = pk.indexOf(" "), c = comp(pk.slice(0,s), sch); return {k, d:wtExit(c, portPos(c, pk.slice(s+1)))}; });
+      const goal = k=>main.cells.has(k) && !(main.pins.has(k) && main.cells.size>1);
+      src.forEach(s=>{ if(g.pin.has(s.k)) g.blocked[s.k] = 0; });
+      let path = wtSearch(g, n.key, src, goal, false);
+      if(!path){ path = wtSearch(g, n.key, src, goal, true); if(path) relaxed++; }
+      src.forEach(s=>{ if(g.pin.has(s.k)) g.blocked[s.k] = 1; });
+      let A, B;
+      if(path){
+        A = wtEndAt(sch, g, path[0], n.ids); B = wtEndAt(sch, g, path[path.length-1], n.ids);
+      }
+      if(!path || !A || !B){
+        // nothing routable: join the two nearest points with a plain wire, connection first
+        plain++;
+        let best = null;
+        f.cells.forEach(a=>main.cells.forEach(b=>{ if(f.pins.has(a)&&f.cells.size>1) return; if(main.pins.has(b)&&main.cells.size>1) return;
+          const d = Math.abs(cx(a)-cx(b))+Math.abs(cy(a)-cy(b)); if(!best || d<best.d) best = {a,b,d}; }));
+        if(!best) continue;
+        A = wtEndAt(sch, g, best.a, n.ids); B = wtEndAt(sch, g, best.b, n.ids); path = null;
+        if(!A || !B) continue;
+      }
+      // the driver's side is `from`; between two dots healJunctions orients it
+      let from = A, to = B, flipped = false;
+      if(wtPortDir(sch,A)==="in" || wtPortDir(sch,B)==="out") { from = B; to = A; flipped = true; }
+      const w = { id: uid("w"), from, to, name: "" };
+      if(n.width>1) w.width = n.width;
+      if(n.name && !keptName.has(n.key)){ w.name = n.name; keptName.add(n.key); }
+      if(path){ const pts = wtCorners(g, path); if(flipped) pts.reverse(); if(pts.length) w.pts = pts; }
+      sch.wires.push(w); n.ids.add(w.id);
+      const cells = path || [];
+      if(path) wtClaim(g, n.key, cells);
+      cells.forEach(k=>main.cells.add(k)); f.cells.forEach(k=>main.cells.add(k)); f.pins.forEach(k=>main.pins.add(k));
+      main.size += f.size + 2;
+    }
+  }
+  healJunctions(sch);
+  return {nets:order.length, relaxed, plain};
+}
+
+/* ---------- the three ways in ---------- */
+function wtTidySheet(sch){
+  sch = sch || activeSch(); if(!sch) return null;
+  return wtReroute(sch, new Set(sch.wires.map(w=>w.id)));
+}
+function wtTidyNet(sch, w){
+  sch = sch || activeSch(); if(!sch || !w) return null;
+  return wtReroute(sch, new Set(netWires(sch, w)));
+}
+/* After parts moved: re-route only the wires hanging off them (one end on a moved part or
+   dot) plus any other wire the moved part now sits on or pins over. Returns false when it
+   did not handle the move (locked sheet, only dots dragged) so the caller heals as before. */
+function wtAfterMove(sch, comps){
+  sch = sch || activeSch();
+  if(!sch || !comps || !comps.length || layoutLocked(sch)) return false;
+  if(comps.every(c=>c.type==="JUNCTION")) return false;           // a dot dragged by hand is the user's
+  const moved = new Set(comps.map(c=>c.id));
+  const del = new Set();
+  sch.wires.forEach(w=>{ if(moved.has(w.from.cid) !== moved.has(w.to.cid)) del.add(w.id); });
+  wireBodyCrossings(sch).forEach(x=>{ if(moved.has(x.cid)) del.add(x.wid); });
+  wirePinCrossings(sch).forEach(x=>{ if(moved.has(x.cid)) del.add(x.wid); });
+  if(!del.size) return true;
+  wtReroute(sch, del);
+  return true;
+}
+
+/* ---------- 🧹 the toolbar button: the selected wire's net, or the whole sheet ---------- */
+function wtTidyCommand(){
+  const sch = activeSch(); if(!sch) return;
+  const w = sch.wires.find(x=>state.selection && state.selection.has(x.id));
+  const r = w ? wtTidyNet(sch, w) : wtTidySheet(sch);
+  if(!r) return;
+  state.selection = new Set();
+  snapshot(); renderAll();
+  toast((w ? "เก็บกวาดเน็ตนี้แล้ว" : `เก็บกวาดสายทั้งแผ่นแล้ว (${r.nets} เน็ต)`)
+    + (r.plain ? ` — มี ${r.plain} เส้นที่หาทางสวยไม่ได้ เลยลากตรงไว้ ลองขยับชิ้นส่วนให้ห่างขึ้น` : " — การต่อเหมือนเดิมทุกเส้น")
+    + " · Ctrl+Z ย้อนได้", r.plain ? "warn" : "ok", 4000);
+}
+
+/* ---------- 🧲 ratsnest mode (KiCad footprint placement) ----------
+   The wires are hidden; every net is drawn as thin straight lines in its own colour between
+   the pins it joins (shortest spanning tree), so parts can be dragged into a sensible order by
+   eye. Nothing is re-routed while it is on. "จัดสายให้" then routes the whole sheet. */
+const RN = { on:false, sid:null, bar:null };
+function wtRatsNets(sch){
+  const out = [], seen = new Set();
+  sch.wires.forEach(w0=>{
+    if(seen.has(w0.id)) return;
+    const ids = netWires(sch, w0); ids.forEach(id=>seen.add(id));
+    const pts = new Map();
+    ids.forEach(id=>{ const w = sch.wires.find(x=>x.id===id); if(!w) return;
+      [w.from, w.to].forEach(ep=>{ const c = comp(ep.cid, sch); if(!c) return;
+        if(c.type==="JUNCTION" && !(c.params && c.params.endpoint)) return;
+        const q = c.type==="JUNCTION" ? portPos(c,"j") : portPos(c, ep.pid); if(q) pts.set(ep.cid+" "+ep.pid, {x:q.x, y:q.y}); }); });
+    const P = [...pts.values()];
+    if(P.length < 2) return;
+    // Prim: the shortest set of straight lines joining every pin of the net
+    const inT = [P[0]], rest = P.slice(1), lines = [];
+    while(rest.length){
+      let best = null;
+      inT.forEach(a=>rest.forEach((b,i)=>{ const d = Math.hypot(a.x-b.x, a.y-b.y); if(!best || d<best.d) best = {a, b, i, d}; }));
+      lines.push([best.a, best.b]); inT.push(best.b); rest.splice(best.i, 1);
+    }
+    out.push({pts:P, lines, bus:ids.size && sch.wires.some(w=>ids.has(w.id) && (w.width||1)>1)});
+  });
+  return out;
+}
+function wtRatsToggle(on){
+  const sch = activeSch(); if(!sch) return;
+  RN.on = on==null ? !RN.on : !!on;
+  RN.sid = RN.on ? state.activeId : null;
+  if(RN.on) toast("🧲 โหมดจัดวาง — ลากชิ้นส่วนไปวางให้เส้นสีสั้นและไม่ไขว้กัน แล้วกด “จัดสายให้”", "info", 4500);
+  render();
+}
+function wtRatsBar(){
+  if(RN.bar) return RN.bar;
+  const host = canvas.parentElement; if(!host) return null;
+  const b = document.createElement("div");
+  b.id = "wtRatsBar"; b.className = "wt-rats-bar";
+  b.innerHTML = `<span>🧲 <b>โหมดจัดวาง</b> — ลากชิ้นส่วนให้เส้นสีสั้นและไขว้กันน้อยที่สุด <span class="muted" id="wtRatsInfo"></span></span>
+    <button class="wt-go" id="wtRatsGo">✓ จัดสายให้</button><button id="wtRatsOff">ออก (ไม่จัด)</button>`;
+  host.appendChild(b);
+  b.querySelector("#wtRatsGo").onclick = ()=>{
+    const s = activeSch(); RN.on = false;
+    const r = wtTidySheet(s); snapshot(); renderAll();
+    if(r) toast(`จัดสายแล้ว ${r.nets} เน็ต — การต่อเหมือนเดิมทุกเส้น`
+      + (r.plain ? ` (มี ${r.plain} เส้นที่หาทางสวยไม่ได้ เลยลากตรงไว้)` : "") + " · Ctrl+Z ย้อนได้", r.plain ? "warn" : "ok", 4000);
+  };
+  b.querySelector("#wtRatsOff").onclick = ()=>wtRatsToggle(false);
+  return RN.bar = b;
+}
+function wtCrossCount(nets){
+  let n = 0; const L = []; nets.forEach((net,i)=>net.lines.forEach(l=>L.push([i, l])));
+  const cr = (p1,p2,p3,p4)=>{ const d = (a,b,c)=>(c.x-a.x)*(b.y-a.y)-(c.y-a.y)*(b.x-a.x);
+    const d1=d(p3,p4,p1), d2=d(p3,p4,p2), d3=d(p1,p2,p3), d4=d(p1,p2,p4); return d1*d2<0 && d3*d4<0; };
+  for(let a=0;a<L.length;a++) for(let b=a+1;b<L.length;b++) if(L[a][0]!==L[b][0] && cr(L[a][1][0],L[a][1][1],L[b][1][0],L[b][1][1])) n++;
+  return n;
+}
+function wtAfterRender(){
+  const sch = activeSch();
+  if(RN.on && RN.sid!==state.activeId){ RN.on = false; }
+  canvas.classList.toggle("wt-rats", RN.on);
+  const bar = wtRatsBar(); if(bar) bar.hidden = !RN.on;
+  const root = [...canvas.children].reverse().find(g=>g.tagName==="g" && (g.getAttribute("transform")||"").startsWith("translate"));
+  if(RN.on && sch && root){
+    root.querySelectorAll(".node[data-cid]").forEach(g=>{ const c = comp(g.getAttribute("data-cid"), sch); if(c && c.type==="JUNCTION") g.classList.add("wt-j"); });
+    const nets = wtRatsNets(sch), k = state.view.k || 1;
+    const layer = el("g", {class:"wt-rats-layer", "pointer-events":"none"});
+    nets.forEach((net,i)=>{
+      const col = `hsl(${(i*137.508)%360},72%,${i%2?42:50}%)`;
+      net.lines.forEach(([a,b])=>layer.appendChild(el("line", {x1:a.x, y1:a.y, x2:b.x, y2:b.y, stroke:col,
+        "stroke-width": (net.bus?2.6:1.6)/Math.min(1.5,Math.max(.6,k)), "stroke-opacity":.9})));
+      net.pts.forEach(p=>layer.appendChild(el("circle", {cx:p.x, cy:p.y, r:3, fill:col})));
+    });
+    root.appendChild(layer);
+    const info = document.getElementById("wtRatsInfo");
+    if(info) info.textContent = `· ${nets.length} เน็ต · เส้นไขว้ ${wtCrossCount(nets)} จุด`;
+  }
+  wtDebugFix(sch);
+}
+{
+  const _render = render;
+  render = function(){ const r = _render.apply(this, arguments); try{ wtAfterRender(); }catch(e){ console.warn("wire tidy", e); } return r; };
+}
+/* nothing re-routes while placing by eye */
+{
+  const _after = wtAfterMove;
+  wtAfterMove = function(sch, comps){ if(RN.on) return true; return _after.apply(this, arguments); };
+}
+
+/* ---------- 🐞 debug panel: a fix button for what it counts ---------- */
+function wtDebugFix(sch){
+  const box = document.getElementById("dbgFix"); if(!box) return;
+  if(!DBG.on || !sch){ box.innerHTML = ""; return; }
+  const bad = new Set();
+  netSelfOverlaps(sch).forEach(o=>{ bad.add(o.a); bad.add(o.b); });
+  netCollinearOverlaps(sch).forEach(o=>{ bad.add(o.a); bad.add(o.b); });
+  wireBodyCrossings(sch).forEach(o=>bad.add(o.wid));
+  wirePinCrossings(sch).forEach(o=>bad.add(o.wid));
+  const key = bad.size+"|"+sch.wires.length;
+  if(box.dataset.k===key) return;
+  box.dataset.k = key;
+  box.innerHTML = (bad.size ? `<button id="dbgFixBad">🧹 แก้เน็ตที่มีปัญหา</button>` : "")
+    + `<button id="dbgFixAll">🧹 เก็บกวาดทั้งแผ่น</button>`;
+  const fb = box.querySelector("#dbgFixBad");
+  if(fb) fb.onclick = ()=>{
+    const s = activeSch(), del = new Set();
+    bad.forEach(id=>{ const w = s.wires.find(x=>x.id===id); if(w) netWires(s, w).forEach(x=>del.add(x)); });
+    const r = wtReroute(s, del); snapshot(); renderAll();
+    toast(`เก็บกวาด ${r.nets} เน็ตที่มีปัญหาแล้ว — การต่อเหมือนเดิม · Ctrl+Z ย้อนได้`, "ok", 3500);
+  };
+  box.querySelector("#dbgFixAll").onclick = ()=>{ state.selection = new Set(); wtTidyCommand(); };
+}
+
+/* ---------- point at a wire: the rest dims, and a note says what the net joins ---------- */
+function wtPinName(c, pid){
+  const p = getPort(c, pid) || {};
+  const ins = getPorts(c).filter(q=>q.dir==="in");
+  if(/^i\d+$/.test(pid) && ins.length>1 && !["MUX","DEMUX","ENC","DEC"].includes(c.type)) return "ขา "+(ins.findIndex(q=>q.id===pid)+1);
+  return String(p.label || pid).toUpperCase();
+}
+function wtPartName(c){
+  if(c.type==="IN" || c.type==="OUT") return `${c.type==="IN"?"INPUT":"OUTPUT"} '${(c.params&&c.params.name)||"?"}'`;
+  return c.label || compDisplay(c);
+}
+function wtNetHtml(wid){
+  const sch = activeSch(); const w = sch && sch.wires.find(x=>x.id===wid); if(!w) return "";
+  const ids = netWires(sch, w), ends = new Map();
+  ids.forEach(id=>{ const x = sch.wires.find(y=>y.id===id); if(!x) return;
+    [x.from, x.to].forEach(ep=>{ const c = comp(ep.cid, sch); if(c && c.type!=="JUNCTION") ends.set(ep.cid+" "+ep.pid, {c, pid:ep.pid}); }); });
+  const d = netDriverPort(sch, w);
+  const all = [...ends.values()];
+  const src = all.find(e=>d && e.c.id===d.cid && e.pid===d.pid);
+  const sinks = all.filter(e=>e!==src);
+  const nm = e=>esc(e.c.type==="IN"||e.c.type==="OUT" ? wtPartName(e.c) : wtPartName(e.c)+" · "+wtPinName(e.c, e.pid));
+  return `<div class="ux-tip-h">${w.name ? "สาย "+esc(w.name) : "สายเส้นนี้"} ต่อ ${all.length} ขา</div>`
+    + (src ? `<div>จาก <b>${nm(src)}</b></div>` : `<div class="muted">ไม่มีตัวขับ</div>`)
+    + (sinks.length ? `<div>ไปที่ ${sinks.map(e=>"<b>"+nm(e)+"</b>").join(", ")}</div>` : "")
+    + `<div class="muted" style="margin-top:3px">เลือกสายแล้วกด 🧹 = เก็บกวาดเฉพาะเน็ตนี้</div>`;
+}
+canvas.addEventListener("mouseover", ev=>{
+  const hit = ev.target.closest && ev.target.closest(".wire-hit");
+  canvas.classList.toggle("wt-focus", !!hit && !state.drag && !state.wireDrag && !state.pan);
+});
+canvas.addEventListener("mouseleave", ()=>canvas.classList.remove("wt-focus"));
 
 </script>
 <!-- UX-LAYER:END -->
