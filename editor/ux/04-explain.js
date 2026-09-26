@@ -141,7 +141,7 @@ canvas.addEventListener("mousemove", ev=>{
   if(MARK.on && MARK.pins.length){ const w=svgPoint(ev), sch=activeSch(); let best=-1, bd=8/Math.max(.4,state.view.k);
     MARK.pins.forEach((m,k)=>{ const c=comp(m.cid,sch); const pp=c&&portPos(c,m.pid); if(!pp) return; const d=Math.hypot(pp.x-w.x,pp.y-w.y); if(d<bd){ bd=d; best=k; } });
     if(best>=0){ clearTimeout(UXTIP.t); uxTipShow(uxMarkHtml("p"+best), ev.clientX, ev.clientY, "mkp"+best); return; } }
-  const wg=PROBE && ev.target.closest && ev.target.closest(".wire-group[data-wid]");
+  const wg=ev.target.closest && ev.target.closest(".wire-group[data-wid]");
   const nd=!wg && ev.target.closest && ev.target.closest(".node[data-cid]");
   const key=wg?"w"+wg.dataset.wid : nd?"n"+nd.dataset.cid : null;
   if(!key){ uxTipHide(); return; }
@@ -150,10 +150,10 @@ canvas.addEventListener("mousemove", ev=>{
   const x=ev.clientX, y=ev.clientY;
   UXTIP.t=setTimeout(()=>{
     let html="";
-    if(wg) html=probeWireHtml(wg.dataset.wid);
+    if(wg) html=PROBE ? probeWireHtml(wg.dataset.wid) : (typeof wtNetHtml==="function" ? wtNetHtml(wg.dataset.wid) : "");
     else { const c=comp(nd.dataset.cid); if(c) html=gateTableHtml(c); }
     if(html) uxTipShow(html, x, y, key);
-  }, wg?120:450);
+  }, wg?(PROBE?120:350):450);
 });
 canvas.addEventListener("mouseleave", uxTipHide);
 canvas.addEventListener("mousedown", uxTipHide);

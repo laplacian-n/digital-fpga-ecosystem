@@ -181,3 +181,14 @@
 .mcp-approval textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical}
 .mcp-approval .mcp-ap-row{display:flex;gap:8px;align-items:center}
 .mcp-approval .grow{flex:1}
+
+/* ===== 12. wire tidy / ratsnest ===== */
+#canvas.wt-focus .wire-group:not(.net-hi):not(:hover){opacity:.28;transition:opacity .12s}
+#canvas.wt-rats .wire-group,#canvas.wt-rats .node.wt-j,#canvas.wt-rats .wire-label,#canvas.wt-rats .wire-label-bg{display:none}
+.wt-rats-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:8px;align-items:center;
+  background:var(--bg-1);border:1px solid var(--accent,#5b6cff);border-radius:10px;padding:7px 10px;box-shadow:0 6px 20px rgba(0,0,0,.18);font-size:13px;max-width:calc(100% - 32px);flex-wrap:wrap}
+.wt-rats-bar[hidden]{display:none}
+.wt-rats-bar button{border:1px solid var(--line,#ccd);background:var(--bg-0);border-radius:7px;padding:4px 10px;cursor:pointer;font:inherit}
+.wt-rats-bar .wt-go{background:var(--accent,#5b6cff);color:#fff;border-color:transparent;font-weight:600}
+.dbg-fix{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
+.dbg-fix button{border:1px solid var(--line,#ccd);background:var(--bg-0);border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;font-size:12px}
