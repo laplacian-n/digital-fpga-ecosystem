@@ -417,6 +417,136 @@ def update_install() -> dict:
     return {"ok": True, "started": True}
 
 
+
+# --------------------------------------------------------------------------
+# Claude (MCP) relay: mcp_server.py → POST /api/mcp/call → queued for the editor page,
+# which long-polls /api/mcp/poll, runs the operation with its own engine and posts
+# /api/mcp/result. The MCP side proves itself with a token from runtime.json (only the
+# local user can read it); the page side must be same-origin.
+# --------------------------------------------------------------------------
+import secrets  # noqa: E402
+
+MCP_TOKEN = secrets.token_hex(24)
+RUNTIME_FILE = CONFIG_DIR / "runtime.json"
+
+
+class McpRelay:
+    def __init__(self):
+        self.cv = threading.Condition()
+        self.jobs = {}          # client -> [job]
+        self.seen = {}          # client -> last poll time
+        self.replies = {}       # job id -> reply
+        self.n = 0
+        self.opened_at = 0.0
+
+    def live_client(self, within=35.0):
+        now = time.time()
+        live = [(t, c) for c, t in self.seen.items() if now - t < within]
+        return max(live)[1] if live else None
+
+    def poll(self, client, wait=20.0):
+        end = time.time() + wait
+        with self.cv:
+            self.seen[client] = time.time()
+            self.cv.notify_all()
+            while True:
+                q = self.jobs.get(client)
+                if q:
+                    return q.pop(0)
+                left = end - time.time()
+                if left <= 0:
+                    return None
+                self.cv.wait(min(left, 5.0))
+                self.seen[client] = time.time()
+
+    def result(self, reply):
+        with self.cv:
+            self.replies[str(reply.get("id"))] = reply
+            self.cv.notify_all()
+
+    def call(self, op, args, timeout=60.0):
+        with self.cv:
+            client = self.live_client()
+        if client is None:
+            # nobody has the editor open: open it (once in a while) and wait for it to connect
+            if time.time() - self.opened_at > 20:
+                self.opened_at = time.time()
+                try:
+                    open_window("studio")
+                except Exception:
+                    pass
+            end = time.time() + 25
+            with self.cv:
+                while client is None and time.time() < end:
+                    self.cv.wait(1.0)
+                    client = self.live_client()
+            if client is None:
+                return {"ok": False, "error": "Schematic Studio is not open and could not be opened",
+                        "hint": "open FPGA Ecosystem and click Schematic Studio, then retry"}
+        with self.cv:
+            self.n += 1
+            jid = f"j{self.n}"
+            self.jobs.setdefault(client, []).append({"id": jid, "op": op, "args": args or {}})
+            self.cv.notify_all()
+            end = time.time() + timeout
+            while jid not in self.replies:
+                left = end - time.time()
+                if left <= 0:
+                    # drop it if the page never picked it up
+                    self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
+                    return {"ok": False, "error": f"the editor did not answer '{op}' within {int(timeout)} s",
+                            "hint": "is the Schematic Studio window frozen or showing a dialog?"}
+                self.cv.wait(min(left, 5.0))
+            return self.replies.pop(jid)
+
+
+RELAY = McpRelay()
+
+
+def write_runtime():
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = RUNTIME_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"port": SERVER_PORT, "pid": os.getpid(), "token": MCP_TOKEN,
+                               "version": VERSION}), "utf-8")
+    try:
+        os.chmod(tmp, 0o600)
+    except Exception:
+        pass
+    tmp.replace(RUNTIME_FILE)
+
+
+def claude_desktop_config_path() -> Path:
+    if IS_WIN:
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Claude" / "claude_desktop_config.json"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "Claude" / "claude_desktop_config.json"
+
+
+def mcp_command() -> dict:
+    """How Claude should start our MCP server on this machine."""
+    if FROZEN:
+        console = INSTALL_DIR / ("FPGAEcosystem-MCP.exe" if IS_WIN else "FPGAEcosystem-MCP")
+        if console.exists():
+            return {"command": str(console), "args": []}
+        return {"command": sys.executable, "args": ["--mcp"]}
+    return {"command": sys.executable, "args": [str(Path(__file__).resolve().parent / "mcp_server.py")]}
+
+
+def install_claude_desktop() -> dict:
+    f = claude_desktop_config_path()
+    cfg = {}
+    if f.exists():
+        try:
+            cfg = json.loads(f.read_text("utf-8") or "{}")
+        except Exception:
+            return {"ok": False, "error": f"อ่าน {f} ไม่ได้ (JSON เสีย) — แก้ไฟล์หรือเพิ่มเองจากข้อความด้านล่าง"}
+        shutil.copyfile(f, f.with_suffix(".json.bak"))
+    cfg.setdefault("mcpServers", {})["fpga-ecosystem"] = mcp_command()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+    return {"ok": True, "path": str(f)}
+
 # --------------------------------------------------------------------------
 # HTTP
 # --------------------------------------------------------------------------
@@ -525,9 +655,34 @@ def make_handler():
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
 
+        def _same_origin(self) -> bool:
+            """Browser requests must come from our own pages (not some other website);
+            non-browser clients (the MCP server, curl, tests) send no Origin."""
+            o = self.headers.get("Origin")
+            return not o or o in (base_url(), f"http://localhost:{SERVER_PORT}")
+
+        def _mcp_authorized(self) -> bool:
+            return secrets.compare_digest(self.headers.get("X-FE-Token", ""), MCP_TOKEN)
+
         # ---- /api ----
         def _api_get(self, path, q):
             global LAST_PING
+            if path == "/api/mcp/poll":
+                if not self._same_origin():
+                    return self._out(403, {"ok": False, "error": "forbidden"})
+                LAST_PING = time.time()
+                job = RELAY.poll((q.get("client") or ["page"])[0])
+                if job is None:
+                    self.send_response(204); self.send_header("Cache-Control", "no-store"); self.end_headers()
+                    return
+                return self._out(200, job)
+            if path == "/api/mcp/status":
+                if not self._mcp_authorized():
+                    return self._out(401, {"ok": False, "error": "bad token"})
+                return self._out(200, {"ok": True, "editor_connected": RELAY.live_client() is not None,
+                                       "version": VERSION})
+            if path == "/api/mcp/setup":
+                return self._out(200, {"command": mcp_command(), "desktop_config": str(claude_desktop_config_path())})
             if path == "/api/ping":
                 LAST_PING = time.time()
                 return self._out(200, {"ok": True})
@@ -552,6 +707,21 @@ def make_handler():
             return self._out(404, {"ok": False, "error": "unknown api"})
 
         def _api_post(self, path, q):
+            global LAST_PING
+            if path == "/api/mcp/call":
+                if not self._mcp_authorized():
+                    return self._out(401, {"ok": False, "error": "bad token"})
+                LAST_PING = time.time()
+                req = json.loads(self._body() or b"{}")
+                return self._out(200, RELAY.call(str(req.get("op") or ""), req.get("args") or {},
+                                                 float(req.get("timeout") or 60)))
+            if not self._same_origin():
+                return self._out(403, {"ok": False, "error": "forbidden (cross-origin)"})
+            if path == "/api/mcp/result":
+                RELAY.result(json.loads(self._body() or b"{}"))
+                return self._out(200, {"ok": True})
+            if path == "/api/mcp/install_desktop":
+                return self._out(200, install_claude_desktop())
             if path == "/api/files/save":
                 proj = safe_name((q.get("project") or [""])[0])
                 name = safe_name(Path((q.get("name") or ["file"])[0]).name, "file")
@@ -677,6 +847,9 @@ def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if "--fpga-builder" in argv:
         return run_fpga_builder()
+    if "--mcp" in argv:                       # Claude starts us as an MCP server (stdio)
+        import mcp_server
+        return mcp_server.main()
     port = int(argv[argv.index("--port") + 1]) if "--port" in argv else int(CFG.get("port") or 8770)
     no_open = "--no-open" in argv
 
@@ -700,6 +873,7 @@ def main(argv=None):
     if HTTPD is None:          # port taken by something else - take any free port
         HTTPD = _bind(0)
     SERVER_PORT = HTTPD.server_address[1]
+    write_runtime()
     start_llama()
     LAST_PING = time.time()
     threading.Thread(target=_watchdog, daemon=True).start()

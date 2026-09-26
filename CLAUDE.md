@@ -14,6 +14,7 @@ UI text is Thai; code and comments are English.
 | `ai/` | Python backend (stdlib only): intent validate, netlist sim, VHDL/XDC codegen, cosim, Vivado synth, `chat_server.py`. |
 | `hub/` | Canonical IR / hashes / SQLite store. |
 | `FPGA_Builder_Package/source/fpga_builder.py` | Tk app: VHDL → .bit → board. The launcher runs it as `FPGAEcosystem.exe --fpga-builder`. |
+| `launcher/mcp_server.py` | MCP server (stdio, stdlib). Tools are forwarded to the launcher relay (`/api/mcp/*`, token in `runtime.json`) and executed in the open editor by `editor/ux/08-mcp-bridge.js` (`MCP_OPS`). Adding a tool = an entry in `TOOLS` + an `MCP_OPS.<name>` handler (a unit test enforces both). See `docs/MCP.md`. |
 | `tests/` | Playwright tests: `tests/editor/*.spec.js` (editor from disk), `tests/launcher.spec.js` (spawns the launcher). |
 
 ## Workflow

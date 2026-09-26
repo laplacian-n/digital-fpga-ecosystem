@@ -14,7 +14,8 @@
 | `FPGA_Builder_Package/source/` | ซอร์สของ FPGA Builder (VHDL → .bit → โหลดลงบอร์ด) — ดู `อ่านก่อนใช้งาน.txt` |
 | `designs_gate/` | ชุดวงจรตัวอย่าง/golden (`*.schproj.json`) |
 | `_ecosystem_docs/` | เอกสารสถาปัตยกรรม, data model, router, board pinout |
-| `schematic_mcp.py`, `mcp_config.reference.json` | MCP server ของตัววาดเกต + ตัวอย่าง config |
+| `launcher/mcp_server.py` | **MCP server ให้ Claude ทำงานใน Schematic Studio**: อ่าน วาง ต่อสาย จัดวาง ตรวจ จำลอง เลือกขา ส่งออก VHDL/XDC วิธีเชื่อมต่อดูที่ [`docs/MCP.md`](docs/MCP.md) (ตั้งค่า ▸ เชื่อมกับ Claude) |
+| `schematic_mcp.py`, `mcp_config.reference.json` | MCP server รุ่นเก่า (เขียนไฟล์ JSON แล้วกด Sync) + ตัวอย่าง config |
 | `launcher/` | **โปรแกรมรวม**: เปิดตัวเดียว ได้ทั้งตัววาด, Top-Down, backend AI/sim, FPGA Builder, หน้าตั้งค่า และที่เก็บโปรเจกต์ พร้อมสคริปต์ build ตัวติดตั้ง Windows |
 | `sketch-handoff/` | ไฟล์ส่งต่องานออกแบบ UI |
 
