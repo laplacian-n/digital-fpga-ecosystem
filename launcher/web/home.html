@@ -548,9 +548,20 @@ $("#updGo").onclick=async()=>{
   if(r.manual){ window.open(r.url,"_blank"); return; }
   if(!r.ok){ toast(r.error||"อัปเดตไม่ได้"); return; }
   const b=$("#updGo"); b.disabled=true;
-  const poll=async()=>{ let p; try{ p=await api("/api/update/progress"); }catch(_){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; return; }
+  let log="", t0=0;
+  // the old program exits while Setup runs: wait for the new one to answer, then reload into it
+  const waitNew=async()=>{
+    try{ const i=await api("/api/info"); if(i.version && i.version!==ST.version){ location.reload(); return; } }catch(_){}
+    if(Date.now()-t0 > 120000){
+      b.textContent="ยังไม่เสร็จ";
+      $("#updCur").textContent="— ติดตั้งนานผิดปกติ: ปิดหน้าต่างนี้แล้วเปิด FPGA Ecosystem ใหม่จาก Start menu"+
+        " ถ้ายังเป็นเวอร์ชันเดิม ให้ดาวน์โหลดตัวติดตั้งจากหน้า Releases (log: "+log+")";
+      return; }
+    setTimeout(waitNew,2000); };
+  const poll=async()=>{ let p; try{ p=await api("/api/update/progress"); }catch(_){ p={phase:"installing"}; }
+    if(p.log) log=p.log;
     if(p.phase==="downloading"){ b.textContent="ดาวน์โหลด "+(p.total?Math.round(p.done*100/p.total)+"%":Math.round(p.done/1e6)+" MB"); setTimeout(poll,500); }
-    else if(p.phase==="installing"){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; }
+    else if(p.phase==="installing"){ b.textContent="กำลังติดตั้ง… หน้านี้จะเปิดเวอร์ชันใหม่เอง"; t0=Date.now(); waitNew(); }
     else if(p.phase==="error"){ b.disabled=false; b.textContent="อัปเดตเลย"; toast(p.error); }
     else setTimeout(poll,500); };
   poll();

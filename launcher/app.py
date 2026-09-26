@@ -748,7 +748,7 @@ def make_handler():
             if path == "/api/update/check":
                 return self._out(200, update_check(force=(q.get("force") or ["0"])[0] == "1"))
             if path == "/api/update/progress":
-                return self._out(200, INSTALLER.snapshot())
+                return self._out(200, dict(INSTALLER.snapshot(), log=updater.setup_log_path()))
             if path == "/api/llm/status":
                 server, model = detect_llama()
                 return self._out(200, dict(llm.status(CFG["features"]["llm_endpoint"], server, model),
@@ -985,7 +985,13 @@ def main(argv=None):
     print(f"{APP_NAME} {VERSION} on {base_url()}  (backend: "
           f"{'ok' if BACKEND else 'OFF - ' + BACKEND_ERROR})")
     print(f"projects: {projects_dir()}")
-    if not no_open:
+    if "--after-update" in argv:
+        # the Home window that started the update reloads itself once we answer; open a
+        # window only if it doesn't come back (the user closed it), so there aren't two
+        t0 = LAST_PING
+        threading.Thread(target=lambda: (time.sleep(8), LAST_PING <= t0 and open_window("home")),
+                         daemon=True).start()
+    elif not no_open:
         open_window("home")
     try:
         HTTPD.serve_forever()
