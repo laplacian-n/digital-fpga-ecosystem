@@ -77,7 +77,17 @@ def _documents_dir() -> Path:
     return d if d.exists() else Path.home()
 
 
+def _data_dir() -> Path:
+    """per-machine data (models are GBs: never in the roaming profile)"""
+    if IS_WIN:
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / APP_NAME
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / APP_NAME
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / APP_ID
+
+
 CONFIG_DIR = _config_dir()
+DATA_DIR = _data_dir()
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 DEFAULTS = {
@@ -104,6 +114,7 @@ DEFAULTS = {
         "ghdl": "",               # path to ghdl(.exe); blank = auto-detect
         "fpga": True,             # FPGA Builder (VHDL -> .bit -> board)
         "vivado": "",             # path to vivado(.bat); blank = auto-detect
+        "openfpgaloader": "",     # path to openFPGALoader(.exe); blank = bundled / PATH
     },
 }
 
@@ -177,13 +188,13 @@ def detect_vivado() -> str:
 
 def detect_llama() -> tuple[str, str]:
     exe = "llama-server.exe" if IS_WIN else "llama-server"
-    server = _first([CFG["features"].get("llama_server"),
+    server = _first([CFG["features"].get("llama_server"), llm.find_server(),
                      ROOT / "ai" / "llama" / exe, INSTALL_DIR / "llama" / exe,
                      shutil.which("llama-server")])
     model = CFG["features"].get("llama_model") or ""
     if not Path(model).is_file():
-        ggufs = sorted(glob.glob(str(ROOT / "ai" / "models" / "*.gguf"))
-                       + glob.glob(str(INSTALL_DIR / "models" / "*.gguf")))
+        ggufs = (llm.installed_models() + sorted(glob.glob(str(ROOT / "ai" / "models" / "*.gguf"))
+                 + glob.glob(str(INSTALL_DIR / "models" / "*.gguf"))))
         model = ggufs[0] if ggufs else ""
     return server, model
 
@@ -240,23 +251,39 @@ def load_backend():
         traceback.print_exc()
 
 
-LLAMA_PROC = None
+import llm  # noqa: E402  local model: download llama.cpp + a .gguf, start/stop (Settings ▸ โมเดล AI)
+llm.init(DATA_DIR, CONFIG_DIR / "llama-server.log")
 
 
-def start_llama():
-    global LLAMA_PROC
+def start_llama(force: bool = False) -> dict:
     f = CFG["features"]
-    if f.get("llm") != "local":
-        return
+    if f.get("llm") != "local" and not force:
+        return {"ok": False, "error": "llm is not local"}
     server, model = detect_llama()
     if not (server and model):
+        return {"ok": False, "error": "ยังไม่มี llama.cpp หรือไฟล์โมเดล"}
+    return llm.start(server, model, f.get("llm_endpoint"), f.get("llama_args") or "")
+
+
+def set_llm_endpoint(ep: str) -> None:
+    """point the in-process backend at the model now (no restart): intent_client reads its
+    endpoint from AI_ENDPOINT at import and bakes it into keyword defaults"""
+    os.environ["AI_ENDPOINT"] = ep
+    ic = sys.modules.get("intent_client")
+    if not ic:
         return
-    port = urlparse(f.get("llm_endpoint") or "").port or 8080
-    args = [server, "-m", model, "--host", "127.0.0.1", "--port", str(port)]
-    args += (f.get("llama_args") or "").split()
-    log = open(CONFIG_DIR / "llama-server.log", "ab")
-    LLAMA_PROC = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT,
-                                  creationflags=_NO_WINDOW)
+    prev, ic.DEFAULT_ENDPOINT = ic.DEFAULT_ENDPOINT, ep
+    for fn in list(vars(ic).values()):
+        if not callable(fn):
+            continue
+        d = getattr(fn, "__defaults__", None)
+        if d:
+            fn.__defaults__ = tuple(ep if x == prev else x for x in d)
+        kw = getattr(fn, "__kwdefaults__", None)
+        if kw:
+            for k, v in kw.items():
+                if v == prev:
+                    kw[k] = ep
 
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -277,7 +304,9 @@ def llm_up() -> bool:
 PAGES = {
     "home": "/",
     "studio": "/studio.html",
-    "topdown": "/topdown/topdown-schematic.html",
+    # Top-Down and the board build live inside Schematic Studio (one program, the circuit follows)
+    "topdown": "/studio.html?view=topdown",
+    "board": "/studio.html?view=board",
 }
 
 
@@ -286,7 +315,8 @@ def base_url() -> str:
 
 
 def open_window(page: str = "home", query: str = "") -> None:
-    url = base_url() + PAGES.get(page, "/") + (("?" + query) if query else "")
+    path = PAGES.get(page, "/")
+    url = base_url() + path + ((("&" if "?" in path else "?") + query) if query else "")
     browser = find_browser()
     if browser:
         prof = CONFIG_DIR / "browser"
@@ -375,6 +405,8 @@ def status() -> dict:
 # updates (GitHub Releases) — see updater.py
 # --------------------------------------------------------------------------
 import updater  # noqa: E402  (launcher/ is on sys.path: script dir / bundled module)
+import board    # noqa: E402  build .bit + load onto the board, for the editor's "ลงบอร์ด" page
+board.init(ROOT, INSTALL_DIR, CONFIG_DIR, lambda: detect_vivado(), lambda: CFG)
 
 INSTALLER = updater.Installer()
 UPDATE_EVERY = 12 * 3600
@@ -600,6 +632,8 @@ def make_handler():
                 f = WEB / "home.html"
             elif path in ("/studio.html", "/schematic&bus2vhdl.html"):
                 f = EDITOR_HTML
+            elif path == "/favicon.ico":
+                f = WEB / "icon-192.png"
             elif path.startswith("/launcher/"):
                 f = inside(WEB, path[len("/launcher/"):])
             elif path.startswith("/topdown/") or path.startswith("/designs_gate/"):
@@ -699,6 +733,16 @@ def make_handler():
                 return self._out(200, update_check(force=(q.get("force") or ["0"])[0] == "1"))
             if path == "/api/update/progress":
                 return self._out(200, INSTALLER.snapshot())
+            if path == "/api/llm/status":
+                server, model = detect_llama()
+                return self._out(200, dict(llm.status(CFG["features"]["llm_endpoint"], server, model),
+                                           mode=CFG["features"].get("llm"), backend_up=llm_up()))
+            if path == "/api/board/status":
+                return self._out(200, board.status(int((q.get("since") or ["0"])[0] or 0)))
+            if path == "/api/board/tools":
+                t = board.tools()
+                t["enabled"] = bool(CFG["features"].get("fpga"))
+                return self._out(200, t)
             if path == "/api/files/read":
                 f = inside(projects_dir(), (q.get("path") or [""])[0])
                 if not f.is_file():
@@ -739,6 +783,44 @@ def make_handler():
                 inside(projects_dir(), rel)
                 open_window("studio", "open=" + quote(rel))
                 return self._out(200, {"ok": True})
+            if path.startswith("/api/llm/"):
+                if path == "/api/llm/download":
+                    if data.get("what") == "llama":
+                        return self._out(200, llm.download_llama(data.get("variant") or "gpu"))
+                    return self._out(200, llm.download_model(str(data.get("id") or "")))
+                if path == "/api/llm/cancel":
+                    return self._out(200, llm.cancel_download())
+                if path == "/api/llm/stop":
+                    return self._out(200, llm.stop())
+                if path == "/api/llm/start":
+                    f = CFG["features"]
+                    if data.get("model"):
+                        f["llama_model"] = str(data["model"])
+                    srv = llm.find_server()
+                    if srv and not Path(f.get("llama_server") or "").is_file():
+                        f["llama_server"] = ""          # auto-detect finds the downloaded one
+                    f["llm"] = "local"
+                    f["ai"] = True
+                    save_config(CFG)
+                    set_llm_endpoint(f["llm_endpoint"])
+                    return self._out(200, start_llama(force=True))
+                return self._out(404, {"ok": False, "error": "unknown api"})
+            if path.startswith("/api/board/"):
+                if not CFG["features"].get("fpga"):
+                    return self._out(200, {"ok": False, "error": "ฟีเจอร์ “สร้าง .bit / ลงบอร์ด” ปิดอยู่ — เปิดได้ที่หน้า ตั้งค่า"})
+                proj = safe_name(data.get("project") or "design")
+                if path == "/api/board/build":
+                    return self._out(200, board.start_build(proj, data.get("top") or proj, data.get("vhdl") or "",
+                                                            data.get("xdc") or "", data.get("clk") or "",
+                                                            inside(projects_dir(), proj)))
+                if path == "/api/board/program":
+                    return self._out(200, board.start_program(proj, data.get("top") or proj,
+                                                              data.get("mode") or "sram", data.get("cable") or "ft2232"))
+                if path == "/api/board/detect":
+                    return self._out(200, board.start_detect(data.get("cable") or "ft2232"))
+                if path == "/api/board/stop":
+                    return self._out(200, board.stop())
+                return self._out(404, {"ok": False, "error": "unknown api"})
             if path == "/api/fpga_builder":
                 if not CFG["features"].get("fpga"):
                     return self._out(200, {"ok": False, "error": "FPGA build ปิดอยู่"})
@@ -809,11 +891,10 @@ def _bind(port: int, wait: float = 0.0):
 
 
 def shutdown():
-    if LLAMA_PROC is not None:
-        try:
-            LLAMA_PROC.terminate()
-        except Exception:
-            pass
+    try:
+        llm.stop()
+    except Exception:
+        pass
     if HTTPD is not None:
         threading.Thread(target=HTTPD.shutdown, daemon=True).start()
     time.sleep(0.5)

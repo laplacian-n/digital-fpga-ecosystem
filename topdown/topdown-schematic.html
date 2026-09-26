@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232f7cf6'/%3E%3Cstop offset='1' stop-color='%236b4ff0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='2' width='60' height='60' rx='14' fill='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M24 11v5M32 11v5M40 11v5M24 48v5M32 48v5M40 48v5M11 24h5M11 32h5M11 40h5M48 24h5M48 32h5M48 40h5'/%3E%3C/g%3E%3Crect x='16' y='16' width='32' height='32' rx='5' fill='%23fff'/%3E%3Cpath d='M23 25h7a7 7 0 0 1 0 14h-7z' fill='none' stroke='%233b5fe0' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M37 32h4M19 28.5h4M19 35.5h4' stroke='%233b5fe0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <title>Top-Down Schematic — แฟ้มงาน</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/opentype.js/1.3.4/opentype.min.js"></script>
 <style>
@@ -458,10 +459,12 @@ function pins(n){
   const a=[];
   if(n.type==='block'){
     const top=20,sp=22;
-    (n.pinsL||[]).forEach((p,i)=>a.push({id:'L'+i,x:n.x,y:n.y+top+i*sp+8,side:'left',...norm(p)}));
-    (n.pinsR||[]).forEach((p,i)=>a.push({id:'R'+i,x:n.x+n.w,y:n.y+top+i*sp+8,side:'right',...norm(p)}));
-    (n.pinsB||[]).forEach((p,i)=>a.push({id:'B'+i,x:n.x+(i+1)*n.w/(n.pinsB.length+1),y:n.y+n.h,side:'bottom',...norm(p)}));
-    (n.pinsT||[]).forEach((p,i)=>a.push({id:'T'+i,x:n.x+(i+1)*n.w/(n.pinsT.length+1),y:n.y,side:'top',...norm(p)}));
+    // pinOff: pin offsets carried over from the gate editor (exact import) — else the even pitch
+    const o=n.pinOff||{}, at=(k,i,def)=>(o[k]&&o[k][i]!=null)?o[k][i]:def;
+    (n.pinsL||[]).forEach((p,i)=>a.push({id:'L'+i,x:n.x,y:n.y+at('L',i,top+i*sp+8),side:'left',...norm(p)}));
+    (n.pinsR||[]).forEach((p,i)=>a.push({id:'R'+i,x:n.x+n.w,y:n.y+at('R',i,top+i*sp+8),side:'right',...norm(p)}));
+    (n.pinsB||[]).forEach((p,i)=>a.push({id:'B'+i,x:n.x+at('B',i,(i+1)*n.w/(n.pinsB.length+1)),y:n.y+n.h,side:'bottom',...norm(p)}));
+    (n.pinsT||[]).forEach((p,i)=>a.push({id:'T'+i,x:n.x+at('T',i,(i+1)*n.w/(n.pinsT.length+1)),y:n.y,side:'top',...norm(p)}));
   } else if(n.type==='gate'){
     const ni=n.inputs||2;
     for(let i=0;i<ni;i++) a.push({id:'in'+i,x:n.x-8,y:n.y+n.h*(i+1)/(ni+1),side:'left',name:''});
@@ -697,9 +700,11 @@ function routeThrough(w){
   const A=[Math.round(a.x),Math.round(a.y)], B=[Math.round(b.x),Math.round(b.y)];
   // leave the source along its stub and meet the sink along its own, so both
   // ends still read as connected however the middle is bent
-  const anchors=[A,[A[0]+da[0]*WIRE_MINLEG,A[1]+da[1]*WIRE_MINLEG]];
+  // an exact wire (drawn by the gate editor's router) already starts and ends on its pins' axes
+  const anchors=w.exact?[A]:[A,[A[0]+da[0]*WIRE_MINLEG,A[1]+da[1]*WIRE_MINLEG]];
   (w.pts||[]).forEach(q=>anchors.push([Math.round(q[0]),Math.round(q[1])]));
-  anchors.push([B[0]+db[0]*WIRE_MINLEG,B[1]+db[1]*WIRE_MINLEG],B);
+  if(!w.exact) anchors.push([B[0]+db[0]*WIRE_MINLEG,B[1]+db[1]*WIRE_MINLEG]);
+  anchors.push(B);
   let out=[anchors[0]];
   let lastHoriz=da[1]===0;                    // how we left the source
   for(let i=1;i<anchors.length;i++){
@@ -1672,6 +1677,8 @@ function wrapFrame(quiet){
   let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
   s.nodes.forEach(n=>{const b=nodeBounds(n);
     x1=Math.min(x1,b.x);y1=Math.min(y1,b.y);x2=Math.max(x2,b.x+b.w);y2=Math.max(y2,b.y+b.h);});
+  // corners of wires drawn by the gate editor can run outside every part (a wrap-around)
+  (s.wires||[]).forEach(w=>(w.pts||[]).forEach(q=>{ x1=Math.min(x1,q[0]);y1=Math.min(y1,q[1]);x2=Math.max(x2,q[0]);y2=Math.max(y2,q[1]); }));
   const pad=40;
   s.frame={x:Math.round(x1-pad),y:Math.round(y1-pad),w:Math.round(x2-x1+pad*2),h:Math.round(y2-y1+pad*2)};
   render(); syncSheetProps(); if(!quiet) toast('ขยายกรอบโมดูลครอบทุกอย่างแล้ว');
@@ -2082,6 +2089,8 @@ cv.addEventListener('pointerdown',e=>{
     sel={type:'node',id};
     // remember where every selected part started, so they all move together
     const start={}; selectedNodes().forEach(m=>start[m.id]=[m.x,m.y]);
+    // wires drawn by the gate editor keep their corners only while their parts stay put
+    SH().wires.forEach(x=>{ if(x.exact&&(start[x.from.node]||start[x.to.node])){ delete x.exact; delete x.pts; } });
     drag={kind:'node',id,ox:w.x-n.x,oy:w.y-n.y,start}; cv.classList.add('grabbing'); render();
   }
   else if(wireEl){ clearMulti(); sel={type:'wire',id:wireEl.getAttribute('data-wire')}; render(); }
@@ -2311,6 +2320,13 @@ function autoLayoutSheet(s){
 function importSheet(sh){
   normalizeSheet(sh); fixSheetDefaults(sh);
   const old=sh.src?P.sheets.find(x=>x.src===sh.src):null;
+  if(sh.exact){                    // the gate editor's own placement + routing: keep it as drawn
+    if(old){ old.nodes=sh.nodes; old.wires=sh.wires; old.module=sh.module||old.module; old.title=sh.title||old.title; old.exact=true; P.active=P.sheets.indexOf(old); }
+    else { P.sheets.push(sh); P.active=P.sheets.length-1; }
+    sel={type:null,id:null};
+    wrapFrame(true); fitPageScale(true); fitView(); render(); syncSheetProps();
+    return {updated:!!old, added:0, removed:0, exact:true};
+  }
   if(!old){
     P.sheets.push(sh); P.active=P.sheets.length-1; sel={type:null,id:null};
     const lay=autoLayoutSheet(sh);
@@ -2346,6 +2362,7 @@ function importSheet(sh){
     toHost({type:'gate:refresh',src:s.src}); };
   const ba=document.getElementById('bAuto');
   if(ba) ba.onclick=()=>{ const s=SH(); if(!s||!s.nodes.length){ toast('แผ่นนี้ยังว่าง'); return; }
+    if(s.src&&toHost({type:'gate:relayout',src:s.src})){ toast('จัดวาง + จัดสายด้วยตัวจัดของโปรแกรมหลัก…'); return; }
     const r=autoLayoutSheet(s); histTick();
     toast('จัดวางแล้ว — '+r.cols+' คอลัมน์'+(r.bands>1?(' พับเป็น '+r.bands+' แถว'):'')+' · ย่อให้พอดี A4 (Ctrl+Z ย้อนได้)'); };
   const dd=document.getElementById('ddExport');
@@ -2366,7 +2383,9 @@ function importSheet(sh){
     else if(m.type==='td:loadSheet' && m.sheet && m.sheet.nodes){
       const r=importSheet(m.sheet);
       renderSheets(); histTick();
-      toast(r.updated
+      toast(r.exact
+        ? ((r.updated?'อัปเดต':'นำเข้า')+' "'+SH().title+'" — วาดตามตำแหน่งและเส้นสายในโปรแกรมหลัก · พอดี A4')
+        : r.updated
         ? ('อัปเดต "'+SH().title+'" จากวงจรแล้ว — ตำแหน่งเดิมคงไว้'+(r.added?(' · ใหม่ '+r.added+' ชิ้น'):'')+(r.removed?(' · ถูกลบ '+r.removed+' ชิ้น'):''))
         : ('นำเข้า "'+SH().title+'" — '+SH().nodes.length+' ชิ้นส่วน · จัดวางอัตโนมัติ + พอดี A4 แล้ว'));
     }
@@ -2391,6 +2410,7 @@ function gotoIssue(it){
   render();
 }
 function doTidy(){
+  const s=SH(); if(s&&s.src&&toHost({type:'gate:relayout',src:s.src,wiresOnly:true})){ toast('จัดสายด้วยตัวจัดสายของโปรแกรมหลัก…'); return; }
   const r=tidySheet(); render();
   toast(r?('สายตรง '+r.before+' → '+r.after+' จาก '+r.total+' เส้น (Ctrl+Z ย้อนได้)'):'ไม่มีอะไรให้จัด');
 }

@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232f7cf6'/%3E%3Cstop offset='1' stop-color='%236b4ff0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2' y='2' width='60' height='60' rx='14' fill='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-width='3.2' stroke-linecap='round'%3E%3Cpath d='M24 11v5M32 11v5M40 11v5M24 48v5M32 48v5M40 48v5M11 24h5M11 32h5M11 40h5M48 24h5M48 32h5M48 40h5'/%3E%3C/g%3E%3Crect x='16' y='16' width='32' height='32' rx='5' fill='%23fff'/%3E%3Cpath d='M23 25h7a7 7 0 0 1 0 14h-7z' fill='none' stroke='%233b5fe0' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M37 32h4M19 28.5h4M19 35.5h4' stroke='%233b5fe0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <title>Schematic Studio — VHDL Generator for Spartan-7 / Vivado</title>
 <style>
 :root{
@@ -89,7 +90,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .btn:disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.6)}
 .btn:hover{border-color:var(--accent);background:var(--bg-3)}
 .btn-primary{background:linear-gradient(135deg,#5b8def,#7c5cff);border:none;color:white;padding:7px 14px}
-.btn-primary:hover{filter:brightness(1.1)}
+/* .btn:hover swaps in a light background — keep the gradient (and the white text readable) on hover/press */
+.btn-primary:hover,.btn-primary:focus-visible{background:linear-gradient(135deg,#5b8def,#7c5cff);color:#fff;filter:brightness(1.1)}
+.btn-primary:active{background:linear-gradient(135deg,#4a7be0,#6a4bf0);color:#fff;filter:none}
 .btn-success{background:linear-gradient(135deg,#10b981,#34d399);border:none;color:#06281c}
 .btn-ghost{background:transparent;border:none;color:var(--ink-dim);padding:5px 9px}
 .btn-ghost:hover{background:var(--bg-2);color:var(--ink)}
@@ -619,17 +622,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 #simScaler{transform-origin:top left}
 /* side panel: truth table + timing, resizable + text-zoomable (#11 #12) */
 /* side panel hugs its content (no filled card) — width follows the table, still resizable */
-.sim-side{position:relative;flex:none;width:auto;max-width:460px;display:flex;flex-direction:column;gap:8px;padding-left:12px;border-left:1px solid var(--line);overflow:hidden}
-.sim-boardrow.stack .sim-side{width:auto;align-self:stretch;border-left:none;padding-left:0}
+.sim-side{position:relative;flex:none;width:auto;max-width:460px;min-height:0;display:flex;flex-direction:column;gap:8px;padding-left:12px;border-left:1px solid var(--line);overflow:hidden}
+.sim-boardrow.stack .sim-side{width:auto;height:auto!important;max-width:none!important;align-self:stretch;border-left:none;padding-left:0}
 .sim-side-resizer{position:absolute;left:-5px;top:0;bottom:0;width:9px;cursor:col-resize}
 .sim-side-resizer:hover{background:var(--accent);opacity:.4;border-radius:4px}
 .sim-boardrow.stack .sim-side-resizer{display:none}
-.sim-side-head{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-dim)}
+.sim-side-head{flex:none;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-dim)}
 .sim-side-head .ttbtn{background:var(--bg-2);border:1px solid var(--line);color:var(--ink-dim);border-radius:5px;padding:1px 7px;cursor:pointer;font:inherit;font-size:11px}
 .sim-side-head .ttbtn:hover{color:var(--ink);border-color:var(--accent)}
-.sim-side-body{overflow:auto;max-height:56vh}
+.sim-side-body{overflow:auto;flex:1 1 auto;min-height:60px}
+.sim-boardrow.stack .sim-side-body{max-height:56vh}
 .sim-side-body table{width:100%}
-.sim-side-timing{overflow:auto;max-width:100%;overflow-wrap:anywhere;word-break:break-word;font-size:12px;line-height:1.5;color:var(--muted)}
+.sim-side-timing{overflow:auto;flex:0 1 auto;max-height:38%;max-width:100%;overflow-wrap:anywhere;word-break:break-word;font-size:12px;line-height:1.5;color:var(--muted)}
 .sim-side-timing svg{display:block;max-width:100%}
 .sim-side-timing:empty{display:none}
 .sim-valbar{margin:6px 2px 12px;font-size:13px;color:var(--ink-dim)}
@@ -11339,6 +11343,10 @@ function hideSimPage(){ const pg=$("#simPage"); if(pg) pg.classList.remove("show
 function openTopdown(){ const v=$("#topdownView"), f=$("#topdownFrame"); if(!v||!f) return;
   if(!f.getAttribute("src")){ f.addEventListener("load",()=>{ f.dataset.loaded="1"; },{once:true}); f.setAttribute("src","topdown/topdown-schematic.html"); }
   v.style.display="flex"; }
+/* open Top-Down showing the circuit you are working on (updated in place if it was sent before) */
+function openTopdownWithSheet(){ const sch=activeSch();
+  const has=sch&&(sch.components||[]).some(c=>c.type!=="IN"&&c.type!=="OUT"&&c.type!=="JUNCTION");
+  if(has) sendToTopdown({type:"td:loadSheet", sheet:schematicToTopdownSheet(sch)}); else openTopdown(); }
 function closeTopdown(){ const v=$("#topdownView"); if(v) v.style.display="none"; }
 /* ---- DATA BRIDGE with the embedded Top-Down editor (postMessage; iframe is same file:// origin
    but an isolated JS context). Gate→TD: send the current sheet as a block. TD→Gate: a block's
@@ -11352,7 +11360,71 @@ function sendToTopdown(msg){ const f=$("#topdownFrame"); if(!f) return; openTopd
    top-down diagram. IN/OUT->port, SCH:/CUSTOM:/MUX->block (pins = its port names -> L#/R#), gates->gate,
    GND/VCC->const; wires are lifted per-net (netDriverPort->sinks) so fan-out junctions become direct
    point-to-point topdown wires. Pin ids follow topdown_mcp: port/const p, gate in0..#/out, block L#/R#. */
+/* EXACT transfer: the gate editor's own placement AND its routed wires, drawn 1:1 in Top-Down.
+   Every symbol is sized so its pins land on the gate editor's pin coordinates, and every
+   wire carries the corners it is drawn through here (w.pts + exact), so Top-Down shows the
+   same clean drawing instead of re-placing and re-routing it with its simpler router.
+   Fan-out through junctions becomes one point-to-point wire per sink that follows the
+   drawn trunk (Top-Down puts the junction dots back). Rotated/mirrored parts can't map
+   onto Top-Down's fixed-orientation symbols → null, and the caller falls back. */
+function schematicToTopdownExact(sch){
+  const GM={AND:"and",OR:"or",NAND:"nand",NOR:"nor",XOR:"xor",XNOR:"xnor",NOT:"not",BUF:"buf"};
+  const comps=(sch.components||[]).filter(c=>c.type!=="JUNCTION");
+  if(!comps.length || comps.some(c=>(c.rot||0)!==0 || c.mirror)) return null;
+  let mnx=1e9,mny=1e9; comps.forEach(c=>{ mnx=Math.min(mnx,c.x); mny=Math.min(mny,c.y); });
+  const OX=160-mnx, OY=170-mny, X=v=>Math.round(v+OX), Y=v=>Math.round(v+OY);
+  const nodes=[], pinmap={};
+  for(const c of comps){ const map={}, sz=getSize(c), ports=getPorts(c); let nd;
+    const pp=id=>portPos(c,id);
+    if(c.type==="IN"||c.type==="OUT"){ const q=pp(c.type==="IN"?"o":"i"); if(!q) return null;
+      nd={id:c.id,type:"port",x:X(q.x),y:Y(q.y),name:sanId((c.params&&c.params.name)||c.id),side:c.type==="IN"?"left":"right",bus:0};
+      map[c.type==="IN"?"o":"i"]="p"; }
+    else if(c.type==="GND"||c.type==="VCC"||c.type==="CONST"){ const out=ports.find(p=>p.dir==="out"); const q=out&&pp(out.id); if(!q) return null;
+      const v=c.type==="GND"?"0":c.type==="VCC"?"1":String((c.params&&c.params.value)!=null?c.params.value:0);
+      nd={id:c.id,type:"const",x:X(q.x)-16,y:Y(q.y)-6,value:v}; map[out.id]="p"; }
+    else if(GM[c.type]){ const ins=ports.filter(p=>p.dir==="in"), out=ports.find(p=>p.dir==="out");
+      const g=GM[c.type], bub=/^(nand|nor|xnor|not)$/.test(g);
+      ins.forEach((p,i)=>map[p.id]="in"+i); if(out) map[out.id]="out";
+      nd={id:c.id,type:"gate",gate:g,inputs:Math.max(1,ins.length),x:X(c.x)+8,y:Y(c.y),w:Math.max(20,sz.w-16-(bub?9:0)),h:sz.h,label:""}; }
+    else { // anything else is a box: pins on the side their offset puts them, at the gate editor's offsets
+      const L=[],R=[],T=[],B=[];
+      ports.forEach(p=>{ const side=p.dx<=0?L:p.dx>=sz.w?R:p.dy<=0?T:p.dy>=sz.h?B:(p.dir==="in"?L:R); side.push(p); });
+      [L,R].forEach(a=>a.sort((u,v)=>u.dy-v.dy)); [T,B].forEach(a=>a.sort((u,v)=>u.dx-v.dx));
+      const bx=X(c.x)+(L.length?10:0), by=Y(c.y)+(T.length?10:0);
+      const bw=Math.max(34,sz.w-(L.length?10:0)-(R.length?10:0)), bh=Math.max(26,sz.h-(T.length?10:0)-(B.length?10:0));
+      const nm=p=>String(p.label||p.id);
+      L.forEach((p,i)=>map[p.id]="L"+i); R.forEach((p,i)=>map[p.id]="R"+i); B.forEach((p,i)=>map[p.id]="B"+i); T.forEach((p,i)=>map[p.id]="T"+i);
+      const sub=subSchOf(c);
+      const label=sub?sub.name:(c.type==="MUX"?("MUX"+(c.params&&c.params.inputs?" "+c.params.inputs+":1":"")):(TYPES[c.type]&&TYPES[c.type].label)||String(c.type).replace(/^SCH:|^CUSTOM:/,"")||"BLOCK");
+      nd={id:c.id,type:"block",x:bx,y:by,minW:bw,minH:bh,label,
+          pinsL:L.map(nm),pinsR:R.map(nm),pinsB:B.map(nm),pinsT:T.map(nm),
+          pinOff:{L:L.map(p=>Y(c.y+p.dy)-by),R:R.map(p=>Y(c.y+p.dy)-by),B:B.map(p=>X(c.x+p.dx)-bx),T:T.map(p=>X(c.x+p.dx)-bx)},
+          ref:/^(SCH|CUSTOM):/.test(String(c.type))?c.type:null}; }
+    nodes.push(nd); pinmap[c.id]=map;
+  }
+  // wire graph: junctions are nodes, every other end is a pin; each wire carries its drawn corners
+  const key=ep=>{ const c=comp(ep.cid,sch); return c&&c.type==="JUNCTION"?"J:"+ep.cid:ep.cid+"."+ep.pid; };
+  const adj=new Map(), add=(k,e)=>{ if(!adj.has(k)) adj.set(k,[]); adj.get(k).push(e); };
+  (sch.wires||[]).forEach(w=>{ const pts=drawnPoints(sch,w); if(!pts) return;
+    const a=key(w.from), b=key(w.to); add(a,{to:b,pts}); add(b,{to:a,pts:pts.slice().reverse()}); });
+  const wires=[], seen=new Set();
+  (sch.wires||[]).forEach(w0=>{ if(seen.has(w0.id)) return; const ids=[...netWires(sch,w0)]; ids.forEach(i=>seen.add(i));
+    const drv=netDriverPort(sch,w0); if(!drv||!pinmap[drv.cid]||!pinmap[drv.cid][drv.pid]) return;
+    const start=drv.cid+"."+drv.pid, prev=new Map([[start,null]]), q=[start];
+    while(q.length){ const k=q.shift(); (adj.get(k)||[]).forEach(e=>{ if(prev.has(e.to)) return; prev.set(e.to,{from:k,pts:e.pts}); if(e.to.indexOf("J:")===0) q.push(e.to); }); }
+    prev.forEach((v,k)=>{ if(!v||k.indexOf("J:")===0) return;
+      const dot=k.lastIndexOf("."), cid=k.slice(0,dot), pid=k.slice(dot+1), pm=pinmap[cid]; if(!pm||!pm[pid]) return;
+      const c=comp(cid,sch), port=c&&getPorts(c).find(p=>p.id===pid); if(!port||port.dir!=="in") return;
+      const chain=[]; for(let cur=k; prev.get(cur); cur=prev.get(cur).from) chain.unshift(prev.get(cur).pts);
+      const line=[]; chain.forEach(pts=>pts.forEach(p=>{ const l=line[line.length-1]; if(!l||l.x!==p.x||l.y!==p.y) line.push(p); }));
+      wires.push({from:{node:drv.cid,pin:pinmap[drv.cid][drv.pid]},to:{node:cid,pin:pm[pid]},bus:0,exact:true,
+                  pts:line.slice(1,-1).map(p=>[X(p.x),Y(p.y)])}); });
+  });
+  return {id:uid("tds"), src:sch.id, title:sch.name, module:sanId(sch.name)||"Module", exact:true,
+          frame:{x:100,y:110,w:1000,h:560}, nodes, wires};
+}
 function schematicToTopdownSheet(sch){
+  try{ const ex=schematicToTopdownExact(sch); if(ex) return ex; }catch(e){ console.warn("topdown exact",e); }
   const GM={AND:"and",OR:"or",NAND:"nand",NOR:"nor",XOR:"xor",XNOR:"xnor",NOT:"not",BUF:"buf"};
   const comps=(sch.components||[]).filter(c=>c.type!=="JUNCTION");
   let mnx=1e9,mny=1e9; comps.forEach(c=>{ mnx=Math.min(mnx,c.x); mny=Math.min(mny,c.y); });
@@ -11411,6 +11483,11 @@ function gateSheetFromBlock(label, ins, outs){
 window.addEventListener("message",ev=>{ const m=ev&&ev.data; if(!m||typeof m!=="object") return;
   const f=$("#topdownFrame"); if(!f||ev.source!==f.contentWindow) return;
   if(m.type==="gate:closeTopdown"){ closeTopdown(); return; }
+  if(m.type==="gate:relayout"){     // Top-Down's layout buttons → this editor's placer/router, then re-send
+    const sch=state.project.schematics[m.src]; if(!sch){ toast("ไม่พบแผ่นต้นทางในโปรเจคนี้","warn"); return; }
+    try{ if(m.wiresOnly) autoRouteSheet(sch); else healLayout(sch, null, true); }catch(e){ toast("จัดวางไม่ได้: "+e.message,"warn"); return; }
+    snapshot(); renderAll();
+    sendToTopdown({type:"td:loadSheet", sheet:schematicToTopdownSheet(sch)}); return; }
   if(m.type==="gate:refresh"){
     const sch=state.project.schematics[m.src];
     if(!sch){ toast("ไม่พบแผ่นต้นทางในโปรเจคนี้ — อาจถูกลบหรืออยู่คนละโปรเจค","warn",4200); return; }
@@ -11484,15 +11561,25 @@ function openUploadDialog(proj, ins, outs, onDownload){
 }
 function simTab(name){ requestAnimationFrame(simFit); }   // single merged view (board + table + timing)
 function simFit(){
-  const row=$("#simBoardRow"), side=$("#simSide"), wrap=$(".sim-boardwrap"), sc=$("#simScaler");
+  const row=$("#simBoardRow"), side=$("#simSide"), wrap=$(".sim-boardwrap"), sc=$("#simScaler"), body=$(".sim-body");
   if(!row||!wrap||!sc) return;
   const rw=row.clientWidth||1000;
-  const cols=+row.dataset.cols||0;
-  // table goes BELOW the board when there are many I/O, or the window is too narrow to fit both
-  const stacked = cols>8 || rw<900;
+  // the table sits BESIDE the board; only a really narrow window puts it below
+  const stacked = rw<760;
   row.classList.toggle("stack", stacked);
+  // fit the page height: board + table use what is left under the controls, so the page never scrolls
+  let availH=0;
+  if(body && !stacked){
+    const cs=getComputedStyle(body), padB=parseFloat(cs.paddingBottom)||0;
+    availH=Math.floor(body.getBoundingClientRect().bottom - row.getBoundingClientRect().top - padB - 2);
+  }
+  if(side){
+    side.style.maxWidth = stacked ? "" : Math.max(300, Math.round(rw*0.52))+"px";
+    side.style.height = (!stacked && availH>200) ? availH+"px" : "";
+  }
   let avail=stacked ? rw : Math.max(240, rw-(side?side.offsetWidth:0)-12);
   let s=Math.min(1, Math.max(0.12,(avail-36)/1100));
+  if(availH>200) s=Math.min(s, Math.max(0.12,(availH-36)/545));
   const apply=()=>{ sc.style.transform="scale("+s+")"; sc.style.height=(545*s)+"px"; wrap.style.width=(1100*s+36)+"px"; };
   apply();
   if(!stacked){ const over=row.scrollWidth-row.clientWidth; if(over>2){ s=Math.max(0.12,((1100*s+36)-over-8)/1100); apply(); } }
@@ -11512,6 +11599,7 @@ function simTT(tt){ let h='<table><tr>'+tt.inputs.concat(tt.outputs).map(x=>`<th
    same shape the board playback (#14) already reads: [cycle, ins[], state[], outs[]]. */
 function clientSeqSim(sch, cycles, opts){
   opts=opts||{};                       // opts.hold = {IN id: 0|1} — levels for non-clock inputs (default 0)
+                                       // opts.holdAt(i) = {IN id: 0|1} — per-cycle levels (the board's live switches)
   const fs=flattenSchematic(sch).sch;
   const ffs=fs.components.filter(c=>PROBE_SEQ[c.type]);
   const clocks=[...probeEval(sch).clocks].filter(id=>comp(id,sch));
@@ -11528,6 +11616,9 @@ function clientSeqSim(sch, cycles, opts){
   try{
     probeSettle(fs, st);
     for(let i=0;i<cycles;i++){
+      if(opts.holdAt){ const h=opts.holdAt(i)||{}; let ch=false;
+        Object.keys(h).forEach(id=>{ if(clocks.includes(id)) return; const v=h[id]?1:0; if(PROBE_VALS[id]!==v){ PROBE_VALS[id]=v; ch=true; } });
+        if(ch) probeSettle(fs, st); }
       const m=probeModel(fs, st);
       rows.push([i, ins.map(c=>probeBit(c)), ffs.map(c=>PROBE_FF[c.id]?1:0), outs.map(c=>m.inVal(c.id,"i")?1:0)]);
       clocks.forEach(id=>{ PROBE_VALS[id]=1; }); probeSettle(fs, st);
@@ -11557,8 +11648,10 @@ function clientSeqSim(sch, cycles, opts){
     outs.map((c,k)=>({name:nm(c), vals:rows.map(r=>r[3][k])})));
   const stuck = ffs.length && rows.length>1 && rows.every(r=>r[2].join("")===rows[0][2].join(""));
   return {ok:true, sequential:true,
-    note: stuck?("สถานะ flip-flop ไม่เปลี่ยนเลยตลอด "+rows.length+" clock — เช็คว่า clk ต่อถึงขา CLK ของ FF จริงไหม และ J/K (หรือ D/T) ไม่ได้ถูกตรึงค่า / reset ค้าง"):"",
-    sequence:{inputs:ins.map(nm), outputs:outs.map(nm), dffs:dffNames, rows},
+    note: stuck && ins.length && rows.every(r=>r[1].every(v=>!v))
+      ? "สถานะ flip-flop ยังไม่เปลี่ยน เพราะ input ทุกตัวเป็น 0 — คลิกสวิตช์บนบอร์ดเพื่อตั้งค่า แล้วกด “ก้าว 1 clock”"
+      : stuck?("สถานะ flip-flop ไม่เปลี่ยนเลยตลอด "+rows.length+" clock — เช็คว่า clk ต่อถึงขา CLK ของ FF จริงไหม และ J/K (หรือ D/T) ไม่ได้ถูกตรึงค่า / reset ค้าง"):"",
+    sequence:{inputs:ins.map(nm), inputIds:ins.map(c=>c.id), outputs:outs.map(nm), dffs:dffNames, rows},
     waveform_svg: seqWaveSvg(sch.name||"seq", tracks, rows.length)};
 }
 /* ===== CLOCK-DIVIDER ANALYSIS (#sim) =====================================================
@@ -12076,39 +12169,77 @@ function wireSimBoardSeq(j, opts){
   const seq=j.sequence;
   if(SIM_SEQ&&SIM_SEQ.timer) clearInterval(SIM_SEQ.timer);
   SIM_SEQ={inputs:seq.inputs||[], outputs:seq.outputs||[], dffs:seq.dffs||[], rows:seq.rows, idx:0, playing:false, timer:null};
-  document.querySelectorAll('#simPcb .swName').forEach(e=>{ e.textContent='sw['+e.dataset.swn+']'; e.parentElement.classList.remove('mapped'); });
+  /* live switches: the data inputs of the drawn sheet can be flipped on the board. Each cycle
+     keeps its own input levels (hist); flipping a switch at clock i changes clock i onward and
+     re-runs the sim, so "set d → step 1 clock" latches it, as on the real board. */
+  const sch = opts.sch || (!opts.noPanel && typeof activeSch==="function" ? activeSch() : null);
+  if(sch && seq.inputIds && seq.inputIds.length===SIM_SEQ.inputs.length){
+    SIM_SEQ.sch=sch; SIM_SEQ.ids=seq.inputIds; SIM_SEQ.hist=seq.rows.map(r=>r[1].slice());
+  }
+  // board pins: the sheet's own pin map (เลือกขา) when it has one, else SW k / LED k in order
+  const own=(sch&&sch.pinmap)||{}, pm=n=>(typeof pmGet==="function"?pmGet(own,n):own[n])||"";
+  const usedSw=new Set(), usedLed=new Set();
+  SIM_SEQ.swOf=SIM_SEQ.inputs.map(n=>{ const t=pm(n); if(t.slice(0,3)==="sw:"){ usedSw.add(+t.slice(3)); return +t.slice(3); } return null; });
+  SIM_SEQ.swOf=SIM_SEQ.swOf.map(v=>{ if(v!=null) return v; let k=0; while(usedSw.has(k)) k++; usedSw.add(k); return k<16?k:null; });
+  SIM_SEQ.ledOf=SIM_SEQ.outputs.map(n=>{ const t=pm(n); if(t.slice(0,4)==="led:"){ usedLed.add(+t.slice(4)); return +t.slice(4); } return null; });
+  SIM_SEQ.ledOf=SIM_SEQ.ledOf.map(v=>{ if(v!=null) return v; let k=0; while(usedLed.has(k)) k++; usedLed.add(k); return k<16?k:null; });
+  document.querySelectorAll('#simPcb .swUnit').forEach(u=>{ u.classList.remove('mapped'); const th=u.querySelector('.swThumb'); th.style.top='12px'; th.style.background='#aaa'; });
+  document.querySelectorAll('#simPcb .swName').forEach(e=>{ e.textContent='sw['+e.dataset.swn+']'; });
   document.querySelectorAll('#simPcb .ledName').forEach(e=>{ e.textContent='led['+e.dataset.ledn+']'; e.style.color='#888'; });
-  SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+k+'"]'); if(u){ u.classList.add('mapped'); u.querySelector('.swName').textContent=name; }});
-  SIM_SEQ.outputs.forEach((name,k)=>{ const e=document.querySelector('#simPcb .ledName[data-ledn="'+k+'"]'); if(e){ e.textContent=name; e.style.color='#2f81f7'; }});
+  SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+SIM_SEQ.swOf[k]+'"]'); if(u){ u.classList.add('mapped'); u.querySelector('.swName').textContent=name; }});
+  SIM_SEQ.outputs.forEach((name,k)=>{ const e=document.querySelector('#simPcb .ledName[data-ledn="'+SIM_SEQ.ledOf[k]+'"]'); if(e){ e.textContent=name; e.style.color='#2f81f7'; }});
+  document.querySelectorAll('#simPcb .swUnit').forEach(u=>{ u.onclick=()=>seqToggle(+u.dataset.sw); });
+  const live=!!SIM_SEQ.hist && SIM_SEQ.inputs.length>0;
   if(msg && !opts.noPanel) msg.innerHTML=`<div class="seq-ctrl">
     <button class="btn2" data-act="seq-play">เล่นตาม clock</button>
     <button class="btn2" data-act="seq-step">ก้าว 1 clock</button>
     <button class="btn2" data-act="seq-reset">รีเซ็ต</button>
     <label class="muted">ความเร็ว <input id="seqSpeed" class="simc" type="number" value="600" min="120" max="3000" step="60"> ms</label>
     <span class="muted" id="seqNow"></span>
-    <span class="muted">— วงจรทำงานตาม clock (นับเลข/กระพริบ) แสดงบนบอร์ดตามเวลา</span></div>`;
-  if(tbl && !opts.noTable){
-    // names come from user text (block labels / port names in a shared .schproj) → escape before innerHTML
-    let th='<th>clk</th>'+SIM_SEQ.inputs.map((n,k)=>`<th>${esc(n)}<span class="bp">IN · SW ${SIM_SW_PINS[15-k]}</span></th>`).join('')
-      +SIM_SEQ.dffs.map(d=>`<th>${esc(d)}<span class="bp">state</span></th>`).join('')
-      +SIM_SEQ.outputs.map((n,k)=>`<th>${esc(n)}<span class="bp">OUT · LED ${SIM_LED_PINS[15-k]}</span></th>`).join('');
-    let body=SIM_SEQ.rows.map(r=>`<tr data-cyc="${r[0]}"><td>${r[0]}</td>`
-      +r[1].map(v=>`<td>${v}</td>`).join('')
-      +r[2].map(v=>`<td style="color:var(--warn)">${v}</td>`).join('')
-      +r[3].map(v=>`<td style="color:var(--ok)">${v}</td>`).join('')+'</tr>').join('');
-    tbl.innerHTML='<table><tr>'+th+'</tr>'+body+'</table>';
-  }
+    <span class="muted">${live?'— คลิกสวิตช์บนบอร์ดเพื่อตั้งค่า input แล้วกด “ก้าว 1 clock”':'— วงจรทำงานตาม clock (นับเลข/กระพริบ) แสดงบนบอร์ดตามเวลา'}</span></div>`;
+  SIM_SEQ.noTable=!!opts.noTable;
+  seqTable();
   if(row) row.dataset.cols=(SIM_SEQ.inputs.length+SIM_SEQ.outputs.length+SIM_SEQ.dffs.length);
   seqShow(0); requestAnimationFrame(simFit);
+}
+function seqTable(){
+  const tbl=$("#simBoardTable"); if(!tbl || !SIM_SEQ || SIM_SEQ.noTable) return;
+  const swL=k=>SIM_SEQ.swOf[k]!=null?'SW '+SIM_SW_PINS[15-SIM_SEQ.swOf[k]]:'—', ledL=k=>SIM_SEQ.ledOf[k]!=null?'LED '+SIM_LED_PINS[15-SIM_SEQ.ledOf[k]]:'—';
+  // names come from user text (block labels / port names in a shared .schproj) → escape before innerHTML
+  let th='<th>clk</th>'+SIM_SEQ.inputs.map((n,k)=>`<th>${esc(n)}<span class="bp">IN · ${swL(k)}</span></th>`).join('')
+    +SIM_SEQ.dffs.map(d=>`<th>${esc(d)}<span class="bp">state</span></th>`).join('')
+    +SIM_SEQ.outputs.map((n,k)=>`<th>${esc(n)}<span class="bp">OUT · ${ledL(k)}</span></th>`).join('');
+  let body=SIM_SEQ.rows.map(r=>`<tr data-cyc="${r[0]}"><td>${r[0]}</td>`
+    +r[1].map(v=>`<td>${v}</td>`).join('')
+    +r[2].map(v=>`<td style="color:var(--warn)">${v}</td>`).join('')
+    +r[3].map(v=>`<td style="color:var(--ok)">${v}</td>`).join('')+'</tr>').join('');
+  tbl.innerHTML='<table><tr>'+th+'</tr>'+body+'</table>';
+}
+/* flip a data switch at the current clock: that input changes from this clock onward */
+function seqToggle(sw){
+  const S=SIM_SEQ; if(!S || !S.hist) return;
+  const k=S.swOf.indexOf(sw); if(k<0) return;          // only mapped switches are live
+  if(S.playing) seqPlay();
+  const v=S.hist[S.idx][k]?0:1;
+  for(let i=S.idx;i<S.hist.length;i++) S.hist[i][k]=v;
+  let j; try{ j=clientSeqSim(S.sch, S.hist.length, {holdAt:i=>{ const h={}; S.ids.forEach((id,q)=>h[id]=S.hist[i]?S.hist[i][q]:0); return h; }}); }
+  catch(e){ toast("จำลองไม่ได้: "+e.message,"warn"); return; }
+  if(!j||!j.ok) return;
+  S.rows=j.sequence.rows; seqTable(); seqShow(S.idx);
+  const sig=$("#simSignals"); if(sig && !S.noTable) sig.innerHTML=j.note?'<span style="color:var(--warn)">⚠ '+esc(j.note)+'</span>':'';
+  const tm=$("#simTiming"); if(tm && j.waveform_svg && !S.noTable) tm.innerHTML=j.waveform_svg;
 }
 function seqShow(i){
   if(!SIM_SEQ) return; const n=SIM_SEQ.rows.length; SIM_SEQ.idx=((i%n)+n)%n;
   const r=SIM_SEQ.rows[SIM_SEQ.idx], ins=r[1], st=r[2], out=r[3];
   const segMap=simDetectSeg(SIM_SEQ.outputs);
-  SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+k+'"]'); if(u){ const th=u.querySelector('.swThumb'); th.style.top=ins[k]?'1px':'12px'; th.style.background=ins[k]?'#222':'#aaa'; }});
-  document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ const idx=+d.dataset.led; const on=idx<out.length?out[idx]:0; d.style.background=on?'#222':'#fff'; d.style.boxShadow=on?'0 0 8px 3px rgba(0,0,0,.35)':'none'; });
+  SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+SIM_SEQ.swOf[k]+'"]'); if(u){ const th=u.querySelector('.swThumb'); th.style.top=ins[k]?'1px':'12px'; th.style.background=ins[k]?'#222':'#aaa'; }});
+  const ledOn={}; SIM_SEQ.ledOf.forEach((l,k)=>{ if(l!=null && out[k]) ledOn[l]=1; });
+  document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ const on=ledOn[+d.dataset.led]; d.style.background=on?'#222':'#fff'; d.style.boxShadow=on?'0 0 8px 3px rgba(0,0,0,.35)':'none'; });
   if(segMap){ for(let s=0;s<7;s++){ const on=segMap[s]!=null?out[segMap[s]]:0; const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background=on?'#000':'#d5d5d0'; el.style.boxShadow=on?'0 0 5px 1px rgba(0,0,0,.6)':'none'; } } }
-  $("#simValbar").innerHTML='<b style="color:var(--accent)">clock '+r[0]+'</b> &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
+  $("#simValbar").innerHTML='<b style="color:var(--accent)">clock '+r[0]+'</b>'
+    +(SIM_SEQ.inputs.length?(' &nbsp; <b style="color:var(--ok)">IN</b> '+SIM_SEQ.inputs.map((nm,i)=>esc(nm)+'='+ins[i]).join(' ')):'')
+    +' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
   document.querySelectorAll('#simBoardTable tr').forEach(t=>t.classList.remove('cur'));
   const cur=document.querySelector('#simBoardTable tr[data-cyc="'+r[0]+'"]'); if(cur){ cur.classList.add('cur'); cur.scrollIntoView({block:'nearest'}); }
   const now=$("#seqNow"); if(now) now.textContent='clock '+r[0]+' / '+(n-1);
@@ -12280,7 +12411,7 @@ document.addEventListener("click",ev=>{
     case "cut": copySelection(); deleteSelection(); break;
     case "import-custom": importCustomComponent(); break;
     case "import-vhdl": importVhdlFile(); break;
-    case "topdown-open": openTopdown(); break;
+    case "topdown-open": openTopdownWithSheet(); break;
     case "topdown-close": closeTopdown(); break;
     case "topdown-send": sendSheetToTopdown(); break;
     case "export-active-custom": exportActiveAsCustom(); break;
@@ -12427,13 +12558,9 @@ init();
 .ux-cmd{display:inline-flex;align-items:center;gap:6px;margin-left:4px}
 .ux-cmd code{background:var(--bg-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:"JetBrains Mono",Consolas,monospace;user-select:all}
 .ux-copy{font:inherit;font-size:11px;background:var(--bg-3);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:1px 8px;cursor:pointer}
-.gen-group{margin-bottom:6px}
-.gen-btn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:5px;color:var(--ink);cursor:pointer;font:inherit}
-.gen-btn:hover{border-color:var(--accent)}
-.gen-btn .gi{width:24px;height:24px;flex:none;border-radius:6px;background:var(--bg-3);display:grid;place-items:center;font-weight:700;color:var(--accent)}
-.gen-btn .gt{display:flex;flex-direction:column;min-width:0}
-.gen-btn .gt b{font-size:12px;font-weight:600}
-.gen-btn .gt span{font-size:11px;color:var(--muted)}
+.dd-head{padding:6px 10px 3px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+.dd-head span{font-weight:400}
+.dd button.gen-mi .gi{width:18px;flex:none;text-align:center;font-weight:700;color:var(--accent)}
 .tt-cfg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
 .tt-cfg label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--ink-dim)}
 .tt-cfg input,.tt-kbar select{background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit}
@@ -12551,6 +12678,32 @@ init();
 .mcp-chip.up{color:var(--ink-dim)}
 .mcp-chip.up .dot{background:#d97757}
 .mcp-chip.busy .dot{animation:uxPulse .6s ease-in-out infinite}
+
+/* ---- 9. ลงบอร์ด page (build .bit + program, inside the editor) ---- */
+.brd-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(360px,520px) 1fr;gap:14px;padding:14px;overflow:hidden}
+.brd-col{display:flex;flex-direction:column;gap:12px;overflow:auto;min-height:0}
+.brd-card{border:1px solid var(--line);border-radius:10px;background:var(--bg-1);padding:12px 14px}
+.brd-card h3{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px}
+.brd-card h3 .muted{font-weight:400;font-size:12px}
+.brd-card h3 .btn2{margin-left:auto}
+.brd-n{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+.brd-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.brd-pins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;max-height:34vh;overflow:auto}
+.brd-pin{display:grid;grid-template-columns:1fr auto;gap:0 6px;border:1px solid var(--line);border-radius:7px;padding:4px 8px;font-size:12px;background:var(--bg-2)}
+.brd-pin span{font-size:10px;color:var(--muted);align-self:center}
+.brd-pin em{grid-column:1/-1;font-style:normal;color:var(--ink-dim);font-size:11px}
+.brd-pin.miss{border-color:var(--warn)}
+.brd-pin.miss em{color:var(--warn)}
+.brd-w{margin-top:8px;font-size:12px;color:var(--warn)}
+.brd-adv{margin-top:10px;font-size:12px}
+.brd-adv summary{cursor:pointer;color:var(--muted)}
+.brd-logcol{display:flex;flex-direction:column;gap:8px;min-height:0}
+.brd-status{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
+.brd-status.ok{color:var(--ok)} .brd-status.bad{color:var(--err)} .brd-status.run{color:var(--accent)}
+.brd-hint{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
+.brd-log{flex:1;min-height:0;margin:0;overflow:auto;background:#0d1117;color:#c9d1d9;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+#brdTools .ok{color:var(--ok)} #brdTools .bad{color:var(--warn)}
+@media (max-width:900px){.brd-body{grid-template-columns:1fr;overflow:auto}.brd-log{min-height:240px}}
 </style>
 <script>
 "use strict";
@@ -12815,7 +12968,7 @@ function uxBackendHelpHtml(what, why){
       <li>หรือเปิด Terminal ที่โฟลเดอร์โปรเจกต์ แล้วรัน
         <span class="ux-cmd"><code>${BACKEND_CMD}</code><button type="button" class="ux-copy" data-copy="${escA(BACKEND_CMD)}">คัดลอก</button></span></li>
     </ol>
-    <div class="ux-need-ok">ใช้ได้โดยไม่ต้องมี backend: จำลองวงจร (หน้า "จำลอง"), ตารางความจริง / K-map และตัวสร้างวงจรในแท็บ Components</div>
+    <div class="ux-need-ok">ใช้ได้โดยไม่ต้องมี backend: จำลองวงจร (หน้า "จำลอง"), ตารางความจริง / K-map และตัวสร้างวงจรในเมนู Tools</div>
   </div>`;
 }
 document.addEventListener("click", ev=>{
@@ -12995,9 +13148,6 @@ function uxDrawGenerated(intent, title){
 }
 const GENERATORS = [
   {id:"tt", icon:"▦", name:"ตารางความจริง / K-map", desc:"กรอกตาราง → ลดรูป → ได้วงจรเกต", run:()=>openTruthTableTool()},
-  {id:"seg7", icon:"8", name:"ถอดรหัส BCD → 7-seg", desc:"4 บิต → a–g เลือก active-low ได้", run:async()=>{
-    const v=await uxAsk("ถอดรหัส BCD → 7-segment",[{label:"ขาแบบ active-low (0 = ติด)",value:"ไม่",hint:"พิมพ์ “ใช่” ถ้าบอร์ดเป็น common anode / ต่อขาให้ติดเมื่อเป็น 0"}],"เปิดตาราง");
-    if(v) openTruthTableTool(seg7Preset(/ใช่|yes|y|1|low/i.test(v[0]))); }},
   {id:"cnt", icon:"↻", name:"ตัวนับ N บิต", desc:"ripple counter นับขึ้น 0 … 2ᴺ−1", run:async()=>{
     const v=await uxAsk("ตัวนับ N บิต (ripple)",[{label:"จำนวนบิต",type:"number",value:4,min:1,max:16}]); if(!v) return;
     const b=seqBuildIntent("counter "+Math.max(1,Math.min(16,v[0]|0))+" bit"); if(b) uxDrawGenerated(b.intent, b.title); }},
@@ -13021,20 +13171,15 @@ const GENERATORS = [
     const b=seqBuildIntent("register "+(v[0]|0)+" bit"); if(b) uxDrawGenerated(b.intent, b.title); }},
 ];
 function runGenerator(id){ const g=GENERATORS.find(x=>x.id===id); if(g) g.run(); }
-{
-  const _renderPalette=renderPalette;
-  renderPalette=function(){
-    const r=_renderPalette.apply(this, arguments);
-    const pal=$("#palettePane .palette"); if(!pal || pal.querySelector(".gen-group")) return r;
-    const g=document.createElement("div"); g.className="pal-group gen-group";
-    g.innerHTML='<h4>ตัวสร้างวงจร <span class="muted" style="font-weight:400">— ไม่ต้องใช้ AI</span></h4>'+GENERATORS.map(x=>
-      `<button class="gen-btn" data-gen="${x.id}"><span class="gi">${x.icon}</span><span class="gt"><b>${x.name}</b><span>${x.desc}</span></span></button>`).join("");
-    pal.insertBefore(g, pal.firstChild);
-    g.querySelectorAll("[data-gen]").forEach(b=>b.onclick=()=>runGenerator(b.dataset.gen));
-    return r;
-  };
-  try{ renderPalette(); }catch(_){}
-}
+/* generators live in the Tools menu (and Ctrl+K), after the editor's own tools */
+(function(){
+  const dd=document.querySelector('#menu .mi > button[data-menu="tools"]'); const box=dd&&dd.parentElement.querySelector(".dd");
+  if(!box || box.querySelector(".gen-mi")) return;
+  const h='<hr><div class="dd-head">ตัวสร้างวงจร <span>— ไม่ต้องใช้ AI</span></div>'+GENERATORS.map(x=>
+    `<button class="gen-mi" data-gen="${x.id}" title="${escA(x.desc)}"><span class="gi">${x.icon}</span>${x.name}…</button>`).join("");
+  box.insertAdjacentHTML("beforeend", h);
+  box.querySelectorAll("[data-gen]").forEach(b=>b.addEventListener("click",()=>runGenerator(b.dataset.gen)));
+})();
 
 /* the open sheet's ports, top to bottom, as the truth-table tool wants them */
 function uxSheetPortsForTT(){
@@ -13176,7 +13321,7 @@ const LAB_TEMPLATES = [
    ins:[["A","sw:2"],["B","sw:1"],["Cin","sw:0"]], outs:[["S","led:0"],["Cout","led:1"]]},
   {id:"cnt8", lab:"แลป 5", title:"ตัวนับ 0–7 (flip-flop)", desc:"clk → Q2 Q1 Q0 บน LED",
    ins:[["clk","clk"]], outs:[["Q2","led:2"],["Q1","led:1"],["Q0","led:0"]],
-   note:"clk บนบอร์ดคือ 50 MHz — ต้องมีวงจรหารความถี่ก่อน (ใช้ “ตัวนับ mod-N” ในแท็บ Components ต่อกันเป็นทอด)"},
+   note:"clk บนบอร์ดคือ 50 MHz — ต้องมีวงจรหารความถี่ก่อน (ใช้ “ตัวนับ mod-N” ในเมนู Tools ต่อกันเป็นทอด)"},
 ];
 function buildTemplateSheet(sch, T){
   const G=typeof GRID==="number"?GRID:11, sn=v=>Math.round(v/G)*G;
@@ -13321,7 +13466,7 @@ document.addEventListener("click", ev=>{
 /* ---------- 3e. five-stop tour ---------- */
 const TOUR = [
   {sel:'[data-ltab="palette"]', pre:()=>{ const t=$('[data-ltab="palette"]'); if(t) t.click(); }, title:"1 · วางเกต",
-   text:"แท็บ Components มีเกต ขา I/O และตัวสร้างวงจรสำเร็จรูป — คลิกหรือลากลงแผ่น (หรือกด A = AND, O = OR, N = NOT, I = INPUT, Q = OUTPUT)"},
+   text:"แท็บ Components มีเกตและขา I/O (ตัวสร้างวงจรสำเร็จรูปอยู่ในเมนู Tools) — คลิกหรือลากลงแผ่น (หรือกด A = AND, O = OR, N = NOT, I = INPUT, Q = OUTPUT)"},
   {sel:'[data-tool="wire"]', title:"2 · ต่อสาย", text:"เลือกเครื่องมือสาย (W) แล้วคลิกขาหนึ่งไปอีกขา · ลากออกจากขาที่ยังว่างแล้วปล่อยในที่โล่ง จะได้ INPUT/OUTPUT ชื่อเดียวกับขาทันที"},
   {sel:'.step[data-stage="sim"]', title:"3 · จำลอง", text:"ดูตารางความจริง สลับสวิตช์บนบอร์ดจำลอง และดูไทม์มิ่งของวงจรที่มี clock — ไม่ต้องติดตั้งอะไรเพิ่ม"},
   {sel:'.step[data-stage="pins"]', title:"4 · เลือกขา", text:"ผูกแต่ละ INPUT/OUTPUT กับสวิตช์ LED หรือ 7-segment บนบอร์ด · ตัวเลขบนปุ่มบอกว่าเลือกครบกี่ขาแล้ว"},
@@ -14670,6 +14815,285 @@ function mcpSetChip(up){ const el=$("#mcpChip"); if(!el) return; el.hidden=false
     MCPB.on=true; mcpLoop();
   }).catch(()=>{});
 })();
+
+/* ===== 9. ลงบอร์ด inside the editor ======================================================
+   Under the desktop app the last pipeline step is a page of its own: check the pins, build the
+   .bit with Vivado and load it onto the board (the launcher runs Vivado / openFPGALoader, see
+   launcher/board.py) — no second program, no copying files around. Opened from disk (no app)
+   the step keeps the old dialog that downloads .vhd + .xdc.
+   Also: ?view=topdown / ?view=board open that view on start (the launcher's Home buttons). */
+const BRD = {tools:null, since:0, timer:null, top:"", sheet:null};
+
+async function brdTools(){
+  if(!/^https?:/.test(location.protocol)) return null;
+  try{ const r=await fetch("/api/board/tools"); if(!r.ok) return null; return await r.json(); }catch(_){ return null; }
+}
+function brdProject(){ return sanId(($("#projectName")||{}).value||state.project.name||"design")||"design"; }
+/* the design that goes on the board: the top sheet (VHDL is generated from it) */
+function brdSheet(){ return state.project.schematics[state.project.topId] || activeSch(); }
+function brdDesign(){
+  const sch=brdSheet(); if(!sch) return null;
+  if(state.activeId!==sch.id){ try{ openSchTab(sch.id); renderAll(); }catch(_){} }
+  const pb=uxPortBits(sch);                             // nothing mapped yet: the pin page's starting guess
+  if(pb.length && !pb.some(b=>pmGet(sch.pinmap||{},b.key))){ uxAutoPins(sch, true); snapshot(); }
+  const all=generateAllVhdl(), names=Object.keys(all);
+  const top=names.find(n=>n.toLowerCase()===sanId(sch.name).toLowerCase()) || names[names.length-1] || sanId(sch.name);
+  const body=uxXdcBody();
+  const bits=uxPortBits(sch).map(b=>({key:b.key, dir:b.dir, t:uxPinTarget(b, sch)}));
+  return {sch, top, vhdl:bundleAll(all)+layoutStamp(), xdc:"## EDGE Spartan-7 (XC7S15 FTGB196) — Schematic Studio\n\n"+body,
+          missing:(UX.xdcMissing||[]).slice(), bits,
+          warns:names.flatMap(n=>((all[n]&&all[n].warns)||[]).map(w=>n+": "+w))};
+}
+
+function brdEnsurePage(){
+  let pg=$("#boardPage"); if(pg) return pg;
+  pg=document.createElement("div"); pg.id="boardPage"; pg.className="sim-page brd-page";
+  pg.innerHTML=`<div class="sim-top">
+      <button class="btn2" data-brd="close">← กลับไปวาดวงจร</button>
+      <b>ลงบอร์ด</b><span class="muted" id="brdSheet"></span><span class="grow"></span>
+      <span class="muted" id="brdTools"></span>
+    </div>
+    <div class="brd-body">
+      <div class="brd-col">
+        <section class="brd-card"><h3><span class="brd-n">1</span> ขาบนบอร์ด <span class="muted" id="brdPinSum"></span>
+          <button class="btn2" data-brd="pins">แก้ขา</button></h3>
+          <div class="brd-pins" id="brdPins"></div><div id="brdWarn"></div></section>
+        <section class="brd-card"><h3><span class="brd-n">2</span> สร้างไฟล์ .bit <span class="muted">Vivado · ราว 1 นาที</span></h3>
+          <div class="brd-row"><button class="btn btn-primary" data-brd="build">⚙ สร้าง .bit</button>
+            <span class="muted" id="brdBit"></span></div></section>
+        <section class="brd-card"><h3><span class="brd-n">3</span> โหลดลงบอร์ด <span class="muted">เสียบสาย USB ของบอร์ดก่อน</span></h3>
+          <div class="brd-row">
+            <button class="btn btn-primary" data-brd="sram" title="เร็ว · หายเมื่อถอดปลั๊ก — ใช้ตอนทดสอบ">▶ โหลดลงบอร์ด (ชั่วคราว)</button>
+            <button class="btn" data-brd="flash" title="ช้ากว่า · อยู่ถาวรแม้ถอดปลั๊ก — เขียนซ้ำได้จำกัด">💾 เขียนถาวร (Flash)</button>
+            <button class="btn" data-brd="detect">ตรวจหาบอร์ด</button>
+          </div>
+          <details class="brd-adv"><summary>ตั้งค่าเพิ่ม</summary>
+            <label class="muted">สาย (cable) <select id="brdCable"></select></label>
+            <div class="brd-row" style="margin-top:8px">
+              <button class="btn2" data-brd="files">บันทึก .vhd + .xdc ลงโฟลเดอร์โปรเจกต์</button>
+              <button class="btn2" data-brd="legacy">เปิด FPGA Builder แบบเดิม</button></div>
+          </details></section>
+      </div>
+      <div class="brd-logcol">
+        <div class="brd-status" id="brdStatus">พร้อม</div>
+        <div class="brd-hint" id="brdHint" hidden></div>
+        <pre class="brd-log" id="brdLog"></pre>
+      </div>
+    </div>`;
+  document.body.appendChild(pg);
+  pg.addEventListener("click", e=>{ const b=e.target.closest("[data-brd]"); if(!b) return; brdAct(b.dataset.brd); });
+  return pg;
+}
+function brdShow(on){ const pg=brdEnsurePage(); pg.classList.toggle("show", on); if(!on){ clearInterval(BRD.timer); BRD.timer=null; setStage("draw", true); } }
+
+async function openBoardPage(){
+  const t=await brdTools();
+  if(!t) return false;                                  // no app: caller falls back to the download dialog
+  BRD.tools=t; brdEnsurePage();
+  const cab=$("#brdCable"); if(cab && !cab.options.length) cab.innerHTML=(t.cables||["ft2232"]).map(c=>`<option>${esc(c)}</option>`).join("");
+  $("#brdTools").innerHTML=(t.vivado?'<span class="ok">● Vivado</span>':'<span class="bad">● ไม่พบ Vivado</span>')+" · "
+    +(t.openfpgaloader?'<span class="ok">● openFPGALoader</span>':'<span class="bad">● ไม่พบ openFPGALoader</span>');
+  brdRefresh(); brdShow(true); setStage("upload", true);
+  brdPoll(true);
+  return true;
+}
+function brdRefresh(){
+  const d=brdDesign(); if(!d) return;
+  BRD.top=d.top; $("#brdSheet").textContent="แผ่น "+d.sch.name+" · entity "+d.top;
+  const ok=d.bits.filter(b=>b.t).length;
+  $("#brdPinSum").textContent=`${ok}/${d.bits.length} ขา`;
+  $("#brdPins").innerHTML=d.bits.length?d.bits.map(b=>`<div class="brd-pin ${b.t?"":"miss"}"><b>${esc(b.key)}</b><span>${b.dir==="in"?"IN":"OUT"}</span><em>${b.t?esc(pinTargetLabel(b.t)):"ยังไม่ได้เลือก"}</em></div>`).join(""):'<div class="muted">วงจรนี้ยังไม่มี INPUT / OUTPUT</div>';
+  $("#brdWarn").innerHTML=(d.missing.length?`<div class="ux-need">⚠ ยังไม่ได้เลือกขา ${d.missing.length} ขา — Vivado จะ build ไม่ผ่าน <button class="btn2" data-brd="pins">ไปเลือกขา</button></div>`:"")
+    +(d.warns.length?`<div class="brd-w">${d.warns.slice(0,4).map(w=>"⚠ "+esc(w)).join("<br>")}</div>`:"");
+  try{ uxRenderStepper(); }catch(_){}                    // pins may have just been guessed
+  const hasBit=BRD.lastBit&&BRD.lastBit.top===d.top;
+  $("#brdBit").textContent=hasBit?("ได้ "+d.top+".bit แล้ว"):"";
+}
+async function brdPost(path, body){
+  try{ const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); return await r.json(); }
+  catch(e){ return {ok:false, error:e.message}; }
+}
+async function brdAct(a){
+  if(a==="close") return brdShow(false);
+  if(a==="pins"){ brdShow(false); UX.highlightPins=(UX.xdcMissing||[]).slice(); setStage("pins"); return; }
+  const d=brdDesign(); if(!d) return;
+  const proj=brdProject(), cable=($("#brdCable")||{}).value||"ft2232";
+  let r;
+  if(a==="build"){
+    if(d.missing.length && !confirm(`ยังไม่ได้เลือกขา ${d.missing.length} ขา (${d.missing.slice(0,5).join(", ")}) — Vivado จะ error\nbuild ต่อไหม?`)) return;
+    brdLog(true); r=await brdPost("/api/board/build",{project:proj, top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+  } else if(a==="sram"||a==="flash"){
+    if(a==="flash" && !confirm("เขียนลง Flash — วงจรจะอยู่ถาวรแม้ถอดปลั๊ก แต่ Flash เขียนซ้ำได้จำนวนจำกัด\nแนะนำให้ทดสอบด้วย “โหลดลงบอร์ด (ชั่วคราว)” ก่อน · เขียนเลยไหม?")) return;
+    brdLog(true); r=await brdPost("/api/board/program",{project:proj, top:d.top, mode:a, cable});
+  } else if(a==="detect"){ brdLog(true); r=await brdPost("/api/board/detect",{cable}); }
+  else if(a==="stop"){ r=await brdPost("/api/board/stop",{}); }
+  else if(a==="files"){
+    try{ const x=await MCP_OPS.export_files({what:["vhdl","xdc","project"]}); toast("บันทึกแล้ว: "+(x.vhdl||""),"ok",4000); }catch(e){ toast("บันทึกไม่ได้: "+e.message,"warn"); } return;
+  } else if(a==="legacy"){
+    try{ await MCP_OPS.export_files({what:["vhdl","xdc"]}); }catch(_){}
+    r=await brdPost("/api/fpga_builder",{}); if(r&&r.ok) toast("เปิด FPGA Builder แล้ว — ไฟล์ .vhd/.xdc อยู่ในโฟลเดอร์โปรเจกต์","ok",4500); else toast((r&&r.error)||"เปิดไม่ได้","warn"); return;
+  }
+  if(r && !r.ok){ $("#brdStatus").className="brd-status bad"; $("#brdStatus").textContent=r.error||"ทำไม่ได้"; return; }
+  brdPoll(false);
+}
+function brdLog(clear){ if(clear){ $("#brdLog").textContent=""; BRD.since=0; $("#brdHint").hidden=true; } }
+function brdPoll(once){
+  clearInterval(BRD.timer); BRD.timer=null;
+  const tick=async()=>{
+    let s; try{ s=await (await fetch("/api/board/status?since="+BRD.since)).json(); }catch(_){ return; }
+    if(s.lines && s.lines.length){ const lg=$("#brdLog"); lg.textContent+=s.lines.join("\n")+"\n"; lg.scrollTop=lg.scrollHeight; }
+    BRD.since=s.next||0;
+    const st=$("#brdStatus"), what={build:"สร้าง .bit",program:"โหลดลงบอร์ด",detect:"ตรวจหาบอร์ด"}[s.kind]||"";
+    const running=s.state==="running";
+    st.className="brd-status "+({ok:"ok",error:"bad",stopped:"bad",running:"run"}[s.state]||"");
+    st.innerHTML=running?`⏳ กำลัง${what}… ${Math.round(s.elapsed||0)} วิ <button class="btn2" data-brd="stop">หยุด</button>`
+      : s.state==="ok"?`✓ ${what}สำเร็จ`+(s.result&&s.result.saved?` · เก็บไว้ที่ ${esc(s.result.saved)}`:"")
+      : s.state==="error"?`✗ ${what}ไม่สำเร็จ`: s.state==="stopped"?"หยุดแล้ว":"พร้อม";
+    const h=$("#brdHint"); if(s.hint){ h.hidden=false; h.textContent=s.hint; } else if(running) h.hidden=true;
+    if(s.kind==="build" && s.state==="ok" && s.result){ BRD.lastBit=s.result; const b=$("#brdBit"); if(b) b.textContent="ได้ "+s.result.top+".bit แล้ว → ขั้นที่ 3"; }
+    $$("#boardPage [data-brd=build],#boardPage [data-brd=sram],#boardPage [data-brd=flash],#boardPage [data-brd=detect]").forEach(b=>b.disabled=running);
+    if(!running && BRD.timer){ clearInterval(BRD.timer); BRD.timer=null; }
+  };
+  tick(); if(!once) BRD.timer=setInterval(tick, 700);
+}
+{
+  const _up=pipelineUpload;
+  pipelineUpload=async function(){ if(await openBoardPage()) return; return _up.apply(this, arguments); };
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("#boardPage.show")) brdShow(false); });
+}
+/* ?view=topdown | board — the launcher's Home buttons open straight into that view */
+(function(){
+  const v=new URLSearchParams(location.search).get("view"); if(!v) return;
+  setTimeout(()=>{ document.querySelectorAll(".modal-bg").forEach(m=>m.remove());
+    if(v==="topdown") openTopdownWithSheet();
+    else if(v==="board") setStage("upload"); }, 900);
+})();
+
+/* ===== 10. AI chat: questions about the drawing =========================================
+   "นี่วงจรอะไร" used to fall through to the build pipeline and come back REJECTED. A question
+   about the sheet is now answered in the editor, without a model: simulate it, recognise the
+   usual lab circuits (gates, adders, mux, decoder, comparator, 7-seg, counters, registers), or
+   give the minimised equation of every output. Free-form questions still go to the model;
+   when no model is running the reply says where to start one (Settings ▸ โมเดล AI). */
+function uxTTcols(tt){
+  const n=tt.inputs.length, cols=tt.outputs.map(()=>Array(1<<n).fill("0"));
+  tt.rows.forEach(([ins,outs])=>{ const r=ins.reduce((a,v)=>a*2+(+v?1:0),0); outs.forEach((v,k)=>cols[k][r]=+v?"1":"0"); });
+  return cols.map(c=>c.join(""));
+}
+/* value of input i (first input = MSB) in row r */
+const uxBit=(r,i,n)=>(r>>(n-1-i))&1;
+function uxRecognize(tt){
+  const n=tt.inputs.length, m=tt.outputs.length, cols=uxTTcols(tt), N=1<<n;
+  const fn=f=>{ let s=""; for(let r=0;r<N;r++) s+=f(r)?"1":"0"; return s; };
+  const has=c=>cols.includes(c);
+  const G2={"0001":"AND","0111":"OR","0110":"XOR","1110":"NAND","1000":"NOR","1001":"XNOR"};
+  if(n===1&&m===1) return cols[0]==="10"?"NOT (กลับค่า)":cols[0]==="01"?"บัฟเฟอร์ (ส่งค่าผ่าน)":"";
+  if(n===2&&m===1&&G2[cols[0]]) return "เกต "+G2[cols[0]];
+  if(n===2&&m===2&&has("0110")&&has("0001")) return "Half Adder (ตัวบวกครึ่ง) — sum = a XOR b, carry = a AND b";
+  if(n===2&&m===2&&has("0110")&&(has("0100")||has("0010"))) return "Half Subtractor (ตัวลบครึ่ง) — diff = a XOR b, borrow";
+  const par=fn(r=>{ let p=0; for(let i=0;i<n;i++) p^=uxBit(r,i,n); return p; });
+  const maj=fn(r=>{ let c=0; for(let i=0;i<n;i++) c+=uxBit(r,i,n); return c>=2; });
+  if(n===3&&m===2&&has(par)&&has(maj)) return "Full Adder (ตัวบวกเต็ม) — sum = a⊕b⊕cin, cout = ค่าส่วนใหญ่ของ 3 อินพุต";
+  if(m===1&&n>=3&&cols[0]===par) return `วงจรตรวจ parity ${n} บิต (XOR ทุกอินพุต — ได้ 1 เมื่อจำนวน 1 เป็นเลขคี่)`;
+  if(m===1&&n===3&&cols[0]===maj) return "วงจรเสียงข้างมาก (majority) 3 อินพุต";
+  // multiplexer: k select lines + 2^k data lines, out = data[sel] for some choice of lines
+  for(let k=1;k<=3;k++){ if(m!==1 || n!==k+(1<<k)) continue;
+    const perms=(a,s)=>{ if(!a.length) return [s]; return a.flatMap((x,i)=>perms(a.slice(0,i).concat(a.slice(i+1)), s.concat([x]))); };
+    const idx=[...Array(n).keys()];
+    const choose=(arr,kk)=>kk===0?[[]]:arr.flatMap((x,i)=>choose(arr.slice(i+1),kk-1).map(c=>[x].concat(c)));
+    for(const sel of choose(idx,k)) for(const sp of perms(sel,[])){ const data=idx.filter(i=>!sel.includes(i));
+      if(cols[0]===fn(r=>{ let s=0; sp.forEach(i=>s=s*2+uxBit(r,i,n)); return uxBit(r,data[s],n); }))
+        return `Multiplexer ${1<<k}:1 — เลือกส่ง ${data.map(i=>tt.inputs[i]).join("/")} ออกตามขาเลือก ${sp.map(i=>tt.inputs[i]).join(",")}`;
+      for(const dp of perms(data,[])) if(cols[0]===fn(r=>{ let s=0; sp.forEach(i=>s=s*2+uxBit(r,i,n)); return uxBit(r,dp[s],n); }))
+        return `Multiplexer ${1<<k}:1 — เลือกอินพุตข้อมูลออกตามขาเลือก ${sp.map(i=>tt.inputs[i]).join(",")}`; } }
+  // decoder: every output is 1 in exactly one row, all different rows
+  if(m===N && n<=4){ const one=cols.map(c=>c.indexOf("1")); if(cols.every((c,k)=>c.split("1").length===2) && new Set(one).size===m) return `Decoder ${n}→${m} (ตัวถอดรหัส — เปิดเอาต์พุตทีละขาตามเลขอินพุต)`; }
+  if(m===N && n<=4){ const one=cols.map(c=>c.indexOf("0")); if(cols.every(c=>c.split("0").length===2) && new Set(one).size===m) return `Decoder ${n}→${m} แบบ active-low`; }
+  // comparator A vs B (first half vs second half of the inputs)
+  if(n%2===0 && n<=8){ const h=n/2, A=r=>r>>h, B=r=>r&((1<<h)-1);
+    const eq=fn(r=>A(r)===B(r)), gt=fn(r=>A(r)>B(r)), lt=fn(r=>A(r)<B(r));
+    const hits=[eq,gt,lt].filter(has).length;
+    if(hits>=1 && cols.every(c=>c===eq||c===gt||c===lt)) return `ตัวเปรียบเทียบ ${h} บิต (${tt.inputs.slice(0,h).join("")} กับ ${tt.inputs.slice(h).join("")}: `+[has(eq)&&"เท่ากัน",has(gt)&&"มากกว่า",has(lt)&&"น้อยกว่า"].filter(Boolean).join(" / ")+")"; }
+  if(typeof simDetectSeg==="function" && simDetectSeg(tt.outputs)) return `ตัวถอดรหัส 7-segment (${n} บิตเข้า → ขา a–g)`;
+  return "";
+}
+function uxEquations(tt){
+  const n=tt.inputs.length; if(n>6) return [];
+  const cols=uxTTcols(tt), rows={}; tt.outputs.forEach((o,k)=>rows[o]=cols[k].split(""));
+  try{ const r=ttToIntent(tt.inputs, tt.outputs, rows, "q"); return r.error?[]:tt.outputs.map(o=>`${o} = ${r.exprs[o]}`); }catch(_){ return []; }
+}
+function uxPartsSummary(sch){
+  const cnt={}; (sch.components||[]).forEach(c=>{ if(["IN","OUT","JUNCTION"].includes(c.type)) return;
+    const sub=/^(SCH|CUSTOM):/.test(String(c.type))&&typeof subSchOf==="function"?subSchOf(c):null;
+    const t=sub?("บล็อก "+sub.name):((TYPES[c.type]&&TYPES[c.type].label)||c.type); cnt[t]=(cnt[t]||0)+1; });
+  return Object.entries(cnt).map(([t,k])=>k>1?`${t} ×${k}`:t).join(", ");
+}
+function uxDescribeSheet(sch){
+  const nm=c=>(c.params&&c.params.name)||c.id;
+  const ins=sch.components.filter(c=>c.type==="IN").map(nm), outs=sch.components.filter(c=>c.type==="OUT").map(nm);
+  let h=`<span class="ac-badge v">แผ่น ${esc(sch.name)}</span><br>`;
+  const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
+  if(hasFF){
+    let j=null; try{ j=clientSeqSim(sch, 16); }catch(_){}
+    const sq=j&&j.ok&&j.sequence;
+    let what="วงจรที่ทำงานตาม clock (sequential)";
+    if(sq){
+      const ord=sq.outputs.map((o,i)=>({o,i})).sort((a,b)=>natCmp(a.o,b.o));     // q0 = LSB
+      const val=r=>ord.reduce((a,x,p)=>a+(r[3][x.i]<<p),0);
+      const vals=sq.rows.map(val);
+      if(!sq.inputs.length && new Set(vals).size>2){
+        let p=vals.slice(1).indexOf(vals[0])+1; if(p<=0) p=vals.length;
+        what=`ตัวนับ ${new Set(vals.slice(0,p)).size} สถานะ — ${vals.slice(0,Math.min(p,12)).join(" → ")}${p<=12?" → วนซ้ำ":" …"}`;
+      } else if(sq.inputs.length){
+        const ids=sq.inputIds||[]; let reg=false;
+        try{ const hi={}; ids.forEach(id=>hi[id]=1); const j1=clientSeqSim(sch, 3, {hold:hi});
+          reg=j1.ok && j1.sequence.rows[0][3].every(v=>!v) && j1.sequence.rows[1][3].length===sq.outputs.length && j1.sequence.rows[1][3].every(v=>v===1); }catch(_){}
+        if(reg && sq.inputs.length===sq.outputs.length) what=`Register ${sq.outputs.length} บิต — เก็บค่า ${sq.inputs.join(", ")} ไว้ที่ ${sq.outputs.join(", ")} ทุกขอบขาขึ้นของ clock`;
+      }
+    }
+    h+=`<b>${esc(what)}</b><br><span class="ac-hint">flip-flop ${sq?sq.dffs.length:"?"} ตัว · อินพุต ${esc(ins.join(", ")||"—")} · เอาต์พุต ${esc(outs.join(", ")||"—")}</span>`;
+    h+=`<div class="ac-hint" style="margin-top:6px">ลองดูการทำงานได้ที่ปุ่ม <b>จำลอง</b> — กดสวิตช์แล้ว “ก้าว 1 clock”</div>`;
+    return h;
+  }
+  const j=clientCombSim(sch);
+  if(!j.ok || !j.truth_table){ return h+`ยังจำลองวงจรนี้ไม่ได้: ${esc(j.reason||"ต่อสายไม่ครบ")}<br><span class="ac-hint">ประกอบด้วย ${esc(uxPartsSummary(sch)||"—")}</span>`; }
+  const tt=j.truth_table, name=uxRecognize(tt), eqs=uxEquations(tt);
+  h+=name?`<b>${esc(name)}</b><br>`:`<b>วงจร combinational ${tt.inputs.length} อินพุต → ${tt.outputs.length} เอาต์พุต</b><br>`;
+  h+=`<span class="ac-hint">อินพุต ${esc(tt.inputs.join(", "))} · เอาต์พุต ${esc(tt.outputs.join(", "))} · ใช้ ${esc(uxPartsSummary(sch)||"—")}</span>`;
+  if(eqs.length) h+=`<div style="margin-top:6px">${eqs.slice(0,8).map(e=>`<code>${esc(e)}</code>`).join("<br>")}${eqs.length>8?"<br>…":""}</div>`;
+  if(tt.inputs.length<=4) h+=aiTruthTableHtml(tt);
+  return h;
+}
+function uxAboutSheet(msg){
+  return /(วงจร|แผ่น|circuit)\s*(นี้|นี่)|นี่(คือ)?(วงจร|อะไร)|วงจรอะไร|ทำหน้าที่|ทำงานยังไง|ทำอะไรได้|what (is|does) (this|it)|what circuit/i.test(msg);
+}
+{
+  const _q=aiLooksLikeQuestion;
+  aiLooksLikeQuestion=function(msg){
+    if(_q(msg)) return true;
+    if(/[=]|minterms?|Σ/i.test(msg)) return false;
+    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|\bwhat\b|\bwhich\b)/i.test(msg);
+  };
+  const _ask=aiAsk;
+  aiAsk=async function(msg){
+    const sch=activeSch();
+    if(uxAboutSheet(msg) && sch && (sch.components||[]).some(c=>c.type!=="JUNCTION")){
+      try{ aiAppend("ai", uxDescribeSheet(sch), {html:true}); return; }catch(e){ console.warn("describe", e); }
+    }
+    if(!(aiSmalltalk(msg)||aiFaq(msg))){
+      const j=await aiHealth();
+      if(j && !j.llm_up){
+        const app=/^https?:/.test(location.protocol);
+        aiAppend("ai", "คำถามแบบอิสระต้องใช้โมเดล AI · "+(app
+          ? "เปิดได้ในโปรแกรม: หน้าหลัก ▸ <b>ตั้งค่า</b> ▸ <b>โมเดล AI ในเครื่อง</b> — กดดาวน์โหลดแล้ว “เริ่มโมเดล” ได้เลย"
+          : "รัน llama.cpp ที่ 127.0.0.1:8080")
+          +"<br><span class=\"ac-hint\">ที่ใช้ได้เลยโดยไม่ต้องมีโมเดล: “นี่วงจรอะไร”, สมการ เช่น <code>y = a xor b</code>, ชื่อวงจร เช่น full adder, /sim</span>", {html:true});
+        return;
+      }
+    }
+    return _ask.apply(this, arguments);
+  };
+}
 
 </script>
 <!-- UX-LAYER:END -->

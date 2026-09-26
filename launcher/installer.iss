@@ -29,6 +29,7 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\FPGAEcosystem.exe
+SetupIconFile=icon.ico
 CloseApplications=yes
 
 [Languages]
