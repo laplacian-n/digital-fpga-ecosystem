@@ -634,7 +634,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .sim-boardrow.stack .sim-side-body{max-height:56vh}
 .sim-side-body table{width:100%}
 .sim-side-timing{overflow:auto;flex:0 1 auto;max-height:38%;max-width:100%;overflow-wrap:anywhere;word-break:break-word;font-size:12px;line-height:1.5;color:var(--muted)}
-.sim-side-timing svg{display:block;max-width:100%}
+.sim-side-timing svg{display:block;max-width:none}
 .sim-side-timing:empty{display:none}
 .sim-valbar{margin:6px 2px 12px;font-size:13px;color:var(--ink-dim)}
 .seq-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
@@ -687,7 +687,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
     <span class="muted" id="simSheet"></span>
     <span class="grow"></span>
     <span class="muted" id="simSignals"></span>
-    <label class="muted">cycles <input id="simCycles" class="simc" type="number" value="8" min="1" max="64"></label>
+    <label class="muted">cycles <input id="simCycles" class="simc" type="number" value="16" min="1" max="64"></label>
     <button class="btn2" data-act="sim-refresh">Refresh</button>
   </div>
   <div class="sim-body">
@@ -6940,7 +6940,9 @@ function probeColorize(sch){
   if(world) clocks.forEach(id=>{
     const c=comp(id,sch); if(!c) return;
     const k=PROBE_CLOCKS[id], sz=getSize(c);
-    const t=txt(c.x+sz.w/2, c.y-6, k?("⏱ "+k.hz+" Hz"):"⏱ กดเพื่อเดิน clk", {anchor:"middle", size:10, fill:k?"var(--ok)":"var(--ink-dim)"});
+    // beside the input, on its LEFT: above it the badge covered whatever sat on the row above
+    // (usually the next input), and inputs live at the sheet's left edge where it is free
+    const t=txt(c.x-6, c.y+sz.h/2+3.5, k?("⏱ "+k.hz+" Hz"):"⏱ คลิกเดิน", {anchor:"end", size:10, fill:k?"var(--ok)":"var(--ink-dim)"});
     t.setAttribute("pointer-events","none"); if(k) t.setAttribute("font-weight","700");
     world.appendChild(t);
   });
@@ -11968,13 +11970,17 @@ function changingSeqTableHtml(seq){
   const body=rows.map(r=>'<tr><td>'+r[0]+'</td>'+cols.map(c=>'<td style="color:'+c.cl+'">'+c.get(r)+'</td>').join('')+'</tr>').join('');
   return '<table><tr>'+th+'</tr>'+body+'</table>';
 }
+/* One clock per 22 px (it was 46: eight clocks filled the panel). Drawn at its natural size and
+   scrolled rather than squeezed to fit, with a cursor on the clock the board is showing and a
+   clock number every 4, so a long run stays readable while it plays. */
 function seqWaveSvg(title, tracks, n){
-  const lw=96, cw=46, rh=34, top=34, left=lw+8, W=left+cw*n+16, H=top+rh*(tracks.length+1)+12;
+  const lw=84, cw=22, rh=24, top=30, left=lw+8, W=left+cw*n+16, H=top+rh*(tracks.length+1)+10;
   const esc=s=>String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
-  let p=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="ui-monospace,Consolas,monospace" font-size="12"><rect width="${W}" height="${H}" fill="#0b0e14"/><text x="10" y="20" fill="#9ecbff" font-size="13">${esc(title)}</text>`;
-  for(let c=0;c<=n;c++) p+=`<line x1="${left+c*cw}" y1="${top-6}" x2="${left+c*cw}" y2="${H-8}" stroke="#1e2633"/>`;
-  const line=(y0,pts,col)=>{ let d="",prev=null; pts.forEach(([x,v])=>{ const y=y0+(v?6:rh-10); d+=(prev===null?"M":(prev!==v?`L${x},${y0+(prev?6:rh-10)} L`:"L"))+`${x},${y} `; prev=v; }); return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.8"/>`; };
-  const row=(k,name,pts,col)=>{ const y0=top+k*rh; return `<text x="8" y="${y0+rh/2+3}" fill="#9ecbff">${esc(String(name).slice(0,11))}</text>`+line(y0,pts,col); };
+  let p=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" data-left="${left}" data-cw="${cw}" font-family="ui-monospace,Consolas,monospace" font-size="11"><rect width="${W}" height="${H}" fill="#0b0e14"/><text x="8" y="18" fill="#9ecbff" font-size="12">${esc(title)}</text>`;
+  for(let c=0;c<=n;c++) p+=`<line x1="${left+c*cw}" y1="${top-6}" x2="${left+c*cw}" y2="${H-6}" stroke="${c%4?"#161c26":"#26303f"}"/>`+(c%4===0&&c<n?`<text x="${left+c*cw+2}" y="${top-9}" fill="#5c6b80" font-size="9">${c}</text>`:"");
+  p+=`<rect class="wv-now" x="${left}" y="${top-6}" width="${cw}" height="${H-top}" fill="#2f81f7" opacity=".18"/>`;
+  const line=(y0,pts,col)=>{ let d="",prev=null; pts.forEach(([x,v])=>{ const y=y0+(v?5:rh-7); d+=(prev===null?"M":(prev!==v?`L${x},${y0+(prev?5:rh-7)} L`:"L"))+`${x},${y} `; prev=v; }); return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>`; };
+  const row=(k,name,pts,col)=>{ const y0=top+k*rh; return `<text x="6" y="${y0+rh/2+3}" fill="#9ecbff">${esc(String(name).slice(0,11))}</text>`+line(y0,pts,col); };
   const clk=[]; for(let c=0;c<n;c++){ clk.push([left+c*cw,1],[left+c*cw+cw/2,1],[left+c*cw+cw/2,0],[left+(c+1)*cw,0]); }
   p+=row(0,"clk",clk,"#e3b341");
   tracks.forEach((t,k)=>{ const pts=[]; t.vals.forEach((v,c)=>{ pts.push([left+c*cw,v],[left+(c+1)*cw,v]); }); p+=row(k+1,t.name,pts,"#7ee787"); });
@@ -12181,6 +12187,7 @@ function wireSimBoardSeq(j, opts){
   if(sch && seq.inputIds && seq.inputIds.length===SIM_SEQ.inputs.length){
     SIM_SEQ.sch=sch; SIM_SEQ.ids=seq.inputIds; SIM_SEQ.hist=seq.rows.map(r=>r[1].slice());
   }
+  SIM_SEQ.run=sch;                      // what to simulate further when playback reaches the end
   // board pins: the sheet's own pin map (เลือกขา) when it has one, else SW k / LED k in order
   const own=(sch&&sch.pinmap)||{}, pm=n=>(typeof pmGet==="function"?pmGet(own,n):own[n])||"";
   const usedSw=new Set(), usedLed=new Set();
@@ -12201,7 +12208,7 @@ function wireSimBoardSeq(j, opts){
     <button class="btn2" data-act="seq-reset">รีเซ็ต</button>
     <label class="muted">ความเร็ว <input id="seqSpeed" class="simc" type="number" value="600" min="120" max="3000" step="60"> ms</label>
     <span class="muted" id="seqNow"></span>
-    <span class="muted">${live?'— คลิกสวิตช์บนบอร์ดเพื่อตั้งค่า input แล้วกด “ก้าว 1 clock”':'— วงจรทำงานตาม clock (นับเลข/กระพริบ) แสดงบนบอร์ดตามเวลา'}</span></div>`;
+    <span class="muted">${live?'— คลิกสวิตช์บนบอร์ดได้ตลอด แม้กำลังเล่นอยู่ วงจรจะทำงานต่อด้วยค่าใหม่':'— วงจรทำงานตาม clock (นับเลข/กระพริบ) แสดงบนบอร์ดตามเวลา'}</span></div>`;
   SIM_SEQ.noTable=!!opts.noTable;
   seqTable();
   if(row) row.dataset.cols=(SIM_SEQ.inputs.length+SIM_SEQ.outputs.length+SIM_SEQ.dffs.length);
@@ -12221,18 +12228,33 @@ function seqTable(){
   tbl.innerHTML='<table><tr>'+th+'</tr>'+body+'</table>';
 }
 /* flip a data switch at the current clock: that input changes from this clock onward */
+/* flip a data switch at the current clock: that input changes from this clock onward. It does
+   NOT stop playback — the circuit keeps running with the new input, like the real board. */
 function seqToggle(sw){
   const S=SIM_SEQ; if(!S || !S.hist) return;
   const k=S.swOf.indexOf(sw); if(k<0) return;          // only mapped switches are live
-  if(S.playing) seqPlay();
   const v=S.hist[S.idx][k]?0:1;
   for(let i=S.idx;i<S.hist.length;i++) S.hist[i][k]=v;
-  let j; try{ j=clientSeqSim(S.sch, S.hist.length, {holdAt:i=>{ const h={}; S.ids.forEach((id,q)=>h[id]=S.hist[i]?S.hist[i][q]:0); return h; }}); }
-  catch(e){ toast("จำลองไม่ได้: "+e.message,"warn"); return; }
-  if(!j||!j.ok) return;
-  S.rows=j.sequence.rows; seqTable(); seqShow(S.idx);
+  if(seqResim(S.hist.length)) seqShow(S.idx);
+}
+/* re-run the sheet for n clocks with the switch history (held at its last value past the end) */
+function seqResim(n){
+  const S=SIM_SEQ; if(!S || !S.run) return false;
+  if(S.hist){ const last=(S.hist[S.hist.length-1]||[]).slice(); while(S.hist.length<n) S.hist.push(last.slice()); }
+  let j; try{ j=clientSeqSim(S.run, n, S.hist?{holdAt:i=>{ const h={}; S.ids.forEach((id,q)=>h[id]=S.hist[i]?S.hist[i][q]:0); return h; }}:{}); }
+  catch(e){ toast("จำลองไม่ได้: "+e.message,"warn"); return false; }
+  if(!j||!j.ok) return false;
+  S.rows=j.sequence.rows; seqTable();
   const sig=$("#simSignals"); if(sig && !S.noTable) sig.innerHTML=j.note?'<span style="color:var(--warn)">⚠ '+esc(j.note)+'</span>':'';
   const tm=$("#simTiming"); if(tm && j.waveform_svg && !S.noTable) tm.innerHTML=j.waveform_svg;
+  return true;
+}
+/* the next clock: past the end of what has been simulated, simulate further instead of
+   jumping back to clock 0 (a run was fixed at its first N clocks) */
+function seqNext(){
+  const S=SIM_SEQ; if(!S) return;
+  if(S.idx+1>=S.rows.length && S.rows.length<512 && seqResim(S.rows.length+16)){}
+  seqShow(S.idx+1);
 }
 function seqShow(i){
   if(!SIM_SEQ) return; const n=SIM_SEQ.rows.length; SIM_SEQ.idx=((i%n)+n)%n;
@@ -12247,15 +12269,19 @@ function seqShow(i){
     +' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
   document.querySelectorAll('#simBoardTable tr').forEach(t=>t.classList.remove('cur'));
   const cur=document.querySelector('#simBoardTable tr[data-cyc="'+r[0]+'"]'); if(cur){ cur.classList.add('cur'); cur.scrollIntoView({block:'nearest'}); }
-  const now=$("#seqNow"); if(now) now.textContent='clock '+r[0]+' / '+(n-1);
+  const now=$("#seqNow"); if(now) now.textContent='clock '+r[0];
+  // the timing cursor follows the clock on show, and the chart scrolls to keep it in view
+  const tm=$("#simTiming"), sv=tm&&tm.querySelector("svg"), cur2=sv&&sv.querySelector(".wv-now");
+  if(cur2){ const L=+sv.dataset.left, cw=+sv.dataset.cw, x=L+SIM_SEQ.idx*cw; cur2.setAttribute("x",x);
+    if(x<tm.scrollLeft+L || x+cw>tm.scrollLeft+tm.clientWidth) tm.scrollLeft=Math.max(0,x-tm.clientWidth/2); }
 }
 function seqPlay(){
   if(!SIM_SEQ) return; const btn=document.querySelector('[data-act="seq-play"]');
   if(SIM_SEQ.playing){ clearInterval(SIM_SEQ.timer); SIM_SEQ.playing=false; if(btn) btn.textContent='เล่นตาม clock'; return; }
   const sp=parseInt(($("#seqSpeed")||{}).value)||600; SIM_SEQ.playing=true; if(btn) btn.textContent='หยุด';
-  SIM_SEQ.timer=setInterval(()=>seqShow(SIM_SEQ.idx+1), sp);
+  SIM_SEQ.timer=setInterval(seqNext, sp);
 }
-function seqStep(){ if(SIM_SEQ){ if(SIM_SEQ.playing) seqPlay(); seqShow(SIM_SEQ.idx+1); } }
+function seqStep(){ if(SIM_SEQ){ if(SIM_SEQ.playing) seqPlay(); seqNext(); } }
 function seqReset(){ if(SIM_SEQ){ if(SIM_SEQ.playing) seqPlay(); seqShow(0); } }
 // sim page sub-tab clicks
 $$("#simPage .sim-tabs button").forEach(b=>b.addEventListener("click",()=>simTab(b.dataset.stab)));
