@@ -12705,6 +12705,7 @@ init();
 .brd-logcol{display:flex;flex-direction:column;gap:8px;min-height:0}
 .brd-status{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
 .brd-status.ok{color:var(--ok)} .brd-status.bad{color:var(--err)} .brd-status.run{color:var(--accent)}
+#brdBit .ok{color:var(--ok)} #brdBit .warn{color:var(--warn)}
 .brd-hint{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
 .brd-log{flex:1;min-height:0;margin:0;overflow:auto;background:#0d1117;color:#c9d1d9;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
 #brdTools .ok{color:var(--ok)} #brdTools .bad{color:var(--warn)}
@@ -14911,8 +14912,23 @@ function brdRefresh(){
   $("#brdWarn").innerHTML=(d.missing.length?`<div class="ux-need">⚠ ยังไม่ได้เลือกขา ${d.missing.length} ขา — Vivado จะ build ไม่ผ่าน <button class="btn2" data-brd="pins">ไปเลือกขา</button></div>`:"")
     +(d.warns.length?`<div class="brd-w">${d.warns.slice(0,4).map(w=>"⚠ "+esc(w)).join("<br>")}</div>`:"");
   try{ uxRenderStepper(); }catch(_){}                    // pins may have just been guessed
-  const hasBit=BRD.lastBit&&BRD.lastBit.top===d.top;
-  $("#brdBit").textContent=hasBit?("ได้ "+d.top+".bit แล้ว"):"";
+  brdBitCheck(d);
+}
+/* Is there a .bit already, and is it the circuit as drawn now? Then step 3 works straight
+   away — no rebuilding every time the page opens (the launcher keeps the last build and a
+   copy in the project folder, and stamps what it was built from). */
+async function brdBitCheck(d){
+  d=d||brdDesign(); if(!d) return;
+  const r=await brdPost("/api/board/bit",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+  BRD.bit=(r&&r.ok)?r:null;
+  const el=$("#brdBit"); if(!el) return;
+  const when=t=>new Date(t*1000).toLocaleString("th-TH",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+  if(!BRD.bit||!BRD.bit.exists) el.innerHTML='<span class="muted">ยังไม่มีไฟล์ .bit — กดสร้างก่อน</span>';
+  else if(BRD.bit.current===true) el.innerHTML=`<span class="ok">✓ มี ${esc(d.top)}.bit แล้ว (${when(BRD.bit.mtime)}) ตรงกับวงจรตอนนี้ — ข้ามไปขั้นที่ 3 ได้เลย ไม่ต้องสร้างใหม่</span>`;
+  else if(BRD.bit.current===false) el.innerHTML=`<span class="warn">⚠ มี .bit จาก ${when(BRD.bit.mtime)} แต่วงจรเปลี่ยนไปแล้ว — ควรสร้างใหม่ (ยังโหลดตัวเก่าได้)</span>`;
+  else el.innerHTML=`<span class="muted">มี ${esc(d.top)}.bit จาก ${when(BRD.bit.mtime)} — ไม่แน่ใจว่าตรงกับวงจรตอนนี้ไหม</span>`;
+  const busy=$("#brdStatus")&&/run/.test($("#brdStatus").className);
+  $$("#boardPage [data-brd=sram],#boardPage [data-brd=flash]").forEach(b=>b.disabled=busy||!(BRD.bit&&BRD.bit.exists));
 }
 async function brdPost(path, body){
   try{ const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); return await r.json(); }
@@ -14929,6 +14945,7 @@ async function brdAct(a){
     brdLog(true); r=await brdPost("/api/board/build",{project:proj, top:d.top, vhdl:d.vhdl, xdc:d.xdc});
   } else if(a==="sram"||a==="flash"){
     if(a==="flash" && !confirm("เขียนลง Flash — วงจรจะอยู่ถาวรแม้ถอดปลั๊ก แต่ Flash เขียนซ้ำได้จำนวนจำกัด\nแนะนำให้ทดสอบด้วย “โหลดลงบอร์ด (ชั่วคราว)” ก่อน · เขียนเลยไหม?")) return;
+    if(BRD.bit&&BRD.bit.current===false&&!confirm("ไฟล์ .bit นี้สร้างจากวงจรเวอร์ชันก่อน — วงจรที่วาดอยู่ตอนนี้เปลี่ยนไปแล้ว\nโหลดตัวเก่าลงบอร์ดไหม? (กด ยกเลิก แล้วกด “สร้าง .bit” เพื่อได้ตัวใหม่)")) return;
     brdLog(true); r=await brdPost("/api/board/program",{project:proj, top:d.top, mode:a, cable});
   } else if(a==="detect"){ brdLog(true); r=await brdPost("/api/board/detect",{cable}); }
   else if(a==="stop"){ r=await brdPost("/api/board/stop",{}); }
@@ -14955,9 +14972,8 @@ function brdPoll(once){
       : s.state==="ok"?`✓ ${what}สำเร็จ`+(s.result&&s.result.saved?` · เก็บไว้ที่ ${esc(s.result.saved)}`:"")
       : s.state==="error"?`✗ ${what}ไม่สำเร็จ`: s.state==="stopped"?"หยุดแล้ว":"พร้อม";
     const h=$("#brdHint"); if(s.hint){ h.hidden=false; h.textContent=s.hint; } else if(running) h.hidden=true;
-    if(s.kind==="build" && s.state==="ok" && s.result){ BRD.lastBit=s.result; const b=$("#brdBit"); if(b) b.textContent="ได้ "+s.result.top+".bit แล้ว → ขั้นที่ 3"; }
     $$("#boardPage [data-brd=build],#boardPage [data-brd=sram],#boardPage [data-brd=flash],#boardPage [data-brd=detect]").forEach(b=>b.disabled=running);
-    if(!running && BRD.timer){ clearInterval(BRD.timer); BRD.timer=null; }
+    if(!running && BRD.timer){ clearInterval(BRD.timer); BRD.timer=null; brdBitCheck(); }
   };
   tick(); if(!once) BRD.timer=setInterval(tick, 700);
 }

@@ -833,7 +833,11 @@ def make_handler():
                                                             inside(projects_dir(), proj)))
                 if path == "/api/board/program":
                     return self._out(200, board.start_program(proj, data.get("top") or proj,
-                                                              data.get("mode") or "sram", data.get("cable") or "ft2232"))
+                                                              data.get("mode") or "sram", data.get("cable") or "ft2232",
+                                                              inside(projects_dir(), proj)))
+                if path == "/api/board/bit":
+                    return self._out(200, board.bit_status(proj, data.get("top") or proj, data.get("vhdl") or "",
+                                                           data.get("xdc") or "", inside(projects_dir(), proj)))
                 if path == "/api/board/detect":
                     return self._out(200, board.start_detect(data.get("cable") or "ft2232"))
                 if path == "/api/board/stop":

@@ -255,6 +255,12 @@ def start(server: str, model: str, endpoint: str, args: str) -> dict:
     cmd = [server, "-m", model, "--host", "127.0.0.1", "--port", str(port)] + (args or "").split()
     CTX["log"].parent.mkdir(parents=True, exist_ok=True)
     log = open(CTX["log"], "wb")
+    if os.name == "nt" and getattr(sys, "frozen", False):   # see board.release_dll_dir
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetDllDirectoryW(None)
+        except Exception:
+            pass
     PROC = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                             cwd=str(Path(server).parent), creationflags=_NO_WINDOW)
     STARTED.update(model=model, port=port, t=time.time())

@@ -163,6 +163,7 @@
 .brd-logcol{display:flex;flex-direction:column;gap:8px;min-height:0}
 .brd-status{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
 .brd-status.ok{color:var(--ok)} .brd-status.bad{color:var(--err)} .brd-status.run{color:var(--accent)}
+#brdBit .ok{color:var(--ok)} #brdBit .warn{color:var(--warn)}
 .brd-hint{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
 .brd-log{flex:1;min-height:0;margin:0;overflow:auto;background:#0d1117;color:#c9d1d9;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
 #brdTools .ok{color:var(--ok)} #brdTools .bad{color:var(--warn)}
