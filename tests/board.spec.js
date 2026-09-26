@@ -76,6 +76,8 @@ test("Top-Down from Home opens inside the editor with the circuit", async ({ pag
   await expect(page.locator("#topdownView")).toBeVisible({ timeout: 5000 });
   const f = page.frameLocator("#topdownFrame");
   await expect(f.locator("svg [data-node]").first()).toBeVisible({ timeout: 5000 });
+  // a small circuit prints at the standard size, not blown up to fill the A4 page
+  await expect(f.locator("svg text", { hasText: "1 หน่วย = 0.3 มม." })).toHaveCount(1);
 });
 
 test("first run opens the setup checklist until it is dismissed", async ({ page }) => {
