@@ -2251,7 +2251,11 @@ function healJunctions(sch){
         sch.components = sch.components.filter(c=>c!==j);
         changed = true;
       } else if(total === 1 && j.params && j.params.endpoint){
-        // a deliberate free wire end (drawn into open space) — keep the stub
+        // a deliberate free wire end (drawn into open space) — keep the stub. But an end
+        // dropped exactly ON another dot is a connection: it looked joined, stayed a
+        // separate net, and the pin it fed read "ปลายลอย" ('0' in VHDL).
+        const twin = junctionTwinAt(sch, j);
+        if(twin && junctionNetsMayJoin(sch, j, twin)){ weldJunction(sch, twin, j); changed = true; }
         continue;
       } else if(total === 1){
         // The one wire left on this dot may be a REAL connection — a run landing on a
@@ -2307,22 +2311,109 @@ function healJunctions(sch){
           // CRITICAL: two coincident dots of DIFFERENT nets (both scalar) would weld
           // and SHORT the nets — silently wrong VHDL. Weld only when they are already
           // electrically one net: joined by the stub, or tracing to the same driver.
-          const drvKey = jj => { const wf = sch.wires.find(w=>w.from.cid===jj.id); if(!wf) return "solo:"+jj.id; const d = netDriverPort(sch, wf); return d ? d.cid+"."+d.pid : "solo:"+jj.id; };
           const joinedByStub = sch.wires.some(w=>(w.from.cid===j.id&&w.to.cid===twin.id)||(w.from.cid===twin.id&&w.to.cid===j.id));
-          const sameNet = joinedByStub || drvKey(j)===drvKey(twin);
-          if(sameNet){
-            sch.wires.forEach(w=>{
-              if(w.from.cid===twin.id) w.from = {cid:j.id, pid:"j"};
-              if(w.to.cid===twin.id)   w.to   = {cid:j.id, pid:"j"};
-            });
-            sch.components = sch.components.filter(c=>c!==twin);
-            sch.wires = sch.wires.filter(w=>w.from.cid!==w.to.cid);   // drop the collapsed stub
+          if(joinedByStub || junctionNetsMayJoin(sch, j, twin)){
+            weldJunction(sch, j, twin);
             changed = true;
           }
         }
       }
     }
   }
+  orientJunctionNets(sch);
+}
+/* Point every wire of a junction cluster AWAY from its driver. The generator, the sim
+   and the checks all trace a pin back by following w.from through the dots; one
+   dot-to-dot wire pointing the wrong way (after a weld, a drag, tied inputs) cut the
+   net in two there — the pin read "ปลายลอย" and got '0' although it was wired. */
+function orientJunctionNets(sch){
+  const isJ = cid => { const c = comp(cid, sch); return !!c && c.type==="JUNCTION"; };
+  const flip = w => { const f = w.from; w.from = w.to; w.to = f; if(w.pts) w.pts = w.pts.slice().reverse(); };
+  const done = new Set();
+  for(const j0 of sch.components){
+    if(j0.type!=="JUNCTION" || done.has(j0.id)) continue;
+    // the cluster: dots joined by wires, either direction
+    const dots = new Set([j0.id]), stack = [j0.id];
+    while(stack.length){
+      const id = stack.pop();
+      sch.wires.forEach(w=>{
+        const o = w.from.cid===id ? w.to.cid : w.to.cid===id ? w.from.cid : null;
+        if(o && isJ(o) && !dots.has(o)){ dots.add(o); stack.push(o); }
+      });
+    }
+    dots.forEach(id=>done.add(id));
+    const touch = sch.wires.filter(w=>dots.has(w.from.cid) || dots.has(w.to.cid));
+    // its drivers: a real port on the from side, or an OUTPUT pin a wire was drawn INTO
+    const feeds = touch.filter(w=>{
+      if(!isJ(w.from.cid)) return true;
+      if(isJ(w.to.cid)) return false;
+      const p = getPort(comp(w.to.cid, sch), w.to.pid);
+      return !!p && p.dir==="out";
+    });
+    if(feeds.length!==1) continue;            // undriven, or shorted — leave that to the checks
+    const feed = feeds[0];
+    if(isJ(feed.from.cid)) flip(feed);
+    // walk out from the dot the driver enters, turning dot-to-dot wires to point away
+    const root = feed.to.cid, seen = new Set([root]), q = [root];
+    while(q.length){
+      const id = q.shift();
+      touch.forEach(w=>{
+        if(w===feed) return;
+        const o = w.from.cid===id ? w.to.cid : w.to.cid===id ? w.from.cid : null;
+        if(!o || !isJ(o) || seen.has(o)) return;
+        if(w.from.cid!==id) flip(w);
+        seen.add(o); q.push(o);
+      });
+    }
+  }
+}
+/* Another dot sitting on exactly the same spot as j, if any. */
+function junctionTwinAt(sch, j){
+  const jp = portPos(j, "j");
+  return sch.components.find(k=>{
+    if(k===j || k.type!=="JUNCTION") return false;
+    const kp = portPos(k, "j");
+    return Math.abs(kp.x-jp.x)<2 && Math.abs(kp.y-jp.y)<2;
+  }) || null;
+}
+/* The real port driving the net through dot jj, or null while nothing drives it. */
+function junctionDriverKey(sch, jj){
+  const w = sch.wires.find(x=>x.from.cid===jj.id || x.to.cid===jj.id);
+  const d = w && netDriverPort(sch, w);
+  if(!d) return null;
+  const c = comp(d.cid, sch);
+  return (c && c.type!=="JUNCTION") ? d.cid+"."+d.pid : null;
+}
+/* Two coincident dots of DIFFERENT driven nets must never weld: that SHORTS the nets
+   and the VHDL is silently wrong. Welding is safe when they are already one net, or
+   when at most one side has a driver (an undriven stub simply joins the other net). */
+function junctionNetsMayJoin(sch, a, b){
+  const ka = junctionDriverKey(sch, a), kb = junctionDriverKey(sch, b);
+  return !ka || !kb || ka===kb;
+}
+/* Move every wire of dot `drop` onto dot `keep` and remove `drop`. */
+function weldJunction(sch, keep, drop){
+  sch.wires.forEach(w=>{
+    if(w.from.cid===drop.id) w.from = {cid:keep.id, pid:"j"};
+    if(w.to.cid===drop.id)   w.to   = {cid:keep.id, pid:"j"};
+  });
+  sch.components = sch.components.filter(c=>c!==drop);
+  sch.wires = sch.wires.filter(w=>w.from.cid!==w.to.cid);   // drop the collapsed stub
+  // A dot takes ONE incoming wire. If the weld brought in a second one, it came from an
+  // undriven side (junctionNetsMayJoin guarantees that) — point it away from the dot.
+  const ins = sch.wires.filter(w=>w.to.cid===keep.id);
+  if(ins.length > 1){
+    const real = ins.find(w=>{ const d = netDriverPort(sch, w), c = d && comp(d.cid, sch); return c && c.type!=="JUNCTION"; }) || ins[0];
+    ins.forEach(w=>{
+      if(w===real) return;
+      const fc = comp(w.from.cid, sch);
+      if(!fc || fc.type!=="JUNCTION") return;               // a real output: leave it for the checker
+      const f = w.from; w.from = w.to; w.to = f;
+      if(w.pts) w.pts = w.pts.slice().reverse();
+    });
+  }
+  if(keep.params && keep.params.endpoint && sch.wires.filter(w=>w.from.cid===keep.id||w.to.cid===keep.id).length>1)
+    delete keep.params.endpoint;                            // it is a branch point now
 }
 /* Re-seed the uid counter after loading external data so new ids never collide */
 /* Lift the uid counter above every id in p (default: the live project). Takes p so
@@ -6207,10 +6298,35 @@ function netHasDriver(sch, w, seen){
   const src = comp(w.from.cid, sch);
   if(!src) return false;
   if(src.type !== "JUNCTION") return true;              // a real port feeds it
-  if(seen.has(src.id)) return false;
+  if(seen.has(src.id)) return !!junctionClusterDriver(sch, src.id);
   seen.add(src.id);
   const up = sch.wires.find(x=>x.to.cid===src.id);
-  return up ? netHasDriver(sch, up, seen) : false;      // a dot with nothing coming in
+  if(up) return netHasDriver(sch, up, seen);
+  return !!junctionClusterDriver(sch, src.id);          // a dot with nothing coming in — unless a
+}                                                       // dot-to-dot wire just points the other way
+
+/* The real port driving the junction cluster around dot jid, found by walking the
+   dots UNDIRECTED. The directed walk above follows w.from back, which only works while
+   every dot-to-dot wire points away from the driver. Merging dots, dragging an end or
+   tying inputs together can leave one pointing the other way — J and K tied, the
+   driver entering at K, the AND's input hung off J — and then the net read as
+   floating (and the generator wrote '0') although it was plainly wired. */
+function junctionClusterDriver(sch, jid){
+  const seenJ = new Set([jid]), stack = [jid];
+  while(stack.length){
+    const id = stack.pop();
+    for(const w of sch.wires){
+      const ends = w.from.cid===id ? [w.to, "to"] : w.to.cid===id ? [w.from, "from"] : null;
+      if(!ends) continue;
+      const [ep, side] = ends, c = comp(ep.cid, sch);
+      if(!c) continue;
+      if(c.type==="JUNCTION"){ if(!seenJ.has(c.id)){ seenJ.add(c.id); stack.push(c.id); } continue; }
+      if(side==="from") return {cid:ep.cid, pid:ep.pid};
+      const port = getPort(c, ep.pid);
+      if(port && port.dir==="out") return {cid:ep.cid, pid:ep.pid};
+    }
+  }
+  return null;
 }
 
 function netDriverPort(sch, w, seen){
@@ -6218,10 +6334,11 @@ function netDriverPort(sch, w, seen){
   const src = comp(w.from.cid, sch);
   if(!src) return null;
   if(src.type!=="JUNCTION") return {cid:w.from.cid, pid:w.from.pid};
-  if(seen.has(src.id)) return null;
+  if(seen.has(src.id)) return junctionClusterDriver(sch, src.id);
   seen.add(src.id);
   const up = sch.wires.find(x=>x.to.cid===src.id);
-  return up ? netDriverPort(sch, up, seen) : {cid:src.id, pid:"j"};
+  if(up) return netDriverPort(sch, up, seen);
+  return junctionClusterDriver(sch, src.id) || {cid:src.id, pid:"j"};
 }
 /* start a branch FROM a wire without committing a junction yet. The dot is minted
    once the target is picked — AT THIS ANCHOR, the spot the user clicked, which
