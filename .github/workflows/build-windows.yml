@@ -44,8 +44,12 @@ jobs:
         id: ver
         shell: pwsh
         run: |
-          if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") }
-          else { $v = (Select-String -Path launcher\app.py -Pattern '^VERSION = "(.+)"').Matches[0].Groups[1].Value }
+          $app = (Select-String -Path launcher\app.py -Pattern '^VERSION = "(.+)"').Matches[0].Groups[1].Value
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $v = "${{ github.ref_name }}".TrimStart("v")
+            # the app compares its VERSION with the release tag to offer updates — they must match
+            if ($v -ne $app) { throw "tag v$v does not match VERSION = `"$app`" in launcher/app.py — bump VERSION first" }
+          } else { $v = $app }
           "v=$v" >> $env:GITHUB_OUTPUT
 
       - name: Build

@@ -51,6 +51,8 @@ Name: "{userdesktop}\FPGA Ecosystem"; Filename: "{app}\FPGAEcosystem.exe"; Tasks
 
 [Run]
 Filename: "{app}\FPGAEcosystem.exe"; Description: "Start FPGA Ecosystem"; Flags: nowait postinstall skipifsilent
+; silent in-place update started by the app itself: start the new version afterwards
+Filename: "{app}\FPGAEcosystem.exe"; Flags: nowait; Check: WizardSilent
 
 [Code]
 function B(const Task: String): String;
