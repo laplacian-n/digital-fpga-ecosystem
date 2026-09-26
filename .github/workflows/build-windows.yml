@@ -25,8 +25,19 @@ jobs:
         shell: pwsh
         run: |
           $env:APPDATA = "$env:RUNNER_TEMP\appdata"
-          $p = Start-Process python -ArgumentList "launcher\app.py","--no-open","--port","18770" -PassThru
-          Start-Sleep 4
+          $log = "$env:RUNNER_TEMP\launcher"
+          $p = Start-Process python -ArgumentList "launcher\app.py","--no-open","--port","18770" -PassThru `
+                 -RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err"
+          # a cold runner can take well over 4 s to import the backend — wait for the port, up to 60 s
+          $up = $false
+          for ($i = 0; $i -lt 120 -and -not $up; $i++) {
+            try { Invoke-RestMethod http://127.0.0.1:18770/api/info -TimeoutSec 2 | Out-Null; $up = $true }
+            catch { if ($p.HasExited) { break }; Start-Sleep -Milliseconds 500 }
+          }
+          if (-not $up) {
+            Get-Content "$log.out","$log.err" -ErrorAction SilentlyContinue
+            throw "launcher did not start (exited: $($p.HasExited))"
+          }
           $s = Invoke-RestMethod http://127.0.0.1:18770/api/status
           if (-not $s.backend) { throw "backend failed: $($s.backend_error)" }
           $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:18770/chat -Body '{"message":"full adder"}'
