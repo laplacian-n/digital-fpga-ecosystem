@@ -66,6 +66,12 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir `
   @icon @datas @hiddenArgs launcher\app.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
+# console build of the MCP server: Claude talks to it over stdin/stdout, which a windowed
+# exe doesn't reliably get. Small, stdlib only; it starts FPGAEcosystem.exe when needed.
+python -m PyInstaller --noconfirm --onefile --console --name FPGAEcosystem-MCP `
+  --distpath dist\FPGAEcosystem --workpath build\pyi-mcp --specpath build launcher\mcp_server.py
+if ($LASTEXITCODE -ne 0) { throw "PyInstaller (MCP) failed" }
+
 # optional side-by-side tools the user may drop in before building (see launcher\README.md)
 if (Test-Path FPGA_Builder_Package\tools\openFPGALoader) {
   Copy-Item FPGA_Builder_Package\tools\openFPGALoader dist\FPGAEcosystem\tools\openFPGALoader -Recurse -Force

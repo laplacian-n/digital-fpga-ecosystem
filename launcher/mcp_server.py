@@ -1,0 +1,447 @@
+"""
+mcp_server.py - FPGA Ecosystem as an MCP server, so Claude can work in Schematic Studio.
+
+Claude (Desktop / Code / any MCP client) starts this over stdio. Every tool call is
+forwarded to the running FPGA Ecosystem app (started here if needed), which hands it to
+the open Schematic Studio window; the editor executes it with its own engine and the
+user watches it happen. Nothing here re-implements the editor: placement, routing,
+checks, simulation, pin mapping and VHDL all come from the editor itself.
+
+Pure standard library (no `pip install mcp`). Protocol: MCP over stdio, JSON-RPC 2.0,
+one message per line.
+
+    python launcher/mcp_server.py          # from source
+    FPGAEcosystem-MCP.exe                  # installed (console build)
+    FPGAEcosystem.exe --mcp                # installed (fallback)
+"""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+SERVER_NAME = "fpga-ecosystem"
+PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"]
+HERE = Path(__file__).resolve().parent
+
+INSTRUCTIONS = """\
+You are connected to Schematic Studio, a gate-level schematic editor for the EDGE Spartan-7 (XC7S15) FPGA board.
+Every change you make is drawn live in the user's editor window and can be undone (Ctrl+Z / `undo`).
+
+Good workflow:
+1. `status` → see the project and sheets; `get_sheet` → parts, pins (with coordinates) and nets.
+2. Build: `build_circuit` (truth table / generators / intent) for whole circuits, or `add_component` + `connect`
+   (or `apply` for many steps at once, all-or-nothing) for edits.
+3. Verify: `check` (design-rule errors with fixes), `simulate` / `verify_truth_table` / `probe`, and
+   `explain_simulation` when results look wrong. Always check before telling the user a design is done.
+4. Look: `layout_report` (overlaps, wires through parts) and `screenshot`; tidy with `auto_layout`.
+5. Board: `board_pins` → `set_pins` or `auto_pins` → `get_pins` (conflicts / unassigned) → `get_xdc`.
+6. Deliver: `get_vhdl`, `export_files` (writes .vhd/.xdc into the project folder), `save_project`.
+
+References: a component is its id ("c12"), an INPUT/OUTPUT name ("a", "sum") or a label ("U1");
+a pin is "<component>.<pin>" ("U1.i0", "ff0.q"). A bare component means its output (as a wire source)
+or its first free input (as a wire sink). Truth tables list rows with the FIRST input as the MSB.
+Sub-circuits are other sheets placed as "block:<sheet name>". Use `get_events` to see what the user changed.
+Prefer small verified steps; call `notify_user` to tell the user something inside the editor."""
+
+
+# --------------------------------------------------------------------------- tools
+def T(name, desc, props=None, required=None, timeout=60):
+    schema = {"type": "object", "properties": props or {}, "additionalProperties": False}
+    if required:
+        schema["required"] = required
+    return {"name": name, "description": desc, "inputSchema": schema, "_timeout": timeout}
+
+
+SHEET = {"type": "string", "description": "Sheet name or id. Default: the active sheet."}
+REF = {"type": "string", "description": "Component: id, INPUT/OUTPUT name, or label."}
+PIN = {"type": "string", "description": "Pin reference 'component.pin' (e.g. 'U1.i0', 'ff0.q') or a bare component."}
+INPUTS = {"type": "object", "description": "INPUT name → 0/1.", "additionalProperties": {"type": "integer", "enum": [0, 1]}}
+
+TOOLS = [
+    # --- looking at the design
+    T("status", "Project, sheets (with part/wire counts), active and top sheet, unsaved changes. Start here."),
+    T("list_component_types", "Every placeable component type with its default params and pin names."),
+    T("get_sheet", "A sheet as data: ports, components (type, name, position, size, params, pins with x/y and "
+      "whether connected) and nets (driver → sinks, with problems such as 'no driver' or 'multiple drivers').",
+      {"sheet": SHEET, "detail": {"type": "string", "enum": ["full", "brief"], "description": "brief = no positions/pins."}}),
+    T("get_netlist", "Only the connectivity of a sheet: each net's driver pin, sink pins, name and problems.", {"sheet": SHEET}),
+    T("screenshot", "PNG image of the sheet as the user sees it (problem markers included unless show_problems=false).",
+      {"sheet": SHEET, "fit": {"type": "boolean", "description": "Zoom to fit first (default true)."},
+       "show_problems": {"type": "boolean"}}, timeout=40),
+    T("get_events", "What happened in the editor since sequence number `since` (user edits, issue count changes). "
+      "Use it to follow along with the user.", {"since": {"type": "integer"}}),
+    # --- sheets
+    T("open_sheet", "Make a sheet the active tab (the user sees it).", {"sheet": SHEET}, ["sheet"]),
+    T("new_sheet", "Create an empty sheet (a new sub-circuit or top level).",
+      {"name": {"type": "string"}, "make_top": {"type": "boolean"}}, ["name"]),
+    T("rename_sheet", "Rename a sheet.", {"sheet": SHEET, "name": {"type": "string"}}, ["sheet", "name"]),
+    T("set_top_sheet", "Choose which sheet is the top entity (what goes to the board).", {"sheet": SHEET}, ["sheet"]),
+    # --- editing
+    T("add_component", "Place one component. type: a type from list_component_types (AND, OR, NOT, XOR, NAND, NOR, "
+      "XNOR, BUF, IN, OUT, VCC, GND, CONST, MUX, DFF, JKFF, TFF, SRFF, …) or 'block:<sheet name>' for a sub-circuit. "
+      "Without x/y it goes to a free spot right of the drawing. Returns the part with its pins.",
+      {"sheet": SHEET, "type": {"type": "string"}, "name": {"type": "string", "description": "INPUT/OUTPUT port name, or a label for other parts."},
+       "width": {"type": "integer", "description": "Bus width for IN/OUT (default 1)."},
+       "params": {"type": "object", "description": "Type params, e.g. {\"inputs\":3} for a 3-input gate, {\"reset\":true} for a DFF with reset."},
+       "x": {"type": "number"}, "y": {"type": "number"}, "rot": {"type": "integer", "enum": [0, 90, 180, 270]}},
+      ["type"]),
+    T("connect", "Wire an output pin to an input pin (fan-out is fine; an input takes one driver). "
+      "Give from/to, or `connections` [[from,to],…] for several. The new wires are routed.",
+      {"sheet": SHEET, "from": PIN, "to": PIN,
+       "connections": {"type": "array", "items": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2}},
+       "net_name": {"type": "string"}}),
+    T("disconnect", "Remove wiring: `pin` drops every wire on that pin; `from`+`to` removes one connection.",
+      {"sheet": SHEET, "pin": PIN, "from": PIN, "to": PIN}),
+    T("delete", "Delete components (and their wires).", {"sheet": SHEET, "refs": {"type": "array", "items": {"type": "string"}}}, ["refs"]),
+    T("update_component", "Rename, change params, change a basic gate's type, move (x/y) or rotate a component.",
+      {"sheet": SHEET, "ref": REF, "name": {"type": "string"}, "params": {"type": "object"},
+       "type": {"type": "string"}, "x": {"type": "number"}, "y": {"type": "number"},
+       "rot": {"type": "integer", "enum": [0, 90, 180, 270]}}, ["ref"]),
+    T("apply", "Run several edit steps as one transaction — if a step fails nothing changes (unless keep_going). "
+      "Each step is {\"op\": \"add_component\"|\"connect\"|\"disconnect\"|\"delete\"|\"update_component\"|\"set_pins\", …that tool's args}.",
+      {"sheet": SHEET, "steps": {"type": "array", "items": {"type": "object"}}, "keep_going": {"type": "boolean"}}, ["steps"]),
+    T("build_circuit", "Create a whole circuit, minimised and laid out by the editor, on a new sheet. One of:\n"
+      "• truth_table: {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; "
+      "into:\"current\" fills a sheet that has exactly those ports, e.g. a lab template)\n"
+      "• generator: {kind: mod_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low}\n"
+      "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}",
+      {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
+       "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]}}, timeout=90),
+    # --- layout
+    T("auto_layout", "Re-place and route the whole sheet (mode 'full'), or only re-route wires keeping parts ('wires_only').",
+      {"sheet": SHEET, "mode": {"type": "string", "enum": ["full", "wires_only"]}, "lock": {"type": "boolean"}}, timeout=120),
+    T("layout_report", "Drawing quality: wire overlaps, wires through parts/pins, overlapping parts, bounding box, score (lower = tidier).",
+      {"sheet": SHEET}),
+    T("lock_layout", "Lock (or unlock) a sheet so nothing gets re-routed automatically.", {"sheet": SHEET, "locked": {"type": "boolean"}}),
+    # --- verification
+    T("check", "Design-rule check (what Vivado would reject + common mistakes): errors and warnings with the "
+      "component and a suggested fix.", {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
+    T("simulate", "Simulate a sheet. Combinational: full truth table (rows 'inputs → outputs', and per-output columns). "
+      "Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0).",
+      {"sheet": SHEET, "cycles": {"type": "integer", "minimum": 1, "maximum": 256}, "inputs": INPUTS}),
+    T("verify_truth_table", "Compare a combinational sheet against expected output columns ({out:\"0110…\"}, x = don't care). "
+      "Returns pass and the mismatching rows.", {"sheet": SHEET, "expected": {"type": "object"}}, ["expected"]),
+    T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong.",
+      {"sheet": SHEET, "inputs": INPUTS}),
+    T("explain_simulation", "Likely reasons a simulation doesn't behave as expected (clock not reaching FFs, reset stuck, "
+      "gated clock, floating pins, multi-driver, constant outputs, unused inputs, divider chains).", {"sheet": SHEET}),
+    # --- board
+    T("board_pins", "Every board target you can assign: switches sw:0-15, buttons pb:0-4, clk (50 MHz), leds led:0-15, "
+      "7-seg seg:a-g/dp, digit selects an:0-3, buzzer — with package pins."),
+    T("get_pins", "Current pin assignment of a sheet's ports (bus bits as name[i]), unassigned ports and conflicts.", {"sheet": SHEET}),
+    T("set_pins", "Assign ports/bits to board targets, e.g. {\"a\":\"sw:0\", \"seg[6]\":\"seg:a\", \"clk\":\"clk\"}; null clears.",
+      {"sheet": SHEET, "map": {"type": "object"}}, ["map"]),
+    T("auto_pins", "Fill pin assignments automatically (mode 'missing' keeps existing ones, 'all' redoes them).",
+      {"sheet": SHEET, "mode": {"type": "string", "enum": ["missing", "all"]}}),
+    T("get_xdc", "The Vivado constraints (.xdc) the sheet's pin map produces, and which ports are still unassigned.", {"sheet": SHEET}),
+    # --- output
+    T("get_vhdl", "Generated VHDL: the whole bundle for the top sheet, or one entity.", {"entity": {"type": "string"}}),
+    T("export_files", "Write files into the project's folder in the user's workspace: vhdl, xdc, project.",
+      {"what": {"type": "array", "items": {"type": "string", "enum": ["vhdl", "xdc", "project"]}}, "sheet": SHEET}),
+    T("save_project", "Save the project file (.schproj.json) into the workspace project folder."),
+    T("list_projects", "Projects saved in the user's workspace folder (paths usable with open_project)."),
+    T("open_project", "Open a saved project from the workspace (replaces what's on screen; a checkpoint is kept).",
+      {"path": {"type": "string", "description": "e.g. 'lab4/lab4.schproj.json'"}}, ["path"]),
+    # --- history & collaboration
+    T("undo", "Undo the last change (yours or the user's)."),
+    T("redo", "Redo."),
+    T("checkpoint", "Save a named restore point in the editor's history.", {"label": {"type": "string"}}),
+    T("list_checkpoints", "Restore points (automatic and named)."),
+    T("restore_checkpoint", "Go back to a restore point (the current state is kept as a new one first).", {"id": {"type": "integer"}}, ["id"]),
+    T("focus", "Select a component and centre the user's view on it.", {"sheet": SHEET, "ref": REF}, ["ref"]),
+    T("notify_user", "Show a short message to the user inside the editor.",
+      {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
+]
+TOOL_MAP = {t["name"]: t for t in TOOLS}
+LOCAL_TOOLS = {"list_projects"}      # answered by the app itself, no editor needed
+
+RESOURCES = [
+    {"uri": "fpga://guide", "name": "How to work with Schematic Studio", "mimeType": "text/markdown"},
+    {"uri": "fpga://board/edge-spartan7", "name": "EDGE Spartan-7 board targets and pins", "mimeType": "application/json"},
+    {"uri": "fpga://sheet/active", "name": "The active sheet (parts, pins, nets)", "mimeType": "application/json"},
+    {"uri": "fpga://component-types", "name": "Component types and their pins", "mimeType": "application/json"},
+]
+PROMPTS = [
+    {"name": "design_from_spec", "description": "Design, verify and pin-map a circuit from a description.",
+     "arguments": [{"name": "spec", "description": "What the circuit should do", "required": True}]},
+    {"name": "debug_simulation", "description": "Find out why the current sheet doesn't simulate as expected.",
+     "arguments": [{"name": "expected", "description": "What you expected to see", "required": False}]},
+    {"name": "prepare_for_board", "description": "Check, assign pins and export VHDL + XDC for the board.", "arguments": []},
+]
+
+
+def prompt_text(name, args):
+    if name == "design_from_spec":
+        return (f"Design this in Schematic Studio: {args.get('spec', '')}\n"
+                "Plan the ports first, then build (build_circuit when a truth table or generator fits, otherwise "
+                "add_component/connect via apply). Then run check and simulate/verify_truth_table and fix every error. "
+                "Use layout_report and auto_layout so the drawing is clean, assign pins with auto_pins/set_pins, and "
+                "finish with a short summary and a screenshot.")
+    if name == "debug_simulation":
+        return ("The current sheet doesn't simulate as expected" + (f" (expected: {args['expected']})" if args.get("expected") else "") +
+                ". Use explain_simulation, check, simulate and probe to find the cause; show the user where it is with focus, "
+                "propose the fix and apply it only after explaining it.")
+    if name == "prepare_for_board":
+        return ("Get the top sheet ready for the EDGE Spartan-7: check (no errors), get_pins (resolve conflicts and "
+                "unassigned ports with set_pins/auto_pins), get_xdc, then export_files ['vhdl','xdc','project'] and report the paths.")
+    raise KeyError(name)
+
+
+# --------------------------------------------------------------------------- app connection
+def config_dir() -> Path:
+    if os.name == "nt":
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "FPGA Ecosystem"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "FPGA Ecosystem"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "fpga-ecosystem"
+
+
+class App:
+    """The running FPGA Ecosystem launcher (started on demand)."""
+
+    def __init__(self):
+        self.base = None
+        self.token = None
+        self.lock = threading.Lock()
+
+    def _read_runtime(self):
+        try:
+            rt = json.loads((config_dir() / "runtime.json").read_text("utf-8"))
+            return f"http://127.0.0.1:{rt['port']}", rt["token"]
+        except Exception:
+            return None, None
+
+    def _alive(self, base, token):
+        try:
+            req = urllib.request.Request(base + "/api/mcp/status", headers={"X-FE-Token": token})
+            with urllib.request.urlopen(req, timeout=2) as r:
+                return json.loads(r.read()).get("ok") is True
+        except Exception:
+            return False
+
+    def _spawn(self):
+        if getattr(sys, "frozen", False):
+            exe = Path(sys.executable)
+            main = exe.with_name("FPGAEcosystem.exe") if exe.name.lower().startswith("fpgaecosystem-mcp") else exe
+            cmd = [str(main), "--no-open"]
+        else:
+            cmd = [sys.executable, str(HERE / "app.py"), "--no-open"]
+        flags = 0
+        if os.name == "nt":
+            flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         creationflags=flags, start_new_session=(os.name != "nt"))
+
+    def ensure(self):
+        with self.lock:
+            if self.base and self._alive(self.base, self.token):
+                return
+            base, token = self._read_runtime()
+            if base and self._alive(base, token):
+                self.base, self.token = base, token
+                return
+            self._spawn()
+            end = time.time() + 45
+            while time.time() < end:
+                time.sleep(0.5)
+                base, token = self._read_runtime()
+                if base and self._alive(base, token):
+                    self.base, self.token = base, token
+                    return
+            raise RuntimeError("could not start FPGA Ecosystem (launcher). Is it installed / is Python able to run launcher/app.py?")
+
+    def request(self, method, path, body=None, timeout=70):
+        self.ensure()
+        data = None if body is None else json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(self.base + path, data=data, method=method,
+                                     headers={"Content-Type": "application/json", "X-FE-Token": self.token})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8") or "null")
+
+    def call(self, op, args, timeout):
+        try:
+            return self.request("POST", "/api/mcp/call", {"op": op, "args": args, "timeout": timeout}, timeout=timeout + 40)
+        except urllib.error.HTTPError as e:
+            if e.code == 401:           # the app restarted with a new token
+                self.base = None
+                return self.request("POST", "/api/mcp/call", {"op": op, "args": args, "timeout": timeout}, timeout=timeout + 40)
+            raise
+
+    def keepalive(self):
+        """The launcher quits when nobody pings it; keep it up while Claude is connected."""
+        while True:
+            time.sleep(30)
+            try:
+                if self.base:
+                    urllib.request.urlopen(self.base + "/api/ping", timeout=3).read()
+            except Exception:
+                pass
+
+
+APP = App()
+
+
+# --------------------------------------------------------------------------- MCP handlers
+def text(obj):
+    return {"type": "text", "text": obj if isinstance(obj, str) else json.dumps(obj, ensure_ascii=False, indent=1)}
+
+
+def call_tool(name, args):
+    tool = TOOL_MAP.get(name)
+    if not tool:
+        return {"content": [text(f"unknown tool '{name}'")], "isError": True}
+    try:
+        if name in LOCAL_TOOLS:
+            res = APP.request("GET", "/api/projects")
+            return {"content": [text({"folder": res.get("dir"), "projects": [
+                {"name": p["name"], "path": p.get("main"), "files": [f["name"] for f in p.get("files", [])]}
+                for p in res.get("projects", [])]})]}
+        reply = APP.call(name, args or {}, tool["_timeout"])
+    except Exception as e:
+        return {"content": [text(f"FPGA Ecosystem is not reachable: {e}")], "isError": True}
+    if not reply.get("ok"):
+        msg = reply.get("error") or "failed"
+        if reply.get("hint"):
+            msg += f"\nhint: {reply['hint']}"
+        return {"content": [text(msg)], "isError": True}
+    result = reply.get("result")
+    if name == "screenshot" and isinstance(result, dict) and result.get("image_png_base64"):
+        img = result.pop("image_png_base64")
+        return {"content": [{"type": "image", "data": img, "mimeType": "image/png"}, text(result)]}
+    return {"content": [text(result)]}
+
+
+def read_resource(uri):
+    if uri == "fpga://guide":
+        return {"uri": uri, "mimeType": "text/markdown", "text": INSTRUCTIONS}
+    op = {"fpga://board/edge-spartan7": "board_pins", "fpga://sheet/active": "get_sheet",
+          "fpga://component-types": "list_component_types"}.get(uri)
+    if not op:
+        raise KeyError(uri)
+    reply = APP.call(op, {}, 30)
+    if not reply.get("ok"):
+        raise RuntimeError(reply.get("error"))
+    return {"uri": uri, "mimeType": "application/json", "text": json.dumps(reply.get("result"), ensure_ascii=False, indent=1)}
+
+
+def handle(msg):
+    method, mid, params = msg.get("method"), msg.get("id"), msg.get("params") or {}
+    if mid is None:                     # notification (initialized, cancelled …)
+        return None
+    try:
+        if method == "initialize":
+            want = params.get("protocolVersion")
+            return ok(mid, {"protocolVersion": want if want in PROTOCOLS else PROTOCOLS[0],
+                            "capabilities": {"tools": {"listChanged": False}, "resources": {}, "prompts": {}},
+                            "serverInfo": {"name": SERVER_NAME, "title": "FPGA Ecosystem — Schematic Studio", "version": version()},
+                            "instructions": INSTRUCTIONS})
+        if method == "ping":
+            return ok(mid, {})
+        if method == "tools/list":
+            return ok(mid, {"tools": [{k: v for k, v in t.items() if not k.startswith("_")} for t in TOOLS]})
+        if method == "tools/call":
+            return ok(mid, call_tool(params.get("name"), params.get("arguments") or {}))
+        if method == "resources/list":
+            return ok(mid, {"resources": RESOURCES})
+        if method == "resources/templates/list":
+            return ok(mid, {"resourceTemplates": []})
+        if method == "resources/read":
+            try:
+                return ok(mid, {"contents": [read_resource(params.get("uri"))]})
+            except KeyError:
+                return err(mid, -32002, f"resource not found: {params.get('uri')}")
+        if method == "prompts/list":
+            return ok(mid, {"prompts": PROMPTS})
+        if method == "prompts/get":
+            try:
+                t = prompt_text(params.get("name"), params.get("arguments") or {})
+            except KeyError:
+                return err(mid, -32602, f"unknown prompt: {params.get('name')}")
+            return ok(mid, {"messages": [{"role": "user", "content": {"type": "text", "text": t}}]})
+        return err(mid, -32601, f"method not found: {method}")
+    except Exception as e:  # never let one bad request kill the server
+        return err(mid, -32603, f"internal error: {e}")
+
+
+def ok(mid, result):
+    return {"jsonrpc": "2.0", "id": mid, "result": result}
+
+
+def err(mid, code, message):
+    return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
+
+
+def version():
+    import re
+    try:                                     # from source: read it from app.py
+        m = re.search(r'^VERSION = "(.+)"', (HERE / "app.py").read_text("utf-8"), re.M)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    try:                                     # installed: the running app tells us
+        return json.loads((config_dir() / "runtime.json").read_text("utf-8")).get("version") or "0"
+    except Exception:
+        return "0"
+
+
+def _stdio():
+    """stdin/stdout as UTF-8 text. A windowed (GUI) exe gets None for sys.stdin/stdout even
+    when Claude hands it pipes — reopen the real OS handles in that case."""
+    if sys.stdin is None or sys.stdout is None:
+        import msvcrt, ctypes  # noqa: E401  (Windows only)
+        k32 = ctypes.windll.kernel32
+        fin = msvcrt.open_osfhandle(k32.GetStdHandle(-10), os.O_RDONLY)
+        fout = msvcrt.open_osfhandle(k32.GetStdHandle(-11), 0)
+        return os.fdopen(fin, "r", encoding="utf-8", newline="\n"), os.fdopen(fout, "w", encoding="utf-8", newline="\n")
+    return (open(sys.stdin.fileno(), "r", encoding="utf-8", newline="\n", closefd=False),
+            open(sys.stdout.fileno(), "w", encoding="utf-8", newline="\n", closefd=False))
+
+
+def main():
+    fin, fout = _stdio()
+    sys.stdout = sys.stderr            # nothing but protocol may reach stdout
+    threading.Thread(target=APP.keepalive, daemon=True).start()
+    wlock = threading.Lock()
+
+    def send(obj):
+        with wlock:
+            fout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+            fout.flush()
+
+    def work(msg):
+        reply = handle(msg)
+        if reply is not None:
+            send(reply)
+
+    running = []
+    for line in fin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except Exception:
+            send(err(None, -32700, "parse error"))
+            continue
+        batch = msg if isinstance(msg, list) else [msg]
+        for m in batch:
+            # tool calls can take a while (layout, screenshots): answer each on its own thread
+            t = threading.Thread(target=work, args=(m,), daemon=True)
+            t.start()
+            running.append(t)
+        running = [t for t in running if t.is_alive()]
+    for t in running:                  # client closed stdin: let in-flight answers go out
+        t.join(timeout=30)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
