@@ -43,3 +43,12 @@ so the editor's own internal calls go through the wrapper. Rules:
 
 ## Not in the repo
 Vivado/ISE, `*.lic`, LLM models (`ai/models`, `ai/llama`), GHDL, RAG index, course material — see README.
+
+## Conventions (owner's wishes)
+- Commit as the repo owner (`git config user.name laplacian-n`, `user.email dinucleotide10292910@gmail.com`).
+  **No `Co-Authored-By: Claude` / `Claude-Session` trailers and no "Generated with Claude Code" footer** in commits or PRs
+  (the owner removed Claude from Contributors on purpose).
+- Talk to the owner in Thai. Before a release, bump `VERSION` — a tag that doesn't match fails the Windows build
+  (this is what left v0.3.0 without an installer).
+- Not verified on real hardware yet: the ลงบอร์ด page with real Vivado / openFPGALoader / board on Windows.
+  openFPGALoader is not in the repo, so the installer doesn't ship it.
