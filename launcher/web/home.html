@@ -263,7 +263,9 @@ $("#btnNew").onclick = async () => {
   const j = await api("/api/projects/new", {name});
   if(!j.ok) return toast(j.error);
   $("#newName").value = ""; await loadProjects();
-  toast("สร้างโปรเจกต์ " + j.name + " แล้ว — เปิด Schematic Studio แล้วตั้งชื่อโปรเจกต์เป็นชื่อเดียวกัน");
+  // straight into the editor with a new project of that name (saved into this folder)
+  api("/api/open", {page:"studio", query:"new="+encodeURIComponent(j.name)});
+  toast("สร้างโปรเจกต์ " + j.name + " แล้ว — กำลังเปิด Schematic Studio");
 };
 
 function ago(t){
@@ -276,17 +278,21 @@ async function loadProjects(){
   const j = await api("/api/projects");
   $("#projDir").textContent = j.dir;
   const el = $("#projects");
-  if(!j.projects.length){ el.innerHTML = `<div class="empty">ยังไม่มีโปรเจกต์ — กด “บันทึก” ใน Schematic Studio แล้วไฟล์จะมาอยู่ที่นี่</div>`; return; }
+  if(!j.projects.length){ el.innerHTML = `<div class="empty">ยังไม่มีโปรเจกต์ — พิมพ์ชื่อด้านบนแล้วกด “สร้าง”</div>`; return; }
   el.innerHTML = j.projects.map((p, i) => `
     <div class="row">
       <div class="grow"><div class="name">${esc(p.name)}</div>
         <div class="meta">${ago(p.mtime)} · ${p.files.length} ไฟล์${p.files.length ? " · " + esc(p.files.slice(0,4).map(f=>f.name).join(", ")) : ""}</div></div>
-      ${p.main ? `<button class="btn primary" data-i="${i}" data-act="open">เปิด</button>` : ""}
+      <button class="btn primary" data-i="${i}" data-act="open">เปิด</button>
       <button class="btn" data-i="${i}" data-act="reveal">โฟลเดอร์</button>
     </div>`).join("");
   el.querySelectorAll("button").forEach(b => b.onclick = () => {
     const p = j.projects[+b.dataset.i];
-    if(b.dataset.act === "open") api("/api/open_project", {path: p.main});
+    if(b.dataset.act === "open"){
+      // a folder with no project file yet opens as a new project of that name
+      if(p.main) api("/api/open_project", {path: p.main});
+      else api("/api/open", {page:"studio", query:"new="+encodeURIComponent(p.name)});
+    }
     else api("/api/reveal", {path: p.name});
   });
 }

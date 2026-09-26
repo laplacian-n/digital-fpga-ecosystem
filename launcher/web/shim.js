@@ -111,5 +111,25 @@
     });
   }
 
+  // ?new=<name>  -> a new project with that name (Home's "สร้าง", or an empty project folder's
+  // "เปิด"), saved once right away so its file sits in the workspace folder of the same name
+  var fresh = new URLSearchParams(location.search).get("new");
+  if (fresh) {
+    window.addEventListener("load", function(){
+      setTimeout(function(){
+        try {
+          if (typeof window.addProject !== "function") throw new Error("editor not ready");
+          // already in the editor (restored from last time)? use it, don't make "lab6_2"
+          var st = window.state, p = null;
+          if (st && st.projects) for (var k in st.projects) if (st.projects[k].name === fresh) p = st.projects[k];
+          if (p) window.switchProject(p.id); else p = window.addProject(fresh);
+          var pn = document.getElementById("projectName"); if (pn) pn.value = p.name;
+          if (typeof window.saveProjectToFile === "function") window.saveProjectToFile();
+          note("สร้างโปรเจกต์ " + p.name + " แล้ว — เริ่มวาดได้เลย (บันทึกลงโฟลเดอร์ " + p.name + ")", "ok");
+        } catch (e) { note("สร้างโปรเจกต์ไม่ได้: " + e.message, "err"); }
+      }, 50);
+    });
+  }
+
   document.title = document.title + " — FPGA Ecosystem";
 })();
