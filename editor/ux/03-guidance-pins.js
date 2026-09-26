@@ -39,7 +39,7 @@ function sheetPorts(sch){
   simDefaultPinmap=function(tt){
     const pm=_def.apply(this, arguments), own=(activeSch()||{}).pinmap||{};
     tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.indexOf("sw:")===0) pm.inMap[n]=+t.slice(3); });
-    tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
+    tt.outputs.forEach(n=>{ const t=pmGet(own,n)||autoSpecialTarget(n,"out"); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||/^an:[0-3]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
     return pm;
   };
   const _pick=renderPinPicker;

@@ -12217,6 +12217,26 @@ function simDetectSeg(outs){ const n=outs.map(x=>x.toLowerCase()); const ord=['a
   const m=ord.map(s=>{ for(const nm of [s,'seg_'+s,'seg'+s,'s'+s,'seg_'+s.toUpperCase()]){ const i=n.indexOf(nm); if(i>=0) return i; } return null; });
   // require at least 4 of the 7 to look like a real 7-seg (avoids false hits on "s0","a" etc.)
   return m.filter(x=>x!=null).length>=4 ? m : null; }
+/* Which of the 4 digits (DOM order, 0 = leftmost) show the segments. The board picks a digit
+   with an:N — 0 is the RIGHTMOST, active-low (the hex7 lab ties an0 to GND to light it). The
+   sim used to paint every pattern on the leftmost digit, the mirror image of the real board.
+   No digit select on the sheet → the rightmost digit, as with an0 tied low. */
+function simSegDigits(names, vals){
+  const own=(activeSch()||{}).pinmap||{}, ans=[];
+  names.forEach((n,k)=>{
+    const t=(SIM_PINMAP&&SIM_PINMAP.outMap&&SIM_PINMAP.outMap[n])
+          || (typeof pmGet==="function" ? pmGet(own,n) : own[n])
+          || (typeof autoSpecialTarget==="function" ? autoSpecialTarget(n,"out") : null);
+    if(t && /^an:[0-3]$/.test(t)) ans.push({d:3-(+t.slice(3)), on:!vals[k]});
+  });
+  if(!ans.length) return [3];
+  return ans.filter(a=>a.on).map(a=>a.d);
+}
+function simPaintSeg(on){   // on: segment index 0..6 → lit?, painted on the selected digits
+  document.querySelectorAll('#simPcb .seg').forEach(el=>{ el.style.background='#d5d5d0'; el.style.boxShadow='none'; });
+  (on.digits||[]).forEach(d=>{ for(let s=0;s<7;s++){ if(!on[s]) continue;
+    const el=document.querySelector('#simPcb .seg[data-seg="'+d+'-'+s+'"]'); if(el){ el.style.background='#000'; el.style.boxShadow='0 0 5px 1px rgba(0,0,0,.6)'; } } });
+}
 function wireSimBoard(j){
   const msg=$("#simBoardMsg"); if(msg) msg.innerHTML="";
   document.querySelectorAll('#simPcb .swName').forEach(e=>{ e.textContent='sw['+e.dataset.swn+']'; e.parentElement.classList.remove('mapped'); });
@@ -12254,13 +12274,14 @@ function wireSimBoard(j){
     const key=tt.inputs.map(n=>SIM_SW[SIM_PINMAP.inMap[n]]||0);
     const out=lookup.get(key.join(''))||tt.outputs.map(()=>0);
     document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ d.style.background='#fff'; d.style.boxShadow='none'; });
-    for(let s=0;s<7;s++){ const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background='#d5d5d0'; el.style.boxShadow='none'; } }
+    const segOn={digits:simSegDigits(tt.outputs, out)};
     const bz=$("#simBuzzer"); if(bz){ bz.style.background='#fff'; bz.style.boxShadow='none'; }
     tt.outputs.forEach((n,k)=>{ if(!out[k]) return; const t=SIM_PINMAP.outMap[n]||'';
       if(t.slice(0,4)==='led:'){ const d=document.querySelector('#simPcb .ledDot[data-led="'+t.slice(4)+'"]'); if(d){ d.style.background='#222'; d.style.boxShadow='0 0 8px 3px rgba(0,0,0,.35)'; } }
-      else if(t.slice(0,4)==='seg:'){ const s=SEGL.indexOf(t.slice(4)); const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background='#000'; el.style.boxShadow='0 0 5px 1px rgba(0,0,0,.6)'; } }
+      else if(t.slice(0,4)==='seg:'){ const s=SEGL.indexOf(t.slice(4)); if(s>=0) segOn[s]=1; }
       else if(t==='buzzer' && bz){ bz.style.background='#ffe08a'; bz.style.boxShadow='0 0 10px 3px rgba(245,180,40,.6)'; }
     });
+    simPaintSeg(segOn);
     $("#simValbar").innerHTML='<b style="color:var(--ok)">IN</b> '+tt.inputs.map(n=>n+'='+(SIM_SW[SIM_PINMAP.inMap[n]]||0)).join(' ')+' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+tt.outputs.map((n,i)=>n+'='+out[i]).join(' ');
     document.querySelectorAll('#simBoardTable tr').forEach(r=>r.classList.remove('cur'));
     const cur=document.querySelector('#simBoardTable tr[data-key="'+key.join('')+'"]'); if(cur){ cur.classList.add('cur'); cur.scrollIntoView({block:"nearest"}); }
@@ -12275,7 +12296,8 @@ function wireSimBoard(j){
 let SIM_PINMAP=null, SIM_REDRAW=null;
 function simSwLabel(i){ return 'SW '+(SIM_SW_PINS[15-i]||'?'); }
 function simPinLabel(t){ t=t||''; if(t.slice(0,4)==='led:') return 'LED '+(SIM_LED_PINS[15-(+t.slice(4))]||'?');
-  if(t.slice(0,4)==='seg:') return '7SEG '+t.slice(4); if(t==='buzzer') return 'BUZZER B14'; return '—'; }
+  if(t.slice(0,4)==='seg:') return '7SEG '+t.slice(4); if(t.slice(0,3)==='an:') return 'หลัก '+t.slice(3)+(+t.slice(3)===0?' (ขวาสุด)':'');
+  if(t==='buzzer') return 'BUZZER B14'; return '—'; }
 function simDefaultPinmap(tt){
   const seg=simDetectSeg(tt.outputs), segOf={};
   if(seg) ['a','b','c','d','e','f','g'].forEach((L,s)=>{ if(seg[s]!=null) segOf[seg[s]]=L; });
@@ -12390,7 +12412,7 @@ function seqShow(i){
   SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+SIM_SEQ.swOf[k]+'"]'); if(u){ const th=u.querySelector('.swThumb'); th.style.top=ins[k]?'1px':'12px'; th.style.background=ins[k]?'#222':'#aaa'; }});
   const ledOn={}; SIM_SEQ.ledOf.forEach((l,k)=>{ if(l!=null && out[k]) ledOn[l]=1; });
   document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ const on=ledOn[+d.dataset.led]; d.style.background=on?'#222':'#fff'; d.style.boxShadow=on?'0 0 8px 3px rgba(0,0,0,.35)':'none'; });
-  if(segMap){ for(let s=0;s<7;s++){ const on=segMap[s]!=null?out[segMap[s]]:0; const el=document.querySelector('#simPcb .seg[data-seg="0-'+s+'"]'); if(el){ el.style.background=on?'#000':'#d5d5d0'; el.style.boxShadow=on?'0 0 5px 1px rgba(0,0,0,.6)':'none'; } } }
+  if(segMap){ const on={digits:simSegDigits(SIM_SEQ.outputs, out)}; for(let s=0;s<7;s++) on[s]=segMap[s]!=null?out[segMap[s]]:0; simPaintSeg(on); }
   $("#simValbar").innerHTML='<b style="color:var(--accent)">clock '+r[0]+'</b>'
     +(SIM_SEQ.inputs.length?(' &nbsp; <b style="color:var(--ok)">IN</b> '+SIM_SEQ.inputs.map((nm,i)=>esc(nm)+'='+ins[i]).join(' ')):'')
     +' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
@@ -13431,7 +13453,7 @@ function sheetPorts(sch){
   simDefaultPinmap=function(tt){
     const pm=_def.apply(this, arguments), own=(activeSch()||{}).pinmap||{};
     tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.indexOf("sw:")===0) pm.inMap[n]=+t.slice(3); });
-    tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
+    tt.outputs.forEach(n=>{ const t=pmGet(own,n)||autoSpecialTarget(n,"out"); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||/^an:[0-3]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
     return pm;
   };
   const _pick=renderPinPicker;
@@ -15130,8 +15152,16 @@ function mcpShowChange(pre){
     }
   }
   // glow on what changed, for a moment
+  // (kept in MCPB.flash so a re-render inside that moment — which rebuilds every node — keeps it)
+  MCPB.flash={ids:new Set(cs.map(c=>c.id)), until:Date.now()+1800};
   requestAnimationFrame(()=>{ cs.forEach(c=>{ const el=document.querySelector('.node[data-cid="'+c.id+'"]'); if(el){ el.classList.remove("mcp-flash"); void el.getBoundingClientRect(); el.classList.add("mcp-flash"); } });
-    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")), 1800); });
+    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>{ MCPB.flash=null; document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")); }, 1800); });
+}
+{
+  const _render=render;
+  render=function(){ const r=_render.apply(this, arguments);
+    const f=MCPB.flash; if(f && Date.now()<f.until) f.ids.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"]'); if(el) el.classList.add("mcp-flash"); });
+    return r; };
 }
 
 /* ---------- transport: long-poll the launcher ---------- */

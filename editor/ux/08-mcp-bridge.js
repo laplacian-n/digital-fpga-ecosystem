@@ -637,8 +637,16 @@ function mcpShowChange(pre){
     }
   }
   // glow on what changed, for a moment
+  // (kept in MCPB.flash so a re-render inside that moment — which rebuilds every node — keeps it)
+  MCPB.flash={ids:new Set(cs.map(c=>c.id)), until:Date.now()+1800};
   requestAnimationFrame(()=>{ cs.forEach(c=>{ const el=document.querySelector('.node[data-cid="'+c.id+'"]'); if(el){ el.classList.remove("mcp-flash"); void el.getBoundingClientRect(); el.classList.add("mcp-flash"); } });
-    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")), 1800); });
+    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>{ MCPB.flash=null; document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")); }, 1800); });
+}
+{
+  const _render=render;
+  render=function(){ const r=_render.apply(this, arguments);
+    const f=MCPB.flash; if(f && Date.now()<f.until) f.ids.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"]'); if(el) el.classList.add("mcp-flash"); });
+    return r; };
 }
 
 /* ---------- transport: long-poll the launcher ---------- */

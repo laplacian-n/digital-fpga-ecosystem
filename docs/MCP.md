@@ -111,3 +111,8 @@ generators, sequential simulation, pins, XDC, events, export, and the security c
 ## Older server
 `schematic_mcp.py` (repo root) is the previous offline server: it writes a JSON file that you then import with
 the Sync button. It still works, but the server described here replaces it.
+
+Both old servers (`schematic_mcp.py`, `topdown/topdown_mcp.py`) only know files they saved themselves. A student
+who rearranged a circuit and asked Claude to check it got an answer from the stale file. So while the app is
+running, their `list_designs` / `read_design` answer with the LIVE sheet (read through the launcher relay by
+`legacy_live.py`, which never starts the app) and say the server is retired. Home also offers to remove them.
