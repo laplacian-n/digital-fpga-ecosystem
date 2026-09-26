@@ -1,0 +1,12 @@
+{
+  "name": "digital-fpga-ecosystem",
+  "private": true,
+  "description": "Browser tests for Schematic Studio (editor) and the launcher",
+  "scripts": {
+    "build": "python3 editor/build.py",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
