@@ -1,0 +1,44 @@
+# Digital FPGA Ecosystem — notes for working on this repo
+
+Teaching toolchain for the EDGE Spartan-7 (XC7S15) board: draw gates → simulate → pick pins → build.
+UI text is Thai; code and comments are English.
+
+## Layout
+| Path | What |
+|---|---|
+| `schematic&bus2vhdl.html` | **Schematic Studio**, the gate editor. One self-contained HTML file (opens from disk and from the launcher). ~12k lines of editor + an inlined UX layer at the end. |
+| `editor/ux/*.js`, `editor/ux/ux.css` | **Source of the UX layer** (save chip/timeline, browser sim, truth-table tool, generators, welcome/templates, stepper, pin page, problem markers, Ctrl+K, …). Inlined into the HTML by `editor/build.py`. |
+| `editor/build.py` | Inlines `editor/ux/` between `<!-- UX-LAYER:BEGIN/END -->`. `--check` fails if the HTML is stale. |
+| `topdown/` | Top-Down block-diagram editor (embedded in the gate editor via iframe). |
+| `launcher/` | `app.py` = the desktop app: one local server (127.0.0.1:8770) serving the editors + `ai/chat_server.py` in-process, settings, project workspace, update check. `web/home.html` (Home/settings), `web/shim.js` (injected into editor pages). Windows build: `build_windows.ps1` + `installer.iss`. |
+| `ai/` | Python backend (stdlib only): intent validate, netlist sim, VHDL/XDC codegen, cosim, Vivado synth, `chat_server.py`. |
+| `hub/` | Canonical IR / hashes / SQLite store. |
+| `FPGA_Builder_Package/source/fpga_builder.py` | Tk app: VHDL → .bit → board. The launcher runs it as `FPGAEcosystem.exe --fpga-builder`. |
+| `tests/` | Playwright tests: `tests/editor/*.spec.js` (editor from disk), `tests/launcher.spec.js` (spawns the launcher). |
+
+## Workflow
+```
+python3 editor/build.py        # after editing editor/ux/* — never edit the inlined copy in the HTML
+npm install && npm test        # Playwright (chromium)
+python3 launcher/app.py        # run the app locally (--no-open to only serve)
+```
+CI (`.github/workflows/ci.yml`) runs `build.py --check`, compiles the Python and runs the Playwright suite on every push.
+
+## How the UX layer hooks in
+The editor defines everything as top-level functions/consts in one classic `<script>`. The UX layer is a second
+`<script>` that **wraps globals by reassignment** (`snapshot = function(){ … _snapshot.apply(this, arguments) … }`),
+so the editor's own internal calls go through the wrapper. Rules:
+- Don't declare a top-level name the editor already uses (a `const` clash kills the whole UX script — this happened with `STEP`).
+- Files load in name order (`01-…` → `07-…`); a later file may wrap or reassign what an earlier one defined.
+- Sheets carry optional extras that serialize with the project: `sch.pinmap` (port/bit → board target, keyed by the
+  VHDL port name `sanId(name)` / `name[i]`) and `sch.portOrder` (declared IN/OUT order for generated sheets).
+
+## Releasing
+1. Bump `VERSION` in `launcher/app.py`, commit.
+2. `git tag vX.Y.Z && git push origin vX.Y.Z` → `.github/workflows/build-windows.yml` builds Setup.exe + portable zip
+   and attaches them to a GitHub Release (it fails if the tag and `VERSION` disagree).
+3. Installed copies see the new release on their next start (launcher update check) and can update in place;
+   projects (Documents) and settings (%APPDATA%) are untouched.
+
+## Not in the repo
+Vivado/ISE, `*.lic`, LLM models (`ai/models`, `ai/llama`), GHDL, RAG index, course material — see README.
