@@ -12739,6 +12739,10 @@ init();
 .brd-log{flex:1;min-height:0;margin:0;overflow:auto;background:#0d1117;color:#c9d1d9;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
 #brdTools .ok{color:var(--ok)} #brdTools .bad{color:var(--warn)}
 @media (max-width:900px){.brd-body{grid-template-columns:1fr;overflow:auto}.brd-log{min-height:240px}}
+
+/* parts Claude just changed glow for a moment (08-mcp-bridge.js mcpShowChange) */
+@keyframes mcpFlash{0%{filter:drop-shadow(0 0 0 transparent)}25%{filter:drop-shadow(0 0 7px var(--accent)) drop-shadow(0 0 2px var(--accent))}100%{filter:drop-shadow(0 0 0 transparent)}}
+.node.mcp-flash{animation:mcpFlash 1.6s ease-out}
 </style>
 <script>
 "use strict";
@@ -14813,6 +14817,48 @@ function mcpEvent(kind, data){ MCPB.events.push(Object.assign({seq:++MCPB.seq, t
     return r; };
 }
 
+/* ---------- you see what Claude does, as it does it ----------
+   Every call already redraws the page; what hid it was WHERE: parts landed off-screen, or on
+   the canvas under the sim / board / Top-Down page. So around each call: note the sheet, and
+   afterwards bring the canvas forward, bring the change into view (only when it is not in view
+   already, so the drawing does not jump on every call) and make the changed parts glow. */
+function mcpSheetState(){
+  const sch=activeSch(); if(!sch) return null;
+  const m=new Map(); sch.components.forEach(c=>{ if(c.type!=="JUNCTION") m.set(c.id, c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{})); });
+  return {id:sch.id, m, w:new Set(sch.wires.map(w=>w.id))};
+}
+function mcpShowChange(pre){
+  const sch=activeSch(); if(!sch) return;
+  const changed=new Set();
+  sch.components.forEach(c=>{ if(c.type==="JUNCTION") return;
+    const k=c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{});
+    if(!pre || pre.id!==sch.id || pre.m.get(c.id)!==k) changed.add(c.id); });
+  sch.wires.forEach(w=>{ if(!pre || pre.id!==sch.id || !pre.w.has(w.id)){ changed.add(w.from.cid); changed.add(w.to.cid); } });
+  const newSheet = !pre || pre.id!==sch.id;
+  if(!changed.size && !newSheet) return;                  // a read-only call: leave the view alone
+  // the canvas has to be the thing on screen
+  try{ if($("#simPage.show")) hideSimPage(); }catch(_){}
+  try{ if($("#boardPage.show")) brdShow(false); }catch(_){}
+  try{ const tv=$("#topdownView"); if(tv && tv.style.display!=="none" && tv.style.display!=="") closeTopdown(); }catch(_){}
+  // in view? (world rectangle of the canvas vs the changed parts)
+  const cs=sch.components.filter(c=>changed.has(c.id));
+  if(cs.length){
+    const r=canvas.getBoundingClientRect();
+    const outOf=()=>{ const v=state.view, vx1=-v.x/v.k, vy1=-v.y/v.k, vx2=(r.width-v.x)/v.k, vy2=(r.height-v.y)/v.k;
+      return cs.some(c=>{ const z=getSize(c); return c.x<vx1+10||c.y<vy1+10||c.x+z.w>vx2-10||c.y+z.h>vy2-10; }); };
+    if(outOf()||newSheet){ try{ zoomFit(); }catch(_){} }
+    // a sheet too big to fit at the smallest zoom: centre the view on what changed instead
+    if(outOf() && r.width>0){
+      const x1=Math.min(...cs.map(c=>c.x)), y1=Math.min(...cs.map(c=>c.y)),
+            x2=Math.max(...cs.map(c=>c.x+getSize(c).w)), y2=Math.max(...cs.map(c=>c.y+getSize(c).h));
+      const v=state.view; v.x=r.width/2-(x1+x2)/2*v.k; v.y=r.height/2-(y1+y2)/2*v.k; render();
+    }
+  }
+  // glow on what changed, for a moment
+  requestAnimationFrame(()=>{ cs.forEach(c=>{ const el=document.querySelector('.node[data-cid="'+c.id+'"]'); if(el){ el.classList.remove("mcp-flash"); void el.getBoundingClientRect(); el.classList.add("mcp-flash"); } });
+    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")), 1800); });
+}
+
 /* ---------- transport: long-poll the launcher ---------- */
 async function mcpLoop(){
   let fails=0;
@@ -14828,10 +14874,12 @@ async function mcpLoop(){
     if(!job||!job.id) continue;
     let reply;
     MCPB.busy=true; MCPB.calls++;
+    const pre=mcpSheetState();
     try{
       const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);
       const result=await fn(job.args||{});
       reply={id:job.id, ok:true, result};
+      try{ mcpShowChange(pre); }catch(e){ console.warn("mcp view", e); }
     }catch(e){
       reply={id:job.id, ok:false, error:String(e&&e.message||e), hint:e&&e.hint||undefined};
       if(!(e instanceof McpError)) console.warn("mcp op failed", job.op, e);

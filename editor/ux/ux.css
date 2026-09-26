@@ -168,3 +168,7 @@
 .brd-log{flex:1;min-height:0;margin:0;overflow:auto;background:#0d1117;color:#c9d1d9;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
 #brdTools .ok{color:var(--ok)} #brdTools .bad{color:var(--warn)}
 @media (max-width:900px){.brd-body{grid-template-columns:1fr;overflow:auto}.brd-log{min-height:240px}}
+
+/* parts Claude just changed glow for a moment (08-mcp-bridge.js mcpShowChange) */
+@keyframes mcpFlash{0%{filter:drop-shadow(0 0 0 transparent)}25%{filter:drop-shadow(0 0 7px var(--accent)) drop-shadow(0 0 2px var(--accent))}100%{filter:drop-shadow(0 0 0 transparent)}}
+.node.mcp-flash{animation:mcpFlash 1.6s ease-out}

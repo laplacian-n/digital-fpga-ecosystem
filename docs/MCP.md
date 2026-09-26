@@ -35,6 +35,12 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 - **Security:** the launcher listens only on 127.0.0.1. MCP calls need a random token that the launcher writes
   to `runtime.json` in your settings folder, which only you can read. The editor-side endpoints refuse requests
   coming from other websites.
+- **You see it as it happens:** after every call that changes the drawing, the editor:
+  - brings the canvas forward, even if you were on the sim, board or Top-Down page;
+  - brings the change into view, zooming or panning only when it is off-screen, so the view doesn't jump on every call;
+  - makes the changed parts glow for a moment.
+
+  Read-only calls leave your view alone.
 - **Undo:** every tool call is one undo step. Before a burst of changes, a timeline checkpoint
   ("ก่อน Claude แก้") is saved.
 

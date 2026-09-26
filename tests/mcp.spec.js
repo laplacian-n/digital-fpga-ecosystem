@@ -138,3 +138,23 @@ test("the relay refuses calls without the token and cross-origin pages", async (
   expect((await request.post(BASE + "/api/mcp/result", { data: {}, headers: { Origin: "https://evil.example" } })).status()).toBe(403);
   expect((await request.get(BASE + "/api/mcp/poll?client=x", { headers: { Origin: "https://evil.example" } })).status()).toBe(403);
 });
+
+test("you see Claude's change straight away: canvas forward, in view, highlighted", async () => {
+  await mcp.tool("new_sheet", { name: "watch" });
+  await mcp.tool("add_component", { type: "IN", name: "w_in" });
+  await page.evaluate(() => showSimPage("signals"));                    // the user is looking at the sim page
+  await expect(page.locator("#simPage")).toHaveClass(/show/);
+  // a part placed far off-screen
+  const r = await mcp.tool("add_component", { type: "NOT", name: "far", x: 4400, y: 3300 });
+  expect(r.error).toBe(false);
+  await expect(page.locator("#simPage")).not.toHaveClass(/show/);       // back on the canvas
+  const inView = await page.evaluate(() => { const s = activeSch(), c = s.components.find(x => x.label === "far");
+    const r = canvas.getBoundingClientRect(), v = state.view, z = getSize(c);
+    return c.x >= -v.x / v.k && c.y >= -v.y / v.k && c.x + z.w <= (r.width - v.x) / v.k && c.y + z.h <= (r.height - v.y) / v.k; });
+  expect(inView).toBe(true);
+  await expect(page.locator(".node.mcp-flash")).toHaveCount(1);          // the new part glows
+  // a read-only call does not move the view
+  const before = await page.evaluate(() => JSON.stringify(state.view));
+  await mcp.tool("get_sheet");
+  expect(await page.evaluate(() => JSON.stringify(state.view))).toBe(before);
+});
