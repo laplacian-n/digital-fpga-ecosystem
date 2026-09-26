@@ -192,3 +192,6 @@
 .wt-rats-bar .wt-go{background:var(--accent,#5b6cff);color:#fff;border-color:transparent;font-weight:600}
 .dbg-fix{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
 .dbg-fix button{border:1px solid var(--line,#ccd);background:var(--bg-0);border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;font-size:12px}
+/* MCP drawing-in: hidden until its turn, then fades in */
+#canvas .mcp-hide{opacity:0 !important;pointer-events:none}
+#canvas .node,#canvas .wire-group{transition:opacity .18s ease-out}

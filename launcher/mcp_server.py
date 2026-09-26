@@ -60,6 +60,11 @@ or its first free input (as a wire sink). Truth tables list rows with the FIRST 
 Sub-circuits are other sheets placed as "block:<sheet name>". Use `get_events` to see what the user changed.
 Prefer small verified steps; call `notify_user` to tell the user something inside the editor.
 
+THE USER'S OWN SHEETS: `get_sheet` is always the live, current drawing — never answer from a saved file. When a
+sheet the user placed / arranged has a wrong connection, fix it IN PLACE with `disconnect` + `connect` (or
+`update_component`) so their placement and wiring stay; never rebuild it (`build_circuit` into the same name,
+`auto_layout`) or replace it from a file unless they ask. The user watches each change appear.
+
 LAB / TOP-DOWN WORK — always in this order, never skip or reorder a step:
   A. Schematic: build the real circuit in Schematic Studio (gate level; one sheet per sub-circuit, placed
      on its parent as "block:<sheet>"; set_top_sheet on the top one).

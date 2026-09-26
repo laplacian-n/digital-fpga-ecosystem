@@ -240,4 +240,21 @@ test("the retired offline servers read the LIVE sheet, not their stale files", a
   expect(sheet).toContain("g_live");
   expect(sheets).toContain("live_one");
   expect(fs.readFileSync(path.join(ROOT, "schematic_mcp.py"), "utf-8")).toContain("legacy_live.live_sheet(name)");
+  // and they refuse to save a file that a Sync would paste over the user's arranged sheet
+  const run = execFileSync(PY, ["-c", "import legacy_live; print(legacy_live.running())"], { cwd: ROOT, env, encoding: "utf-8" });
+  expect(run.trim()).toBe("True");
+  for (const f of ["schematic_mcp.py", path.join("topdown", "topdown_mcp.py")])
+    expect(fs.readFileSync(path.join(ROOT, f), "utf-8")).toContain("return legacy_live.SAVE_REFUSED");
+});
+
+test("a big change draws in piece by piece (ค่อยๆโผล่มา), and ends fully shown", async () => {
+  await mcp.tool("build_circuit", { name: "reveal", truth_table: { inputs: ["a", "b", "c"], outputs: ["y", "z"], columns: { y: "01101001", z: "00010111" } } });
+  const seen = await page.evaluate(() => new Promise(res => { let max = 0; const t0 = Date.now();
+    const f = () => { const n = document.querySelectorAll("#canvas .mcp-hide").length; max = Math.max(max, n);
+      if (Date.now() - t0 > 4000 || (max && !n)) res({ max, left: n }); else requestAnimationFrame(f); }; f(); }));
+  expect(seen.max).toBeGreaterThan(2);       // things were still hidden, waiting their turn
+  expect(seen.left).toBe(0);                 // and everything ended up on screen
+  // the sheet itself was complete from the start: reading it does not wait for the animation
+  const g = await mcp.tool("get_sheet", { sheet: "reveal" });
+  expect(g.error).toBe(false);
 });
