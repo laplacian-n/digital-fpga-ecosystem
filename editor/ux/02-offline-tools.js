@@ -242,9 +242,6 @@ function uxDrawGenerated(intent, title){
 }
 const GENERATORS = [
   {id:"tt", icon:"▦", name:"ตารางความจริง / K-map", desc:"กรอกตาราง → ลดรูป → ได้วงจรเกต", run:()=>openTruthTableTool()},
-  {id:"seg7", icon:"8", name:"ถอดรหัส BCD → 7-seg", desc:"4 บิต → a–g เลือก active-low ได้", run:async()=>{
-    const v=await uxAsk("ถอดรหัส BCD → 7-segment",[{label:"ขาแบบ active-low (0 = ติด)",value:"ไม่",hint:"พิมพ์ “ใช่” ถ้าบอร์ดเป็น common anode / ต่อขาให้ติดเมื่อเป็น 0"}],"เปิดตาราง");
-    if(v) openTruthTableTool(seg7Preset(/ใช่|yes|y|1|low/i.test(v[0]))); }},
   {id:"cnt", icon:"↻", name:"ตัวนับ N บิต", desc:"ripple counter นับขึ้น 0 … 2ᴺ−1", run:async()=>{
     const v=await uxAsk("ตัวนับ N บิต (ripple)",[{label:"จำนวนบิต",type:"number",value:4,min:1,max:16}]); if(!v) return;
     const b=seqBuildIntent("counter "+Math.max(1,Math.min(16,v[0]|0))+" bit"); if(b) uxDrawGenerated(b.intent, b.title); }},
@@ -268,20 +265,15 @@ const GENERATORS = [
     const b=seqBuildIntent("register "+(v[0]|0)+" bit"); if(b) uxDrawGenerated(b.intent, b.title); }},
 ];
 function runGenerator(id){ const g=GENERATORS.find(x=>x.id===id); if(g) g.run(); }
-{
-  const _renderPalette=renderPalette;
-  renderPalette=function(){
-    const r=_renderPalette.apply(this, arguments);
-    const pal=$("#palettePane .palette"); if(!pal || pal.querySelector(".gen-group")) return r;
-    const g=document.createElement("div"); g.className="pal-group gen-group";
-    g.innerHTML='<h4>ตัวสร้างวงจร <span class="muted" style="font-weight:400">— ไม่ต้องใช้ AI</span></h4>'+GENERATORS.map(x=>
-      `<button class="gen-btn" data-gen="${x.id}"><span class="gi">${x.icon}</span><span class="gt"><b>${x.name}</b><span>${x.desc}</span></span></button>`).join("");
-    pal.insertBefore(g, pal.firstChild);
-    g.querySelectorAll("[data-gen]").forEach(b=>b.onclick=()=>runGenerator(b.dataset.gen));
-    return r;
-  };
-  try{ renderPalette(); }catch(_){}
-}
+/* generators live in the Tools menu (and Ctrl+K), after the editor's own tools */
+(function(){
+  const dd=document.querySelector('#menu .mi > button[data-menu="tools"]'); const box=dd&&dd.parentElement.querySelector(".dd");
+  if(!box || box.querySelector(".gen-mi")) return;
+  const h='<hr><div class="dd-head">ตัวสร้างวงจร <span>— ไม่ต้องใช้ AI</span></div>'+GENERATORS.map(x=>
+    `<button class="gen-mi" data-gen="${x.id}" title="${escA(x.desc)}"><span class="gi">${x.icon}</span>${x.name}…</button>`).join("");
+  box.insertAdjacentHTML("beforeend", h);
+  box.querySelectorAll("[data-gen]").forEach(b=>b.addEventListener("click",()=>runGenerator(b.dataset.gen)));
+})();
 
 /* the open sheet's ports, top to bottom, as the truth-table tool wants them */
 function uxSheetPortsForTT(){
