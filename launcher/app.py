@@ -595,6 +595,83 @@ def install_claude_desktop() -> dict:
     f.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
     return {"ok": True, "path": str(f)}
 
+def mcp_app(action: str, args: dict) -> dict:
+    """What Claude can ask the app itself (no editor window needed): who/what/which version
+    this is, whether an update is out, whether the board toolchain is ready; and open Home."""
+    if action in ("about", "check_update"):
+        up = update_check(force=(action == "check_update"))
+        upd = {"current": VERSION, "checked": bool(up.get("ok"))}
+        if up.get("ok"):
+            upd.update(available=bool(up.get("available")), latest=up.get("latest"),
+                       notes=(up.get("notes") or "")[:1500], page=up.get("url"),
+                       how="the user clicks 'อัปเดตเลย' on Home (open_home) — projects and settings are kept")
+        else:
+            upd["error"] = up.get("error") or ("update check is off in Settings" if up.get("disabled") else "")
+        if action == "check_update":
+            return {"ok": True, "update": upd}
+        sc = setup_check()
+        drv = sc["driver"].get("state")
+        return {"ok": True,
+                "app": {"name": APP_NAME, "version": VERSION, "installed": FROZEN,
+                        "install_dir": str(INSTALL_DIR), "platform": sys.platform},
+                "update": upd,
+                "workspace": {"folder": CFG["workspace"], "projects": str(projects_dir()),
+                              "count": len(list_projects())},
+                "editor_open": RELAY.live_client() is not None,
+                "board": {"name": board.BOARD["label"],
+                          "vivado": sc["vivado"]["path"] or None,
+                          "vivado_ok": bool(sc["vivado"]["path"]) and not sc["vivado"]["spaces"],
+                          "openfpgaloader": sc["openfpgaloader"]["path"] or None,
+                          "flash_bridge": bool(sc["openfpgaloader"].get("bridge")),
+                          "usb_driver": drv, "build_enabled": sc["fpga_enabled"]},
+                "ai_model": {"mode": sc["llm"]["mode"], "running": sc["llm"]["up"]},
+                "views": ["Schematic Studio (gate editor)", "simulation page", "ลงบอร์ด (build .bit + program)",
+                          "Top-Down (block diagrams for the lab report)", "Home (projects, settings, updates)"]}
+    if action == "open_home":
+        tab = str(args.get("tab") or "home")
+        if tab not in ("home", "setup", "settings"):
+            return {"ok": False, "error": f"unknown tab '{tab}'", "hint": "home | setup | settings"}
+        open_window("home", "tab=" + tab)
+        return {"ok": True, "opened": tab}
+    return {"ok": False, "error": f"unknown action '{action}'"}
+
+
+_LEGACY_MCP = ("topdown_mcp", "schematic_mcp", "top-down-schematic")
+
+
+def legacy_mcp() -> list:
+    """Older offline servers still set up in Claude Desktop (topdown_mcp.py / schematic_mcp.py).
+    Claude reaches for them and writes a Top-Down JSON to import by hand, skipping the
+    schematic → simulate → approve order the live server enforces."""
+    f = claude_desktop_config_path()
+    try:
+        servers = json.loads(f.read_text("utf-8") or "{}").get("mcpServers") or {}
+    except Exception:
+        return []
+    out = []
+    for name, spec in servers.items():
+        blob = (name + " " + json.dumps(spec)).lower()
+        if name != "fpga-ecosystem" and any(k in blob for k in _LEGACY_MCP):
+            out.append(name)
+    return out
+
+
+def remove_legacy_mcp() -> dict:
+    f = claude_desktop_config_path()
+    names = legacy_mcp()
+    if not names:
+        return {"ok": True, "removed": []}
+    try:
+        cfg = json.loads(f.read_text("utf-8") or "{}")
+    except Exception:
+        return {"ok": False, "error": f"อ่าน {f} ไม่ได้"}
+    shutil.copyfile(f, f.with_suffix(".json.bak"))
+    for n in names:
+        cfg.get("mcpServers", {}).pop(n, None)
+    f.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+    return {"ok": True, "removed": names, "backup": str(f.with_suffix(".json.bak"))}
+
+
 # --------------------------------------------------------------------------
 # HTTP
 # --------------------------------------------------------------------------
@@ -731,8 +808,14 @@ def make_handler():
                     return self._out(401, {"ok": False, "error": "bad token"})
                 return self._out(200, {"ok": True, "editor_connected": RELAY.live_client() is not None,
                                        "version": VERSION})
+            if path == "/api/mcp/app":
+                if not self._mcp_authorized():
+                    return self._out(401, {"ok": False, "error": "bad token"})
+                return self._out(200, mcp_app((q.get("action") or ["about"])[0],
+                                              {k: v[0] for k, v in q.items() if k != "action"}))
             if path == "/api/mcp/setup":
-                return self._out(200, {"command": mcp_command(), "desktop_config": str(claude_desktop_config_path())})
+                return self._out(200, {"command": mcp_command(), "desktop_config": str(claude_desktop_config_path()),
+                                       "legacy": legacy_mcp()})
             if path == "/api/ping":
                 LAST_PING = time.time()
                 return self._out(200, {"ok": True})
@@ -748,7 +831,7 @@ def make_handler():
             if path == "/api/update/check":
                 return self._out(200, update_check(force=(q.get("force") or ["0"])[0] == "1"))
             if path == "/api/update/progress":
-                return self._out(200, INSTALLER.snapshot())
+                return self._out(200, dict(INSTALLER.snapshot(), log=updater.setup_log_path()))
             if path == "/api/llm/status":
                 server, model = detect_llama()
                 return self._out(200, dict(llm.status(CFG["features"]["llm_endpoint"], server, model),
@@ -784,6 +867,8 @@ def make_handler():
                 return self._out(200, {"ok": True})
             if path == "/api/mcp/install_desktop":
                 return self._out(200, install_claude_desktop())
+            if path == "/api/mcp/remove_legacy":
+                return self._out(200, remove_legacy_mcp())
             if path == "/api/files/save":
                 proj = safe_name((q.get("project") or [""])[0])
                 name = safe_name(Path((q.get("name") or ["file"])[0]).name, "file")
@@ -833,7 +918,11 @@ def make_handler():
                                                             inside(projects_dir(), proj)))
                 if path == "/api/board/program":
                     return self._out(200, board.start_program(proj, data.get("top") or proj,
-                                                              data.get("mode") or "sram", data.get("cable") or "ft2232"))
+                                                              data.get("mode") or "sram", data.get("cable") or "ft2232",
+                                                              inside(projects_dir(), proj)))
+                if path == "/api/board/bit":
+                    return self._out(200, board.bit_status(proj, data.get("top") or proj, data.get("vhdl") or "",
+                                                           data.get("xdc") or "", inside(projects_dir(), proj)))
                 if path == "/api/board/detect":
                     return self._out(200, board.start_detect(data.get("cable") or "ft2232"))
                 if path == "/api/board/stop":
@@ -985,7 +1074,13 @@ def main(argv=None):
     print(f"{APP_NAME} {VERSION} on {base_url()}  (backend: "
           f"{'ok' if BACKEND else 'OFF - ' + BACKEND_ERROR})")
     print(f"projects: {projects_dir()}")
-    if not no_open:
+    if "--after-update" in argv:
+        # the Home window that started the update reloads itself once we answer; open a
+        # window only if it doesn't come back (the user closed it), so there aren't two
+        t0 = LAST_PING
+        threading.Thread(target=lambda: (time.sleep(8), LAST_PING <= t0 and open_window("home")),
+                         daemon=True).start()
+    elif not no_open:
         open_window("home")
     try:
         HTTPD.serve_forever()

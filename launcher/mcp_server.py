@@ -23,6 +23,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -31,8 +32,15 @@ PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"]
 HERE = Path(__file__).resolve().parent
 
 INSTRUCTIONS = """\
-You are connected to Schematic Studio, a gate-level schematic editor for the EDGE Spartan-7 (XC7S15) FPGA board.
+You are connected to FPGA Ecosystem — the desktop app for a digital-logic lab on the EDGE Spartan-7 (XC7S15) FPGA
+board: Schematic Studio (gate-level schematic editor + simulator), a ลงบอร์ด page (Vivado builds the .bit,
+openFPGALoader loads it) and a Top-Down view (block diagrams for the lab report). Students use it in Thai.
 Every change you make is drawn live in the user's editor window and can be undone (Ctrl+Z / `undo`).
+
+Start with `about`: the app version, whether a newer version is out (tell the user, with what's new — they update
+from Home, `open_home`), which workspace/projects exist, and whether Vivado / openFPGALoader / the board's USB driver
+are ready (before promising a .bit or programming the board). New work: `new_project`, or open one with
+`list_projects` → `open_project`.
 
 Good workflow:
 1. `status` → see the project and sheets; `get_sheet` → parts, pins (with coordinates) and nets.
@@ -43,12 +51,25 @@ Good workflow:
 4. Look: `layout_report` (overlaps, wires through parts) and `screenshot`; tidy with `auto_layout`.
 5. Board: `board_pins` → `set_pins` or `auto_pins` → `get_pins` (conflicts / unassigned) → `get_xdc`.
 6. Deliver: `get_vhdl`, `export_files` (writes .vhd/.xdc into the project folder), `save_project`.
+7. On the board: `board_build` (Vivado makes the .bit, ~1-3 min) → `board_status` until done → `board_program`
+   (load into the FPGA; writing the Flash permanently is only ever done by the user on the ลงบอร์ด page).
 
 References: a component is its id ("c12"), an INPUT/OUTPUT name ("a", "sum") or a label ("U1");
 a pin is "<component>.<pin>" ("U1.i0", "ff0.q"). A bare component means its output (as a wire source)
 or its first free input (as a wire sink). Truth tables list rows with the FIRST input as the MSB.
 Sub-circuits are other sheets placed as "block:<sheet name>". Use `get_events` to see what the user changed.
-Prefer small verified steps; call `notify_user` to tell the user something inside the editor."""
+Prefer small verified steps; call `notify_user` to tell the user something inside the editor.
+
+LAB / TOP-DOWN WORK — always in this order, never skip or reorder a step:
+  A. Schematic: build the real circuit in Schematic Studio (gate level; one sheet per sub-circuit, placed
+     on its parent as "block:<sheet>"; set_top_sheet on the top one).
+  B. Simulate: check + simulate / verify_truth_table every sheet, fix what fails, and tell the user the results.
+  C. Approval: request_approval with a short summary (blocks, what the simulation showed), then call
+     approval_status until it is no longer "waiting". If the user asks for changes, make them, go back to B,
+     and ask again. Do not continue without "approved".
+  D. Top-Down: make_topdown — it draws the approved circuit's layers in the Top-Down view.
+Never write Top-Down JSON by hand or use another server's save_design / Sync: the Top-Down must come from the
+approved, simulated circuit (make_topdown refuses anything else)."""
 
 
 # --------------------------------------------------------------------------- tools
@@ -65,6 +86,14 @@ PIN = {"type": "string", "description": "Pin reference 'component.pin' (e.g. 'U1
 INPUTS = {"type": "object", "description": "INPUT name → 0/1.", "additionalProperties": {"type": "integer", "enum": [0, 1]}}
 
 TOOLS = [
+    # --- the app itself (answered by the app, no editor window needed)
+    T("about", "Which app and version this is, whether an update is available (version + what's new), the workspace "
+      "and number of projects, whether the editor window is open, and whether the board toolchain is ready "
+      "(Vivado, openFPGALoader, flash bridge, USB driver) and the local AI model. Call this first."),
+    T("check_update", "Ask GitHub now whether a newer FPGA Ecosystem is out (about uses a cached answer ≤12 h old)."),
+    T("open_home", "Open the app's Home window: 'home' (projects, update banner — the user clicks อัปเดตเลย), "
+      "'setup' (first-run checklist: Vivado / openFPGALoader / USB driver / AI model) or 'settings'.",
+      {"tab": {"type": "string", "enum": ["home", "setup", "settings"]}}),
     # --- looking at the design
     T("status", "Project, sheets (with part/wire counts), active and top sheet, unsaved changes. Start here."),
     T("list_component_types", "Every placeable component type with its default params and pin names."),
@@ -141,11 +170,25 @@ TOOLS = [
     T("auto_pins", "Fill pin assignments automatically (mode 'missing' keeps existing ones, 'all' redoes them).",
       {"sheet": SHEET, "mode": {"type": "string", "enum": ["missing", "all"]}}),
     T("get_xdc", "The Vivado constraints (.xdc) the sheet's pin map produces, and which ports are still unassigned.", {"sheet": SHEET}),
+    # --- the real board
+    T("board_build", "Build the .bit for the top sheet with Vivado (the ลงบอร์ด page opens so the user sees the log). "
+      "Every port needs a board pin first (get_pins / auto_pins). Returns at once — then call board_status.",
+      {}, timeout=40),
+    T("board_program", "Load the last .bit into the FPGA over USB (temporary, lost at power-off), or 'detect' to "
+      "check the board answers. Permanent Flash writing is left to the user (💾 on the ลงบอร์ด page).",
+      {"mode": {"type": "string", "enum": ["sram", "detect"]},
+       "cable": {"type": "string", "description": "openFPGALoader cable (default ft2232)"}}, timeout=40),
+    T("board_status", "Wait (≤`wait` s, max 40) for the running build / program job, then report state "
+      "(running / ok / error), the last log lines, a Thai explanation of an error, and whether a .bit exists and "
+      "matches the circuit.", {"wait": {"type": "integer", "minimum": 1, "maximum": 40}}, timeout=55),
     # --- output
     T("get_vhdl", "Generated VHDL: the whole bundle for the top sheet, or one entity.", {"entity": {"type": "string"}}),
     T("export_files", "Write files into the project's folder in the user's workspace: vhdl, xdc, project.",
       {"what": {"type": "array", "items": {"type": "string", "enum": ["vhdl", "xdc", "project"]}}, "sheet": SHEET}),
     T("save_project", "Save the project file (.schproj.json) into the workspace project folder."),
+    T("new_project", "Start a new, empty project in the editor (with one blank top sheet) and switch to it. The "
+      "previous project stays open in the editor's project list. Name it like the lab, e.g. 'lab6_counter'.",
+      {"name": {"type": "string"}}, ["name"]),
     T("list_projects", "Projects saved in the user's workspace folder (paths usable with open_project)."),
     T("open_project", "Open a saved project from the workspace (replaces what's on screen; a checkpoint is kept).",
       {"path": {"type": "string", "description": "e.g. 'lab4/lab4.schproj.json'"}}, ["path"]),
@@ -156,11 +199,22 @@ TOOLS = [
     T("list_checkpoints", "Restore points (automatic and named)."),
     T("restore_checkpoint", "Go back to a restore point (the current state is kept as a new one first).", {"id": {"type": "integer"}}, ["id"]),
     T("focus", "Select a component and centre the user's view on it.", {"sheet": SHEET, "ref": REF}, ["ref"]),
+    # --- lab workflow: approval, then Top-Down
+    T("request_approval", "Ask the user to approve the circuit before the Top-Down is made. Shows your summary in a "
+      "card in the editor with 'approve' / 'request changes'. Returns at once — then call approval_status.",
+      {"summary": {"type": "string", "description": "What you built (sheets/blocks) and what the simulation showed. Plain text; Thai is fine."}},
+      ["summary"]),
+    T("approval_status", "Wait (up to `wait` seconds, max 40) for the user's answer to request_approval: "
+      "'waiting' (call again), 'approved' (then make_topdown), 'changes' (with the user's comment), or 'none'.",
+      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}}, timeout=55),
+    T("make_topdown", "Draw the APPROVED circuit in the Top-Down view: the top sheet and every sheet it uses as a block, "
+      "as layers (1st Layer (top), 2nd Layer (…), …). Refuses unless the user approved exactly the circuit on screen.",
+      {"sheet": {"type": "string", "description": "Top sheet to start from. Default: the project's top sheet."}}),
     T("notify_user", "Show a short message to the user inside the editor.",
       {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
 ]
 TOOL_MAP = {t["name"]: t for t in TOOLS}
-LOCAL_TOOLS = {"list_projects"}      # answered by the app itself, no editor needed
+LOCAL_TOOLS = {"list_projects", "about", "check_update", "open_home"}   # answered by the app itself, no editor needed
 
 RESOURCES = [
     {"uri": "fpga://guide", "name": "How to work with Schematic Studio", "mimeType": "text/markdown"},
@@ -174,6 +228,8 @@ PROMPTS = [
     {"name": "debug_simulation", "description": "Find out why the current sheet doesn't simulate as expected.",
      "arguments": [{"name": "expected", "description": "What you expected to see", "required": False}]},
     {"name": "prepare_for_board", "description": "Check, assign pins and export VHDL + XDC for the board.", "arguments": []},
+    {"name": "lab_topdown", "description": "A lab: schematic → simulate → the user approves → Top-Down.",
+     "arguments": [{"name": "spec", "description": "The lab assignment / what the circuit must do", "required": True}]},
 ]
 
 
@@ -188,6 +244,13 @@ def prompt_text(name, args):
         return ("The current sheet doesn't simulate as expected" + (f" (expected: {args['expected']})" if args.get("expected") else "") +
                 ". Use explain_simulation, check, simulate and probe to find the cause; show the user where it is with focus, "
                 "propose the fix and apply it only after explaining it.")
+    if name == "lab_topdown":
+        return (f"Lab assignment: {args.get('spec', '')}\n"
+                "Work strictly in this order. (A) Build the circuit in Schematic Studio: plan the blocks, one sheet per "
+                "sub-circuit placed on its parent as block:<sheet>, set_top_sheet. (B) check and simulate / "
+                "verify_truth_table each sheet, fix every failure, and report the results. (C) request_approval with a "
+                "summary, then call approval_status until it is not 'waiting'; on 'changes' fix and ask again. "
+                "(D) Only after 'approved': make_topdown. Never write a Top-Down file yourself.")
     if name == "prepare_for_board":
         return ("Get the top sheet ready for the EDGE Spartan-7: check (no errors), get_pins (resolve conflicts and "
                 "unassigned ports with set_pins/auto_pins), get_xdc, then export_files ['vhdl','xdc','project'] and report the paths.")
@@ -298,6 +361,16 @@ def call_tool(name, args):
     if not tool:
         return {"content": [text(f"unknown tool '{name}'")], "isError": True}
     try:
+        if name in LOCAL_TOOLS and name != "list_projects":
+            qs = "action=" + name + "".join(f"&{k}={urllib.parse.quote(str(v))}" for k, v in (args or {}).items())
+            res = APP.request("GET", "/api/mcp/app?" + qs)
+            if not res.get("ok"):
+                return {"content": [text(res.get("error", "failed") + (f"\nhint: {res['hint']}" if res.get("hint") else ""))],
+                        "isError": True}
+            res.pop("ok", None)
+            if name == "about":
+                res["mcp_server"] = {"name": SERVER_NAME, "version": version()}
+            return {"content": [text(res)]}
         if name in LOCAL_TOOLS:
             res = APP.request("GET", "/api/projects")
             return {"content": [text({"folder": res.get("dir"), "projects": [

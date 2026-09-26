@@ -220,6 +220,11 @@ def _validate_sheet(s: dict, where: str) -> list:
 def save_design(name: str, design: str) -> str:
     """Save a design so the editor can import it.
 
+    SUPERSEDED for lab work: when the "fpga-ecosystem" server is also connected, do NOT use this.
+    Build the circuit in Schematic Studio there, simulate it, get the user's approval
+    (request_approval / approval_status) and then call make_topdown — the Top-Down must come
+    from the approved, simulated circuit, not from JSON written by hand.
+
     Args:
         name:   file name (no extension needed), e.g. "randomdice" or "comparator_4th".
         design: the design as a JSON string -- a full project or a single sheet,

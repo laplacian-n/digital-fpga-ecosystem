@@ -634,7 +634,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .sim-boardrow.stack .sim-side-body{max-height:56vh}
 .sim-side-body table{width:100%}
 .sim-side-timing{overflow:auto;flex:0 1 auto;max-height:38%;max-width:100%;overflow-wrap:anywhere;word-break:break-word;font-size:12px;line-height:1.5;color:var(--muted)}
-.sim-side-timing svg{display:block;max-width:100%}
+.sim-side-timing svg{display:block;max-width:none}
 .sim-side-timing:empty{display:none}
 .sim-valbar{margin:6px 2px 12px;font-size:13px;color:var(--ink-dim)}
 .seq-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:10px}
@@ -687,7 +687,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
     <span class="muted" id="simSheet"></span>
     <span class="grow"></span>
     <span class="muted" id="simSignals"></span>
-    <label class="muted">cycles <input id="simCycles" class="simc" type="number" value="8" min="1" max="64"></label>
+    <label class="muted">cycles <input id="simCycles" class="simc" type="number" value="16" min="1" max="64"></label>
     <button class="btn2" data-act="sim-refresh">Refresh</button>
   </div>
   <div class="sim-body">
@@ -6940,7 +6940,9 @@ function probeColorize(sch){
   if(world) clocks.forEach(id=>{
     const c=comp(id,sch); if(!c) return;
     const k=PROBE_CLOCKS[id], sz=getSize(c);
-    const t=txt(c.x+sz.w/2, c.y-6, k?("⏱ "+k.hz+" Hz"):"⏱ กดเพื่อเดิน clk", {anchor:"middle", size:10, fill:k?"var(--ok)":"var(--ink-dim)"});
+    // beside the input, on its LEFT: above it the badge covered whatever sat on the row above
+    // (usually the next input), and inputs live at the sheet's left edge where it is free
+    const t=txt(c.x-6, c.y+sz.h/2+3.5, k?("⏱ "+k.hz+" Hz"):"⏱ คลิกเดิน", {anchor:"end", size:10, fill:k?"var(--ok)":"var(--ink-dim)"});
     t.setAttribute("pointer-events","none"); if(k) t.setAttribute("font-weight","700");
     world.appendChild(t);
   });
@@ -10656,6 +10658,8 @@ function aiRenderChat(r){
   // ---- VHDL mode: the LLM wrote gate-level VHDL; draw it here, then simulate ----
   if(r.mode==="vhdl" && st!=="REJECTED"){
     let html='<span class="ac-badge u">วาดจาก VHDL (AI)</span>';
+    // what the model understood, when the request was restated in English first
+    if(r.restated) html+='<details class="ac-fold" open><summary>AI เข้าใจโจทย์ว่า (แปลเป็นอังกฤษก่อนส่งให้โมเดล)</summary><pre>'+e(r.restated)+'</pre></details>';
     const d=aiDrawVhdl(r.vhdl||"");
     if(d.ok){ const g=d.guarantees, nc=d.sch.components.filter(c=>c.type!=="JUNCTION").length;
       html+='<div>วาดแล้ว: <b>'+e(d.entity||"design")+'</b> — '+nc+' gate'+(g?(' · overlaps self '+g.self+'/coll '+g.coll):'')+'</div>';
@@ -10684,6 +10688,7 @@ function aiRenderChat(r){
   if(r.sequence)    html+=aiSeqHtml(r.sequence);
   if(r.samples)     html+=aiSamplesHtml(r.samples);
   if(st==="REJECTED"){
+    if(r.restated) html+='<details class="ac-fold"><summary>AI เข้าใจโจทย์ว่า</summary><pre>'+e(r.restated)+'</pre></details>';
     if(r.reason) html+='<div class="ac-hint">เหตุผล: '+e(r.reason)+'</div>';
     if(Array.isArray(r.errors)) html+='<div class="ac-hint">'+r.errors.slice(0,5).map(x=>"• "+e(x.msg||x.code||x)+(x.hint?(" — "+e(x.hint)):"")).join("<br>")+'</div>';
     if(r.compare&&r.compare.mismatches) html+='<div class="ac-hint">ไม่ตรงที่: '+r.compare.mismatches.slice(0,4).map(m=>JSON.stringify(m.in)+"→ได้ "+JSON.stringify(m.got)+" ควร "+JSON.stringify(m.exp)).map(e).join("<br>")+'</div>';
@@ -11968,13 +11973,17 @@ function changingSeqTableHtml(seq){
   const body=rows.map(r=>'<tr><td>'+r[0]+'</td>'+cols.map(c=>'<td style="color:'+c.cl+'">'+c.get(r)+'</td>').join('')+'</tr>').join('');
   return '<table><tr>'+th+'</tr>'+body+'</table>';
 }
+/* One clock per 22 px (it was 46: eight clocks filled the panel). Drawn at its natural size and
+   scrolled rather than squeezed to fit, with a cursor on the clock the board is showing and a
+   clock number every 4, so a long run stays readable while it plays. */
 function seqWaveSvg(title, tracks, n){
-  const lw=96, cw=46, rh=34, top=34, left=lw+8, W=left+cw*n+16, H=top+rh*(tracks.length+1)+12;
+  const lw=84, cw=22, rh=24, top=30, left=lw+8, W=left+cw*n+16, H=top+rh*(tracks.length+1)+10;
   const esc=s=>String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
-  let p=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="ui-monospace,Consolas,monospace" font-size="12"><rect width="${W}" height="${H}" fill="#0b0e14"/><text x="10" y="20" fill="#9ecbff" font-size="13">${esc(title)}</text>`;
-  for(let c=0;c<=n;c++) p+=`<line x1="${left+c*cw}" y1="${top-6}" x2="${left+c*cw}" y2="${H-8}" stroke="#1e2633"/>`;
-  const line=(y0,pts,col)=>{ let d="",prev=null; pts.forEach(([x,v])=>{ const y=y0+(v?6:rh-10); d+=(prev===null?"M":(prev!==v?`L${x},${y0+(prev?6:rh-10)} L`:"L"))+`${x},${y} `; prev=v; }); return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.8"/>`; };
-  const row=(k,name,pts,col)=>{ const y0=top+k*rh; return `<text x="8" y="${y0+rh/2+3}" fill="#9ecbff">${esc(String(name).slice(0,11))}</text>`+line(y0,pts,col); };
+  let p=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" data-left="${left}" data-cw="${cw}" font-family="ui-monospace,Consolas,monospace" font-size="11"><rect width="${W}" height="${H}" fill="#0b0e14"/><text x="8" y="18" fill="#9ecbff" font-size="12">${esc(title)}</text>`;
+  for(let c=0;c<=n;c++) p+=`<line x1="${left+c*cw}" y1="${top-6}" x2="${left+c*cw}" y2="${H-6}" stroke="${c%4?"#161c26":"#26303f"}"/>`+(c%4===0&&c<n?`<text x="${left+c*cw+2}" y="${top-9}" fill="#5c6b80" font-size="9">${c}</text>`:"");
+  p+=`<rect class="wv-now" x="${left}" y="${top-6}" width="${cw}" height="${H-top}" fill="#2f81f7" opacity=".18"/>`;
+  const line=(y0,pts,col)=>{ let d="",prev=null; pts.forEach(([x,v])=>{ const y=y0+(v?5:rh-7); d+=(prev===null?"M":(prev!==v?`L${x},${y0+(prev?5:rh-7)} L`:"L"))+`${x},${y} `; prev=v; }); return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>`; };
+  const row=(k,name,pts,col)=>{ const y0=top+k*rh; return `<text x="6" y="${y0+rh/2+3}" fill="#9ecbff">${esc(String(name).slice(0,11))}</text>`+line(y0,pts,col); };
   const clk=[]; for(let c=0;c<n;c++){ clk.push([left+c*cw,1],[left+c*cw+cw/2,1],[left+c*cw+cw/2,0],[left+(c+1)*cw,0]); }
   p+=row(0,"clk",clk,"#e3b341");
   tracks.forEach((t,k)=>{ const pts=[]; t.vals.forEach((v,c)=>{ pts.push([left+c*cw,v],[left+(c+1)*cw,v]); }); p+=row(k+1,t.name,pts,"#7ee787"); });
@@ -12181,6 +12190,7 @@ function wireSimBoardSeq(j, opts){
   if(sch && seq.inputIds && seq.inputIds.length===SIM_SEQ.inputs.length){
     SIM_SEQ.sch=sch; SIM_SEQ.ids=seq.inputIds; SIM_SEQ.hist=seq.rows.map(r=>r[1].slice());
   }
+  SIM_SEQ.run=sch;                      // what to simulate further when playback reaches the end
   // board pins: the sheet's own pin map (เลือกขา) when it has one, else SW k / LED k in order
   const own=(sch&&sch.pinmap)||{}, pm=n=>(typeof pmGet==="function"?pmGet(own,n):own[n])||"";
   const usedSw=new Set(), usedLed=new Set();
@@ -12201,7 +12211,7 @@ function wireSimBoardSeq(j, opts){
     <button class="btn2" data-act="seq-reset">รีเซ็ต</button>
     <label class="muted">ความเร็ว <input id="seqSpeed" class="simc" type="number" value="600" min="120" max="3000" step="60"> ms</label>
     <span class="muted" id="seqNow"></span>
-    <span class="muted">${live?'— คลิกสวิตช์บนบอร์ดเพื่อตั้งค่า input แล้วกด “ก้าว 1 clock”':'— วงจรทำงานตาม clock (นับเลข/กระพริบ) แสดงบนบอร์ดตามเวลา'}</span></div>`;
+    <span class="muted">${live?'— คลิกสวิตช์บนบอร์ดได้ตลอด แม้กำลังเล่นอยู่ วงจรจะทำงานต่อด้วยค่าใหม่':'— วงจรทำงานตาม clock (นับเลข/กระพริบ) แสดงบนบอร์ดตามเวลา'}</span></div>`;
   SIM_SEQ.noTable=!!opts.noTable;
   seqTable();
   if(row) row.dataset.cols=(SIM_SEQ.inputs.length+SIM_SEQ.outputs.length+SIM_SEQ.dffs.length);
@@ -12221,18 +12231,33 @@ function seqTable(){
   tbl.innerHTML='<table><tr>'+th+'</tr>'+body+'</table>';
 }
 /* flip a data switch at the current clock: that input changes from this clock onward */
+/* flip a data switch at the current clock: that input changes from this clock onward. It does
+   NOT stop playback — the circuit keeps running with the new input, like the real board. */
 function seqToggle(sw){
   const S=SIM_SEQ; if(!S || !S.hist) return;
   const k=S.swOf.indexOf(sw); if(k<0) return;          // only mapped switches are live
-  if(S.playing) seqPlay();
   const v=S.hist[S.idx][k]?0:1;
   for(let i=S.idx;i<S.hist.length;i++) S.hist[i][k]=v;
-  let j; try{ j=clientSeqSim(S.sch, S.hist.length, {holdAt:i=>{ const h={}; S.ids.forEach((id,q)=>h[id]=S.hist[i]?S.hist[i][q]:0); return h; }}); }
-  catch(e){ toast("จำลองไม่ได้: "+e.message,"warn"); return; }
-  if(!j||!j.ok) return;
-  S.rows=j.sequence.rows; seqTable(); seqShow(S.idx);
+  if(seqResim(S.hist.length)) seqShow(S.idx);
+}
+/* re-run the sheet for n clocks with the switch history (held at its last value past the end) */
+function seqResim(n){
+  const S=SIM_SEQ; if(!S || !S.run) return false;
+  if(S.hist){ const last=(S.hist[S.hist.length-1]||[]).slice(); while(S.hist.length<n) S.hist.push(last.slice()); }
+  let j; try{ j=clientSeqSim(S.run, n, S.hist?{holdAt:i=>{ const h={}; S.ids.forEach((id,q)=>h[id]=S.hist[i]?S.hist[i][q]:0); return h; }}:{}); }
+  catch(e){ toast("จำลองไม่ได้: "+e.message,"warn"); return false; }
+  if(!j||!j.ok) return false;
+  S.rows=j.sequence.rows; seqTable();
   const sig=$("#simSignals"); if(sig && !S.noTable) sig.innerHTML=j.note?'<span style="color:var(--warn)">⚠ '+esc(j.note)+'</span>':'';
   const tm=$("#simTiming"); if(tm && j.waveform_svg && !S.noTable) tm.innerHTML=j.waveform_svg;
+  return true;
+}
+/* the next clock: past the end of what has been simulated, simulate further instead of
+   jumping back to clock 0 (a run was fixed at its first N clocks) */
+function seqNext(){
+  const S=SIM_SEQ; if(!S) return;
+  if(S.idx+1>=S.rows.length && S.rows.length<512 && seqResim(S.rows.length+16)){}
+  seqShow(S.idx+1);
 }
 function seqShow(i){
   if(!SIM_SEQ) return; const n=SIM_SEQ.rows.length; SIM_SEQ.idx=((i%n)+n)%n;
@@ -12247,15 +12272,19 @@ function seqShow(i){
     +' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
   document.querySelectorAll('#simBoardTable tr').forEach(t=>t.classList.remove('cur'));
   const cur=document.querySelector('#simBoardTable tr[data-cyc="'+r[0]+'"]'); if(cur){ cur.classList.add('cur'); cur.scrollIntoView({block:'nearest'}); }
-  const now=$("#seqNow"); if(now) now.textContent='clock '+r[0]+' / '+(n-1);
+  const now=$("#seqNow"); if(now) now.textContent='clock '+r[0];
+  // the timing cursor follows the clock on show, and the chart scrolls to keep it in view
+  const tm=$("#simTiming"), sv=tm&&tm.querySelector("svg"), cur2=sv&&sv.querySelector(".wv-now");
+  if(cur2){ const L=+sv.dataset.left, cw=+sv.dataset.cw, x=L+SIM_SEQ.idx*cw; cur2.setAttribute("x",x);
+    if(x<tm.scrollLeft+L || x+cw>tm.scrollLeft+tm.clientWidth) tm.scrollLeft=Math.max(0,x-tm.clientWidth/2); }
 }
 function seqPlay(){
   if(!SIM_SEQ) return; const btn=document.querySelector('[data-act="seq-play"]');
   if(SIM_SEQ.playing){ clearInterval(SIM_SEQ.timer); SIM_SEQ.playing=false; if(btn) btn.textContent='เล่นตาม clock'; return; }
   const sp=parseInt(($("#seqSpeed")||{}).value)||600; SIM_SEQ.playing=true; if(btn) btn.textContent='หยุด';
-  SIM_SEQ.timer=setInterval(()=>seqShow(SIM_SEQ.idx+1), sp);
+  SIM_SEQ.timer=setInterval(seqNext, sp);
 }
-function seqStep(){ if(SIM_SEQ){ if(SIM_SEQ.playing) seqPlay(); seqShow(SIM_SEQ.idx+1); } }
+function seqStep(){ if(SIM_SEQ){ if(SIM_SEQ.playing) seqPlay(); seqNext(); } }
 function seqReset(){ if(SIM_SEQ){ if(SIM_SEQ.playing) seqPlay(); seqShow(0); } }
 // sim page sub-tab clicks
 $$("#simPage .sim-tabs button").forEach(b=>b.addEventListener("click",()=>simTab(b.dataset.stab)));
@@ -12705,10 +12734,24 @@ init();
 .brd-logcol{display:flex;flex-direction:column;gap:8px;min-height:0}
 .brd-status{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px}
 .brd-status.ok{color:var(--ok)} .brd-status.bad{color:var(--err)} .brd-status.run{color:var(--accent)}
+#brdBit .ok{color:var(--ok)} #brdBit .warn{color:var(--warn)}
 .brd-hint{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.55;white-space:pre-wrap}
 .brd-log{flex:1;min-height:0;margin:0;overflow:auto;background:#0d1117;color:#c9d1d9;border-radius:10px;padding:10px 12px;font:12px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
 #brdTools .ok{color:var(--ok)} #brdTools .bad{color:var(--warn)}
 @media (max-width:900px){.brd-body{grid-template-columns:1fr;overflow:auto}.brd-log{min-height:240px}}
+
+/* parts Claude just changed glow for a moment (08-mcp-bridge.js mcpShowChange) */
+@keyframes mcpFlash{0%{filter:drop-shadow(0 0 0 transparent)}25%{filter:drop-shadow(0 0 7px var(--accent)) drop-shadow(0 0 2px var(--accent))}100%{filter:drop-shadow(0 0 0 transparent)}}
+.node.mcp-flash{animation:mcpFlash 1.6s ease-out}
+
+/* Claude asks the user to approve the circuit before it makes the Top-Down (08-mcp-bridge.js) */
+.mcp-approval{position:fixed;right:18px;bottom:18px;z-index:9000;width:min(440px,calc(100vw - 36px));background:var(--bg-2);border:1px solid var(--accent);border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.25);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--ink)}
+.mcp-approval .mcp-ap-h{font-weight:700;display:flex;align-items:center;gap:7px}
+.mcp-approval .mcp-ap-h .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:uxPulse 1.6s ease-in-out infinite}
+.mcp-approval .mcp-ap-body{max-height:40vh;overflow:auto;line-height:1.55;background:var(--bg-3,var(--bg));border-radius:8px;padding:8px 10px;white-space:normal}
+.mcp-approval textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical}
+.mcp-approval .mcp-ap-row{display:flex;gap:8px;align-items:center}
+.mcp-approval .grow{flex:1}
 </style>
 <script>
 "use strict";
@@ -14783,6 +14826,177 @@ function mcpEvent(kind, data){ MCPB.events.push(Object.assign({seq:++MCPB.seq, t
     return r; };
 }
 
+/* ---------- projects ---------- */
+MCP_OPS.new_project = a=>{
+  const name=String(a.name||"").trim(); if(!name) mcpFail("name is required");
+  mcpBeforeChange("โปรเจกต์ใหม่");
+  const p=addProject(name); state.view={x:0,y:0,k:1};
+  const pn=$("#projectName"); if(pn) pn.value=p.name;
+  mcpCommit(null); try{ zoomFit(); }catch(_){}
+  mcpActivity("โปรเจกต์ใหม่ "+p.name);
+  return Object.assign({created:p.name, renamed: p.name!==sanId(name) ? "a project with that name exists — used "+p.name : undefined}, MCP_OPS.status());
+};
+
+/* ---------- the real board: the ลงบอร์ด page's own build / program, driven by Claude ----------
+   A Vivado build takes minutes, longer than an MCP client waits for one call, so board_build /
+   board_program start the job and board_status follows it (≤40 s per call). The page opens so
+   the user watches the same log. Writing the Flash (permanent) stays a click of the user's. */
+async function mcpBoardPage(){ try{ if(!$("#boardPage.show")) await openBoardPage(); }catch(_){} }
+MCP_OPS.board_build = async ()=>{
+  if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("building needs the FPGA Ecosystem app (the editor was opened from disk)");
+  const d=brdDesign(); if(!d) mcpFail("no top sheet");
+  if(d.missing.length) mcpFail(`${d.missing.length} port(s) have no board pin: ${d.missing.slice(0,8).join(", ")}`, "get_pins, then set_pins or auto_pins");
+  await mcpBoardPage();
+  const r=await brdPost("/api/board/build",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+  if(!r||!r.ok) mcpFail((r&&r.error)||"could not start the build");
+  try{ brdLog(true); brdPoll(false); }catch(_){}
+  mcpActivity("สร้าง .bit");
+  return {started:"build", top:d.top, folder:r.dir, next:"call board_status until state is not 'running' (Vivado takes ~1-3 min)"};
+};
+MCP_OPS.board_program = async a=>{
+  if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("programming needs the FPGA Ecosystem app");
+  const mode=a.mode||"sram", cable=a.cable||"ft2232";
+  await mcpBoardPage();
+  let r;
+  if(mode==="detect") r=await brdPost("/api/board/detect",{cable});
+  else { const d=brdDesign(); r=await brdPost("/api/board/program",{project:brdProject(), top:d.top, mode:"sram", cable}); }
+  if(!r||!r.ok) mcpFail((r&&r.error)||"could not start", "board_status shows the log; about → board shows what is installed");
+  try{ brdLog(true); brdPoll(false); }catch(_){}
+  mcpActivity(mode==="detect"?"ตรวจหาบอร์ด":"โหลดลงบอร์ด");
+  return {started:mode, next:"call board_status"};
+};
+MCP_OPS.board_status = async a=>{
+  const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
+  let s;
+  for(;;){ s=await (await fetch("/api/board/status")).json(); if(s.state!=="running" || Date.now()>until) break;
+    await new Promise(r=>setTimeout(r, 700)); }
+  const out={job:s.kind, state:s.state, seconds:s.elapsed, log_tail:(s.lines||[]).slice(-25).join("\n")};
+  if(s.hint) out.explain=s.hint;
+  if(s.result&&Object.keys(s.result).length) out.result=s.result;
+  if(s.state==="running") out.next="still running — call board_status again";
+  try{ const d=brdDesign(); const b=await brdPost("/api/board/bit",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+    if(b&&b.ok) out.bit=b.exists?{path:b.path, matches_circuit:b.current}:null; }catch(_){}
+  return out;
+};
+
+/* ---------- the lab workflow: schematic → simulate → the USER approves → Top-Down ----------
+   Claude shows its summary in a card in the editor and the user answers there (อนุมัติ / ขอแก้).
+   The approval is tied to the circuit as it was when approved (a fingerprint of every sheet's
+   parts, params and wiring — not positions): make_topdown refuses anything else, so a design
+   changed after approval has to be approved again. request_approval returns at once and
+   approval_status waits ≤40 s per call, because MCP clients give up on a single long call. */
+MCPB.approval={state:"none"};
+function mcpDesignHash(){
+  const P=state.project, out=[P.topId||""];
+  Object.keys(P.schematics).sort().forEach(id=>{ const s=P.schematics[id];
+    out.push(id+":"+s.name);
+    s.components.filter(c=>c.type!=="JUNCTION").map(c=>c.id+"|"+c.type+"|"+(c.label||"")+"|"+JSON.stringify(c.params||{})).sort().forEach(x=>out.push(x));
+    // wiring as connectivity: junctions collapse into nets, so re-routing does not count as a change
+    try{ const seen=new Set(); s.wires.forEach(w=>{ if(seen.has(w.id)) return; const ids=[...netWires(s,w)]; ids.forEach(i=>seen.add(i));
+      const ends=new Set(); ids.forEach(i=>{ const x=s.wires.find(q=>q.id===i); if(!x) return;
+        [x.from,x.to].forEach(e=>{ const c=comp(e.cid,s); if(c&&c.type!=="JUNCTION") ends.add(e.cid+"."+e.pid); }); });
+      out.push("net:"+[...ends].sort().join(",")); }); }catch(_){ s.wires.forEach(w=>out.push(w.from.cid+"."+w.from.pid+">"+w.to.cid+"."+w.to.pid)); }
+  });
+  const str=out.join("\n"); let h=2166136261>>>0;
+  for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+  return h.toString(16)+"-"+str.length;
+}
+function mcpApprovalCard(summary){
+  let el=$("#mcpApproval"); if(el) el.remove();
+  el=document.createElement("div"); el.id="mcpApproval"; el.className="mcp-approval";
+  el.innerHTML=`<div class="mcp-ap-h"><span class="dot"></span>Claude ขออนุมัติวงจร <span class="muted">${esc(state.project.name||"")}</span></div>
+    <div class="mcp-ap-body">${esc(summary).replace(/\n/g,"<br>")}</div>
+    <div class="muted" style="font-size:12px">ดูวงจรและผลจำลองในหน้าจอก่อน — อนุมัติแล้ว Claude จะทำ Top-Down จากวงจรนี้</div>
+    <textarea id="mcpApNote" rows="2" placeholder="ถ้าจะให้แก้ บอกตรงนี้ว่าแก้อะไร"></textarea>
+    <div class="mcp-ap-row"><button class="btn" data-ap="changes">✎ ขอแก้</button><span class="grow"></span>
+      <button class="btn btn-primary" data-ap="approve">✓ อนุมัติ — ทำ Top-Down ต่อ</button></div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", e=>{ const b=e.target.closest("[data-ap]"); if(!b) return;
+    const note=($("#mcpApNote")||{}).value||"";
+    if(b.dataset.ap==="changes" && !note.trim()){ $("#mcpApNote").focus(); toast("พิมพ์สิ่งที่อยากให้แก้ก่อน แล้วกด ขอแก้ อีกครั้ง","warn"); return; }
+    MCPB.approval = b.dataset.ap==="approve"
+      ? {state:"approved", hash:mcpDesignHash(), comment:note.trim(), at:Date.now()}
+      : {state:"changes", comment:note.trim(), at:Date.now()};
+    el.remove(); mcpEvent("approval", {state:MCPB.approval.state, comment:MCPB.approval.comment||""});
+    toast(MCPB.approval.state==="approved"?"อนุมัติแล้ว — Claude จะทำ Top-Down ต่อ":"ส่งให้ Claude แก้แล้ว","ok",3000);
+  });
+}
+MCP_OPS.request_approval = a=>{
+  const summary=String(a.summary||"").trim(); if(!summary) mcpFail("summary is required: what you built and what the simulation showed");
+  MCPB.approval={state:"waiting", asked:Date.now()};
+  mcpApprovalCard(summary); mcpActivity("รออนุมัติ");
+  return {status:"waiting", next:"call approval_status (it waits for the user's click) until it is no longer 'waiting'"};
+};
+MCP_OPS.approval_status = async a=>{
+  const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
+  while(MCPB.approval.state==="waiting" && Date.now()<until) await new Promise(r=>setTimeout(r, 300));
+  const ap=MCPB.approval, out={status:ap.state};
+  if(ap.comment) out.comment=ap.comment;
+  if(ap.state==="approved") out.design_unchanged = ap.hash===mcpDesignHash();
+  if(ap.state==="waiting") out.next="still waiting for the user — call approval_status again";
+  if(ap.state==="changes") out.next="make the changes the user asked for, simulate again, then request_approval again";
+  if(ap.state==="none") out.next="nothing asked yet — call request_approval with a summary first";
+  return out;
+};
+/* the approved design → Top-Down: the top sheet, then every sheet it uses as a block, as layers */
+MCP_OPS.make_topdown = a=>{
+  const ap=MCPB.approval;
+  if(ap.state!=="approved") mcpFail("the user has not approved the design yet", "simulate/verify, then request_approval and wait for approval_status 'approved'");
+  if(ap.hash!==mcpDesignHash()) mcpFail("the circuit changed after the user approved it", "request_approval again for the changed circuit");
+  const P=state.project, top=a.sheet ? mcpSheet(a.sheet) : (P.schematics[P.topId]||activeSch());
+  const order=[], seen=new Set();
+  const walk=(s,d)=>{ if(!s||seen.has(s.id)) return; seen.add(s.id); order.push({s,d});
+    s.components.forEach(c=>{ const sub=subSchOf(c); if(sub) walk(sub,d+1); }); };
+  walk(top,0);
+  const ord=n=>n+(n%10===1&&n%100!==11?"st":n%10===2&&n%100!==12?"nd":n%10===3&&n%100!==13?"rd":"th");
+  const sheets=order.map(({s,d})=>{ const t=schematicToTopdownSheet(s); t.title=ord(d+1)+" Layer ("+s.name+")"; t.module=s.name; return t; });
+  sendToTopdown({type:"td:loadSheets", sheets});
+  mcpActivity("ทำ Top-Down");
+  return {sheets:sheets.map(t=>t.title), note:"shown in the Top-Down view (Tools ▸ Top-Down); the user can print / export from there"};
+};
+
+/* ---------- you see what Claude does, as it does it ----------
+   Every call already redraws the page; what hid it was WHERE: parts landed off-screen, or on
+   the canvas under the sim / board / Top-Down page. So around each call: note the sheet, and
+   afterwards bring the canvas forward, bring the change into view (only when it is not in view
+   already, so the drawing does not jump on every call) and make the changed parts glow. */
+function mcpSheetState(){
+  const sch=activeSch(); if(!sch) return null;
+  const m=new Map(); sch.components.forEach(c=>{ if(c.type!=="JUNCTION") m.set(c.id, c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{})); });
+  return {id:sch.id, m, w:new Set(sch.wires.map(w=>w.id))};
+}
+function mcpShowChange(pre){
+  const sch=activeSch(); if(!sch) return;
+  const changed=new Set();
+  sch.components.forEach(c=>{ if(c.type==="JUNCTION") return;
+    const k=c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{});
+    if(!pre || pre.id!==sch.id || pre.m.get(c.id)!==k) changed.add(c.id); });
+  sch.wires.forEach(w=>{ if(!pre || pre.id!==sch.id || !pre.w.has(w.id)){ changed.add(w.from.cid); changed.add(w.to.cid); } });
+  const newSheet = !pre || pre.id!==sch.id;
+  if(!changed.size && !newSheet) return;                  // a read-only call: leave the view alone
+  // the canvas has to be the thing on screen
+  try{ if($("#simPage.show")) hideSimPage(); }catch(_){}
+  try{ if($("#boardPage.show")) brdShow(false); }catch(_){}
+  try{ const tv=$("#topdownView"); if(tv && tv.style.display!=="none" && tv.style.display!=="") closeTopdown(); }catch(_){}
+  // in view? (world rectangle of the canvas vs the changed parts)
+  const cs=sch.components.filter(c=>changed.has(c.id));
+  if(cs.length){
+    const r=canvas.getBoundingClientRect();
+    const outOf=()=>{ const v=state.view, vx1=-v.x/v.k, vy1=-v.y/v.k, vx2=(r.width-v.x)/v.k, vy2=(r.height-v.y)/v.k;
+      return cs.some(c=>{ const z=getSize(c); return c.x<vx1+10||c.y<vy1+10||c.x+z.w>vx2-10||c.y+z.h>vy2-10; }); };
+    if(outOf()||newSheet){ try{ zoomFit(); }catch(_){} }
+    // a sheet too big to fit at the smallest zoom: centre the view on what changed instead
+    if(outOf() && r.width>0){
+      const x1=Math.min(...cs.map(c=>c.x)), y1=Math.min(...cs.map(c=>c.y)),
+            x2=Math.max(...cs.map(c=>c.x+getSize(c).w)), y2=Math.max(...cs.map(c=>c.y+getSize(c).h));
+      const v=state.view; v.x=r.width/2-(x1+x2)/2*v.k; v.y=r.height/2-(y1+y2)/2*v.k; render();
+    }
+  }
+  // glow on what changed, for a moment
+  requestAnimationFrame(()=>{ cs.forEach(c=>{ const el=document.querySelector('.node[data-cid="'+c.id+'"]'); if(el){ el.classList.remove("mcp-flash"); void el.getBoundingClientRect(); el.classList.add("mcp-flash"); } });
+    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")), 1800); });
+}
+
 /* ---------- transport: long-poll the launcher ---------- */
 async function mcpLoop(){
   let fails=0;
@@ -14798,10 +15012,12 @@ async function mcpLoop(){
     if(!job||!job.id) continue;
     let reply;
     MCPB.busy=true; MCPB.calls++;
+    const pre=mcpSheetState();
     try{
       const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);
       const result=await fn(job.args||{});
       reply={id:job.id, ok:true, result};
+      try{ mcpShowChange(pre); }catch(e){ console.warn("mcp view", e); }
     }catch(e){
       reply={id:job.id, ok:false, error:String(e&&e.message||e), hint:e&&e.hint||undefined};
       if(!(e instanceof McpError)) console.warn("mcp op failed", job.op, e);
@@ -14911,8 +15127,23 @@ function brdRefresh(){
   $("#brdWarn").innerHTML=(d.missing.length?`<div class="ux-need">⚠ ยังไม่ได้เลือกขา ${d.missing.length} ขา — Vivado จะ build ไม่ผ่าน <button class="btn2" data-brd="pins">ไปเลือกขา</button></div>`:"")
     +(d.warns.length?`<div class="brd-w">${d.warns.slice(0,4).map(w=>"⚠ "+esc(w)).join("<br>")}</div>`:"");
   try{ uxRenderStepper(); }catch(_){}                    // pins may have just been guessed
-  const hasBit=BRD.lastBit&&BRD.lastBit.top===d.top;
-  $("#brdBit").textContent=hasBit?("ได้ "+d.top+".bit แล้ว"):"";
+  brdBitCheck(d);
+}
+/* Is there a .bit already, and is it the circuit as drawn now? Then step 3 works straight
+   away — no rebuilding every time the page opens (the launcher keeps the last build and a
+   copy in the project folder, and stamps what it was built from). */
+async function brdBitCheck(d){
+  d=d||brdDesign(); if(!d) return;
+  const r=await brdPost("/api/board/bit",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+  BRD.bit=(r&&r.ok)?r:null;
+  const el=$("#brdBit"); if(!el) return;
+  const when=t=>new Date(t*1000).toLocaleString("th-TH",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+  if(!BRD.bit||!BRD.bit.exists) el.innerHTML='<span class="muted">ยังไม่มีไฟล์ .bit — กดสร้างก่อน</span>';
+  else if(BRD.bit.current===true) el.innerHTML=`<span class="ok">✓ มี ${esc(d.top)}.bit แล้ว (${when(BRD.bit.mtime)}) ตรงกับวงจรตอนนี้ — ข้ามไปขั้นที่ 3 ได้เลย ไม่ต้องสร้างใหม่</span>`;
+  else if(BRD.bit.current===false) el.innerHTML=`<span class="warn">⚠ มี .bit จาก ${when(BRD.bit.mtime)} แต่วงจรเปลี่ยนไปแล้ว — ควรสร้างใหม่ (ยังโหลดตัวเก่าได้)</span>`;
+  else el.innerHTML=`<span class="muted">มี ${esc(d.top)}.bit จาก ${when(BRD.bit.mtime)} — ไม่แน่ใจว่าตรงกับวงจรตอนนี้ไหม</span>`;
+  const busy=$("#brdStatus")&&/run/.test($("#brdStatus").className);
+  $$("#boardPage [data-brd=sram],#boardPage [data-brd=flash]").forEach(b=>b.disabled=busy||!(BRD.bit&&BRD.bit.exists));
 }
 async function brdPost(path, body){
   try{ const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}); return await r.json(); }
@@ -14929,6 +15160,7 @@ async function brdAct(a){
     brdLog(true); r=await brdPost("/api/board/build",{project:proj, top:d.top, vhdl:d.vhdl, xdc:d.xdc});
   } else if(a==="sram"||a==="flash"){
     if(a==="flash" && !confirm("เขียนลง Flash — วงจรจะอยู่ถาวรแม้ถอดปลั๊ก แต่ Flash เขียนซ้ำได้จำนวนจำกัด\nแนะนำให้ทดสอบด้วย “โหลดลงบอร์ด (ชั่วคราว)” ก่อน · เขียนเลยไหม?")) return;
+    if(BRD.bit&&BRD.bit.current===false&&!confirm("ไฟล์ .bit นี้สร้างจากวงจรเวอร์ชันก่อน — วงจรที่วาดอยู่ตอนนี้เปลี่ยนไปแล้ว\nโหลดตัวเก่าลงบอร์ดไหม? (กด ยกเลิก แล้วกด “สร้าง .bit” เพื่อได้ตัวใหม่)")) return;
     brdLog(true); r=await brdPost("/api/board/program",{project:proj, top:d.top, mode:a, cable});
   } else if(a==="detect"){ brdLog(true); r=await brdPost("/api/board/detect",{cable}); }
   else if(a==="stop"){ r=await brdPost("/api/board/stop",{}); }
@@ -14955,9 +15187,8 @@ function brdPoll(once){
       : s.state==="ok"?`✓ ${what}สำเร็จ`+(s.result&&s.result.saved?` · เก็บไว้ที่ ${esc(s.result.saved)}`:"")
       : s.state==="error"?`✗ ${what}ไม่สำเร็จ`: s.state==="stopped"?"หยุดแล้ว":"พร้อม";
     const h=$("#brdHint"); if(s.hint){ h.hidden=false; h.textContent=s.hint; } else if(running) h.hidden=true;
-    if(s.kind==="build" && s.state==="ok" && s.result){ BRD.lastBit=s.result; const b=$("#brdBit"); if(b) b.textContent="ได้ "+s.result.top+".bit แล้ว → ขั้นที่ 3"; }
     $$("#boardPage [data-brd=build],#boardPage [data-brd=sram],#boardPage [data-brd=flash],#boardPage [data-brd=detect]").forEach(b=>b.disabled=running);
-    if(!running && BRD.timer){ clearInterval(BRD.timer); BRD.timer=null; }
+    if(!running && BRD.timer){ clearInterval(BRD.timer); BRD.timer=null; brdBitCheck(); }
   };
   tick(); if(!once) BRD.timer=setInterval(tick, 700);
 }
@@ -15097,6 +15328,30 @@ function uxAboutSheet(msg){
       }
     }
     return _ask.apply(this, arguments);
+  };
+}
+
+/* ===== 11. A Top-Down file opened in Schematic Studio ======================================
+   A Top-Down project ({meta, sheets:[{title, nodes, wires}]}) and a Schematic Studio project
+   ({project:{schematics}}) are both .json, and students keep them in the same folder. Opening
+   the Top-Down one here used to fail with "โหลดไม่สำเร็จ: Invalid file". Every way in (File ▸
+   Open, the Home project list, MCP open_project) goes through deserialize(), so it is caught
+   there: the sheets go to the Top-Down view, ADDED to what is already there (nothing lost),
+   drawn exactly as saved. */
+function uxIsTopdownProject(o){
+  return !!(o && typeof o==="object" && !o.project && !o.workspace && Array.isArray(o.sheets)
+            && o.sheets.length && o.sheets.every(s=>s && typeof s==="object" && Array.isArray(s.nodes)));
+}
+{
+  const _deserialize = deserialize;
+  deserialize = function(json){
+    let o=null; try{ o = typeof json==="string" ? JSON.parse(json) : json; }catch(_){}
+    if(uxIsTopdownProject(o)){
+      sendToTopdown({type:"td:loadProject", project:o});
+      toast(`ไฟล์นี้เป็นผัง Top-Down (${o.sheets.length} แผ่น) — เปิดในหน้า Top-Down ให้แล้ว`, "ok", 4500);
+      return;
+    }
+    return _deserialize.apply(this, arguments);
   };
 }
 

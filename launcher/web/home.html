@@ -204,6 +204,10 @@ nav .badge:empty{display:none}
     </div>
     <div class="field"><label>Claude Code</label><div class="bar" style="flex-wrap:nowrap"><input type="text" id="mcpCode" readonly style="flex:1;width:auto"><button class="btn" data-copyfrom="mcpCode">คัดลอก</button></div></div>
     <div class="field"><label>ตั้งค่าเอง (JSON)</label><div class="bar" style="flex-wrap:nowrap"><input type="text" id="mcpJson" readonly style="flex:1;width:auto"><button class="btn" data-copyfrom="mcpJson">คัดลอก</button></div></div>
+    <div id="mcpLegacy" hidden style="margin:8px 0;padding:8px 10px;border:1px solid var(--warn);border-radius:8px;background:var(--chip-warn)">
+      ⚠ Claude Desktop ยังมี MCP ตัวเก่า (<b id="mcpLegacyNames"></b>) — Claude มักไปใช้ตัวนั้นแล้วเขียนไฟล์ Top-Down เองโดยไม่ผ่านวาดวงจร/จำลอง/อนุมัติ
+      <div class="bar" style="margin-top:6px"><button class="btn" id="mcpLegacyRm">เอาตัวเก่าออก (เก็บสำรองไฟล์ตั้งค่าไว้)</button><span class="muted" id="mcpLegacyMsg"></span></div>
+    </div>
     <p class="muted" style="margin:8px 0 0">หลังติดตั้ง ปิด Claude Desktop ให้สนิท (จากถาด) แล้วเปิดใหม่ จากนั้นลองพิมพ์ “ช่วยวาด full adder แล้วจำลองให้ดูหน่อย”</p>
   </div>
 
@@ -340,7 +344,10 @@ window.addEventListener("focus", () => loadProjects().catch(()=>{}));
   fetch("/api/ping").catch(()=>{});
   [CFG, ST] = await Promise.all([api("/api/config"), api("/api/status")]);
   fillSettings(); fillStatus(); loadProjects();
-  if(!CFG.setup_done) showTab("setup"); else loadSetup();
+  // ?tab=setup|settings (opened by Claude via MCP open_home, or a link)
+  const want=new URLSearchParams(location.search).get("tab");
+  if(want && document.getElementById("tab-"+want)){ showTab(want); if(want!=="setup") loadSetup(); }
+  else if(!CFG.setup_done) showTab("setup"); else loadSetup();
   checkUpdate(false);
 })();
 
@@ -514,8 +521,12 @@ async function loadMcp(){
     $("#mcpCode").value="claude mcp add fpga-ecosystem -- "+[c.command,...c.args].map(q).join(" ");
     $("#mcpJson").value=JSON.stringify({"mcpServers":{"fpga-ecosystem":c}});
     $("#st-mcp").innerHTML=chip("ok","พร้อม");
+    const lg=j.legacy||[]; $("#mcpLegacy").hidden=!lg.length; $("#mcpLegacyNames").textContent=lg.join(", ");
   }catch(_){ $("#st-mcp").innerHTML=chip("bad","ไม่พร้อม"); }
 }
+$("#mcpLegacyRm").onclick=async()=>{ const r=await api("/api/mcp/remove_legacy",{});
+  $("#mcpLegacyMsg").textContent = r.ok ? ("เอาออกแล้ว: "+(r.removed||[]).join(", ")+" — รีสตาร์ท Claude Desktop") : (r.error||"ไม่สำเร็จ");
+  if(r.ok) loadMcp(); };
 $("#mcpDesktop").onclick=async()=>{ const r=await api("/api/mcp/install_desktop",{});
   $("#mcpDesktopMsg").textContent = r.ok ? "เพิ่มแล้วใน "+r.path+" — รีสตาร์ท Claude Desktop" : (r.error||"ไม่สำเร็จ"); };
 document.addEventListener("click", e=>{ const b=e.target.closest("[data-copyfrom]"); if(!b) return;
@@ -548,9 +559,20 @@ $("#updGo").onclick=async()=>{
   if(r.manual){ window.open(r.url,"_blank"); return; }
   if(!r.ok){ toast(r.error||"อัปเดตไม่ได้"); return; }
   const b=$("#updGo"); b.disabled=true;
-  const poll=async()=>{ let p; try{ p=await api("/api/update/progress"); }catch(_){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; return; }
+  let log="", t0=0;
+  // the old program exits while Setup runs: wait for the new one to answer, then reload into it
+  const waitNew=async()=>{
+    try{ const i=await api("/api/info"); if(i.version && i.version!==ST.version){ location.reload(); return; } }catch(_){}
+    if(Date.now()-t0 > 120000){
+      b.textContent="ยังไม่เสร็จ";
+      $("#updCur").textContent="— ติดตั้งนานผิดปกติ: ปิดหน้าต่างนี้แล้วเปิด FPGA Ecosystem ใหม่จาก Start menu"+
+        " ถ้ายังเป็นเวอร์ชันเดิม ให้ดาวน์โหลดตัวติดตั้งจากหน้า Releases (log: "+log+")";
+      return; }
+    setTimeout(waitNew,2000); };
+  const poll=async()=>{ let p; try{ p=await api("/api/update/progress"); }catch(_){ p={phase:"installing"}; }
+    if(p.log) log=p.log;
     if(p.phase==="downloading"){ b.textContent="ดาวน์โหลด "+(p.total?Math.round(p.done*100/p.total)+"%":Math.round(p.done/1e6)+" MB"); setTimeout(poll,500); }
-    else if(p.phase==="installing"){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; }
+    else if(p.phase==="installing"){ b.textContent="กำลังติดตั้ง… หน้านี้จะเปิดเวอร์ชันใหม่เอง"; t0=Date.now(); waitNew(); }
     else if(p.phase==="error"){ b.disabled=false; b.textContent="อัปเดตเลย"; toast(p.error); }
     else setTimeout(poll,500); };
   poll();

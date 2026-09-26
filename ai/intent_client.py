@@ -213,6 +213,39 @@ def _extract_vhdl(raw: str) -> str:
     return t.strip()
 
 
+_RESTATE_SYS = (
+    "You translate a student's digital-logic request (often in Thai, sometimes pasted from a lab sheet "
+    "with broken characters) into a precise ENGLISH hardware specification for a VHDL generator.\n"
+    "Output ONLY the specification, in this shape:\n"
+    "Module: <name>\nInputs: <name>[<width>] ... \nOutputs: <name>[<width>] ...\n"
+    "Behaviour: <1-4 short sentences; say whether it is combinational or clocked>\n"
+    "Rules: keep every signal name exactly as the student wrote it (SW, yy, clk ...), keep given bit "
+    "ranges (SW[7:4]); if something is ambiguous choose the usual classroom meaning; no VHDL, no prose.")
+_THAI = re.compile(r"[\u0E00-\u0E7F]")
+
+
+def needs_restate(spec: str) -> bool:
+    return bool(_THAI.search(spec or ""))
+
+
+def restate_spec(spec: str, *, endpoint: str = DEFAULT_ENDPOINT, model: str = DEFAULT_MODEL,
+                 timeout: float = 90.0) -> dict:
+    """Thai request -> short English spec. Coder models (Qwen2.5-Coder) follow an English
+    spec far better than Thai text; the student sees the restatement, so a misunderstanding
+    shows before they trust the circuit. Returns {ok, spec, raw}."""
+    payload = {"model": model, "temperature": 0.1, "max_tokens": 320, "stream": False,
+               "messages": [{"role": "system", "content": _RESTATE_SYS},
+                            {"role": "user", "content": spec}]}
+    try:
+        data = _post(endpoint, payload, timeout)
+    except Exception as e:
+        return {"ok": False, "spec": "", "raw": "", "error": str(e)[:120]}
+    raw = (data.get("choices", [{}])[0].get("message", {}) or {}).get("content", "") or ""
+    raw = re.sub(r"(?s)<think>.*?</think>", "", raw).strip().strip("`").strip()
+    ok = bool(raw) and not needs_restate(raw) and len(raw) < 2000
+    return {"ok": ok, "spec": raw if ok else "", "raw": raw}
+
+
 def generate_vhdl_from_spec(spec: str, *, endpoint: str = DEFAULT_ENDPOINT,
                             model: str = DEFAULT_MODEL, temperature: float = 0.2,
                             timeout: float = 180.0, use_rag: bool = False,

@@ -24,6 +24,13 @@ You don't need to start anything else. The MCP server starts FPGA Ecosystem if i
 Schematic Studio window if none is open. A **Claude** chip in the editor's top bar shows the connection and
 flashes while Claude is working.
 
+Claude starts with `about`, which tells it:
+- which app and version it is talking to, and whether a newer version is out (with the release notes);
+- whether the board toolchain is ready (Vivado, openFPGALoader, the flash bridge, the USB driver);
+- the local AI model's state, the workspace and number of projects, and whether the editor window is open.
+
+The server also reports the app version as its own version when Claude connects.
+
 ## How it works
 ```
 Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (127.0.0.1) ──long-poll──▶ Schematic Studio page
@@ -35,12 +42,19 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 - **Security:** the launcher listens only on 127.0.0.1. MCP calls need a random token that the launcher writes
   to `runtime.json` in your settings folder, which only you can read. The editor-side endpoints refuse requests
   coming from other websites.
+- **You see it as it happens:** after every call that changes the drawing, the editor:
+  - brings the canvas forward, even if you were on the sim, board or Top-Down page;
+  - brings the change into view, zooming or panning only when it is off-screen, so the view doesn't jump on every call;
+  - makes the changed parts glow for a moment.
+
+  Read-only calls leave your view alone.
 - **Undo:** every tool call is one undo step. Before a burst of changes, a timeline checkpoint
   ("ก่อน Claude แก้") is saved.
 
 ## Tools
 | Group | Tools |
 |---|---|
+| The app | `about` (app + version, update available and what's new, workspace, editor open?, Vivado / openFPGALoader / USB driver / AI model ready?), `check_update`, `open_home` (Home / setup checklist / settings — the user clicks อัปเดตเลย there) |
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
 | Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
 | Edit | `add_component`, `connect`, `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
@@ -48,9 +62,27 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
 | Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation` |
 | Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc` |
-| Output | `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `list_projects`, `open_project` |
+| Output | `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `new_project`, `list_projects`, `open_project` |
+| Real board | `board_build` (Vivado → .bit), `board_program` (load into the FPGA, or `detect`), `board_status` (follow the job: log tail, Thai explanation of an error, does the .bit match the circuit). Writing the Flash stays the user's click. |
 | History | `undo`, `redo`, `checkpoint`, `list_checkpoints`, `restore_checkpoint` |
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
+| Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |
+
+### Lab work: schematic → simulate → you approve → Top-Down
+Claude is told to work in this order, and the tools enforce it:
+1. **Schematic:** Claude builds the circuit in Schematic Studio. Each sub-circuit is its own sheet, placed on its parent as a block.
+2. **Simulate:** Claude checks and simulates every sheet, and tells you the results.
+3. **Approve:** `request_approval` shows Claude's summary in a card in the editor, with **✓ อนุมัติ** and **✎ ขอแก้**.
+   - For ขอแก้, you type what to change; Claude gets your comment, fixes it, simulates again and asks again.
+   - Claude waits for your answer with `approval_status`. It returns after ≤40 s per call, because MCP clients cancel long calls.
+4. **Top-Down:** `make_topdown` draws the top sheet and every sheet it uses as layers in the Top-Down view:
+   `1st Layer (top)`, `2nd Layer (…)`, and so on.
+   - It **refuses** unless you approved exactly the circuit that is on screen.
+   - The approval is tied to each sheet's parts, parameters and connections, not to positions. Tidying the drawing is fine; changing the circuit needs a new approval.
+
+The prompt `lab_topdown` starts this flow. The old offline servers (`topdown/topdown_mcp.py`, `schematic_mcp.py`)
+write a Top-Down JSON that you then import yourself, so they skip steps 1–3. If Claude Desktop still has one of them
+configured, **ตั้งค่า → เชื่อมกับ Claude** warns about it and can remove it. The config file is backed up to `.json.bak`.
 
 There are also **resources** (`fpga://guide`, `fpga://board/edge-spartan7`, `fpga://sheet/active`,
 `fpga://component-types`) and **prompts** (`design_from_spec`, `debug_simulation`, `prepare_for_board`).

@@ -63,3 +63,21 @@ test("same version is not offered", async ({ request }) => {
   const r = await (await request.get(BASE + "/api/update/check?force=1")).json();
   expect(r.available).toBe(false);
 });
+
+test("while Setup runs, Home waits for the new version and reloads into it", async ({ request, page }) => {
+  release = { tag_name: "v9.9.10", body: "", html_url: "https://example.invalid/rel",
+    assets: [{ name: "FPGAEcosystem-Setup-9.9.10.exe", browser_download_url: "https://example.invalid/setup.exe" }] };
+  await request.get(BASE + "/api/update/check?force=1");
+  // the install itself only runs on Windows: fake it, and the old server going away mid-way
+  let infos = 0;
+  await page.route("**/api/update/install", r => r.fulfill({ json: { ok: true, started: true } }));
+  await page.route("**/api/update/progress", r => r.fulfill({ json: { phase: "installing", log: "C:\\Temp\\FPGAEcosystem-update.log" } }));
+  await page.route("**/api/info", r => (++infos === 1 ? r.abort() : r.fulfill({ json: { app: "fpga-ecosystem", version: "9.9.10" } })));
+  await page.goto(BASE + "/");
+  await expect(page.locator("#updBanner")).toBeVisible();
+  const reloaded = page.waitForEvent("load");
+  await page.click("#updGo");
+  await expect(page.locator("#updGo")).toContainText("กำลังติดตั้ง");
+  await reloaded;                                   // the new version answered → the page reloaded itself
+  expect(infos).toBeGreaterThanOrEqual(2);
+});

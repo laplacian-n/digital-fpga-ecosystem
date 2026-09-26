@@ -112,8 +112,15 @@ class Installer:
         on_ready(dest)
 
 
+def setup_log_path() -> str:
+    return os.path.join(tempfile.gettempdir(), "FPGAEcosystem-update.log")
+
+
 def run_setup(path: str) -> None:
-    """Silent in-place upgrade. The installer closes nothing we still need (the launcher
-    exits right after this) and relaunches the app when it is done (installer.iss [Run])."""
-    subprocess.Popen([path, "/SILENT", "/SP-", "/SUPPRESSMSGBOXES", "/NORESTART"],
+    """Silent in-place upgrade. The launcher exits right after this; the installer force-closes
+    anything else still running from the install folder (FPGA Builder, or the MCP exe that
+    Claude Desktop keeps open - a silent install would otherwise stall on it), logs to
+    setup_log_path() and relaunches the app with --after-update (installer.iss [Run])."""
+    subprocess.Popen([path, "/SILENT", "/SP-", "/SUPPRESSMSGBOXES", "/NORESTART",
+                      "/CLOSEAPPLICATIONS", "/FORCECLOSEAPPLICATIONS", "/LOG=" + setup_log_path()],
                      creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))

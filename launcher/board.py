@@ -18,6 +18,7 @@ the project folder afterwards.
 from __future__ import annotations
 
 import glob
+import hashlib
 import os
 import re
 import shutil
@@ -189,6 +190,21 @@ def status(since: int = 0) -> dict:
             "elapsed": round((j.ended or time.time()) - j.started, 1) if j.kind != "idle" else 0}
 
 
+def release_dll_dir() -> None:
+    """The frozen launcher's bootloader calls SetDllDirectoryW(<bundle>) so Python finds
+    its DLLs - and child processes inherit that search path. Vivado then loaded OUR
+    tcl86t.dll (8.6.15) instead of its own and died on "version conflict for package
+    Tcl: have 8.6.15, need exactly 8.6.13", whatever TCL_LIBRARY said. Reset it before
+    starting any outside program (PyInstaller documents exactly this). Harmless when
+    not frozen / not Windows; our own extension modules load from their own folder."""
+    if IS_WIN and getattr(sys, "frozen", False):
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetDllDirectoryW(None)
+        except Exception:
+            pass
+
+
 def _clean_env(extra_path: str = "") -> dict:
     """The frozen launcher bundles its own Tcl/Tk (for FPGA Builder). Vivado must not see it:
     PyInstaller exports TCL_LIBRARY/TK_LIBRARY and prepends its folder to PATH, and Vivado's
@@ -210,6 +226,7 @@ def _run(kind, cmd, cwd, on_ok=None, scan_log=None, env=None, ok_check=None):
         j = JOB
         try:
             j.log("$ " + " ".join(cmd))
+            release_dll_dir()
             j.proc = subprocess.Popen(cmd, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                       stdin=subprocess.DEVNULL, env=env or _clean_env(),
                                       text=True, encoding="utf-8", errors="replace",
@@ -226,15 +243,16 @@ def _run(kind, cmd, cwd, on_ok=None, scan_log=None, env=None, ok_check=None):
                     on_ok()
                 j.state = "ok"
             else:
-                j.state = "error"
                 text = "\n".join(j.lines)
                 try:
                     if scan_log and Path(scan_log).is_file():
                         text = Path(scan_log).read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     pass
+                # hint BEFORE state: the page stops polling once it sees "error"
                 j.hint = explain(text, kind)
                 j.log(f"ล้มเหลว (exit {rc})")
+                j.state = "error"
         except FileNotFoundError as e:
             j.state = "error"
             j.log(f"เรียกโปรแกรมไม่ได้: {e}")
@@ -337,6 +355,10 @@ def start_build(project: str, top: str, vhdl: str, xdc: str, clk_port: str = "",
     bdir.mkdir(parents=True, exist_ok=True)
     vf = bdir / f"{top}.vhd"
     vf.write_text(vhdl, encoding="utf-8")
+    try:
+        (bdir / f"{top}.bit").with_suffix(".design").unlink()      # stamped again on success
+    except OSError:
+        pass
     (bdir / f"{top}.xdc").write_text(xdc_with_config(xdc, vhdl, clk_port), encoding="utf-8")
     part = BOARD["part"] + BOARD["pkg"] + BOARD["speed"]
     write_tcl(bdir, top, [vf], part)
@@ -353,6 +375,10 @@ def start_build(project: str, top: str, vhdl: str, xdc: str, clk_port: str = "",
 
     def done():
         JOB.result = {"bit": str(bit), "top": top}
+        try:   # what this .bit was built from, so the page can tell whether it is still current
+            bit.with_suffix(".design").write_text(design_hash(vhdl, xdc), encoding="utf-8")
+        except OSError:
+            pass
         if project_dir:
             try:
                 project_dir.mkdir(parents=True, exist_ok=True)
@@ -369,9 +395,39 @@ def start_build(project: str, top: str, vhdl: str, xdc: str, clk_port: str = "",
     return {"ok": True, "dir": str(bdir)}
 
 
-def last_bit(project: str, top: str) -> Path | None:
+def design_hash(vhdl: str, xdc: str) -> str:
+    return hashlib.sha256((vhdl or "").encode("utf-8") + b"\0" + (xdc or "").encode("utf-8")).hexdigest()
+
+
+def last_bit(project: str, top: str, project_dir: Path | None = None) -> Path | None:
+    """the .bit to load: the last build, else the copy kept in the project folder"""
     b = build_root() / safe_id(project, safe_id(top)) / f"{safe_id(top)}.bit"
-    return b if b.is_file() else None
+    if b.is_file():
+        return b
+    if project_dir:
+        c = Path(project_dir) / f"{safe_id(top)}.bit"
+        if c.is_file():
+            return c
+    return None
+
+
+def bit_status(project: str, top: str, vhdl: str = "", xdc: str = "",
+               project_dir: Path | None = None) -> dict:
+    """Is there a .bit for this design already, and was it built from the circuit as it is now?
+    current: True (same VHDL+XDC) / False (changed since) / None (unknown - e.g. a copy)."""
+    b = last_bit(project, top, project_dir)
+    if not b:
+        return {"ok": True, "exists": False}
+    st = b.stat()
+    stamp = b.with_suffix(".design")
+    current = None
+    if stamp.is_file() and (vhdl or xdc):
+        try:
+            current = stamp.read_text(encoding="utf-8").strip() == design_hash(vhdl, xdc)
+        except OSError:
+            pass
+    return {"ok": True, "exists": True, "path": str(b), "mtime": st.st_mtime, "size": st.st_size,
+            "current": current}
 
 
 def bit_info(path: Path) -> dict:
@@ -382,11 +438,12 @@ def bit_info(path: Path) -> dict:
         return {}
 
 
-def start_program(project: str, top: str, mode: str = "sram", cable: str = "ft2232") -> dict:
+def start_program(project: str, top: str, mode: str = "sram", cable: str = "ft2232",
+                  project_dir: Path | None = None) -> dict:
     ofl = find_ofl()
     if not ofl:
         return {"ok": False, "error": "ไม่พบ openFPGALoader (โปรแกรมโหลด .bit ลงบอร์ด) — ติดตั้งชุดเต็มหรือวางไว้ที่ tools\\openFPGALoader"}
-    bit = last_bit(project, top)
+    bit = last_bit(project, top, project_dir)
     if not bit:
         return {"ok": False, "error": "ยังไม่มีไฟล์ .bit — กด “สร้าง .bit” ก่อน"}
     info = bit_info(bit)

@@ -46,3 +46,26 @@ test("register: flip a data switch, step one clock, q follows d", async ({ page 
   await page.screenshot({ path: test.info().outputPath("register-sim.png") });
   expect(page.errors).toEqual([]);
 });
+
+test("register: plays on past the first run and takes a switch flip without stopping", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 860 });
+  await openEditor(page);
+  await drawRegister(page);
+  await page.evaluate(() => showSimPage("signals"));
+  await page.waitForFunction(() => SIM_SEQ && SIM_SEQ.rows.length);
+  const n0 = await page.evaluate(() => SIM_SEQ.rows.length);
+  await page.fill("#seqSpeed", "120");
+  await page.click('[data-act="seq-play"]');
+  await page.locator('#simPcb .swUnit.mapped', { hasText: "d2" }).click();       // while playing
+  expect(await page.evaluate(() => SIM_SEQ.playing)).toBe(true);                   // still running
+  await page.waitForFunction(n => SIM_SEQ.idx >= n + 2, n0, { timeout: 10000 });  // went past the first run
+  expect(await page.evaluate(() => SIM_SEQ.rows.length)).toBeGreaterThan(n0);
+  await expect(page.locator("#simValbar")).toContainText("q2=1");                  // the flip took effect
+  await page.click('[data-act="seq-play"]');
+  // timing: compact, with a cursor on the clock being shown
+  const w = await page.evaluate(() => +document.querySelector("#simTiming svg").dataset.cw);
+  expect(w).toBeLessThanOrEqual(24);
+  await expect(page.locator("#simTiming .wv-now")).toHaveCount(1);
+  await page.screenshot({ path: test.info().outputPath("sim-live.png") });
+  expect(page.errors).toEqual([]);
+});

@@ -315,6 +315,7 @@
           <button data-tx="1.3">ใหญ่</button><button data-tx="1.7">ใหญ่มาก</button>
         </div>
         <div class="hint" style="margin-top:6px" id="txInfo">—</div>
+        <label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="hopShow"> วาดสะพานตรงที่สายไขว้กัน</label>
       </div></div>
       <div class="sec pgsec collapsed"><h4>ข้อมูลนักศึกษา (หัวกระดาษ)</h4><div class="body">
         <label class="f">รหัสนักศึกษา</label><input class="i" id="mId">
@@ -389,6 +390,7 @@ function ensureProjectDefaults(){
   P.meta=Object.assign({projectName:'Digital Systems Lab',studentId:'',studentName:'',section:'',page:''},P.meta||{});
   P.page=Object.assign({show:true,orient:'landscape',mmPerUnit:0.30,marginMm:8},P.page||{});
   P.text=Object.assign({scale:1},P.text||{});
+  if(typeof P.hops!=='boolean') P.hops=false;
   P.sheets=P.sheets||[];
   P.active=Math.min(Math.max(0,P.active||0),Math.max(0,P.sheets.length-1));
   P.sheets.forEach(fixSheetDefaults);
@@ -467,7 +469,7 @@ function pins(n){
     (n.pinsT||[]).forEach((p,i)=>a.push({id:'T'+i,x:n.x+at('T',i,(i+1)*n.w/(n.pinsT.length+1)),y:n.y,side:'top',...norm(p)}));
   } else if(n.type==='gate'){
     const ni=n.inputs||2;
-    for(let i=0;i<ni;i++) a.push({id:'in'+i,x:n.x-8,y:n.y+n.h*(i+1)/(ni+1),side:'left',name:''});
+    for(let i=0;i<ni;i++) a.push({id:'in'+i,x:n.x-8-((n.invIn&&n.invIn[i])?2*BUBBLE_R:0),y:n.y+n.h*(i+1)/(ni+1),side:'left',name:''});
     const bub=(n.gate==='nand'||n.gate==='nor'||n.gate==='xnor'||n.gate==='not');
     a.push({id:'out',x:n.x+n.w+(bub?9:0)+8,y:n.y+n.h/2,side:'right',name:''});
   } else if(n.type==='mux'){
@@ -497,7 +499,7 @@ function geom(n){
   if(n.type==='block'){
     L.push([[n.x,n.y],[n.x+n.w,n.y],[n.x+n.w,n.y+n.h],[n.x,n.y+n.h],[n.x,n.y]]);
     // the drawings write a block's name ABOVE its box, not inside it
-    T.push({s:n.label,x:n.x+n.w/2,y:n.y-5*ts,h:11*ts,a:'middle'});
+    T.push({s:n.label,x:n.x,y:n.y-5*ts,h:11*ts,a:'start'});
     // a block detailed by a child sheet gets the nested-frame mark
     if(n.sheet){
       const c=n.x+n.w-6, b=n.y+n.h-6;
@@ -542,7 +544,9 @@ function geom(n){
     }
     // input/output stubs
     pins(n).forEach(p=>{ if(p.id==='out'){ const ox=(g==='not'||g==='buf')?x+w:(g==='and'||g==='nand')?x+w:x+w;
-        L.push([[ox,y+h/2],[p.x,p.y]]); } else { L.push([[x,p.y],[p.x,p.y]]); } });
+        L.push([[ox,y+h/2],[p.x,p.y]]); }
+      else if(n.invIn&&n.invIn[+p.id.slice(2)]){ L.push([[x-2*BUBBLE_R,p.y],[p.x,p.y]]); D.push([x-BUBBLE_R,p.y,BUBBLE_R]); }
+      else { L.push([[x,p.y],[p.x,p.y]]); } });
     const bub=(g==='nand'||g==='nor'||g==='xnor'||g==='not');
     if(bub){ const bx=(g==='not'||g==='buf')?x+w:x+w; D.push([bx+4.5,y+h/2,4.5]); }
     if(n.label) T.push({s:n.label,x:x+w/2,y:y-4*ts,h:8*ts,a:'middle'});
@@ -560,11 +564,12 @@ function geom(n){
     // other way, into the circuit, so a label can never lie along its own wire.
     const horiz=dy===0;
     const lx=horiz?(n.x+dx*32):n.x, ly=horiz?(n.y+3):(n.y+dy*32+(dy>0?9:-3));
-    T.push({s:n.name+(n.bus?('['+(n.bus-1)+':0]'):''),x:lx,y:ly,h:9*ts,a:horiz?(dx<0?'end':'start'):'middle'});
+    // a name that already says its width ("D0[3:0]") is not given a second one
+    T.push({s:n.name+(n.bus&&!/\]\s*$/.test(n.name)?('['+(n.bus-1)+':0]'):''),x:lx,y:ly,h:9*ts,a:horiz?(dx<0?'end':'start'):'middle'});
     if(n.bus){ const mx=n.x+dx*16,my=n.y+dy*16; L.push([[mx-5,my+6],[mx+5,my-6]]);
       T.push({s:String(n.bus),x:mx+8,y:my-9,h:7,a:'start'});}
   } else if(n.type==='const'){
-    L.push([[n.x,n.y],[n.x+16,n.y]]); T.push({s:n.value,x:n.x-3,y:n.y+3,h:9*ts,a:'end'});
+    L.push([[n.x,n.y+6],[n.x+16,n.y+6]]); T.push({s:n.value,x:n.x-3,y:n.y+9,h:9*ts,a:'end'});
   } else if(n.type==='netlabel'){
     // a flag whose point sits on the pin, body running away from the circuit
     const d=(n.side==='right')?-1:1;
@@ -1151,6 +1156,7 @@ function hopWidth(q,xs,lo,hi){
   return Math.max(0,Math.min(HOP_W,room));
 }
 function crossings(s,routes){
+  if(!P.hops) return {};
   const key=w=>(w.from&&w.from.node)?(w.from.node+'.'+w.from.pin):('w:'+w.id);
   const byWire={};
   const ws=s.wires.filter(w=>routes.get(w.id));
@@ -1227,6 +1233,64 @@ function gJunctions(s,routes){
     }
   });
   return dots;
+}
+/* Bus width marks, the way the sheets draw them: a slash with the width a little way out
+   of the source AND a little way before every sink ("4" by Counter's D0, again by Display's
+   and Compare's). Branches of one net share the run out of the source, so its mark is
+   drawn once. A short straight bus gets one mark in the middle. Shared by screen and plotter. */
+function busTicks(s,routes){
+  // out of a source: a hand's width along; into a sink: close to the pin, clear of the dots
+  const out=[], seen=new Set(), dots=gJunctions(s,routes);
+  const put=(p,fromStart,n)=>{
+    const len=p.t==='h'?Math.abs(p.x2-p.x1):Math.abs(p.y2-p.y1);
+    let d=Math.min(fromStart?22:12,len/2);
+    const at=dd=>p.t==='h'?[fromStart?p.x1+(Math.sign(p.x2-p.x1)||1)*dd:p.x2-(Math.sign(p.x2-p.x1)||1)*dd,p.y]
+                          :[p.x,fromStart?p.y1+(Math.sign(p.y2-p.y1)||1)*dd:p.y2-(Math.sign(p.y2-p.y1)||1)*dd];
+    for(let k=0;k<4&&dots.some(q=>Math.hypot(q[0]-at(d)[0],q[1]-at(d)[1])<9);k++) d=Math.max(4,d-6);
+    let x,y;
+    if(p.t==='h'){ const dir=Math.sign(p.x2-p.x1)||1; x=fromStart?p.x1+dir*d:p.x2-dir*d; y=p.y; }
+    else { const dir=Math.sign(p.y2-p.y1)||1; x=p.x; y=fromStart?p.y1+dir*d:p.y2-dir*d; }
+    const k=Math.round(x)+','+Math.round(y); if(seen.has(k)) return; seen.add(k);
+    out.push({x,y,horiz:p.t==='h',n});
+  };
+  const node=id=>s.nodes.find(m=>m.id===id);
+  for(const w of s.wires){
+    if(!w.bus) continue;
+    const r=routes.get(w.id); if(!r||!r.parts.length) continue;
+    const a=node(w.from.node), b=node(w.to.node);
+    const first=r.parts[0], last=r.parts[r.parts.length-1];
+    const total=r.parts.reduce((m,p)=>m+(p.t==='h'?Math.abs(p.x2-p.x1):Math.abs(p.y2-p.y1)),0);
+    if(r.parts.length===1&&total<90){ put(first,true,w.bus); continue; }
+    // a port draws its own mark on its tail
+    if(!(a&&a.type==='port'&&a.bus)) put(first,true,w.bus);
+    if(!(b&&b.type==='port'&&b.bus)) put(last,false,w.bus);
+  }
+  return out;
+}
+function busTickLines(t){
+  return t.horiz?[[t.x-5,t.y+6],[t.x+5,t.y-6]]:[[t.x-6,t.y+5],[t.x+6,t.y-5]];
+}
+/* A net's branches share their run out of the source; drawn wire by wire, that trunk is inked
+   once per branch (bold on screen, several pen passes on the plotter). Without hop arcs the
+   net is drawn ONCE instead: every run merged with the collinear runs it overlaps. */
+function netUnion(s,routes){
+  const key=w=>(w.from&&w.from.node)?(w.from.node+'.'+w.from.pin):('w:'+w.id);
+  const nets=new Map();
+  for(const w of s.wires){ const r=routes.get(w.id); if(!r) continue; const k=key(w);
+    if(!nets.has(k)) nets.set(k,{h:new Map(),v:new Map()});
+    const n=nets.get(k);
+    for(const p of r.parts){
+      if(p.t==='h'){ const y=Math.round(p.y*10)/10; (n.h.get(y)||n.h.set(y,[]).get(y)).push([Math.min(p.x1,p.x2),Math.max(p.x1,p.x2)]); }
+      else { const x=Math.round(p.x*10)/10; (n.v.get(x)||n.v.set(x,[]).get(x)).push([Math.min(p.y1,p.y2),Math.max(p.y1,p.y2)]); }
+    } }
+  const merge=a=>{ a.sort((p,q)=>p[0]-q[0]); const o=[]; for(const iv of a){ const l=o[o.length-1];
+    if(l&&iv[0]<=l[1]+0.5) l[1]=Math.max(l[1],iv[1]); else o.push(iv.slice()); } return o; };
+  const out=[];
+  for(const n of nets.values()){
+    for(const [y,a] of n.h) merge(a).forEach(([x1,x2])=>out.push([[x1,y],[x2,y]]));
+    for(const [x,a] of n.v) merge(a).forEach(([y1,y2])=>out.push([[x,y1],[x,y2]]));
+  }
+  return out;
 }
 /* Where a route crosses the module boundary. The sheets mark a bus again on
    the far side of the dashed line — the reader needs to know how wide the
@@ -1403,7 +1467,8 @@ function render(){
     }
     const isSel=sel.type==='wire'&&sel.id===w.id;
     const dPath=wirePath(r,hops[w.id]);
-    g+=`<path data-wire="${w.id}" d="${dPath}" fill="none" stroke="${isSel?'#000':'#111'}" stroke-width="${isSel?2.2:1.3}"/>`;
+    // without hops the nets are drawn once each (netUnion, below); a selected wire on top
+    if(P.hops||isSel) g+=`<path data-wire="${w.id}" d="${dPath}" fill="none" stroke="${isSel?'#000':'#111'}" stroke-width="${isSel?2.2:1.3}"/>`;
     g+=`<path data-wire="${w.id}" d="${r.d}" fill="none" stroke="transparent" stroke-width="10" style="cursor:pointer"/>`;
     if(isSel){
       const lg=movableLeg(r);
@@ -1443,11 +1508,12 @@ function render(){
         g+=`<line x1="${bx2-5}" y1="${by2+6}" x2="${bx2+5}" y2="${by2-6}" stroke="#111"/>`+
            `<text x="${bx2+7}" y="${by2-7}" font-family="${fam()}" font-size="${(9*TS()).toFixed(1)}">${w.bus}</text>`;
       });
-      const m=routeMid(r,hops[w.id]);
-      g+=(m[2]?`<line x1="${m[0]-5}" y1="${m[1]+6}" x2="${m[0]+5}" y2="${m[1]-6}" stroke="#111"/>`
-              :`<line x1="${m[0]-6}" y1="${m[1]+5}" x2="${m[0]+6}" y2="${m[1]-5}" stroke="#111"/>`)+
-        `<text x="${m[0]+7}" y="${m[1]-7}" font-family="${fam()}" font-size="${(9*TS()).toFixed(1)}">${w.bus}</text>`; }
+    }
   }
+  if(!P.hops) g+=`<path d="${netUnion(s,routes).map(sg=>'M'+sg[0][0].toFixed(1)+' '+sg[0][1].toFixed(1)+'L'+sg[1][0].toFixed(1)+' '+sg[1][1].toFixed(1)).join('')}" fill="none" stroke="#111" stroke-width="1.3" pointer-events="none"/>`;
+  busTicks(s,routes).forEach(t=>{ const l=busTickLines(t);
+    g+=`<line x1="${l[0][0]}" y1="${l[0][1]}" x2="${l[1][0]}" y2="${l[1][1]}" stroke="#111"/>`+
+       `<text x="${t.x+7}" y="${t.y-7}" font-family="${fam()}" font-size="${(9*TS()).toFixed(1)}">${t.n}</text>`; });
   /* Junction dots mark where a wire branches off the MIDDLE of another, the
      way the hand-drawn sheets do. A dot at a component pin is not drawn: the
      pin is already the connection, and a filled dot there landed straight on
@@ -1582,11 +1648,13 @@ function nodeBounds(n){
   if(minX>maxX){minX=n.x;minY=n.y;maxX=n.x+20;maxY=n.y+20;}
   // a block's name now sits above the box, so it belongs inside the bounds —
   // otherwise you cannot grab a part by its name and it can sit on a neighbour
+  // a port's name sits past its tail; the page fit has to leave room for it
+  if(n.type==='port'){ const g=geom(n).texts[0]; if(g){ const w=String(g.s).length*6.2*TS();
+    if(g.a==='end') minX=Math.min(minX,g.x-w); else if(g.a==='start') maxX=Math.max(maxX,g.x+w); } }
   if(n.type==='block'&&n.label){
     const ts=TS();
     minY=Math.min(minY,n.y-16*ts);
-    const half=String(n.label).length*3.6*ts;
-    minX=Math.min(minX,n.x+n.w/2-half); maxX=Math.max(maxX,n.x+n.w/2+half);
+    maxX=Math.max(maxX,n.x+String(n.label).length*7.2*ts);
   }
   return {x:minX,y:minY,w:maxX-minX,h:maxY-minY};
 }
@@ -1653,6 +1721,7 @@ function syncSheetProps(){
   if(pg&&P.page){ pg.checked=!!P.page.show;
     set(document.getElementById('pgOrient'),P.page.orient);
     set(document.getElementById('pgScale'),P.page.mmPerUnit); }
+  const hs=document.getElementById('hopShow'); if(hs) hs.checked=!!P.hops;
   const tr=document.getElementById('txRange');
   if(tr&&P.text){ const v=TS();
     if(tr!==act) tr.value=v;
@@ -2066,7 +2135,8 @@ cv.addEventListener('pointerdown',e=>{
           // take the bus width from the pins themselves — "D0[3:0]" already says 4
           const na=s.nodes.find(m=>m.id===a.node), nb=s.nodes.find(m=>m.id===b.node);
           const bw=Math.max(na?pinWidth(na,a.pin):0, nb?pinWidth(nb,b.pin):0);
-          s.wires.push({id:uid(),from:a,to:b,bus:bw>1?bw:0});
+          s.wires.push({id:uid(),from:a,to:b,bus:bw>1?bw:0,auto:s.wires.some(x=>x.auto)||undefined});
+          engineReroute();
           wireStart=null;                    // stay in wire mode for the next one
           toast(bw>1?('Wired · '+bw+"-bit bus"):'Wired — Esc to leave wire mode');
         }
@@ -2173,7 +2243,13 @@ cv.addEventListener('pointermove',e=>{
   }
   else if(drag.kind==='pan'){const r=cv.getBoundingClientRect();const sc=Math.min(r.width/view.w,r.height/view.h);view.x=drag.vx-(e.clientX-drag.sx)/sc;view.y=drag.vy-(e.clientY-drag.sy)/sc;render();}
 });
-cv.addEventListener('pointerup',()=>{const hadBox=!!box;drag=null;box=null;cv.classList.remove('grabbing');
+/* A sheet laid out by td-engine keeps its wiring engine-owned (w.auto): after a part is
+   moved or resized, every such wire is routed again as one set, so nets stay trees that
+   go round the bodies. A corner the user drags by hand makes that wire theirs. */
+function engineReroute(){ const s=SH(); if(window.TDE&&s&&s.wires.some(w=>w.auto)){ TDE.route(s); return true; } return false; }
+cv.addEventListener('pointerup',()=>{const hadBox=!!box, d=drag;drag=null;box=null;cv.classList.remove('grabbing');
+  if(d&&d.kind==='wp'){ const w=SH().wires.find(x=>x.id===d.id); if(w) delete w.auto; }
+  if(d&&(d.kind==='node'||d.kind==='bres')&&engineReroute()){ guides=[]; render(); histTick(); return; }
   if(guides.length||hadBox){guides=[];render();}});
 /* double-click a block to drill into the sheet that details it */
 cv.addEventListener('dblclick',e=>{
@@ -2203,7 +2279,7 @@ function delSel(){
     s.nodes=s.nodes.filter(n=>!ids.has(n.id));
     if(ids.size>1) toast('Deleted '+ids.size+' parts');
   } else if(sel.type==='wire'){ s.wires=s.wires.filter(w=>w.id!==sel.id); }
-  clearMulti(); sel={type:null,id:null}; render();
+  clearMulti(); sel={type:null,id:null}; engineReroute(); render();
 }
 /* ---- arrange a group ---- */
 function alignSel(how){
@@ -2260,6 +2336,10 @@ function openBlockInGate(n){
    no page can hold, so the columns are folded into bands chosen to land near A4's 1.41 aspect.
    Then the frame is wrapped, hand routing cleared and the page scale fitted. */
 function autoLayoutSheet(s){
+  if(window.TDE&&s.nodes.length){
+    const r=TDE.layout(s); fitPageScale(true); fitView(); render(); syncSheetProps();
+    return {cols:r.cols, bands:r.bands};
+  }
   const nodes=s.nodes; if(!nodes.length) return null;
   const byId=new Map(nodes.map(n=>[n.id,n]));
   const preds=new Map(nodes.map(n=>[n.id,new Set()])), succs=new Map(nodes.map(n=>[n.id,new Set()]));
@@ -2379,6 +2459,23 @@ function importSheet(sh){
       const n=mkBlock(160,140, m.label||'Block', (m.pinsL&&m.pinsL.length)?m.pinsL:['in'], (m.pinsR&&m.pinsR.length)?m.pinsR:['out']);
       s.nodes.push(n); sel={type:'node',id:n.id}; render(); histTick();
       toast('รับบล็อก "'+(m.label||'')+'" จากตัววาดเกต');
+    }
+    else if(m.type==='td:loadSheets' && Array.isArray(m.sheets) && m.sheets.length){
+      // the approved design's layers, top first (MCP make_topdown): each is added, or updated in
+      // place when it came from the same gate sheet before; the view opens on the top layer
+      let firstIdx=-1;
+      m.sheets.forEach(sh=>{ importSheet(sh); if(firstIdx<0) firstIdx=P.active; });
+      if(firstIdx>=0){ P.active=firstIdx; fitView(); render(); }
+      renderSheets(); syncSheetProps(); histTick();
+      toast('Top-Down: '+m.sheets.length+' แผ่น จากวงจรที่อนุมัติแล้ว');
+    }
+    else if(m.type==='td:loadProject' && m.project && Array.isArray(m.project.sheets)){
+      // a Top-Down file opened from the gate editor: its sheets are ADDED, drawn as saved
+      const first=P.sheets.length;
+      m.project.sheets.forEach(sh=>{ const s2=normalizeSheet(JSON.parse(JSON.stringify(sh))); fixSheetDefaults(s2); P.sheets.push(s2); });
+      P.active=first; sel={type:null,id:null};
+      fitView(); render(); renderSheets(); syncSheetProps(); histTick();
+      toast('เปิด '+m.project.sheets.length+' แผ่นจากไฟล์ ('+((m.project.meta&&m.project.meta.projectName)||'Top-Down')+')');
     }
     else if(m.type==='td:loadSheet' && m.sheet && m.sheet.nodes){
       const r=importSheet(m.sheet);
@@ -2554,6 +2651,7 @@ function setTextScale(v,fromEl){
   render();
 }
 document.getElementById('txRange').oninput=e=>setTextScale(e.target.value,e.target);
+document.getElementById('hopShow').onchange=e=>{P.hops=e.target.checked;render();histTick();};
 document.getElementById('txNum').oninput=e=>setTextScale(e.target.value,e.target);
 document.querySelectorAll('[data-tx]').forEach(b=>b.onclick=()=>setTextScale(b.getAttribute('data-tx')));
 /* the standard print size: a 2-input gate (52 × 44 units) is ~16 × 13 mm on paper */
@@ -2760,19 +2858,18 @@ function sheetPolys(s,dx,dy,report){
   const gHops=crossings(s,gRoutes);
   s.wires.forEach(w=>{
     const r=gRoutes.get(w.id); if(!r) return;
-    P2.push(off(hopPoly(r,gHops[w.id])));          // bridges go on the paper too
+    if(P.hops) P2.push(off(hopPoly(r,gHops[w.id])));   // bridges go on the paper too
     if(w.bus){
       frameCrossings(s,r).forEach(fc=>{
         const bx2=fc.x+(fc.horiz?fc.dir*16:0), by2=fc.y+(fc.horiz?0:fc.dir*16);
         P2.push(off([[bx2-5,by2+6],[bx2+5,by2-6]]));
         txt(String(w.bus),bx2+7,by2-7,9*TS()).forEach(pl=>P2.push(off(pl)));
       });
-      const m=routeMid(r,gHops[w.id]);
-      P2.push(off([[m[0]-5,m[1]+6],[m[0]+5,m[1]-6]]));
-      // the width figure beside the tick was never emitted at all
-      txt(String(w.bus),m[0]+7,m[1]-7,9*TS()).forEach(pl=>P2.push(off(pl)));
     }
   });
+  if(!P.hops) netUnion(s,gRoutes).forEach(sg=>P2.push(off(sg)));   // each run inked once
+  busTicks(s,gRoutes).forEach(t=>{ P2.push(off(busTickLines(t)));
+    txt(String(t.n),t.x+7,t.y-7,9*TS()).forEach(pl=>P2.push(off(pl))); });
   // junction dots, drawn as a filled-looking ring
   gJunctions(s,gRoutes).forEach(d=>{ P2.push(off(circle(d[0],d[1],2.2))); P2.push(off(circle(d[0],d[1],1.1))); });
   // nodes
@@ -3428,3 +3525,4 @@ syncMeta();fitView();render();renderSheets();syncSheetProps();initHist();
 _g('bSnap').setAttribute('aria-pressed',snap.on);
 window.addEventListener('resize',()=>render());
 </script>
+<script src="td-engine.js"></script>

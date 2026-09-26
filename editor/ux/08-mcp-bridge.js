@@ -470,6 +470,177 @@ function mcpEvent(kind, data){ MCPB.events.push(Object.assign({seq:++MCPB.seq, t
     return r; };
 }
 
+/* ---------- projects ---------- */
+MCP_OPS.new_project = a=>{
+  const name=String(a.name||"").trim(); if(!name) mcpFail("name is required");
+  mcpBeforeChange("โปรเจกต์ใหม่");
+  const p=addProject(name); state.view={x:0,y:0,k:1};
+  const pn=$("#projectName"); if(pn) pn.value=p.name;
+  mcpCommit(null); try{ zoomFit(); }catch(_){}
+  mcpActivity("โปรเจกต์ใหม่ "+p.name);
+  return Object.assign({created:p.name, renamed: p.name!==sanId(name) ? "a project with that name exists — used "+p.name : undefined}, MCP_OPS.status());
+};
+
+/* ---------- the real board: the ลงบอร์ด page's own build / program, driven by Claude ----------
+   A Vivado build takes minutes, longer than an MCP client waits for one call, so board_build /
+   board_program start the job and board_status follows it (≤40 s per call). The page opens so
+   the user watches the same log. Writing the Flash (permanent) stays a click of the user's. */
+async function mcpBoardPage(){ try{ if(!$("#boardPage.show")) await openBoardPage(); }catch(_){} }
+MCP_OPS.board_build = async ()=>{
+  if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("building needs the FPGA Ecosystem app (the editor was opened from disk)");
+  const d=brdDesign(); if(!d) mcpFail("no top sheet");
+  if(d.missing.length) mcpFail(`${d.missing.length} port(s) have no board pin: ${d.missing.slice(0,8).join(", ")}`, "get_pins, then set_pins or auto_pins");
+  await mcpBoardPage();
+  const r=await brdPost("/api/board/build",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+  if(!r||!r.ok) mcpFail((r&&r.error)||"could not start the build");
+  try{ brdLog(true); brdPoll(false); }catch(_){}
+  mcpActivity("สร้าง .bit");
+  return {started:"build", top:d.top, folder:r.dir, next:"call board_status until state is not 'running' (Vivado takes ~1-3 min)"};
+};
+MCP_OPS.board_program = async a=>{
+  if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("programming needs the FPGA Ecosystem app");
+  const mode=a.mode||"sram", cable=a.cable||"ft2232";
+  await mcpBoardPage();
+  let r;
+  if(mode==="detect") r=await brdPost("/api/board/detect",{cable});
+  else { const d=brdDesign(); r=await brdPost("/api/board/program",{project:brdProject(), top:d.top, mode:"sram", cable}); }
+  if(!r||!r.ok) mcpFail((r&&r.error)||"could not start", "board_status shows the log; about → board shows what is installed");
+  try{ brdLog(true); brdPoll(false); }catch(_){}
+  mcpActivity(mode==="detect"?"ตรวจหาบอร์ด":"โหลดลงบอร์ด");
+  return {started:mode, next:"call board_status"};
+};
+MCP_OPS.board_status = async a=>{
+  const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
+  let s;
+  for(;;){ s=await (await fetch("/api/board/status")).json(); if(s.state!=="running" || Date.now()>until) break;
+    await new Promise(r=>setTimeout(r, 700)); }
+  const out={job:s.kind, state:s.state, seconds:s.elapsed, log_tail:(s.lines||[]).slice(-25).join("\n")};
+  if(s.hint) out.explain=s.hint;
+  if(s.result&&Object.keys(s.result).length) out.result=s.result;
+  if(s.state==="running") out.next="still running — call board_status again";
+  try{ const d=brdDesign(); const b=await brdPost("/api/board/bit",{project:brdProject(), top:d.top, vhdl:d.vhdl, xdc:d.xdc});
+    if(b&&b.ok) out.bit=b.exists?{path:b.path, matches_circuit:b.current}:null; }catch(_){}
+  return out;
+};
+
+/* ---------- the lab workflow: schematic → simulate → the USER approves → Top-Down ----------
+   Claude shows its summary in a card in the editor and the user answers there (อนุมัติ / ขอแก้).
+   The approval is tied to the circuit as it was when approved (a fingerprint of every sheet's
+   parts, params and wiring — not positions): make_topdown refuses anything else, so a design
+   changed after approval has to be approved again. request_approval returns at once and
+   approval_status waits ≤40 s per call, because MCP clients give up on a single long call. */
+MCPB.approval={state:"none"};
+function mcpDesignHash(){
+  const P=state.project, out=[P.topId||""];
+  Object.keys(P.schematics).sort().forEach(id=>{ const s=P.schematics[id];
+    out.push(id+":"+s.name);
+    s.components.filter(c=>c.type!=="JUNCTION").map(c=>c.id+"|"+c.type+"|"+(c.label||"")+"|"+JSON.stringify(c.params||{})).sort().forEach(x=>out.push(x));
+    // wiring as connectivity: junctions collapse into nets, so re-routing does not count as a change
+    try{ const seen=new Set(); s.wires.forEach(w=>{ if(seen.has(w.id)) return; const ids=[...netWires(s,w)]; ids.forEach(i=>seen.add(i));
+      const ends=new Set(); ids.forEach(i=>{ const x=s.wires.find(q=>q.id===i); if(!x) return;
+        [x.from,x.to].forEach(e=>{ const c=comp(e.cid,s); if(c&&c.type!=="JUNCTION") ends.add(e.cid+"."+e.pid); }); });
+      out.push("net:"+[...ends].sort().join(",")); }); }catch(_){ s.wires.forEach(w=>out.push(w.from.cid+"."+w.from.pid+">"+w.to.cid+"."+w.to.pid)); }
+  });
+  const str=out.join("\n"); let h=2166136261>>>0;
+  for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+  return h.toString(16)+"-"+str.length;
+}
+function mcpApprovalCard(summary){
+  let el=$("#mcpApproval"); if(el) el.remove();
+  el=document.createElement("div"); el.id="mcpApproval"; el.className="mcp-approval";
+  el.innerHTML=`<div class="mcp-ap-h"><span class="dot"></span>Claude ขออนุมัติวงจร <span class="muted">${esc(state.project.name||"")}</span></div>
+    <div class="mcp-ap-body">${esc(summary).replace(/\n/g,"<br>")}</div>
+    <div class="muted" style="font-size:12px">ดูวงจรและผลจำลองในหน้าจอก่อน — อนุมัติแล้ว Claude จะทำ Top-Down จากวงจรนี้</div>
+    <textarea id="mcpApNote" rows="2" placeholder="ถ้าจะให้แก้ บอกตรงนี้ว่าแก้อะไร"></textarea>
+    <div class="mcp-ap-row"><button class="btn" data-ap="changes">✎ ขอแก้</button><span class="grow"></span>
+      <button class="btn btn-primary" data-ap="approve">✓ อนุมัติ — ทำ Top-Down ต่อ</button></div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", e=>{ const b=e.target.closest("[data-ap]"); if(!b) return;
+    const note=($("#mcpApNote")||{}).value||"";
+    if(b.dataset.ap==="changes" && !note.trim()){ $("#mcpApNote").focus(); toast("พิมพ์สิ่งที่อยากให้แก้ก่อน แล้วกด ขอแก้ อีกครั้ง","warn"); return; }
+    MCPB.approval = b.dataset.ap==="approve"
+      ? {state:"approved", hash:mcpDesignHash(), comment:note.trim(), at:Date.now()}
+      : {state:"changes", comment:note.trim(), at:Date.now()};
+    el.remove(); mcpEvent("approval", {state:MCPB.approval.state, comment:MCPB.approval.comment||""});
+    toast(MCPB.approval.state==="approved"?"อนุมัติแล้ว — Claude จะทำ Top-Down ต่อ":"ส่งให้ Claude แก้แล้ว","ok",3000);
+  });
+}
+MCP_OPS.request_approval = a=>{
+  const summary=String(a.summary||"").trim(); if(!summary) mcpFail("summary is required: what you built and what the simulation showed");
+  MCPB.approval={state:"waiting", asked:Date.now()};
+  mcpApprovalCard(summary); mcpActivity("รออนุมัติ");
+  return {status:"waiting", next:"call approval_status (it waits for the user's click) until it is no longer 'waiting'"};
+};
+MCP_OPS.approval_status = async a=>{
+  const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
+  while(MCPB.approval.state==="waiting" && Date.now()<until) await new Promise(r=>setTimeout(r, 300));
+  const ap=MCPB.approval, out={status:ap.state};
+  if(ap.comment) out.comment=ap.comment;
+  if(ap.state==="approved") out.design_unchanged = ap.hash===mcpDesignHash();
+  if(ap.state==="waiting") out.next="still waiting for the user — call approval_status again";
+  if(ap.state==="changes") out.next="make the changes the user asked for, simulate again, then request_approval again";
+  if(ap.state==="none") out.next="nothing asked yet — call request_approval with a summary first";
+  return out;
+};
+/* the approved design → Top-Down: the top sheet, then every sheet it uses as a block, as layers */
+MCP_OPS.make_topdown = a=>{
+  const ap=MCPB.approval;
+  if(ap.state!=="approved") mcpFail("the user has not approved the design yet", "simulate/verify, then request_approval and wait for approval_status 'approved'");
+  if(ap.hash!==mcpDesignHash()) mcpFail("the circuit changed after the user approved it", "request_approval again for the changed circuit");
+  const P=state.project, top=a.sheet ? mcpSheet(a.sheet) : (P.schematics[P.topId]||activeSch());
+  const order=[], seen=new Set();
+  const walk=(s,d)=>{ if(!s||seen.has(s.id)) return; seen.add(s.id); order.push({s,d});
+    s.components.forEach(c=>{ const sub=subSchOf(c); if(sub) walk(sub,d+1); }); };
+  walk(top,0);
+  const ord=n=>n+(n%10===1&&n%100!==11?"st":n%10===2&&n%100!==12?"nd":n%10===3&&n%100!==13?"rd":"th");
+  const sheets=order.map(({s,d})=>{ const t=schematicToTopdownSheet(s); t.title=ord(d+1)+" Layer ("+s.name+")"; t.module=s.name; return t; });
+  sendToTopdown({type:"td:loadSheets", sheets});
+  mcpActivity("ทำ Top-Down");
+  return {sheets:sheets.map(t=>t.title), note:"shown in the Top-Down view (Tools ▸ Top-Down); the user can print / export from there"};
+};
+
+/* ---------- you see what Claude does, as it does it ----------
+   Every call already redraws the page; what hid it was WHERE: parts landed off-screen, or on
+   the canvas under the sim / board / Top-Down page. So around each call: note the sheet, and
+   afterwards bring the canvas forward, bring the change into view (only when it is not in view
+   already, so the drawing does not jump on every call) and make the changed parts glow. */
+function mcpSheetState(){
+  const sch=activeSch(); if(!sch) return null;
+  const m=new Map(); sch.components.forEach(c=>{ if(c.type!=="JUNCTION") m.set(c.id, c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{})); });
+  return {id:sch.id, m, w:new Set(sch.wires.map(w=>w.id))};
+}
+function mcpShowChange(pre){
+  const sch=activeSch(); if(!sch) return;
+  const changed=new Set();
+  sch.components.forEach(c=>{ if(c.type==="JUNCTION") return;
+    const k=c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{});
+    if(!pre || pre.id!==sch.id || pre.m.get(c.id)!==k) changed.add(c.id); });
+  sch.wires.forEach(w=>{ if(!pre || pre.id!==sch.id || !pre.w.has(w.id)){ changed.add(w.from.cid); changed.add(w.to.cid); } });
+  const newSheet = !pre || pre.id!==sch.id;
+  if(!changed.size && !newSheet) return;                  // a read-only call: leave the view alone
+  // the canvas has to be the thing on screen
+  try{ if($("#simPage.show")) hideSimPage(); }catch(_){}
+  try{ if($("#boardPage.show")) brdShow(false); }catch(_){}
+  try{ const tv=$("#topdownView"); if(tv && tv.style.display!=="none" && tv.style.display!=="") closeTopdown(); }catch(_){}
+  // in view? (world rectangle of the canvas vs the changed parts)
+  const cs=sch.components.filter(c=>changed.has(c.id));
+  if(cs.length){
+    const r=canvas.getBoundingClientRect();
+    const outOf=()=>{ const v=state.view, vx1=-v.x/v.k, vy1=-v.y/v.k, vx2=(r.width-v.x)/v.k, vy2=(r.height-v.y)/v.k;
+      return cs.some(c=>{ const z=getSize(c); return c.x<vx1+10||c.y<vy1+10||c.x+z.w>vx2-10||c.y+z.h>vy2-10; }); };
+    if(outOf()||newSheet){ try{ zoomFit(); }catch(_){} }
+    // a sheet too big to fit at the smallest zoom: centre the view on what changed instead
+    if(outOf() && r.width>0){
+      const x1=Math.min(...cs.map(c=>c.x)), y1=Math.min(...cs.map(c=>c.y)),
+            x2=Math.max(...cs.map(c=>c.x+getSize(c).w)), y2=Math.max(...cs.map(c=>c.y+getSize(c).h));
+      const v=state.view; v.x=r.width/2-(x1+x2)/2*v.k; v.y=r.height/2-(y1+y2)/2*v.k; render();
+    }
+  }
+  // glow on what changed, for a moment
+  requestAnimationFrame(()=>{ cs.forEach(c=>{ const el=document.querySelector('.node[data-cid="'+c.id+'"]'); if(el){ el.classList.remove("mcp-flash"); void el.getBoundingClientRect(); el.classList.add("mcp-flash"); } });
+    clearTimeout(mcpShowChange._t); mcpShowChange._t=setTimeout(()=>document.querySelectorAll(".mcp-flash").forEach(e=>e.classList.remove("mcp-flash")), 1800); });
+}
+
 /* ---------- transport: long-poll the launcher ---------- */
 async function mcpLoop(){
   let fails=0;
@@ -485,10 +656,12 @@ async function mcpLoop(){
     if(!job||!job.id) continue;
     let reply;
     MCPB.busy=true; MCPB.calls++;
+    const pre=mcpSheetState();
     try{
       const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);
       const result=await fn(job.args||{});
       reply={id:job.id, ok:true, result};
+      try{ mcpShowChange(pre); }catch(e){ console.warn("mcp view", e); }
     }catch(e){
       reply={id:job.id, ok:false, error:String(e&&e.message||e), hint:e&&e.hint||undefined};
       if(!(e instanceof McpError)) console.warn("mcp op failed", job.op, e);

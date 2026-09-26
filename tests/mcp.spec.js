@@ -33,6 +33,9 @@ test.beforeAll(async ({ browser: b }) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "fe-mcp-"));
   env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), APPDATA: path.join(home, "AppData"),
           NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost" };
+  // no network in tests: the update check is off (about then says so instead of asking GitHub)
+  const cfgDir = path.join(home, ".config", "fpga-ecosystem"); fs.mkdirSync(cfgDir, { recursive: true });
+  fs.writeFileSync(path.join(cfgDir, "config.json"), JSON.stringify({ update: { auto_check: false } }));
   launcher = spawn(PY, [path.join(ROOT, "launcher", "app.py"), "--no-open", "--port", String(PORT)], { env, stdio: "ignore" });
   for (let i = 0; i < 80; i++) { try { if ((await fetch(BASE + "/api/info")).ok) break; } catch (_) {} await new Promise(r => setTimeout(r, 250)); }
   browser = b;
@@ -137,4 +140,91 @@ test("the relay refuses calls without the token and cross-origin pages", async (
   expect((await request.post(BASE + "/api/mcp/call", { data: { op: "status" } })).status()).toBe(401);
   expect((await request.post(BASE + "/api/mcp/result", { data: {}, headers: { Origin: "https://evil.example" } })).status()).toBe(403);
   expect((await request.get(BASE + "/api/mcp/poll?client=x", { headers: { Origin: "https://evil.example" } })).status()).toBe(403);
+});
+
+test("you see Claude's change straight away: canvas forward, in view, highlighted", async () => {
+  await mcp.tool("new_sheet", { name: "watch" });
+  await mcp.tool("add_component", { type: "IN", name: "w_in" });
+  await page.evaluate(() => showSimPage("signals"));                    // the user is looking at the sim page
+  await expect(page.locator("#simPage")).toHaveClass(/show/);
+  // a part placed far off-screen
+  const r = await mcp.tool("add_component", { type: "NOT", name: "far", x: 4400, y: 3300 });
+  expect(r.error).toBe(false);
+  await expect(page.locator("#simPage")).not.toHaveClass(/show/);       // back on the canvas
+  const inView = await page.evaluate(() => { const s = activeSch(), c = s.components.find(x => x.label === "far");
+    const r = canvas.getBoundingClientRect(), v = state.view, z = getSize(c);
+    return c.x >= -v.x / v.k && c.y >= -v.y / v.k && c.x + z.w <= (r.width - v.x) / v.k && c.y + z.h <= (r.height - v.y) / v.k; });
+  expect(inView).toBe(true);
+  await expect(page.locator(".node.mcp-flash")).toHaveCount(1);          // the new part glows
+  // a read-only call does not move the view
+  const before = await page.evaluate(() => JSON.stringify(state.view));
+  await mcp.tool("get_sheet");
+  expect(await page.evaluate(() => JSON.stringify(state.view))).toBe(before);
+});
+
+test("lab flow: Top-Down only after the user approves the simulated circuit", async () => {
+  const tt = await mcp.tool("build_circuit", { name: "lab_ha", truth_table: { inputs: ["a", "b"], outputs: ["s", "c"], columns: { s: "0110", c: "0001" } } });
+  expect(tt.error).toBe(false);
+  await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "lab_ha"); state.project.topId = s.id; });
+  // not approved yet → refused
+  let r = await mcp.tool("make_topdown");
+  expect(r.error).toBe(true); expect(r.text).toContain("not approved");
+  // ask: the card shows the summary; the answer is pending
+  r = await mcp.tool("request_approval", { summary: "half adder: s = a xor b, c = a and b — simulation matches" });
+  expect(r.data.status).toBe("waiting");
+  await expect(page.locator("#mcpApproval")).toContainText("half adder");
+  r = await mcp.tool("approval_status", { wait: 1 });
+  expect(r.data.status).toBe("waiting");
+  // the user approves in the editor
+  const pending = mcp.tool("approval_status", { wait: 20 });
+  await page.click('#mcpApproval [data-ap="approve"]');
+  r = await pending;
+  expect(r.data).toMatchObject({ status: "approved", design_unchanged: true });
+  r = await mcp.tool("make_topdown");
+  expect(r.error).toBe(false);
+  expect(r.data.sheets[0]).toBe("1st Layer (lab_ha)");
+  await expect(page.locator("#topdownView")).toBeVisible();
+  await page.evaluate(() => closeTopdown());
+  // the circuit changes after approval → must be approved again
+  await mcp.tool("add_component", { sheet: "lab_ha", type: "NOT", name: "extra" });
+  r = await mcp.tool("make_topdown");
+  expect(r.error).toBe(true); expect(r.text).toContain("changed after");
+  // asking for changes gives Claude the user's comment
+  await mcp.tool("request_approval", { summary: "half adder + extra NOT" });
+  await page.fill("#mcpApNote", "เอา NOT ออก");
+  await page.click('#mcpApproval [data-ap="changes"]');
+  r = await mcp.tool("approval_status", { wait: 5 });
+  expect(r.data).toMatchObject({ status: "changes", comment: "เอา NOT ออก" });
+});
+
+test("Claude knows the app: about, projects, board readiness; new_project; board errors are clear", async () => {
+  const ver = fs.readFileSync(path.join(ROOT, "launcher", "app.py"), "utf8").match(/^VERSION = "(.+)"/m)[1];
+  const init = await mcp.rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } });
+  expect(init.result.serverInfo.version).toBe(ver);
+  expect(init.result.instructions).toContain("Start with `about`");
+  let r = await mcp.tool("about");
+  expect(r.error).toBe(false);
+  expect(r.data.app).toMatchObject({ name: "FPGA Ecosystem", version: ver });
+  expect(r.data.update.current).toBe(ver);
+  expect(r.data.editor_open).toBe(true);
+  expect(r.data.board).toHaveProperty("vivado_ok");
+  expect(r.data.board).toHaveProperty("usb_driver");
+  expect(r.data.mcp_server.version).toBe(ver);
+  r = await mcp.tool("open_home", { tab: "nope" });
+  expect(r.error).toBe(true);
+  // a new project
+  r = await mcp.tool("new_project", { name: "lab7 counter" });
+  expect(r.error).toBe(false);
+  expect(r.data.created).toBe("lab7_counter");
+  expect(await page.evaluate(() => state.project.name)).toBe("lab7_counter");
+  // building without Vivado: a clear answer, not a hang
+  await mcp.tool("build_circuit", { name: "t", truth_table: { inputs: ["a"], outputs: ["y"], columns: { y: "10" } } });
+  await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "t"); state.project.topId = s.id; });
+  await mcp.tool("auto_pins");
+  r = await mcp.tool("board_build");
+  expect(r.error).toBe(true);
+  expect(r.text).toMatch(/Vivado/);
+  r = await mcp.tool("board_status", { wait: 1 });
+  expect(r.error).toBe(false);
+  expect(r.data).toHaveProperty("state");
 });

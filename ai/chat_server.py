@@ -397,13 +397,22 @@ def _run_llm_vhdl(spec: str, use_rag: bool = False) -> dict:
     it via parseVhdl/buildSchematicFromVhdl and simulates the drawn sheet for a truth table
     (correctness is shown to the user, not gated — the fast "just get a circuit" path)."""
     import intent_client
-    r = intent_client.generate_vhdl_from_spec(spec, use_rag=use_rag)
+    ev, restated, ask = [], "", spec
+    # a Thai request is first restated as a short English spec: the coder model follows that
+    # far better, and the student sees what it understood (see intent_client.restate_spec)
+    if intent_client.needs_restate(spec):
+        t = intent_client.restate_spec(spec)
+        ev.append({"stage": "translate", "ok": bool(t.get("ok"))})
+        if t.get("ok"):
+            restated = t["spec"]
+            ask = restated + "\n\n(Original request, Thai: " + spec + ")"
+    r = intent_client.generate_vhdl_from_spec(ask, use_rag=use_rag)
+    ev.append({"stage": "generate-vhdl", "ok": bool(r.get("ok"))})
     if r.get("ok"):
         return {"status": "DRAWN", "mode": "vhdl", "vhdl": r["vhdl"], "source": "llm-vhdl",
-                "evidence": [{"stage": "generate-vhdl", "ok": True}], "llm_up": _llm_up()}
-    return {"status": "REJECTED", "reason": "สร้าง VHDL ไม่ได้ (LLM)",
-            "raw": (r.get("raw") or "")[:300],
-            "evidence": [{"stage": "generate-vhdl", "ok": False}], "llm_up": _llm_up()}
+                "restated": restated, "evidence": ev, "llm_up": _llm_up()}
+    return {"status": "REJECTED", "reason": "สร้าง VHDL ไม่ได้ (LLM)", "restated": restated,
+            "raw": (r.get("raw") or "")[:300], "evidence": ev, "llm_up": _llm_up()}
 
 
 class Handler(BaseHTTPRequestHandler):
