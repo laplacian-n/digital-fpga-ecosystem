@@ -79,6 +79,17 @@ input[type=text]{width:100%}
 .prog-bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
 .log{max-height:220px;overflow:auto;background:var(--hover);border-radius:8px;padding:8px 10px;font:12px/1.4 ui-monospace,Consolas,monospace;white-space:pre-wrap;margin:6px 0 0}
 .muted{color:var(--muted)}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-top:1px solid var(--line)}
+.chk:first-child{border-top:0}
+.chk .ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;flex:none;font-size:14px}
+.chk .ic.ok{background:var(--chip-ok);color:var(--ok)} .chk .ic.warn{background:var(--chip-warn);color:var(--warn)}
+.chk .ic.bad{background:var(--chip-bad);color:var(--bad)} .chk .ic.opt{background:var(--hover);color:var(--muted)}
+.chk .grow{flex:1;min-width:0}
+.chk .t{font-weight:600} .chk .d{color:var(--muted);font-size:13px;margin:2px 0 0}
+.chk .bar{margin-top:8px}
+.chk ol{margin:6px 0 0;padding-left:20px;font-size:13px;color:var(--muted)}
+nav .badge{display:inline-block;min-width:16px;padding:0 5px;margin-left:4px;border-radius:99px;background:var(--bad);color:#fff;font-size:11px;line-height:16px;font-weight:700}
+nav .badge:empty{display:none}
 #toast{position:fixed;right:16px;bottom:16px;padding:10px 14px;border-radius:8px;background:var(--ink);color:var(--bg);display:none;max-width:70vw}
 @media (max-width:640px){ .field{grid-template-columns:1fr} header{flex-wrap:wrap} nav{margin-left:0} }
 </style>
@@ -88,6 +99,7 @@ input[type=text]{width:100%}
   <h1>FPGA Ecosystem</h1><span class="ver" id="ver"></span>
   <nav>
     <button data-tab="home" class="on">หน้าหลัก</button>
+    <button data-tab="setup">เริ่มต้นใช้งาน<span class="badge" id="setupBadge"></span></button>
     <button data-tab="settings">ตั้งค่า</button>
   </nav>
 </header>
@@ -117,6 +129,17 @@ input[type=text]{width:100%}
   </div>
   <div class="path" id="projDir" style="margin-bottom:8px"></div>
   <div class="list" id="projects"><div class="empty">กำลังโหลด…</div></div>
+</section>
+
+<section id="tab-setup">
+  <h2 style="margin-top:4px">เริ่มต้นใช้งาน</h2>
+  <p class="muted" style="margin:0 0 12px">เช็กว่าเครื่องนี้พร้อมสำหรับ วาดวงจร → จำลอง → สร้าง .bit → โหลดลงบอร์ด แล้วหรือยัง ถ้าข้อไหนยังไม่พร้อม ทำตามปุ่มในข้อนั้นแล้วกด “ตรวจใหม่”</p>
+  <div class="list" id="setupList"><div class="empty">กำลังตรวจ…</div></div>
+  <div class="bar" style="margin-top:12px">
+    <button class="btn" id="setupRecheck">ตรวจใหม่</button>
+    <span class="grow"></span>
+    <button class="btn primary" id="setupDone">เสร็จแล้ว — ไม่ต้องเปิดหน้านี้ตอนเริ่มโปรแกรมอีก</button>
+  </div>
 </section>
 
 <section id="tab-settings">
@@ -168,6 +191,7 @@ input[type=text]{width:100%}
       <label class="switch"><input type="checkbox" data-f="fpga"> เปิด</label></h3>
     <p>ใช้ FPGA Builder ต้องติดตั้ง Vivado (ML Standard ฟรี รองรับ Spartan-7 XC7S15) แยกเอง</p>
     <div class="field"><label>vivado.bat</label><input type="text" data-f="vivado" placeholder="เว้นว่าง = หาอัตโนมัติ"></div>
+    <div class="field"><label>openFPGALoader.exe</label><input type="text" data-f="openfpgaloader" placeholder="เว้นว่าง = ตัวที่มากับโปรแกรม"></div>
   </div>
 
   <h2>เชื่อมกับ Claude</h2>
@@ -221,10 +245,12 @@ function toast(msg){ const t = $("#toast"); t.textContent = msg; t.style.display
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function chip(kind, txt){ return `<span class="chip ${kind}">${esc(txt)}</span>`; }
 
-$$("nav button").forEach(b => b.onclick = () => {
-  $$("nav button").forEach(x => x.classList.toggle("on", x === b));
-  $$("section").forEach(s => s.classList.toggle("on", s.id === "tab-" + b.dataset.tab));
-});
+function showTab(name){
+  $$("nav button").forEach(x => x.classList.toggle("on", x.dataset.tab === name));
+  $$("section").forEach(s => s.classList.toggle("on", s.id === "tab-" + name));
+  if(name === "setup") loadSetup();
+}
+$$("nav button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
 $$("[data-open]").forEach(b => b.onclick = () => api("/api/open", {page: b.dataset.open}));
 $("#btnReveal").onclick = () => api("/api/reveal", {});
@@ -314,6 +340,7 @@ window.addEventListener("focus", () => loadProjects().catch(()=>{}));
   fetch("/api/ping").catch(()=>{});
   [CFG, ST] = await Promise.all([api("/api/config"), api("/api/status")]);
   fillSettings(); fillStatus(); loadProjects();
+  if(!CFG.setup_done) showTab("setup"); else loadSetup();
   checkUpdate(false);
 })();
 
@@ -372,6 +399,113 @@ $("#llmCard").addEventListener("click", async e => {
   loadLlm();
 });
 loadLlm();
+
+/* ---- first-run checklist ---- */
+const VIVADO_URL = "https://www.xilinx.com/support/download.html";
+const RELEASES_URL = "https://github.com/laplacian-n/digital-fpga-ecosystem/releases/latest";
+let SETUP = null, SETUP_BUSY = false;
+function chk(kind, title, desc, extra){
+  const ic = {ok:"✓", warn:"!", bad:"✗", opt:"–"}[kind];
+  return `<div class="chk"><div class="ic ${kind}">${ic}</div><div class="grow"><div class="t">${title}</div>
+    <div class="d">${desc}</div>${extra || ""}</div></div>`;
+}
+const bar = btns => `<div class="bar">${btns}</div>`;
+async function loadSetup(){
+  if(SETUP_BUSY) return; SETUP_BUSY = true;
+  $("#setupRecheck").disabled = true; $("#setupRecheck").textContent = "กำลังตรวจ…";
+  try{ SETUP = await api("/api/setup/check"); }
+  catch(_){ $("#setupList").innerHTML = `<div class="empty">ตรวจไม่ได้ — ลองกด “ตรวจใหม่”</div>`; return; }
+  finally{ SETUP_BUSY = false; $("#setupRecheck").disabled = false; $("#setupRecheck").textContent = "ตรวจใหม่"; }
+  renderSetup();
+}
+function renderSetup(){
+  const S = SETUP, win = S.os === "windows", rows = [];
+  let missing = 0;
+  rows.push(chk("ok", "วาดวงจรและจำลอง", "ใช้ได้ทันที ไม่ต้องติดตั้งอะไรเพิ่ม — Schematic Studio มีตัวจำลอง ตารางความจริง และเลือกขาในตัว"));
+  const off = S.fpga_enabled ? "" : `<div class="d">ฟีเจอร์ “สร้าง .bit และลงบอร์ด” ปิดอยู่ — เปิดได้ที่หน้า ตั้งค่า</div>`;
+
+  const v = S.vivado;
+  if(v.path && !v.spaces) rows.push(chk("ok", "Vivado (สร้างไฟล์ .bit)", `<span class="path">${esc(v.path)}</span>`, off));
+  else if(v.path){ missing++; rows.push(chk("bad", "Vivado (สร้างไฟล์ .bit)",
+    `ติดตั้งไว้ในโฟลเดอร์ที่มีช่องว่าง ซึ่ง Vivado จะ build ไม่ผ่าน: <span class="path">${esc(v.path)}</span>`,
+    `<div class="d">ติดตั้งใหม่ไว้ที่ C:\\AMD หรือ C:\\Xilinx (ค่าเริ่มต้นของตัวติดตั้ง)</div>` + off)); }
+  else { missing++; rows.push(chk("bad", "Vivado (สร้างไฟล์ .bit)",
+    "ยังไม่พบ Vivado — ต้องมีเพื่อแปลงวงจรเป็นไฟล์ .bit ใช้รุ่น ML Standard (ฟรี) ตอนติดตั้งเลือกเฉพาะ Spartan-7 ก็พอ จะใช้พื้นที่น้อยลงมาก",
+    bar(`<button class="btn primary" data-href="${VIVADO_URL}">ไปหน้าดาวน์โหลด Vivado</button>
+         <button class="btn" data-goto="vivado">ติดตั้งแล้ว — ระบุตำแหน่งเอง</button>`) + off)); }
+
+  const o = S.openfpgaloader;
+  if(o.path) rows.push(chk("ok", "openFPGALoader (โหลด .bit ลงบอร์ด)", `<span class="path">${esc(o.path)}</span>`,
+    o.bridge ? "" : `<div class="d">⚠ ไม่พบไฟล์ spiOverJtag_xc7s15ftgb196.bit — โหลดแบบชั่วคราวได้ แต่เขียนถาวร (Flash) ไม่ได้</div>`));
+  else { missing++; rows.push(chk("bad", "openFPGALoader (โหลด .bit ลงบอร์ด)",
+    "ยังไม่พบ — ตัวติดตั้งเวอร์ชันล่าสุดมีมาให้แล้ว อัปเดตโปรแกรม หรือระบุตำแหน่ง openFPGALoader.exe ที่มีอยู่เอง",
+    bar(`<button class="btn primary" data-href="${RELEASES_URL}">ดาวน์โหลดเวอร์ชันล่าสุด</button>
+         <button class="btn" data-goto="openfpgaloader">ระบุตำแหน่งเอง</button>`))); }
+
+  if(win){
+    const d = S.driver, z = S.zadig;
+    const zadigSteps = `<ol><li>เสียบบอร์ดก่อน แล้วกด “เปิด Zadig” (Windows จะถามสิทธิ์ admin)</li>
+      <li>เมนู Options ▸ List All Devices</li><li>ช่องบนสุด เลือกตัวที่ลงท้ายด้วย <b>(Interface 0)</b> — ห้ามเลือก Interface 1</li>
+      <li>ช่องไดรเวอร์ทางขวาเลือก <b>WinUSB</b> แล้วกด Replace Driver รอจนเสร็จ</li><li>กลับมากด “ตรวจใหม่”</li></ol>`;
+    const zbtn = z ? `<button class="btn primary" data-act="zadig">เปิด Zadig</button>`
+                   : `<button class="btn primary" data-href="https://zadig.akeo.ie/">ดาวน์โหลด Zadig</button>`;
+    const test = `<button class="btn" data-act="detect" ${o.path ? "" : "disabled"}>ทดสอบกับบอร์ด</button>`;
+    const log = `<pre class="log" id="detectLog" hidden></pre>`;
+    if(d.state === "winusb") rows.push(chk("ok", "ไดรเวอร์บอร์ด (USB)", "บอร์ดเสียบอยู่และใช้ไดรเวอร์ WinUSB แล้ว", bar(test) + log));
+    else if(d.state === "ftdi" || d.state === "other"){ missing++; rows.push(chk("bad", "ไดรเวอร์บอร์ด (USB)",
+      `เจอบอร์ดแล้ว แต่ใช้ไดรเวอร์ ${esc(d.service || "อื่น")} — openFPGALoader ต้องใช้ WinUSB (ตั้งครั้งเดียวต่อเครื่อง)`,
+      zadigSteps + bar(zbtn + test) + log)); }
+    else if(d.state === "none") rows.push(chk("warn", "ไดรเวอร์บอร์ด (USB)",
+      "ยังไม่เจอบอร์ด — เสียบบอร์ดด้วยสาย USB แล้วกด “ตรวจใหม่” (ถ้ายังไม่มีบอร์ด ข้ามข้อนี้ไปก่อนได้)",
+      `<details><summary class="muted" style="cursor:pointer;font-size:13px">วิธีตั้งไดรเวอร์ WinUSB</summary>${zadigSteps}</details>` + bar(zbtn + test) + log));
+    else rows.push(chk("warn", "ไดรเวอร์บอร์ด (USB)", "ตรวจไดรเวอร์ไม่ได้" + (d.error ? " (" + esc(d.error) + ")" : "") + " — ลองกด “ทดสอบกับบอร์ด”",
+      zadigSteps + bar(zbtn + test) + log));
+  }
+
+  const L = S.llm;
+  const llmBtn = bar(`<button class="btn" data-goto="llm">ตั้งค่าโมเดล AI</button>`);
+  if(L.up) rows.push(chk("ok", "โมเดล AI (ไม่บังคับ)", "แชตตอบคำถามอิสระและวาดวงจรจากคำบรรยายได้"));
+  else if(L.mode === "off") rows.push(chk("opt", "โมเดล AI (ไม่บังคับ)",
+    "ไม่ได้ใช้ — แชตยังวาดวงจรจากสมการ ตารางความจริง และชื่อวงจรมาตรฐานได้ ถ้าอยากให้ตอบคำถามอิสระ ดาวน์โหลดโมเดลได้ (หลาย GB)", llmBtn));
+  else rows.push(chk("warn", "โมเดล AI (ไม่บังคับ)",
+    L.mode === "local" && !(L.server && L.model) ? "ตั้งให้รันในเครื่อง แต่ยังไม่มี llama.cpp หรือไฟล์โมเดล" : "ตั้งไว้แล้วแต่โมเดลยังไม่ตอบ", llmBtn));
+
+  $("#setupList").innerHTML = rows.join("");
+  $("#setupBadge").textContent = missing ? String(missing) : "";
+}
+$("#setupRecheck").onclick = () => loadSetup();
+$("#setupDone").onclick = async () => { await api("/api/setup/done", {done:true}); CFG.setup_done = true;
+  toast("เปิดหน้านี้ได้อีกทีจากแถบ “เริ่มต้นใช้งาน” ด้านบน"); showTab("home"); };
+$("#setupList").addEventListener("click", async e => {
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.href) return window.open(b.dataset.href, "_blank");
+  if(b.dataset.goto){
+    showTab("settings");
+    const el = b.dataset.goto === "llm" ? $("#llmCard") : $(`[data-f="${b.dataset.goto}"]`);
+    el.scrollIntoView({block:"center"}); if(el.focus) el.focus();
+    return;
+  }
+  if(b.dataset.act === "zadig"){
+    const r = await api("/api/setup/zadig", {});
+    if(!r.ok){ toast(r.error); if(r.url) window.open(r.url, "_blank"); }
+    return;
+  }
+  if(b.dataset.act === "detect"){
+    const log = $("#detectLog"); log.hidden = false; log.textContent = "กำลังคุยกับบอร์ด…\n";
+    const r = await api("/api/board/detect", {cable:"ft2232"});
+    if(!r.ok){ log.textContent = r.error || "ทดสอบไม่ได้"; return; }
+    b.disabled = true;
+    let since = 0;
+    const poll = async () => {
+      const st = await api("/api/board/status?since=" + since); since = st.next;
+      log.textContent += st.lines.join("\n") + (st.lines.length ? "\n" : "");
+      if(st.state === "running") return setTimeout(poll, 500);
+      b.disabled = false;
+      log.textContent += st.state === "ok" ? "✓ คุยกับบอร์ดได้ พร้อมโหลดวงจรลงบอร์ด" : "✗ " + (st.hint || "ยังคุยกับบอร์ดไม่ได้");
+    };
+    poll();
+  }
+});
 
 /* ---- Claude (MCP) ---- */
 async function loadMcp(){

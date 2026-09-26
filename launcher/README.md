@@ -27,9 +27,13 @@ powershell -ExecutionPolicy Bypass -File launcher\build_windows.ps1
 
 อีกทางหนึ่งคือ push tag เช่น `git tag v0.1.0 && git push origin v0.1.0` แล้ว GitHub Actions (`.github/workflows/build-windows.yml`) จะ build และแนบไฟล์ไว้ใน Releases ให้เอง
 
-ถ้าต้องการแถมเครื่องมือไปในชุด ให้วางไว้ก่อน build
-- `FPGA_Builder_Package\tools\openFPGALoader\` สำหรับโหลด .bit ลงบอร์ด
-- `ai\tools\ghdl\` สำหรับ co-simulation
+เครื่องมือที่แถมไปในชุด (`dist\FPGAEcosystem\tools\`)
+- **openFPGALoader** (Apache-2.0) สำหรับโหลด .bit ลงบอร์ด ถ้ามี `FPGA_Builder_Package\tools\openFPGALoader\` จะใช้ตัวนั้น ไม่มีจะติดตั้งแพ็กเกจ MSYS2 `mingw-w64-ucrt-x86_64-openFPGALoader` (runner ของ GitHub มี MSYS2 ที่ `C:\msys64`) แล้วคัดลอก exe + DLL ที่ต้องใช้ + `spiOverJtag_xc7s15ftgb196.bit` (สำหรับเขียน Flash) บน CI ถ้าหาไม่ได้ build จะล้ม
+- **Zadig** (GPLv3) สำหรับเปลี่ยนไดรเวอร์บอร์ดเป็น WinUSB ดาวน์โหลดตอน build (ถ้าโหลดไม่ได้ก็ข้าม)
+- `ai\tools\ghdl\` สำหรับ co-simulation ถ้าวางไว้ก่อน build
+
+## หน้า “เริ่มต้นใช้งาน”
+เปิดเองตอนเริ่มโปรแกรมจนกว่าจะกด “เสร็จแล้ว” (`setup_done` ใน config) ตรวจ Vivado, openFPGALoader, ไดรเวอร์ USB ของบอร์ด (Windows: ดูว่า FT2232 interface 0 ใช้ WinUSB หรือยัง ผ่าน `Win32_PnPEntity`) และโมเดล AI (ไม่บังคับ) แต่ละข้อมีปุ่มแก้ (ดาวน์โหลด / ระบุ path / เปิด Zadig / ทดสอบกับบอร์ดด้วย `openFPGALoader --detect`) API: `GET /api/setup/check`, `POST /api/setup/done`, `POST /api/setup/zadig`
 
 ## สิ่งที่แจกไปด้วยไม่ได้หรือไม่ได้แจก
 - **Vivado** เป็นลิขสิทธิ์ของ AMD และมีขนาดประมาณ 15 GB ให้ผู้ใช้ติดตั้ง Vivado ML Standard (ฟรี) เอง โปรแกรมจะหาเจอเองใน `C:\AMD\Vivado\*` และ `C:\Xilinx\Vivado\*` หรือกำหนด path ในหน้าตั้งค่า
