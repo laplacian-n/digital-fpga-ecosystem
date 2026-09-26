@@ -48,7 +48,18 @@ References: a component is its id ("c12"), an INPUT/OUTPUT name ("a", "sum") or 
 a pin is "<component>.<pin>" ("U1.i0", "ff0.q"). A bare component means its output (as a wire source)
 or its first free input (as a wire sink). Truth tables list rows with the FIRST input as the MSB.
 Sub-circuits are other sheets placed as "block:<sheet name>". Use `get_events` to see what the user changed.
-Prefer small verified steps; call `notify_user` to tell the user something inside the editor."""
+Prefer small verified steps; call `notify_user` to tell the user something inside the editor.
+
+LAB / TOP-DOWN WORK — always in this order, never skip or reorder a step:
+  A. Schematic: build the real circuit in Schematic Studio (gate level; one sheet per sub-circuit, placed
+     on its parent as "block:<sheet>"; set_top_sheet on the top one).
+  B. Simulate: check + simulate / verify_truth_table every sheet, fix what fails, and tell the user the results.
+  C. Approval: request_approval with a short summary (blocks, what the simulation showed), then call
+     approval_status until it is no longer "waiting". If the user asks for changes, make them, go back to B,
+     and ask again. Do not continue without "approved".
+  D. Top-Down: make_topdown — it draws the approved circuit's layers in the Top-Down view.
+Never write Top-Down JSON by hand or use another server's save_design / Sync: the Top-Down must come from the
+approved, simulated circuit (make_topdown refuses anything else)."""
 
 
 # --------------------------------------------------------------------------- tools
@@ -156,6 +167,17 @@ TOOLS = [
     T("list_checkpoints", "Restore points (automatic and named)."),
     T("restore_checkpoint", "Go back to a restore point (the current state is kept as a new one first).", {"id": {"type": "integer"}}, ["id"]),
     T("focus", "Select a component and centre the user's view on it.", {"sheet": SHEET, "ref": REF}, ["ref"]),
+    # --- lab workflow: approval, then Top-Down
+    T("request_approval", "Ask the user to approve the circuit before the Top-Down is made. Shows your summary in a "
+      "card in the editor with 'approve' / 'request changes'. Returns at once — then call approval_status.",
+      {"summary": {"type": "string", "description": "What you built (sheets/blocks) and what the simulation showed. Plain text; Thai is fine."}},
+      ["summary"]),
+    T("approval_status", "Wait (up to `wait` seconds, max 40) for the user's answer to request_approval: "
+      "'waiting' (call again), 'approved' (then make_topdown), 'changes' (with the user's comment), or 'none'.",
+      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}}, timeout=55),
+    T("make_topdown", "Draw the APPROVED circuit in the Top-Down view: the top sheet and every sheet it uses as a block, "
+      "as layers (1st Layer (top), 2nd Layer (…), …). Refuses unless the user approved exactly the circuit on screen.",
+      {"sheet": {"type": "string", "description": "Top sheet to start from. Default: the project's top sheet."}}),
     T("notify_user", "Show a short message to the user inside the editor.",
       {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
 ]
@@ -174,6 +196,8 @@ PROMPTS = [
     {"name": "debug_simulation", "description": "Find out why the current sheet doesn't simulate as expected.",
      "arguments": [{"name": "expected", "description": "What you expected to see", "required": False}]},
     {"name": "prepare_for_board", "description": "Check, assign pins and export VHDL + XDC for the board.", "arguments": []},
+    {"name": "lab_topdown", "description": "A lab: schematic → simulate → the user approves → Top-Down.",
+     "arguments": [{"name": "spec", "description": "The lab assignment / what the circuit must do", "required": True}]},
 ]
 
 
@@ -188,6 +212,13 @@ def prompt_text(name, args):
         return ("The current sheet doesn't simulate as expected" + (f" (expected: {args['expected']})" if args.get("expected") else "") +
                 ". Use explain_simulation, check, simulate and probe to find the cause; show the user where it is with focus, "
                 "propose the fix and apply it only after explaining it.")
+    if name == "lab_topdown":
+        return (f"Lab assignment: {args.get('spec', '')}\n"
+                "Work strictly in this order. (A) Build the circuit in Schematic Studio: plan the blocks, one sheet per "
+                "sub-circuit placed on its parent as block:<sheet>, set_top_sheet. (B) check and simulate / "
+                "verify_truth_table each sheet, fix every failure, and report the results. (C) request_approval with a "
+                "summary, then call approval_status until it is not 'waiting'; on 'changes' fix and ask again. "
+                "(D) Only after 'approved': make_topdown. Never write a Top-Down file yourself.")
     if name == "prepare_for_board":
         return ("Get the top sheet ready for the EDGE Spartan-7: check (no errors), get_pins (resolve conflicts and "
                 "unassigned ports with set_pins/auto_pins), get_xdc, then export_files ['vhdl','xdc','project'] and report the paths.")

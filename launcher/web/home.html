@@ -204,6 +204,10 @@ nav .badge:empty{display:none}
     </div>
     <div class="field"><label>Claude Code</label><div class="bar" style="flex-wrap:nowrap"><input type="text" id="mcpCode" readonly style="flex:1;width:auto"><button class="btn" data-copyfrom="mcpCode">คัดลอก</button></div></div>
     <div class="field"><label>ตั้งค่าเอง (JSON)</label><div class="bar" style="flex-wrap:nowrap"><input type="text" id="mcpJson" readonly style="flex:1;width:auto"><button class="btn" data-copyfrom="mcpJson">คัดลอก</button></div></div>
+    <div id="mcpLegacy" hidden style="margin:8px 0;padding:8px 10px;border:1px solid var(--warn);border-radius:8px;background:var(--chip-warn)">
+      ⚠ Claude Desktop ยังมี MCP ตัวเก่า (<b id="mcpLegacyNames"></b>) — Claude มักไปใช้ตัวนั้นแล้วเขียนไฟล์ Top-Down เองโดยไม่ผ่านวาดวงจร/จำลอง/อนุมัติ
+      <div class="bar" style="margin-top:6px"><button class="btn" id="mcpLegacyRm">เอาตัวเก่าออก (เก็บสำรองไฟล์ตั้งค่าไว้)</button><span class="muted" id="mcpLegacyMsg"></span></div>
+    </div>
     <p class="muted" style="margin:8px 0 0">หลังติดตั้ง ปิด Claude Desktop ให้สนิท (จากถาด) แล้วเปิดใหม่ จากนั้นลองพิมพ์ “ช่วยวาด full adder แล้วจำลองให้ดูหน่อย”</p>
   </div>
 
@@ -514,8 +518,12 @@ async function loadMcp(){
     $("#mcpCode").value="claude mcp add fpga-ecosystem -- "+[c.command,...c.args].map(q).join(" ");
     $("#mcpJson").value=JSON.stringify({"mcpServers":{"fpga-ecosystem":c}});
     $("#st-mcp").innerHTML=chip("ok","พร้อม");
+    const lg=j.legacy||[]; $("#mcpLegacy").hidden=!lg.length; $("#mcpLegacyNames").textContent=lg.join(", ");
   }catch(_){ $("#st-mcp").innerHTML=chip("bad","ไม่พร้อม"); }
 }
+$("#mcpLegacyRm").onclick=async()=>{ const r=await api("/api/mcp/remove_legacy",{});
+  $("#mcpLegacyMsg").textContent = r.ok ? ("เอาออกแล้ว: "+(r.removed||[]).join(", ")+" — รีสตาร์ท Claude Desktop") : (r.error||"ไม่สำเร็จ");
+  if(r.ok) loadMcp(); };
 $("#mcpDesktop").onclick=async()=>{ const r=await api("/api/mcp/install_desktop",{});
   $("#mcpDesktopMsg").textContent = r.ok ? "เพิ่มแล้วใน "+r.path+" — รีสตาร์ท Claude Desktop" : (r.error||"ไม่สำเร็จ"); };
 document.addEventListener("click", e=>{ const b=e.target.closest("[data-copyfrom]"); if(!b) return;

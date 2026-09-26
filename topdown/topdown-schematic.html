@@ -2460,6 +2460,15 @@ function importSheet(sh){
       s.nodes.push(n); sel={type:'node',id:n.id}; render(); histTick();
       toast('รับบล็อก "'+(m.label||'')+'" จากตัววาดเกต');
     }
+    else if(m.type==='td:loadSheets' && Array.isArray(m.sheets) && m.sheets.length){
+      // the approved design's layers, top first (MCP make_topdown): each is added, or updated in
+      // place when it came from the same gate sheet before; the view opens on the top layer
+      let firstIdx=-1;
+      m.sheets.forEach(sh=>{ importSheet(sh); if(firstIdx<0) firstIdx=P.active; });
+      if(firstIdx>=0){ P.active=firstIdx; fitView(); render(); }
+      renderSheets(); syncSheetProps(); histTick();
+      toast('Top-Down: '+m.sheets.length+' แผ่น จากวงจรที่อนุมัติแล้ว');
+    }
     else if(m.type==='td:loadProject' && m.project && Array.isArray(m.project.sheets)){
       // a Top-Down file opened from the gate editor: its sheets are ADDED, drawn as saved
       const first=P.sheets.length;

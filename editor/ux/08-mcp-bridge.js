@@ -470,6 +470,82 @@ function mcpEvent(kind, data){ MCPB.events.push(Object.assign({seq:++MCPB.seq, t
     return r; };
 }
 
+/* ---------- the lab workflow: schematic → simulate → the USER approves → Top-Down ----------
+   Claude shows its summary in a card in the editor and the user answers there (อนุมัติ / ขอแก้).
+   The approval is tied to the circuit as it was when approved (a fingerprint of every sheet's
+   parts, params and wiring — not positions): make_topdown refuses anything else, so a design
+   changed after approval has to be approved again. request_approval returns at once and
+   approval_status waits ≤40 s per call, because MCP clients give up on a single long call. */
+MCPB.approval={state:"none"};
+function mcpDesignHash(){
+  const P=state.project, out=[P.topId||""];
+  Object.keys(P.schematics).sort().forEach(id=>{ const s=P.schematics[id];
+    out.push(id+":"+s.name);
+    s.components.filter(c=>c.type!=="JUNCTION").map(c=>c.id+"|"+c.type+"|"+(c.label||"")+"|"+JSON.stringify(c.params||{})).sort().forEach(x=>out.push(x));
+    // wiring as connectivity: junctions collapse into nets, so re-routing does not count as a change
+    try{ const seen=new Set(); s.wires.forEach(w=>{ if(seen.has(w.id)) return; const ids=[...netWires(s,w)]; ids.forEach(i=>seen.add(i));
+      const ends=new Set(); ids.forEach(i=>{ const x=s.wires.find(q=>q.id===i); if(!x) return;
+        [x.from,x.to].forEach(e=>{ const c=comp(e.cid,s); if(c&&c.type!=="JUNCTION") ends.add(e.cid+"."+e.pid); }); });
+      out.push("net:"+[...ends].sort().join(",")); }); }catch(_){ s.wires.forEach(w=>out.push(w.from.cid+"."+w.from.pid+">"+w.to.cid+"."+w.to.pid)); }
+  });
+  const str=out.join("\n"); let h=2166136261>>>0;
+  for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+  return h.toString(16)+"-"+str.length;
+}
+function mcpApprovalCard(summary){
+  let el=$("#mcpApproval"); if(el) el.remove();
+  el=document.createElement("div"); el.id="mcpApproval"; el.className="mcp-approval";
+  el.innerHTML=`<div class="mcp-ap-h"><span class="dot"></span>Claude ขออนุมัติวงจร <span class="muted">${esc(state.project.name||"")}</span></div>
+    <div class="mcp-ap-body">${esc(summary).replace(/\n/g,"<br>")}</div>
+    <div class="muted" style="font-size:12px">ดูวงจรและผลจำลองในหน้าจอก่อน — อนุมัติแล้ว Claude จะทำ Top-Down จากวงจรนี้</div>
+    <textarea id="mcpApNote" rows="2" placeholder="ถ้าจะให้แก้ บอกตรงนี้ว่าแก้อะไร"></textarea>
+    <div class="mcp-ap-row"><button class="btn" data-ap="changes">✎ ขอแก้</button><span class="grow"></span>
+      <button class="btn btn-primary" data-ap="approve">✓ อนุมัติ — ทำ Top-Down ต่อ</button></div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", e=>{ const b=e.target.closest("[data-ap]"); if(!b) return;
+    const note=($("#mcpApNote")||{}).value||"";
+    if(b.dataset.ap==="changes" && !note.trim()){ $("#mcpApNote").focus(); toast("พิมพ์สิ่งที่อยากให้แก้ก่อน แล้วกด ขอแก้ อีกครั้ง","warn"); return; }
+    MCPB.approval = b.dataset.ap==="approve"
+      ? {state:"approved", hash:mcpDesignHash(), comment:note.trim(), at:Date.now()}
+      : {state:"changes", comment:note.trim(), at:Date.now()};
+    el.remove(); mcpEvent("approval", {state:MCPB.approval.state, comment:MCPB.approval.comment||""});
+    toast(MCPB.approval.state==="approved"?"อนุมัติแล้ว — Claude จะทำ Top-Down ต่อ":"ส่งให้ Claude แก้แล้ว","ok",3000);
+  });
+}
+MCP_OPS.request_approval = a=>{
+  const summary=String(a.summary||"").trim(); if(!summary) mcpFail("summary is required: what you built and what the simulation showed");
+  MCPB.approval={state:"waiting", asked:Date.now()};
+  mcpApprovalCard(summary); mcpActivity("รออนุมัติ");
+  return {status:"waiting", next:"call approval_status (it waits for the user's click) until it is no longer 'waiting'"};
+};
+MCP_OPS.approval_status = async a=>{
+  const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
+  while(MCPB.approval.state==="waiting" && Date.now()<until) await new Promise(r=>setTimeout(r, 300));
+  const ap=MCPB.approval, out={status:ap.state};
+  if(ap.comment) out.comment=ap.comment;
+  if(ap.state==="approved") out.design_unchanged = ap.hash===mcpDesignHash();
+  if(ap.state==="waiting") out.next="still waiting for the user — call approval_status again";
+  if(ap.state==="changes") out.next="make the changes the user asked for, simulate again, then request_approval again";
+  if(ap.state==="none") out.next="nothing asked yet — call request_approval with a summary first";
+  return out;
+};
+/* the approved design → Top-Down: the top sheet, then every sheet it uses as a block, as layers */
+MCP_OPS.make_topdown = a=>{
+  const ap=MCPB.approval;
+  if(ap.state!=="approved") mcpFail("the user has not approved the design yet", "simulate/verify, then request_approval and wait for approval_status 'approved'");
+  if(ap.hash!==mcpDesignHash()) mcpFail("the circuit changed after the user approved it", "request_approval again for the changed circuit");
+  const P=state.project, top=a.sheet ? mcpSheet(a.sheet) : (P.schematics[P.topId]||activeSch());
+  const order=[], seen=new Set();
+  const walk=(s,d)=>{ if(!s||seen.has(s.id)) return; seen.add(s.id); order.push({s,d});
+    s.components.forEach(c=>{ const sub=subSchOf(c); if(sub) walk(sub,d+1); }); };
+  walk(top,0);
+  const ord=n=>n+(n%10===1&&n%100!==11?"st":n%10===2&&n%100!==12?"nd":n%10===3&&n%100!==13?"rd":"th");
+  const sheets=order.map(({s,d})=>{ const t=schematicToTopdownSheet(s); t.title=ord(d+1)+" Layer ("+s.name+")"; t.module=s.name; return t; });
+  sendToTopdown({type:"td:loadSheets", sheets});
+  mcpActivity("ทำ Top-Down");
+  return {sheets:sheets.map(t=>t.title), note:"shown in the Top-Down view (Tools ▸ Top-Down); the user can print / export from there"};
+};
+
 /* ---------- you see what Claude does, as it does it ----------
    Every call already redraws the page; what hid it was WHERE: parts landed off-screen, or on
    the canvas under the sim / board / Top-Down page. So around each call: note the sheet, and

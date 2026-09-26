@@ -37,3 +37,20 @@ test("editor saves into the workspace project folder and reopens it", async ({ p
   await expect(page.locator("#projectName")).toHaveValue("citest");
   await expect(page.locator("#saveChip")).toHaveClass(/clean/);
 });
+
+test("Settings spots an old offline MCP server in Claude Desktop and removes it (with a backup)", async ({ request }) => {
+  const f = path.join(home, ".config", "Claude", "claude_desktop_config.json");
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, JSON.stringify({ mcpServers: {
+    "top-down-schematic": { command: "python", args: ["C:/x/topdown/topdown_mcp.py"] },
+    "fpga-ecosystem": { command: "FPGAEcosystem-MCP.exe", args: [] }, "other": { command: "node", args: ["x.js"] } } }));
+  let j = await (await request.get(BASE + "/api/mcp/setup")).json();
+  expect(j.legacy).toEqual(["top-down-schematic"]);
+  const r = await (await request.post(BASE + "/api/mcp/remove_legacy", { data: {}, headers: { Origin: BASE } })).json();
+  expect(r).toMatchObject({ ok: true, removed: ["top-down-schematic"] });
+  const cfg = JSON.parse(fs.readFileSync(f, "utf8"));
+  expect(Object.keys(cfg.mcpServers).sort()).toEqual(["fpga-ecosystem", "other"]);
+  expect(fs.existsSync(f.replace(/\.json$/, ".json.bak"))).toBe(true);
+  j = await (await request.get(BASE + "/api/mcp/setup")).json();
+  expect(j.legacy).toEqual([]);
+});

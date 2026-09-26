@@ -172,3 +172,12 @@
 /* parts Claude just changed glow for a moment (08-mcp-bridge.js mcpShowChange) */
 @keyframes mcpFlash{0%{filter:drop-shadow(0 0 0 transparent)}25%{filter:drop-shadow(0 0 7px var(--accent)) drop-shadow(0 0 2px var(--accent))}100%{filter:drop-shadow(0 0 0 transparent)}}
 .node.mcp-flash{animation:mcpFlash 1.6s ease-out}
+
+/* Claude asks the user to approve the circuit before it makes the Top-Down (08-mcp-bridge.js) */
+.mcp-approval{position:fixed;right:18px;bottom:18px;z-index:9000;width:min(440px,calc(100vw - 36px));background:var(--bg-2);border:1px solid var(--accent);border-radius:12px;box-shadow:0 10px 32px rgba(0,0,0,.25);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--ink)}
+.mcp-approval .mcp-ap-h{font-weight:700;display:flex;align-items:center;gap:7px}
+.mcp-approval .mcp-ap-h .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:uxPulse 1.6s ease-in-out infinite}
+.mcp-approval .mcp-ap-body{max-height:40vh;overflow:auto;line-height:1.55;background:var(--bg-3,var(--bg));border-radius:8px;padding:8px 10px;white-space:normal}
+.mcp-approval textarea{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical}
+.mcp-approval .mcp-ap-row{display:flex;gap:8px;align-items:center}
+.mcp-approval .grow{flex:1}

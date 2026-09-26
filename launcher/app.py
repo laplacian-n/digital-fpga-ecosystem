@@ -595,6 +595,42 @@ def install_claude_desktop() -> dict:
     f.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
     return {"ok": True, "path": str(f)}
 
+_LEGACY_MCP = ("topdown_mcp", "schematic_mcp", "top-down-schematic")
+
+
+def legacy_mcp() -> list:
+    """Older offline servers still set up in Claude Desktop (topdown_mcp.py / schematic_mcp.py).
+    Claude reaches for them and writes a Top-Down JSON to import by hand, skipping the
+    schematic → simulate → approve order the live server enforces."""
+    f = claude_desktop_config_path()
+    try:
+        servers = json.loads(f.read_text("utf-8") or "{}").get("mcpServers") or {}
+    except Exception:
+        return []
+    out = []
+    for name, spec in servers.items():
+        blob = (name + " " + json.dumps(spec)).lower()
+        if name != "fpga-ecosystem" and any(k in blob for k in _LEGACY_MCP):
+            out.append(name)
+    return out
+
+
+def remove_legacy_mcp() -> dict:
+    f = claude_desktop_config_path()
+    names = legacy_mcp()
+    if not names:
+        return {"ok": True, "removed": []}
+    try:
+        cfg = json.loads(f.read_text("utf-8") or "{}")
+    except Exception:
+        return {"ok": False, "error": f"อ่าน {f} ไม่ได้"}
+    shutil.copyfile(f, f.with_suffix(".json.bak"))
+    for n in names:
+        cfg.get("mcpServers", {}).pop(n, None)
+    f.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), "utf-8")
+    return {"ok": True, "removed": names, "backup": str(f.with_suffix(".json.bak"))}
+
+
 # --------------------------------------------------------------------------
 # HTTP
 # --------------------------------------------------------------------------
@@ -732,7 +768,8 @@ def make_handler():
                 return self._out(200, {"ok": True, "editor_connected": RELAY.live_client() is not None,
                                        "version": VERSION})
             if path == "/api/mcp/setup":
-                return self._out(200, {"command": mcp_command(), "desktop_config": str(claude_desktop_config_path())})
+                return self._out(200, {"command": mcp_command(), "desktop_config": str(claude_desktop_config_path()),
+                                       "legacy": legacy_mcp()})
             if path == "/api/ping":
                 LAST_PING = time.time()
                 return self._out(200, {"ok": True})
@@ -784,6 +821,8 @@ def make_handler():
                 return self._out(200, {"ok": True})
             if path == "/api/mcp/install_desktop":
                 return self._out(200, install_claude_desktop())
+            if path == "/api/mcp/remove_legacy":
+                return self._out(200, remove_legacy_mcp())
             if path == "/api/files/save":
                 proj = safe_name((q.get("project") or [""])[0])
                 name = safe_name(Path((q.get("name") or ["file"])[0]).name, "file")

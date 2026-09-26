@@ -57,6 +57,23 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | Output | `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `list_projects`, `open_project` |
 | History | `undo`, `redo`, `checkpoint`, `list_checkpoints`, `restore_checkpoint` |
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
+| Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |
+
+### Lab work: schematic → simulate → you approve → Top-Down
+Claude is told to work in this order, and the tools enforce it:
+1. **Schematic:** Claude builds the circuit in Schematic Studio. Each sub-circuit is its own sheet, placed on its parent as a block.
+2. **Simulate:** Claude checks and simulates every sheet, and tells you the results.
+3. **Approve:** `request_approval` shows Claude's summary in a card in the editor, with **✓ อนุมัติ** and **✎ ขอแก้**.
+   - For ขอแก้, you type what to change; Claude gets your comment, fixes it, simulates again and asks again.
+   - Claude waits for your answer with `approval_status`. It returns after ≤40 s per call, because MCP clients cancel long calls.
+4. **Top-Down:** `make_topdown` draws the top sheet and every sheet it uses as layers in the Top-Down view:
+   `1st Layer (top)`, `2nd Layer (…)`, and so on.
+   - It **refuses** unless you approved exactly the circuit that is on screen.
+   - The approval is tied to each sheet's parts, parameters and connections, not to positions. Tidying the drawing is fine; changing the circuit needs a new approval.
+
+The prompt `lab_topdown` starts this flow. The old offline servers (`topdown/topdown_mcp.py`, `schematic_mcp.py`)
+write a Top-Down JSON that you then import yourself, so they skip steps 1–3. If Claude Desktop still has one of them
+configured, **ตั้งค่า → เชื่อมกับ Claude** warns about it and can remove it. The config file is backed up to `.json.bak`.
 
 There are also **resources** (`fpga://guide`, `fpga://board/edge-spartan7`, `fpga://sheet/active`,
 `fpga://component-types`) and **prompts** (`design_from_spec`, `debug_simulation`, `prepare_for_board`).

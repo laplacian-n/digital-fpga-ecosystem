@@ -158,3 +158,38 @@ test("you see Claude's change straight away: canvas forward, in view, highlighte
   await mcp.tool("get_sheet");
   expect(await page.evaluate(() => JSON.stringify(state.view))).toBe(before);
 });
+
+test("lab flow: Top-Down only after the user approves the simulated circuit", async () => {
+  const tt = await mcp.tool("build_circuit", { name: "lab_ha", truth_table: { inputs: ["a", "b"], outputs: ["s", "c"], columns: { s: "0110", c: "0001" } } });
+  expect(tt.error).toBe(false);
+  await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "lab_ha"); state.project.topId = s.id; });
+  // not approved yet → refused
+  let r = await mcp.tool("make_topdown");
+  expect(r.error).toBe(true); expect(r.text).toContain("not approved");
+  // ask: the card shows the summary; the answer is pending
+  r = await mcp.tool("request_approval", { summary: "half adder: s = a xor b, c = a and b — simulation matches" });
+  expect(r.data.status).toBe("waiting");
+  await expect(page.locator("#mcpApproval")).toContainText("half adder");
+  r = await mcp.tool("approval_status", { wait: 1 });
+  expect(r.data.status).toBe("waiting");
+  // the user approves in the editor
+  const pending = mcp.tool("approval_status", { wait: 20 });
+  await page.click('#mcpApproval [data-ap="approve"]');
+  r = await pending;
+  expect(r.data).toMatchObject({ status: "approved", design_unchanged: true });
+  r = await mcp.tool("make_topdown");
+  expect(r.error).toBe(false);
+  expect(r.data.sheets[0]).toBe("1st Layer (lab_ha)");
+  await expect(page.locator("#topdownView")).toBeVisible();
+  await page.evaluate(() => closeTopdown());
+  // the circuit changes after approval → must be approved again
+  await mcp.tool("add_component", { sheet: "lab_ha", type: "NOT", name: "extra" });
+  r = await mcp.tool("make_topdown");
+  expect(r.error).toBe(true); expect(r.text).toContain("changed after");
+  // asking for changes gives Claude the user's comment
+  await mcp.tool("request_approval", { summary: "half adder + extra NOT" });
+  await page.fill("#mcpApNote", "เอา NOT ออก");
+  await page.click('#mcpApproval [data-ap="changes"]');
+  r = await mcp.tool("approval_status", { wait: 5 });
+  expect(r.data).toMatchObject({ status: "changes", comment: "เอา NOT ออก" });
+});
