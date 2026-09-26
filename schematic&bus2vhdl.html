@@ -10658,6 +10658,8 @@ function aiRenderChat(r){
   // ---- VHDL mode: the LLM wrote gate-level VHDL; draw it here, then simulate ----
   if(r.mode==="vhdl" && st!=="REJECTED"){
     let html='<span class="ac-badge u">วาดจาก VHDL (AI)</span>';
+    // what the model understood, when the request was restated in English first
+    if(r.restated) html+='<details class="ac-fold" open><summary>AI เข้าใจโจทย์ว่า (แปลเป็นอังกฤษก่อนส่งให้โมเดล)</summary><pre>'+e(r.restated)+'</pre></details>';
     const d=aiDrawVhdl(r.vhdl||"");
     if(d.ok){ const g=d.guarantees, nc=d.sch.components.filter(c=>c.type!=="JUNCTION").length;
       html+='<div>วาดแล้ว: <b>'+e(d.entity||"design")+'</b> — '+nc+' gate'+(g?(' · overlaps self '+g.self+'/coll '+g.coll):'')+'</div>';
@@ -10686,6 +10688,7 @@ function aiRenderChat(r){
   if(r.sequence)    html+=aiSeqHtml(r.sequence);
   if(r.samples)     html+=aiSamplesHtml(r.samples);
   if(st==="REJECTED"){
+    if(r.restated) html+='<details class="ac-fold"><summary>AI เข้าใจโจทย์ว่า</summary><pre>'+e(r.restated)+'</pre></details>';
     if(r.reason) html+='<div class="ac-hint">เหตุผล: '+e(r.reason)+'</div>';
     if(Array.isArray(r.errors)) html+='<div class="ac-hint">'+r.errors.slice(0,5).map(x=>"• "+e(x.msg||x.code||x)+(x.hint?(" — "+e(x.hint)):"")).join("<br>")+'</div>';
     if(r.compare&&r.compare.mismatches) html+='<div class="ac-hint">ไม่ตรงที่: '+r.compare.mismatches.slice(0,4).map(m=>JSON.stringify(m.in)+"→ได้ "+JSON.stringify(m.got)+" ควร "+JSON.stringify(m.exp)).map(e).join("<br>")+'</div>';
