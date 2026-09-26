@@ -84,6 +84,14 @@ DEFAULTS = {
     "workspace": str(_documents_dir() / APP_NAME),
     "port": 8770,                 # the editor's AI chat defaults to 127.0.0.1:8770
     "save_to_workspace": True,    # route editor downloads into the project folder
+    "update": {
+        "auto_check": True,       # look for a newer release when Home opens (at most every 12 h)
+        "repo": "laplacian-n/digital-fpga-ecosystem",
+        "api": "https://api.github.com",
+        "skip": "",               # a version the user chose to skip
+        "last_check": 0,
+        "last_result": {},
+    },
     "features": {
         "ai": True,               # AI chat panel backend (equations/truth tables work offline)
         "sim": True,              # backend netlist simulation (POST /sim)
@@ -103,8 +111,10 @@ DEFAULTS = {
 def _merge(base: dict, over: dict) -> dict:
     out = dict(base)
     for k, v in (over or {}).items():
-        if isinstance(v, dict) and isinstance(base.get(k), dict):
+        if isinstance(v, dict) and isinstance(base.get(k), dict) and base[k]:
             out[k] = _merge(base[k], v)
+        elif isinstance(v, dict) and base.get(k) == {}:
+            out[k] = v                      # free-form dict (e.g. a cached update result)
         elif k in base:
             out[k] = v
     return out
@@ -362,6 +372,52 @@ def status() -> dict:
 
 
 # --------------------------------------------------------------------------
+# updates (GitHub Releases) — see updater.py
+# --------------------------------------------------------------------------
+import updater  # noqa: E402  (launcher/ is on sys.path: script dir / bundled module)
+
+INSTALLER = updater.Installer()
+UPDATE_EVERY = 12 * 3600
+
+
+def update_check(force: bool = False) -> dict:
+    u = CFG["update"]
+    if not force and not u.get("auto_check", True):
+        return {"ok": True, "available": False, "disabled": True, "current": VERSION}
+    fresh = time.time() - float(u.get("last_check") or 0) < UPDATE_EVERY
+    if not force and fresh and u.get("last_result"):
+        res = dict(u["last_result"])
+    else:
+        res = updater.check(u.get("repo") or DEFAULTS["update"]["repo"], VERSION, u.get("api") or updater.DEFAULT_API)
+        if res.get("ok"):
+            u["last_check"], u["last_result"] = time.time(), res
+            save_config(CFG)
+    # re-evaluate against THIS version (a cached result may predate an update)
+    if res.get("ok"):
+        res["current"] = VERSION
+        res["available"] = updater.is_newer(res.get("latest", ""), VERSION)
+        res["skipped"] = bool(res["available"] and u.get("skip") == res.get("latest"))
+    res["can_install"] = bool(FROZEN and IS_WIN and res.get("asset"))
+    return res
+
+
+def update_install() -> dict:
+    res = update_check()
+    if not res.get("ok") or not res.get("available"):
+        return {"ok": False, "error": res.get("error") or "ใช้เวอร์ชันล่าสุดอยู่แล้ว"}
+    if not res.get("can_install"):
+        # running from source / not Windows: send the user to the release page
+        return {"ok": False, "manual": True, "url": res.get("url")}
+
+    def ready(path):
+        updater.run_setup(path)
+        threading.Thread(target=lambda: (time.sleep(1.0), shutdown()), daemon=True).start()
+
+    INSTALLER.start(res["asset"], res.get("asset_name") or "FPGAEcosystem-Setup.exe", ready)
+    return {"ok": True, "started": True}
+
+
+# --------------------------------------------------------------------------
 # HTTP
 # --------------------------------------------------------------------------
 LAST_PING = time.time()
@@ -484,6 +540,10 @@ def make_handler():
             if path == "/api/projects":
                 return self._out(200, {"ok": True, "dir": str(projects_dir()),
                                        "projects": list_projects()})
+            if path == "/api/update/check":
+                return self._out(200, update_check(force=(q.get("force") or ["0"])[0] == "1"))
+            if path == "/api/update/progress":
+                return self._out(200, INSTALLER.snapshot())
             if path == "/api/files/read":
                 f = inside(projects_dir(), (q.get("path") or [""])[0])
                 if not f.is_file():
@@ -532,6 +592,12 @@ def make_handler():
                 CFG.clear()
                 CFG.update(new)
                 return self._out(200, {"ok": True, "restart": True})
+            if path == "/api/update/skip":
+                CFG["update"]["skip"] = str(data.get("version") or "")
+                save_config(CFG)
+                return self._out(200, {"ok": True})
+            if path == "/api/update/install":
+                return self._out(200, update_install())
             if path == "/api/restart":
                 self._out(200, {"ok": True})
                 threading.Thread(target=restart, daemon=True).start()

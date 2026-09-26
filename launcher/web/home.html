@@ -57,6 +57,10 @@ input[type=text]{width:100%}
 .switch{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
 .switch input{width:16px;height:16px}
 .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-all}
+.upd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.upd[hidden]{display:none}
+.upd .grow{flex:1}
+.upd-body{flex-basis:100%;white-space:pre-wrap;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;max-height:220px;overflow:auto}
 #toast{position:fixed;right:16px;bottom:16px;padding:10px 14px;border-radius:8px;background:var(--ink);color:var(--bg);display:none;max-width:70vw}
 @media (max-width:640px){ .field{grid-template-columns:1fr} header{flex-wrap:wrap} nav{margin-left:0} }
 </style>
@@ -70,6 +74,14 @@ input[type=text]{width:100%}
   </nav>
 </header>
 <main>
+<div class="upd" id="updBanner" hidden>
+  <div class="upd-t"><b>มีเวอร์ชันใหม่ <span id="updVer"></span></b> <span class="muted" id="updCur"></span></div>
+  <span class="grow"></span>
+  <button class="btn" id="updNotes">มีอะไรใหม่</button>
+  <button class="btn" id="updSkip">ข้ามเวอร์ชันนี้</button>
+  <button class="btn primary" id="updGo">อัปเดตเลย</button>
+  <div class="upd-body" id="updBody" hidden></div>
+</div>
 <section id="tab-home" class="on">
   <h2 style="margin-top:4px">เปิดโปรแกรม</h2>
   <div class="apps">
@@ -127,6 +139,14 @@ input[type=text]{width:100%}
       <label class="switch"><input type="checkbox" data-f="fpga"> เปิด</label></h3>
     <p>ใช้ FPGA Builder ต้องติดตั้ง Vivado (ML Standard ฟรี รองรับ Spartan-7 XC7S15) แยกเอง</p>
     <div class="field"><label>vivado.bat</label><input type="text" data-f="vivado" placeholder="เว้นว่าง = หาอัตโนมัติ"></div>
+  </div>
+
+  <h2>อัปเดตโปรแกรม</h2>
+  <div class="card">
+    <h3>เวอร์ชัน <span id="verNow"></span> <span id="st-upd"></span>
+      <label class="switch"><input type="checkbox" id="updAuto"> ตรวจอัปเดตเองตอนเปิดโปรแกรม</label></h3>
+    <p>ดึงเวอร์ชันใหม่จาก GitHub Releases — โปรเจกต์และการตั้งค่าไม่หายเมื่ออัปเดต</p>
+    <div class="bar"><button class="btn" id="updNow">ตรวจตอนนี้</button><span class="muted" id="updMsg"></span></div>
   </div>
 
   <h2>ที่เก็บไฟล์</h2>
@@ -233,7 +253,8 @@ function fillStatus(){
 $("#btnSave").onclick = async () => {
   const features = {};
   $$("[data-f]").forEach(el => features[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value.trim());
-  await api("/api/config", {features, workspace: $("#workspace").value.trim(), save_to_workspace: $("#saveWs").checked});
+  await api("/api/config", {features, workspace: $("#workspace").value.trim(), save_to_workspace: $("#saveWs").checked,
+    update: {auto_check: $("#updAuto").checked}});
   await api("/api/restart", {});
   toast("กำลังรีสตาร์ท…");
   const t0 = Date.now();
@@ -252,7 +273,42 @@ window.addEventListener("focus", () => loadProjects().catch(()=>{}));
   fetch("/api/ping").catch(()=>{});
   [CFG, ST] = await Promise.all([api("/api/config"), api("/api/status")]);
   fillSettings(); fillStatus(); loadProjects();
+  checkUpdate(false);
 })();
+
+/* ---- updates ---- */
+let UPD=null;
+async function checkUpdate(force){
+  $("#verNow").textContent="v"+(ST?ST.version:"");
+  $("#updAuto").checked=!CFG.update || CFG.update.auto_check!==false;
+  if(force) $("#updMsg").textContent="กำลังตรวจ…";
+  try{ UPD=await api("/api/update/check"+(force?"?force=1":"")); }catch(_){ UPD={ok:false,error:"เช็กไม่ได้"}; }
+  const st=$("#st-upd");
+  if(UPD.disabled){ st.innerHTML=chip("warn","ปิดการตรวจอัตโนมัติ"); $("#updMsg").textContent=""; }
+  else if(!UPD.ok){ st.innerHTML=chip("warn","ตรวจไม่ได้"); $("#updMsg").textContent=UPD.error||""; }
+  else if(UPD.available){ st.innerHTML=chip("ok","มี v"+UPD.latest); $("#updMsg").textContent=""; }
+  else { st.innerHTML=chip("ok","ล่าสุดแล้ว"); $("#updMsg").textContent=force?"ใช้เวอร์ชันล่าสุดอยู่แล้ว":""; }
+  const show=UPD.ok && UPD.available && (force || !UPD.skipped);
+  $("#updBanner").hidden=!show;
+  if(show){ $("#updVer").textContent="v"+UPD.latest; $("#updCur").textContent="(ตอนนี้ v"+UPD.current+")";
+    $("#updBody").textContent=UPD.notes||"—";
+    $("#updGo").textContent=UPD.can_install?"อัปเดตเลย":"ไปหน้าดาวน์โหลด"; }
+}
+$("#updNow").onclick=()=>checkUpdate(true);
+$("#updNotes").onclick=()=>{ $("#updBody").hidden=!$("#updBody").hidden; };
+$("#updSkip").onclick=async()=>{ await api("/api/update/skip",{version:UPD.latest}); $("#updBanner").hidden=true; toast("ข้าม v"+UPD.latest+" — ตรวจเองได้ที่หน้าตั้งค่า"); };
+$("#updGo").onclick=async()=>{
+  const r=await api("/api/update/install",{});
+  if(r.manual){ window.open(r.url,"_blank"); return; }
+  if(!r.ok){ toast(r.error||"อัปเดตไม่ได้"); return; }
+  const b=$("#updGo"); b.disabled=true;
+  const poll=async()=>{ let p; try{ p=await api("/api/update/progress"); }catch(_){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; return; }
+    if(p.phase==="downloading"){ b.textContent="ดาวน์โหลด "+(p.total?Math.round(p.done*100/p.total)+"%":Math.round(p.done/1e6)+" MB"); setTimeout(poll,500); }
+    else if(p.phase==="installing"){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; }
+    else if(p.phase==="error"){ b.disabled=false; b.textContent="อัปเดตเลย"; toast(p.error); }
+    else setTimeout(poll,500); };
+  poll();
+};
 </script>
 </body>
 </html>
