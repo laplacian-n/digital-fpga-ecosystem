@@ -2460,6 +2460,14 @@ function importSheet(sh){
       s.nodes.push(n); sel={type:'node',id:n.id}; render(); histTick();
       toast('รับบล็อก "'+(m.label||'')+'" จากตัววาดเกต');
     }
+    else if(m.type==='td:loadProject' && m.project && Array.isArray(m.project.sheets)){
+      // a Top-Down file opened from the gate editor: its sheets are ADDED, drawn as saved
+      const first=P.sheets.length;
+      m.project.sheets.forEach(sh=>{ const s2=normalizeSheet(JSON.parse(JSON.stringify(sh))); fixSheetDefaults(s2); P.sheets.push(s2); });
+      P.active=first; sel={type:null,id:null};
+      fitView(); render(); renderSheets(); syncSheetProps(); histTick();
+      toast('เปิด '+m.project.sheets.length+' แผ่นจากไฟล์ ('+((m.project.meta&&m.project.meta.projectName)||'Top-Down')+')');
+    }
     else if(m.type==='td:loadSheet' && m.sheet && m.sheet.nodes){
       const r=importSheet(m.sheet);
       renderSheets(); histTick();
