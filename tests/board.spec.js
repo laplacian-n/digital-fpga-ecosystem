@@ -77,3 +77,24 @@ test("Top-Down from Home opens inside the editor with the circuit", async ({ pag
   const f = page.frameLocator("#topdownFrame");
   await expect(f.locator("svg [data-node]").first()).toBeVisible({ timeout: 5000 });
 });
+
+test("first run opens the setup checklist until it is dismissed", async ({ page }) => {
+  const errors = []; page.on("pageerror", e => errors.push(e.message));
+  await page.goto(BASE + "/");
+  await expect(page.locator("#tab-setup")).toBeVisible();
+  const list = page.locator("#setupList");
+  await expect(list.locator(".chk")).toHaveCount(4);        // editor, Vivado, openFPGALoader, AI (no USB row off Windows)
+  await expect(list.locator(".chk", { hasText: "Vivado" }).locator(".ic")).toHaveClass(/ok/);
+  await expect(list.locator(".chk", { hasText: "openFPGALoader" })).toContainText("spiOverJtag");   // no flash bridge next to the fake
+  await expect(list.locator(".chk", { hasText: "โมเดล AI" }).locator(".ic")).toHaveClass(/opt/);
+  await expect(page.locator("#setupBadge")).toBeEmpty();
+  await list.locator('[data-goto="llm"]').click();
+  await expect(page.locator("#tab-settings")).toBeVisible();
+  await page.click('nav [data-tab="setup"]');
+  await page.click("#setupDone");
+  expect((await (await fetch(BASE + "/api/config")).json()).setup_done).toBe(true);
+  await page.reload();
+  await expect(page.locator("#tab-home")).toBeVisible();
+  await expect(page.locator("#tab-setup")).toBeHidden();
+  expect(errors).toEqual([]);
+});

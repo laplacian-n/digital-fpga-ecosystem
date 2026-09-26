@@ -94,6 +94,7 @@ DEFAULTS = {
     "workspace": str(_documents_dir() / APP_NAME),
     "port": 8770,                 # the editor's AI chat defaults to 127.0.0.1:8770
     "save_to_workspace": True,    # route editor downloads into the project folder
+    "setup_done": False,          # the first-run "เริ่มต้นใช้งาน" checklist was dismissed
     "update": {
         "auto_check": True,       # look for a newer release when Home opens (at most every 12 h)
         "repo": "laplacian-n/digital-fpga-ecosystem",
@@ -398,6 +399,21 @@ def status() -> dict:
         "ghdl": detect_ghdl(), "vivado": detect_vivado(),
         "fpga_builder": tk_ok, "browser": find_browser(),
         "features": CFG["features"], "save_to_workspace": CFG["save_to_workspace"],
+    }
+
+
+def setup_check() -> dict:
+    """what the first-run checklist shows: each tool the build → board path needs"""
+    viv = detect_vivado()
+    ofl = board.find_ofl()
+    server, model = detect_llama()
+    return {
+        "os": "windows" if IS_WIN else sys.platform, "setup_done": bool(CFG.get("setup_done")),
+        "vivado": {"path": viv, "spaces": bool(viv and IS_WIN and " " in viv)},
+        "openfpgaloader": {"path": ofl, "bridge": board.find_bridge(ofl) if ofl else ""},
+        "driver": board.usb_driver(), "zadig": board.find_zadig(),
+        "llm": {"mode": CFG["features"].get("llm"), "up": llm_up(), "server": server, "model": model},
+        "fpga_enabled": bool(CFG["features"].get("fpga")),
     }
 
 
@@ -737,6 +753,8 @@ def make_handler():
                 server, model = detect_llama()
                 return self._out(200, dict(llm.status(CFG["features"]["llm_endpoint"], server, model),
                                            mode=CFG["features"].get("llm"), backend_up=llm_up()))
+            if path == "/api/setup/check":
+                return self._out(200, setup_check())
             if path == "/api/board/status":
                 return self._out(200, board.status(int((q.get("since") or ["0"])[0] or 0)))
             if path == "/api/board/tools":
@@ -821,6 +839,12 @@ def make_handler():
                 if path == "/api/board/stop":
                     return self._out(200, board.stop())
                 return self._out(404, {"ok": False, "error": "unknown api"})
+            if path == "/api/setup/done":
+                CFG["setup_done"] = bool(data.get("done", True))
+                save_config(CFG)
+                return self._out(200, {"ok": True})
+            if path == "/api/setup/zadig":
+                return self._out(200, board.open_zadig())
             if path == "/api/fpga_builder":
                 if not CFG["features"].get("fpga"):
                     return self._out(200, {"ok": False, "error": "FPGA build ปิดอยู่"})

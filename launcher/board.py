@@ -79,6 +79,57 @@ def find_ofl() -> str:
                    r"C:\msys64\mingw64\bin\openFPGALoader.exe" if IS_WIN else ""])
 
 
+def find_bridge(ofl: str = "") -> str:
+    """spiOverJtag bitstream openFPGALoader needs (-B) to write the board's SPI flash"""
+    ofl = ofl or find_ofl()
+    name = f"spiOverJtag_{BOARD['part']}{BOARD['pkg']}.bit"
+    d = Path(ofl).parent if ofl else CTX["install"] / "tools" / "openFPGALoader"
+    return _first([d / name, CTX["install"] / "tools" / "openFPGALoader" / name,
+                   d.parent / "share" / "openFPGALoader" / name])
+
+
+def find_zadig() -> str:
+    return _first([CTX["install"] / "tools" / "zadig.exe",
+                   CTX["root"] / "FPGA_Builder_Package" / "tools" / "zadig.exe"]) if IS_WIN else ""
+
+
+# the board's JTAG side: FT2232H interface 0 (EDGE boards, Digilent-style cables)
+FTDI_JTAG_ID = r"USB\VID_0403&PID_6010&MI_00"
+
+
+def usb_driver() -> dict:
+    """Which Windows driver owns the board's JTAG interface. openFPGALoader (libusb) needs
+    WinUSB there; the stock FTDI driver (FTDIBUS) makes it fail with "unable to open ftdi".
+    state: winusb | ftdi | other | none (board not plugged in) | unknown | na (not Windows)"""
+    if not IS_WIN:
+        return {"state": "na"}
+    ps = ("Get-CimInstance Win32_PnPEntity | Where-Object { $_.DeviceID -like '" + FTDI_JTAG_ID + "*' } | "
+          "ForEach-Object { $_.Service + '|' + $_.Status + '|' + $_.Name }")
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                           capture_output=True, text=True, timeout=20, creationflags=_NO_WINDOW,
+                           encoding="utf-8", errors="replace")
+    except Exception as e:  # noqa: BLE001
+        return {"state": "unknown", "error": str(e)}
+    rows = [ln.split("|", 2) for ln in r.stdout.splitlines() if ln.strip()]
+    if not rows:
+        return {"state": "none"}
+    svc, st, name = (rows[0] + ["", "", ""])[:3]
+    state = "winusb" if svc.lower() == "winusb" else "ftdi" if svc.lower() == "ftdibus" else "other"
+    return {"state": state, "service": svc, "status": st, "name": name, "count": len(rows)}
+
+
+def open_zadig() -> dict:
+    z = find_zadig()
+    if not z:
+        return {"ok": False, "error": "ไม่พบ Zadig ในโปรแกรม — ดาวน์โหลดได้ที่ zadig.akeo.ie", "url": "https://zadig.akeo.ie/"}
+    try:
+        os.startfile(z)  # type: ignore[attr-defined]  # asks for admin itself (UAC)
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": f"เปิด Zadig ไม่ได้: {e}"}
+    return {"ok": True}
+
+
 def tools() -> dict:
     return {"vivado": find_vivado(), "openfpgaloader": find_ofl(), "board": BOARD["label"],
             "cables": CABLES}
@@ -209,7 +260,7 @@ def explain(text: str, kind: str) -> str:
     if kind != "build" and ("unable to open ftdi" in low or "usb_open" in low or "jtag init failed" in low
                             or "no cable found" in low or "libusb" in low):
         return ("เปิดบอร์ดไม่ได้ — เช็คว่าเสียบสาย USB แล้ว และไดรเวอร์เป็น WinUSB "
-                "(ครั้งแรกใช้ปุ่ม “ตั้งไดรเวอร์” ใน FPGA Builder แบบเดิม หรือโปรแกรม Zadig)")
+                "(ตั้งได้ที่หน้า “เริ่มต้นใช้งาน” ในหน้าหลัก → ปุ่ม “เปิด Zadig” เลือก Interface 0 → WinUSB)")
     if kind == "build" and "unconstrained" in low:
         return "มีขาที่ยังไม่ได้เลือกพิน — กลับไปหน้า “เลือกขา” แล้วเลือกให้ครบทุกขา"
     return ""
@@ -345,9 +396,7 @@ def start_program(project: str, top: str, mode: str = "sram", cable: str = "ft22
     cable = cable if cable in CABLES else "ft2232"
     if mode == "flash":
         name = f"spiOverJtag_{BOARD['part']}{BOARD['pkg']}.bit"
-        d = Path(ofl).parent
-        bridge = _first([d / name, CTX["install"] / "tools" / "openFPGALoader" / name,
-                         d.parent / "share" / "openFPGALoader" / name])
+        bridge = find_bridge(ofl)
         if not bridge:
             return {"ok": False, "error": f"เขียนถาวรต้องมีไฟล์ {name} วางไว้ข้าง openFPGALoader"}
         cmd = [ofl, "-c", cable, "-f", "-B", bridge.replace("\\", "/"), str(bit)]
