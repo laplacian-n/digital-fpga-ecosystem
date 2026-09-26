@@ -140,15 +140,32 @@ function layout(s, opts){
   // --- rows: columns left → right, each part lined up with what feeds it
   const pos = new Map();                                    // id → {x,y}
   let bandTop = 0; const bandBox = [];
+  /* x of every column, per row; then a column is lined up across the rows (so a wrapped row
+     sits under the one above) wherever the rows are within 40 of each other. A column that
+     needs a much wider channel (JK-FF + its '1') keeps its own spacing rather than pushing
+     the row above out of shape. */
+  const leftChAll = Math.max(...Array.from({length:rows},(_,r)=>Math.round((40 + 18*chanBefore[r*per])*wide)));
+  const bx = [];
+  for(let r=0;r<rows;r++){ const row=[]; let xx=leftChAll;
+    for(let c=r*per;c<Math.min(K,(r+1)*per);c++){
+      if(c>r*per) xx += Math.round((50 + 18*chanBefore[c] + (busIn[c]?40:0))*wide);
+      xx = snapG(xx); row.push(xx); xx += colW[c]; }
+    bx.push(row); }
+  const shift = new Array(rows).fill(0);
+  for(let q=0;q<per;q++){
+    const xs = bx.map((row,r)=>row[q]==null?null:row[q]+shift[r]).filter(v=>v!=null);
+    if(!xs.length) continue;
+    const m = Math.max(...xs);
+    bx.forEach((row,r)=>{ if(row[q]==null) return; const x=row[q]+shift[r]; if(m-x<=40) shift[r]+=m-x; row[q]+=shift[r]; });
+    // later columns of a row move with it (shift already folded into row[q]); keep order
+  }
   for(let r=0;r<rows;r++){
     const c0 = r*per, c1 = Math.min(K, (r+1)*per);
     let x = 0;
-    const leftCh = Math.round((40 + 18*chanBefore[c0])*wide);
-    x = leftCh;
+    const leftCh = leftChAll;
     let minY = Infinity, maxY = -Infinity;
     for(let c=c0;c<c1;c++){
-      if(c>c0) x += Math.round((50 + 18*chanBefore[c] + (busIn[c]?40:0))*wide);
-      x = snapG(x);
+      x = bx[r][c-c0];
       const placed = [];
       const want = cols[c].map(n=>{
         // the strongest wire in from an already-placed part in THIS row sets the row
@@ -235,7 +252,7 @@ function layout(s, opts){
   const OX = 160 - f.x, OY = 170 - f.y;
   nodes.forEach(n=>{ if(isCore(n)||n.type==='port'||n.type==='const'){ n.x=Math.round(n.x+OX); n.y=Math.round(n.y+OY); } });
   s.frame = {x:f.x+OX, y:f.y+OY, w:f.w, h:f.h};
-  s.wires.forEach(w=>{ w.auto = true; delete w.mx; delete w.my; });
+  s.wires.forEach(w=>{ w.auto = true; delete w.mx; delete w.my; if(back.has(w.id)) w.loop = true; else delete w.loop; });
   const r = route(s);
   // crowded channels → spread the columns and try again (at most twice)
   if(r.relaxed && (opts.widen||0) < 2) return layout(s, Object.assign({}, opts, {widen:(opts.widen||0)+1}));
@@ -318,18 +335,22 @@ function route(s){
 
   const DIRS = [[1,0],[0,1],[-1,0],[0,-1]];
   const dIdx = d => d[0]===1?0:d[1]===1?1:d[0]===-1?2:3;
-  const BEND = 34, CROSS = 28, NEAR = 3;
-  const near = (key, i, j, horiz) => {      // another net's parallel run on a track < 9 away
+  const BEND = 34, CROSS = 28, NEAR = 5;
+  /* another net's parallel run close by: within 15 = the next grid track, which reads as one
+     doubled line on paper — so where there is room, runs keep two tracks apart (the sheets'
+     ~one grid square). Closer than 9 costs double. */
+  const near = (key, i, j, horiz) => {
     let c=0;
-    if(horiz){ for(const dj of [-1,1]){ const jj=j+dj; if(jj<0||jj>=NY||Math.abs(ys[jj]-ys[j])>=9) continue;
-        const o=hOwn[id(i,jj)]; if(o&&o!==key) c++; } }
-    else { for(const di of [-1,1]){ const ii=i+di; if(ii<0||ii>=NX||Math.abs(xs[ii]-xs[i])>=9) continue;
-        const o=vOwn[id(ii,j)]; if(o&&o!==key) c++; } }
+    if(horiz){ for(const dj of [-2,-1,1,2]){ const jj=j+dj; if(jj<0||jj>=NY) continue; const dd=Math.abs(ys[jj]-ys[j]); if(dd>=15) continue;
+        const o=hOwn[id(i,jj)]; if(o&&o!==key) c+= dd<9?2:1; } }
+    else { for(const di of [-2,-1,1,2]){ const ii=i+di; if(ii<0||ii>=NX) continue; const dd=Math.abs(xs[ii]-xs[i]); if(dd>=15) continue;
+        const o=vOwn[id(ii,j)]; if(o&&o!==key) c+= dd<9?2:1; } }
     return c;
   };
 
   /* A* from a sink back to the net's tree. `goal(k,dir)` accepts the end state. */
-  function search(key, start, startDir, goal, relax){
+  function search(key, start, startDir, goal, relax, crossW, joinCost){
+    crossW = crossW || 1;
     const S = N*4, gC = new Float64Array(S).fill(Infinity), from = new Int32Array(S).fill(-1);
     const heap = []; const push=(f,st)=>{ heap.push([f,st]); let c=heap.length-1; while(c){ const p=(c-1)>>1; if(heap[p][0]<=heap[c][0]) break; [heap[p],heap[c]]=[heap[c],heap[p]]; c=p; } };
     const pop=()=>{ const top=heap[0], last=heap.pop(); if(heap.length){ heap[0]=last; let c=0; for(;;){ let l=2*c+1,r=l+1,m=c; if(l<heap.length&&heap[l][0]<heap[m][0]) m=l; if(r<heap.length&&heap[r][0]<heap[m][0]) m=r; if(m===c) break; [heap[m],heap[c]]=[heap[c],heap[m]]; c=m; } } return top; };
@@ -358,9 +379,10 @@ function route(s){
         if(po && po!==key){
           if(pHard[nk] && pHard[nk]!==key){ if(!relax) continue; cost += 300; }
           if(pinTips.has(nk) && !goal(nk,nd)){ if(!relax) continue; cost += 300; }
-          cost += CROSS;
+          cost += CROSS*crossW;
         } else if(pinTips.has(nk) && !goal(nk,nd)){ if(!relax) continue; cost+=300; }
         cost += NEAR*near(key, horiz?Math.min(i,ni):i, horiz?j:Math.min(j,nj), horiz)*(Math.abs(xs[ni]-xs[i])+Math.abs(ys[nj]-ys[j]))/G;
+        if(joinCost && goal(nk,nd)) cost += joinCost(nk);
         const ns = nk*4+nd, ng = g+cost;
         if(ng < gC[ns]){ gC[ns]=ng; from[ns]=st; push(ng, ns); }
       }
@@ -374,9 +396,12 @@ function route(s){
     const a = tip(s, ws[0].from); const bs = ws.map(w=>tip(s,w.to)).filter(Boolean);
     const span = bs.reduce((m,b)=>m+Math.abs(b.x-a.x)+Math.abs(b.y-a.y),0);
     const straight = ws.length===1 && bs[0] && Math.abs(bs[0].y-a.y)<1;
-    return {k, ws, a, span, straight};
+    const loop = ws.some(w=>w.loop);
+    return {k, ws, a, span, straight, loop};
   }).filter(o=>o.a);
-  info.sort((p,q)=>(q.straight-p.straight)||(p.ws.length-q.ws.length)||(p.span-q.span));
+  // a feedback loop goes last and pays 4× per crossing: like the sheets, it goes the long
+  // way round the outside instead of cutting through the middle of the drawing
+  info.sort((p,q)=>(p.loop-q.loop)||(q.straight-p.straight)||(p.ws.length-q.ws.length)||(p.span-q.span));
 
   let relaxed = 0;
   const gpt = t => (xi.has(Math.round(t.x))&&yi.has(Math.round(t.y))) ? id(xi.get(Math.round(t.x)), yi.get(Math.round(t.y))) : -1;
@@ -393,8 +418,14 @@ function route(s){
       if(tree.has(st)) continue;
       const od = dIdx(outDir(s, sk.w.to));
       const goal = (k,d) => tree.has(k) && (k!==src || d===into) && !(k!==src && treeHard.has(k) && pinTips.has(k));
-      let res = search(it.k, st, od, goal, false);
-      if(!res){ res = search(it.k, st, od, goal, true); relaxed++; }
+      // (d) branch a little way back from the pins already on the tree, not right at them —
+      // the sheets put the dot first and the pin (and its bus slash) after it
+      const sinkTips = [...treeHard].filter(k=>k!==src&&pinTips.has(k)).map(k=>[xs[k%NX],ys[(k/NX)|0]]);
+      const joinCost = k => { const x=xs[k%NX], y=ys[(k/NX)|0]; let c=0;
+        for(const [px,py] of sinkTips){ const dd=Math.abs(px-x)+Math.abs(py-y); if(dd<30) c+=(30-dd)*4; } return c; };
+      const cw = it.loop ? 4 : 1;
+      let res = search(it.k, st, od, goal, false, cw, joinCost);
+      if(!res){ res = search(it.k, st, od, goal, true, cw, joinCost); relaxed++; }
       if(!res) continue;
       const path = unwind(res);                             // [join, …, sink]
       const join = path[0];
