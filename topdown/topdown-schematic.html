@@ -2384,7 +2384,7 @@ function importSheet(sh){
       const r=importSheet(m.sheet);
       renderSheets(); histTick();
       toast(r.exact
-        ? ((r.updated?'อัปเดต':'นำเข้า')+' "'+SH().title+'" — วาดตามตำแหน่งและเส้นสายในโปรแกรมหลัก · พอดี A4')
+        ? ((r.updated?'อัปเดต':'นำเข้า')+' "'+SH().title+'" — วาดตามตำแหน่งและเส้นสายในโปรแกรมหลัก · ขนาดมาตรฐาน')
         : r.updated
         ? ('อัปเดต "'+SH().title+'" จากวงจรแล้ว — ตำแหน่งเดิมคงไว้'+(r.added?(' · ใหม่ '+r.added+' ชิ้น'):'')+(r.removed?(' · ถูกลบ '+r.removed+' ชิ้น'):''))
         : ('นำเข้า "'+SH().title+'" — '+SH().nodes.length+' ชิ้นส่วน · จัดวางอัตโนมัติ + พอดี A4 แล้ว'));
@@ -2556,16 +2556,20 @@ function setTextScale(v,fromEl){
 document.getElementById('txRange').oninput=e=>setTextScale(e.target.value,e.target);
 document.getElementById('txNum').oninput=e=>setTextScale(e.target.value,e.target);
 document.querySelectorAll('[data-tx]').forEach(b=>b.onclick=()=>setTextScale(b.getAttribute('data-tx')));
-/* scale mm-per-unit so the drawing clears the page margin (shrinks OR grows), rounded down a step */
-function fitPageScale(quiet){
+/* the standard print size: a 2-input gate (52 × 44 units) is ~16 × 13 mm on paper */
+const PAGE_STD_MM=0.30;
+/* scale mm-per-unit so the drawing clears the page margin, rounded down a step. The button
+   (grow=true) also enlarges a small drawing to fill the page; imports and auto-layout only
+   shrink a big one, so a half adder prints at the standard size instead of blown up. */
+function fitPageScale(quiet, grow){
   const s=SH(), fit=pageFit(s);
   if(!fit||!isFinite(fit.need)||!(fit.need>0)) return false;
-  P.page.mmPerUnit=Math.max(0.02,Math.min(1,Math.floor((P.page.mmPerUnit/fit.need)*100)/100));
+  P.page.mmPerUnit=Math.max(0.02,Math.min(grow?1:PAGE_STD_MM,Math.floor((P.page.mmPerUnit/fit.need)*100)/100));
   render(); syncSheetProps();
   if(quiet!==true){ const f2=pageFit(s); toast('1 หน่วย = '+P.page.mmPerUnit+' มม. — ผังกว้าง '+f2.mmW+' × '+f2.mmH+' มม.'); }
   return true;
 }
-document.getElementById('pgFit').onclick=()=>{ if(!fitPageScale()) toast('เปิด "แสดงกระดาษ A4" ก่อน'); };
+document.getElementById('pgFit').onclick=()=>{ if(!fitPageScale(false,true)) toast('เปิด "แสดงกระดาษ A4" ก่อน'); };
 pFW.oninput=e=>{SH().frame.w=parseInt(e.target.value)||600;render();};
 pFH.oninput=e=>{SH().frame.h=parseInt(e.target.value)||400;render();};
 /* meta inputs */
@@ -2574,7 +2578,13 @@ metaBind('mId','studentId');metaBind('mName','studentName');metaBind('mSec','sec
 function syncMeta(){mId.value=P.meta.studentId;mName.value=P.meta.studentName;mSec.value=P.meta.section;mPage.value=P.meta.page;mProj.value=P.meta.projectName;}
 
 /* ======================= view ======================= */
-function fitView(){const s=SH();const f=s.frame;const pad=90;let w=f.w+pad*2,h=f.h+pad*2+70;const r=cv.getBoundingClientRect();const asp=(r.width/r.height)||1.7;if(w/h<asp)w=h*asp;else h=w/asp;view={x:f.x-(w-f.w)/2,y:f.y-70-(h-f.h-70)/2,w,h};}
+/* frame the module box — or, with the A4 page shown, the whole page, so the screen shows the
+   drawing at the size it prints instead of zooming a small circuit up to fill the view */
+function fitView(){const s=SH();const f=s.frame;const pad=90;
+  let x1=f.x-pad,y1=f.y-70-pad,x2=f.x+f.w+pad,y2=f.y+f.h+pad;
+  const pg=pageRect(s); if(pg){x1=Math.min(x1,pg.x-20);y1=Math.min(y1,pg.y-20);x2=Math.max(x2,pg.x+pg.w+20);y2=Math.max(y2,pg.y+pg.h+40);}
+  let w=x2-x1,h=y2-y1;const r=cv.getBoundingClientRect();const asp=(r.width/r.height)||1.7;if(w/h<asp)w=h*asp;else h=w/asp;
+  view={x:(x1+x2-w)/2,y:(y1+y2-h)/2,w,h};}
 
 /* ======================= font ======================= */
 document.getElementById('fontFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;const st=document.getElementById('fontStatus');try{const buf=await f.arrayBuffer();const face=new FontFace('UserHand',buf);await face.load();document.fonts.add(face);font={buffer:buf,name:f.name,applied:true,otf:null};plotFace='UserHand';try{font.otf=opentype.parse(buf.slice(0));}catch(_){}st.textContent='Applied "'+f.name+'"';render();}catch(err){st.textContent='Font error: '+err.message;}});

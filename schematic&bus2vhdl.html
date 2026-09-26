@@ -11366,13 +11366,18 @@ function sendToTopdown(msg){ const f=$("#topdownFrame"); if(!f) return; openTopd
    same clean drawing instead of re-placing and re-routing it with its simpler router.
    Fan-out through junctions becomes one point-to-point wire per sink that follows the
    drawn trunk (Top-Down puts the junction dots back). Rotated/mirrored parts can't map
-   onto Top-Down's fixed-orientation symbols → null, and the caller falls back. */
+   onto Top-Down's fixed-orientation symbols → null, and the caller falls back.
+   SIZE: gate-editor gates are square (2 inputs = 66×66) while Top-Down's standard gate is
+   52×44, so the drawing is squashed vertically by TD_SY (66 → 44). It is one affine map
+   applied to every pin and every wire corner alike, so wires still meet their pins exactly;
+   y stays fractional (no rounding) for the same reason. */
+const TD_SY = 44/66;
 function schematicToTopdownExact(sch){
   const GM={AND:"and",OR:"or",NAND:"nand",NOR:"nor",XOR:"xor",XNOR:"xnor",NOT:"not",BUF:"buf"};
   const comps=(sch.components||[]).filter(c=>c.type!=="JUNCTION");
   if(!comps.length || comps.some(c=>(c.rot||0)!==0 || c.mirror)) return null;
   let mnx=1e9,mny=1e9; comps.forEach(c=>{ mnx=Math.min(mnx,c.x); mny=Math.min(mny,c.y); });
-  const OX=160-mnx, OY=170-mny, X=v=>Math.round(v+OX), Y=v=>Math.round(v+OY);
+  const OX=160-mnx, X=v=>Math.round(v+OX), Y=v=>Math.round(((v-mny)*TD_SY+170)*100)/100;
   const nodes=[], pinmap={};
   for(const c of comps){ const map={}, sz=getSize(c), ports=getPorts(c); let nd;
     const pp=id=>portPos(c,id);
@@ -11385,13 +11390,13 @@ function schematicToTopdownExact(sch){
     else if(GM[c.type]){ const ins=ports.filter(p=>p.dir==="in"), out=ports.find(p=>p.dir==="out");
       const g=GM[c.type], bub=/^(nand|nor|xnor|not)$/.test(g);
       ins.forEach((p,i)=>map[p.id]="in"+i); if(out) map[out.id]="out";
-      nd={id:c.id,type:"gate",gate:g,inputs:Math.max(1,ins.length),x:X(c.x)+8,y:Y(c.y),w:Math.max(20,sz.w-16-(bub?9:0)),h:sz.h,label:""}; }
+      nd={id:c.id,type:"gate",gate:g,inputs:Math.max(1,ins.length),x:X(c.x)+8,y:Y(c.y),w:Math.max(20,sz.w-16-(bub?9:0)),h:Y(c.y+sz.h)-Y(c.y),label:""}; }
     else { // anything else is a box: pins on the side their offset puts them, at the gate editor's offsets
       const L=[],R=[],T=[],B=[];
       ports.forEach(p=>{ const side=p.dx<=0?L:p.dx>=sz.w?R:p.dy<=0?T:p.dy>=sz.h?B:(p.dir==="in"?L:R); side.push(p); });
       [L,R].forEach(a=>a.sort((u,v)=>u.dy-v.dy)); [T,B].forEach(a=>a.sort((u,v)=>u.dx-v.dx));
       const bx=X(c.x)+(L.length?10:0), by=Y(c.y)+(T.length?10:0);
-      const bw=Math.max(34,sz.w-(L.length?10:0)-(R.length?10:0)), bh=Math.max(26,sz.h-(T.length?10:0)-(B.length?10:0));
+      const bw=Math.max(34,sz.w-(L.length?10:0)-(R.length?10:0)), bh=Math.max(26,Y(c.y+sz.h)-(B.length?10:0)-by);
       const nm=p=>String(p.label||p.id);
       L.forEach((p,i)=>map[p.id]="L"+i); R.forEach((p,i)=>map[p.id]="R"+i); B.forEach((p,i)=>map[p.id]="B"+i); T.forEach((p,i)=>map[p.id]="T"+i);
       const sub=subSchOf(c);
