@@ -32,6 +32,7 @@ function Stage($src, $dst) {
 }
 Stage "schematic&bus2vhdl.html"                  "schematic&bus2vhdl.html"
 Stage "topdown\topdown-schematic.html"           "topdown\topdown-schematic.html"
+Stage "topdown\td-engine.js"                     "topdown\td-engine.js"
 Stage "launcher\web"                             "launcher\web"
 Stage "designs_gate"                             "designs_gate"
 Stage "FPGA_Builder_Package\source\fpga_builder.py" "FPGA_Builder_Package\source\fpga_builder.py"
