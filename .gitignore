@@ -37,3 +37,12 @@ hub/hub.db
 *.bit
 *.zip
 *.dll
+
+# launcher build output (launcher/build_windows.ps1)
+/build/
+/dist/
+
+# tests
+node_modules/
+test-results/
+playwright-report/

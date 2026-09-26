@@ -436,6 +436,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <button data-act="duplicate">Duplicate<span class="kbd">Ctrl+D</span></button>
           <button data-act="delete-sel">Delete<span class="kbd">Del</span></button>
           <hr>
+          <button data-act="array-place">วางซ้ำเป็นชุด…</button>
+          <button data-act="cmdk">ค้นหาคำสั่ง…<span class="kbd">Ctrl+K</span></button>
+          <hr>
           <button data-act="clear-sch">Clear Schematic</button>
         </div></div>
       <div class="mi"><button data-menu="tools">Tools</button>
@@ -458,6 +461,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <button data-act="theme" data-theme="dark"     class="mi-theme">ธีม: มืด (Studio)</button>
           <button data-act="toggle-hops" id="miHops">จุดตัดสาย: เรียบ (แบบ ISE)</button>
           <button data-act="show-hint">แสดงคำแนะนำ</button>
+          <hr>
+          <button data-act="toggle-marks">แสดง/ซ่อนปัญหาบนผัง</button>
+          <button data-act="welcome-open">หน้าต้อนรับ / เทมเพลตแลป…</button>
+          <button data-act="tour-start">ทัวร์ 1 นาที</button>
+          <button data-act="shortcuts">คีย์ลัด<span class="kbd">?</span></button>
         </div></div>
     </nav>
     <div class="grow"></div>
@@ -471,8 +479,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
       <button class="step" data-stage="upload" title="เตรียมไฟล์ลงบอร์ดจริง (VHDL + XDC สำหรับ Vivado)">ลงบอร์ด</button>
     </div>
     <div class="grow"></div>
-    <span style="font-size:11px;color:var(--muted)">Project:</span>
+    <button class="cmdk-btn" data-act="cmdk" title="ค้นหาทุกคำสั่ง (Ctrl+K) — พิมพ์ไทยหรืออังกฤษก็ได้">🔍 <span style="opacity:.75">Ctrl+K</span></button>
+    <span class="proj-lbl" style="font-size:11px;color:var(--muted)">Project:</span>
     <input class="proj-name" id="projectName" value="my_project" spellcheck="false">
+    <button class="save-chip clean" id="saveChip" data-act="save-project" title="สถานะการบันทึก"><span class="dot"></span>…</button>
+    <button class="btn btn-ghost" data-act="history-open" title="ประวัติย้อนเวลา — กลับไปจุดที่เก็บไว้อัตโนมัติ">🕘<span class="lbl-wide"> ประวัติ</span></button>
     <button class="btn btn-ghost" data-act="sync-bridge" title="โหลดดีไซน์จาก MCP bridge (127.0.0.1:8766)">Sync</button>
     <button class="btn btn-ghost" data-act="open-manual" title="เปิดคู่มือการใช้งาน">คู่มือ</button>
     <button class="btn btn-ghost" data-act="synth" title="Run synthesis check (F7)">Check</button>
@@ -507,8 +518,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
             <button data-tool="select" class="active" title="เลือก / ย้าย  (Esc)">➤</button>
             <hr>
             <button data-tool="wire"     title="Add Wire (W) — คลิกพอร์ต→พอร์ต ต่อสาย, คลิกกลางสาย = แยกสาย">╱</button>
-            <button data-tool="netname"  title="Add Net Name (N) — คลิกสายเพื่อตั้งชื่อ · พิมพ์ data(7:0) เพื่อกำหนดบัส">ab</button>
-            <button data-tool="iomarker" title="Add I/O Marker (I) — คลิกขาที่ว่างเพื่อติด INPUT/OUTPUT">⇥</button>
+            <button data-tool="netname"  title="Add Net Name (Shift+N) — คลิกสายเพื่อตั้งชื่อ · พิมพ์ data(7:0) เพื่อกำหนดบัส">ab</button>
+            <button data-tool="iomarker" title="Add I/O Marker (Shift+I) — คลิกขาที่ว่างเพื่อติด INPUT/OUTPUT">⇥</button>
             <button data-tool="bustap"   title="Bus Tap (B) — ลากสายไว้ก่อน แล้วคลิกบนสายบัสตรงจุดที่สายมาเจอกัน">≣</button>
             <hr>
             <button data-tool="symbol"   title="Add Symbol — เปิดแผง Components">⊞</button>
@@ -786,8 +797,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <tbody>
             <tr><td class="k">➤ เลือก</td><td class="k">Esc</td><td>เลือกและลากย้ายชิ้นส่วน ลากคลุมเพื่อเลือกหลายชิ้น</td></tr>
             <tr><td class="k">╱ สาย</td><td class="k">W</td><td>ต่อสาย คลิกขา → คลิกขา หรือคลิกกลางสายเดิมเพื่อแตกสาย</td></tr>
-            <tr><td class="k">ab ชื่อ net</td><td class="k">N</td><td>คลิกที่สายเพื่อตั้งชื่อสัญญาณ</td></tr>
-            <tr><td class="k">⇥ I/O marker</td><td class="k">I</td><td>คลิกขาที่ว่างเพื่อแปะพอร์ต INPUT หรือ OUTPUT ให้ทันที</td></tr>
+            <tr><td class="k">ab ชื่อ net</td><td class="k">Shift+N</td><td>คลิกที่สายเพื่อตั้งชื่อสัญญาณ</td></tr>
+            <tr><td class="k">⇥ I/O marker</td><td class="k">Shift+I</td><td>คลิกขาที่ว่างเพื่อแปะพอร์ต INPUT หรือ OUTPUT ให้ทันที</td></tr>
             <tr><td class="k">≣ Bus Tap</td><td class="k">B</td><td>วางจุดแตก/รวมบิตบนสายบัส</td></tr>
             <tr><td class="k">⊞ Symbol</td><td class="k">—</td><td>เปิดแผง Components</td></tr>
             <tr><td class="k">🔓 ล็อกการจัดวาง</td><td class="k">—</td><td>ตรึงตำแหน่งทุกอย่างที่วางไว้ — ชิ้นส่วน สาย และจุดต่อ ขยับไม่ได้ทั้งโปรแกรมและผู้ใช้ แต่ยังเลือก ต่อสายเพิ่ม ตั้งชื่อ และลบได้ตามปกติ</td></tr>
@@ -1107,11 +1118,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <thead><tr><th>คีย์</th><th>ทำอะไร</th><th>คีย์</th><th>ทำอะไร</th></tr></thead>
           <tbody>
             <tr><td class="k">W</td><td>เครื่องมือสาย</td><td class="k">Ctrl+Z</td><td>ย้อนกลับ</td></tr>
-            <tr><td class="k">N</td><td>ตั้งชื่อ net</td><td class="k">Ctrl+Shift+Z / Ctrl+Y</td><td>ทำซ้ำที่ย้อน</td></tr>
+            <tr><td class="k">Shift+N</td><td>ตั้งชื่อ net</td><td class="k">Ctrl+Shift+Z / Ctrl+Y</td><td>ทำซ้ำที่ย้อน</td></tr>
             <tr><td class="k">B</td><td>Bus Tap</td><td class="k">Ctrl+A</td><td>เลือกทั้งแผ่น</td></tr>
-            <tr><td class="k">I</td><td>แปะ I/O marker</td><td class="k">Ctrl+C / Ctrl+V</td><td>คัดลอก / วาง (ข้ามแผ่นได้)</td></tr>
+            <tr><td class="k">Shift+I</td><td>แปะ I/O marker</td><td class="k">Ctrl+C / Ctrl+V</td><td>คัดลอก / วาง (ข้ามแผ่นได้)</td></tr>
             <tr><td class="k">R / Shift+R</td><td>หมุน 90° ตาม / ทวนเข็ม</td><td class="k">Ctrl+X</td><td>ตัด</td></tr>
             <tr><td class="k">M</td><td>พลิกซ้ายขวา</td><td class="k">Ctrl+D</td><td>ทำซ้ำ</td></tr>
+            <tr><td class="k">A / O / X / N</td><td>วาง AND / OR / XOR / NOT ที่เมาส์ (Shift = NAND / NOR / XNOR / BUF)</td><td class="k">Ctrl+K</td><td>ค้นหาคำสั่ง (ไทย/อังกฤษ)</td></tr>
+            <tr><td class="k">I / Q / D / C</td><td>วาง INPUT / OUTPUT / D-FF / CONST ที่เมาส์</td><td class="k">?</td><td>ตารางคีย์ลัด</td></tr>
             <tr><td class="k">Esc</td><td>ยกเลิก / กลับไปเครื่องมือเลือก</td><td class="k">Ctrl+S / Ctrl+O</td><td>บันทึก / เปิดโปรเจกต์</td></tr>
             <tr><td class="k">Delete</td><td>ลบสิ่งที่เลือก</td><td class="k">Ctrl+N</td><td>โปรเจกต์ใหม่</td></tr>
             <tr><td class="k">Enter</td><td>จบสายที่กำลังลาก</td><td class="k">Space + ลาก</td><td>เลื่อนจอ</td></tr>
@@ -2398,7 +2411,12 @@ function schPortList(sch){
      the layout the control: arrange the port blocks on the sub-sheet top to bottom the
      way you want them on the symbol, and the symbol follows. Ids are unaffected, so
      nothing a parent has wired comes loose — the pins only move. */
-  const byPos = (a,b) => (a.y - b.y) || (a.x - b.x);
+  const byPos0 = (a,b) => (a.y - b.y) || (a.x - b.x);
+  // a generated sheet (sch.portOrder) keeps its declared order — q0..q3, not whatever the
+  // router's straight-line alignment left them in; hand-drawn sheets follow the drawing
+  const po = sch.portOrder, rk = c => { const L = po && (c.type==="IN" ? po.in : po.out); if(!L) return -1;
+    const n = String((c.params&&c.params.name)||"").toLowerCase(); return L.findIndex(o=>String(o).toLowerCase()===n); };
+  const byPos = (a,b) => { const ra=rk(a), rb=rk(b); return (ra>=0 && rb>=0 && ra!==rb) ? ra-rb : byPos0(a,b); };
   (sch.components||[]).filter(c=>c.type==="IN").slice().sort(byPos)
     .forEach(c=>out.push({cid:c.id, id:uq(c.params.name||"in"),  name:c.params.name, dir:"in",  width:c.params.width||1}));
   (sch.components||[]).filter(c=>c.type==="OUT").slice().sort(byPos)
@@ -4755,7 +4773,11 @@ function autoPlaceSheet(sch){
   // (dummies reserve a lane in the middle columns so long wires get a straight path
   //  and the gates they'd cross are pushed out of the way — classic Sugiyama).
   const node={}, inpC={}, outC={}; const layers=[]; for(let i=0;i<=maxL;i++) layers.push([]);
-  comps.forEach(c=>{ node[c.id]={id:c.id,h:getSize(c).h,comp:c}; inpC[c.id]=[]; outC[c.id]=[]; layers[layer[c.id]].push(c.id); });
+  // a generated sheet may pin its IN / OUT columns to the declared order (sch.portOrder):
+  // those nodes keep their rank while every other column is still median-ordered around them
+  const _po=sch.portOrder, _rk=c=>{ const L=_po&&(c.type==="IN"?_po.in:c.type==="OUT"?_po.out:null); if(!L) return null;
+    const n=String((c.params&&c.params.name)||"").toLowerCase(), i=L.findIndex(o=>String(o).toLowerCase()===n); return i<0?null:i; };
+  comps.forEach(c=>{ node[c.id]={id:c.id,h:getSize(c).h,comp:c,rk:_rk(c)}; inpC[c.id]=[]; outC[c.id]=[]; layers[layer[c.id]].push(c.id); });
   let dn=0;
   rawEdges.forEach(e=>{
     const Ld=layer[e.from], Ls=layer[e.to];
@@ -4772,7 +4794,8 @@ function autoPlaceSheet(sch){
       inpC[e.to].push({o:prev,d:-e.inDy}); outC[prev].push({o:e.to,d:e.inDy});
     }
   });
-  layers.forEach(col=>col.sort((A,B)=>((node[A].comp?node[A].comp.y:1e6)-(node[B].comp?node[B].comp.y:1e6))));
+  const _byRank=(a,b,f)=>{ const ra=node[a].rk, rb=node[b].rk; return (ra!=null&&rb!=null) ? ra-rb : f(a,b); };
+  layers.forEach(col=>col.sort((A,B)=>_byRank(A,B,(A,B)=>((node[A].comp?node[A].comp.y:1e6)-(node[B].comp?node[B].comp.y:1e6)))));
   const COLX=18*GRID, GAP=5*GRID, DGAP=2*GRID, X0=6*GRID, Y0=6*GRID;  // COLX=18: roomy columns (X-compression removed — wider channels = fewer crossings, easier to read)
   const H=id=>node[id].h, PADafter=id=>node[id].dummy?DGAP:GAP;
   layers.forEach(col=>{ let y=Y0; col.forEach(id=>{ node[id].y=y; y+=H(id)+PADafter(id); }); });
@@ -4782,7 +4805,7 @@ function autoPlaceSheet(sch){
       const col=layers[fwd?li:maxL-li];
       col.forEach(id=>{ const cn=fwd?inpC[id]:outC[id]; const ys=cn.map(k=>node[k.o].y+k.d);
         node[id]._w = ys.length ? (ys.sort((p,q)=>p-q), ys[(ys.length-1)>>1]) : node[id].y; });
-      col.sort((a,b)=>node[a]._w-node[b]._w);
+      col.sort((a,b)=>_byRank(a,b,(a,b)=>node[a]._w-node[b]._w));
       let bot=-1e9; col.forEach(id=>{ let y=Math.max(node[id]._w,bot); node[id].y=y; bot=y+H(id)+PADafter(id); });
     }
   }
@@ -10567,8 +10590,7 @@ async function aiSimActiveSheet(){
     const sch=activeSch(); if(!sch) return;
     const lift=schematicToIntent(sch);
     if(!lift.intent.components.length) return;
-    const r=await fetch(aiEndpoint()+"/sim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({intent:lift.intent})});
-    const j=await r.json();
+    const j=await uxSimSheet(sch, lift.intent);
     if(j&&j.ok){ const h='<span class="ac-badge v">จำลอง</span>'+(j.truth_table?aiTruthTableHtml(j.truth_table):(j.sequence?aiSeqHtml(j.sequence):'')); aiAppend("ai",h,{html:true}); }
     else if(j&&j.reason){ aiAppend("ai",'<span class="ac-hint">จำลองไม่ได้: '+((typeof esc==="function"?esc:(x=>x))(j.reason))+'</span>',{html:true}); }
   }catch(_){}
@@ -10889,8 +10911,7 @@ async function aiSend(){
       const sch=activeSch(); if(!sch||!(sch.components||[]).length){ aiAppend("ai","ยังไม่มีวงจรบนแผ่น",{err:true}); return; }
       const lift=schematicToIntent(sch);
       AICHAT.busy=true; aiSetBusy(true);
-      try{ const r=await fetch(aiEndpoint()+"/sim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({intent:lift.intent})});
-        const j=await r.json();
+      try{ const j=await uxSimSheet(sch, lift.intent);
         if(!j.ok){ aiAppend("ai","จำลองไม่ได้: "+(j.reason||JSON.stringify(j.errors||j)),{html:false,err:true}); }
         else { let h='<span class="ac-badge v">จำลองแผ่นปัจจุบัน</span>'+(j.truth_table?aiTruthTableHtml(j.truth_table):aiSeqHtml(j.sequence)); aiAppend("ai",h,{html:true}); }
       }catch(e){ aiAppend("ai","ต่อ backend ไม่ได้ — รัน python ai/chat_server.py",{err:true}); }
@@ -11418,11 +11439,7 @@ async function pipelineUpload(){
   if(!sch || !((sch.components||[]).length)){ toast("ยังไม่มีวงจรให้ลงบอร์ด","warn"); return; }
   let tt=SIM_LAST_TT;
   if(!tt){
-    try{
-      const intent=schematicToIntent(sch).intent;
-      const r=await fetch(aiEndpoint()+"/sim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({intent,cycles:8})});
-      const j=await r.json(); if(j.ok && j.truth_table) tt=j.truth_table;
-    }catch(_){}
+    try{ const j=await uxSimSheet(sch); if(j.ok && j.truth_table) tt=j.truth_table; }catch(_){}
   }
   let ins=[], outs=[];
   if(tt){ ins=tt.inputs; outs=tt.outputs; }
@@ -11434,18 +11451,7 @@ async function pipelineUpload(){
   let xdc="## EDGE Spartan-7 (XC7S15 FTGB196) — สร้างโดย Schematic Studio\n";
   xdc+="## ขาตรงกับที่เลือกไว้ในหน้า Sim · Board (เลือกขา)\n\n";
   const put=(n,pin)=>{ xdc+=`set_property -dict {PACKAGE_PIN ${pin} IOSTANDARD LVCMOS33} [get_ports ${n}]\n`; };
-  if(SIM_PINMAP && tt){          // honour the user's pin selection
-    ins.forEach(n=>put(n, SIM_SW_PINS[15-(SIM_PINMAP.inMap[n]|0)]||"?"));
-    xdc+="\n";
-    outs.forEach(n=>{ const t=SIM_PINMAP.outMap[n]||"";
-      if(t.slice(0,4)==="led:") put(n, SIM_LED_PINS[15-(+t.slice(4))]||"?");
-      else if(t==="buzzer") put(n, "B14");
-      else if(t.slice(0,4)==="seg:") xdc+=`# ${n} -> 7-SEG segment ${t.slice(4)} : ใส่ PACKAGE_PIN ของเซกเมนต์นี้เองตาม datasheet บอร์ด\n`;
-      else put(n, "?"); });
-  } else {                        // fallback: sequential order
-    ins.forEach((n,k)=>put(n, SIM_SW_PINS[15-k]||"?")); xdc+="\n";
-    outs.forEach((n,k)=>put(n, SIM_LED_PINS[15-k]||"?"));
-  }
+  xdc+=uxXdcBody(ins, outs);      // sheet's own pin map → sim page choice → name rules → order
   try{ generateVHDL(); }catch(_){}
   const vhdl=($("#vhdlOutput").dataset.raw)||"";
   const dl=(fn,txt)=>{ const b=new Blob([txt],{type:"text/plain"}); const u=URL.createObjectURL(b);
@@ -11887,8 +11893,9 @@ async function runSim(){
   let j;
   const hasFF = flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
   if(hasFF){ try{ j=clientSeqSim(sch,cyc); }catch(e){ sig.innerHTML='<span style="color:var(--err)">จำลอง flip-flop ไม่ได้: '+e.message+'</span>'; return; } }
-  else try{ const r=await fetch(aiEndpoint()+"/sim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({intent,cycles:cyc})}); j=await r.json(); }
-  catch(e){ sig.innerHTML='<span style="color:var(--err)">ต่อ backend ไม่ได้ — รัน python ai/chat_server.py</span>'; return; }
+  // combinational: simulated in the browser (probe engine); the backend only for what it can't evaluate
+  else try{ j=await uxSimSheet(sch, intent, cyc); }
+  catch(e){ sig.innerHTML=''; if(msg) msg.innerHTML=uxBackendHelpHtml("การจำลองวงจรนี้", e.why||e.message); return; }
   if(!j.ok){ sig.innerHTML='<span style="color:var(--err)">จำลองไม่ได้: '+(j.reason||JSON.stringify(j.errors||j))+'</span>'; return; }
   // status line: normally clear (table + timing live on the board page) — but never hide a
   // warning that changes the meaning of the result (skipped block, floating pin, multi-bit port)
@@ -12395,5 +12402,1760 @@ function init(){
 init();
 
 </script>
+<!-- UX-LAYER:BEGIN -->
+<style>
+/* ---- UX layer ---- */
+.save-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);background:var(--bg-2);color:var(--ink-dim);cursor:pointer;white-space:nowrap}
+.save-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.save-chip.clean .dot{background:var(--ok)}
+.save-chip.dirty{border-color:var(--warn);color:var(--warn)}
+.save-chip.dirty .dot{background:var(--warn);animation:uxPulse 1.6s ease-in-out infinite}
+@keyframes uxPulse{50%{opacity:.35}}
+.tl-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tl-row{display:flex;align-items:center;gap:12px;padding:8px 12px;border-top:1px solid var(--line)}
+.tl-row:first-child{border-top:0}
+.tl-when{width:110px;flex:none;font-variant-numeric:tabular-nums;color:var(--ink-dim);font-size:12px}
+.tl-what{flex:1;min-width:0;display:flex;flex-direction:column}
+.tl-what span{font-size:11.5px;color:var(--muted)}
+.tl-now{font-size:11px;color:var(--ok);font-weight:600;padding:0 8px}
+.muted{color:var(--muted)}
+.ux-need{border:1px solid var(--warn);border-radius:10px;padding:10px 12px;background:color-mix(in srgb,var(--warn) 8%,transparent);font-size:12.5px;line-height:1.55;color:var(--ink);margin-bottom:10px}
+.ux-need-h{font-weight:700;margin-bottom:4px}
+.ux-need-why{color:var(--ink-dim);margin-bottom:4px}
+.ux-need ol{margin:4px 0 6px;padding-left:20px}
+.ux-need-ok{color:var(--ok);font-size:12px}
+.ux-cmd{display:inline-flex;align-items:center;gap:6px;margin-left:4px}
+.ux-cmd code{background:var(--bg-2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:"JetBrains Mono",Consolas,monospace;user-select:all}
+.ux-copy{font:inherit;font-size:11px;background:var(--bg-3);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:1px 8px;cursor:pointer}
+.gen-group{margin-bottom:6px}
+.gen-btn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:5px;color:var(--ink);cursor:pointer;font:inherit}
+.gen-btn:hover{border-color:var(--accent)}
+.gen-btn .gi{width:24px;height:24px;flex:none;border-radius:6px;background:var(--bg-3);display:grid;place-items:center;font-weight:700;color:var(--accent)}
+.gen-btn .gt{display:flex;flex-direction:column;min-width:0}
+.gen-btn .gt b{font-size:12px;font-weight:600}
+.gen-btn .gt span{font-size:11px;color:var(--muted)}
+.tt-cfg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+.tt-cfg label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--ink-dim)}
+.tt-cfg input,.tt-kbar select{background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit}
+.tt-bar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;font-size:12px}
+.seg-tabs{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg-tabs button{background:transparent;border:0;color:var(--muted);padding:5px 12px;cursor:pointer;font:inherit}
+.seg-tabs button.on{background:var(--bg-3);color:var(--ink);font-weight:600}
+.tt-grid{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.tt-t,.tt-k{border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.tt-t{width:100%}
+.tt-t th,.tt-t td{border-bottom:1px solid var(--line);padding:2px 8px;text-align:center}
+.tt-t th{position:sticky;top:0;background:var(--bg-2);color:var(--ink-dim);font-weight:600}
+.tt-t th.o{color:var(--accent)}
+.tt-t .rn{color:var(--muted);font-size:11px;width:30px}
+.tt-t .sp{width:10px;border-left:1px solid var(--line-2)}
+.tt-c{width:30px;height:22px;border-radius:5px;border:1px solid var(--line);background:var(--bg-1);color:var(--muted);cursor:pointer;font:inherit;font-weight:700}
+.tt-c.v1{background:color-mix(in srgb,var(--ok) 22%,transparent);border-color:var(--ok);color:var(--ok)}
+.tt-c.vx{color:var(--warn);border-style:dashed}
+.tt-kbar{padding:8px 10px;font-size:12px;color:var(--ink-dim)}
+.tt-k{margin:0 10px 12px}
+.tt-k th{padding:4px 10px;color:var(--ink-dim);font-weight:600;font-family:"JetBrains Mono",Consolas,monospace}
+.tt-k th.corner{font-size:11px;color:var(--muted)}
+.tt-k td{border:1px solid var(--line-2);padding:6px 10px;position:relative;text-align:center}
+.tt-k td .tt-c{width:38px;height:30px}
+.tt-k .mi{position:absolute;right:3px;bottom:1px;font-size:9px;color:var(--muted)}
+.tt-expr{margin-top:10px;font-family:"JetBrains Mono",Consolas,monospace;font-size:12.5px;line-height:1.6}
+#pipeline .step{position:relative}
+.st-b{display:inline-block;min-width:16px;margin-left:5px;padding:0 5px;border-radius:99px;font-size:10px;font-weight:700;line-height:15px;text-align:center;vertical-align:1px;background:var(--bg-3);color:var(--muted)}
+.st-b.ok{background:color-mix(in srgb,var(--ok) 20%,transparent);color:var(--ok)}
+.st-b.warn{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--warn);cursor:pointer}
+.st-b.err{background:color-mix(in srgb,var(--err) 22%,transparent);color:var(--err);cursor:pointer}
+.pintbl tr.ux-unconf td{background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.pintbl tr.ux-flash td{animation:uxFlash 1.2s ease-in-out 3}
+@keyframes uxFlash{50%{background:color-mix(in srgb,var(--warn) 40%,transparent)}}
+.ux-confirm{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:11.5px}
+.wl-view{display:none}.wl-view.on{display:block}
+.wl-main{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.wl-big{display:flex;flex-direction:column;gap:4px;text-align:left;padding:16px;border-radius:12px;border:1px solid var(--line);background:var(--bg-2);color:var(--ink);cursor:pointer;font:inherit}
+.wl-big:hover,.wl-card:hover{border-color:var(--accent)}
+.wl-big b{font-size:14px}.wl-big span{font-size:12px;color:var(--muted)}
+.wl-ico{font-size:24px;color:var(--ink)!important}
+.wl-foot{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px}
+.wl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:10px 0}
+.wl-card{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);color:var(--ink);cursor:pointer;font:inherit}
+.wl-card b{font-size:13px}.wl-card span{font-size:11.5px;color:var(--muted)}
+.wl-card .wl-lab{color:var(--accent);font-weight:600;font-size:11px}
+@media (max-width:700px){.wl-main{grid-template-columns:1fr}}
+.tour-ov{position:fixed;inset:0;z-index:3000}
+.tour-hole{position:fixed;border-radius:10px;box-shadow:0 0 0 9999px #000a;border:2px solid var(--accent);transition:all .25s;pointer-events:none}
+.tour-tip{position:fixed;width:320px;background:var(--bg-1);border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh-3);padding:14px 16px;transition:top .25s,left .25s}
+.tour-h{font-weight:700;font-size:14px;margin-bottom:6px}
+.tour-t{font-size:12.5px;line-height:1.6;color:var(--ink-dim)}
+.tour-f{display:flex;align-items:center;gap:8px;margin-top:12px}
+.ux-tip{position:fixed;z-index:2500;max-width:360px;background:var(--bg-1);color:var(--ink);border:1px solid var(--line-2);border-radius:9px;box-shadow:var(--sh-2);padding:8px 10px;font-size:12px;line-height:1.5;pointer-events:none;display:none}
+.ux-tip-h{font-weight:700;margin-bottom:2px}
+.ux-tip-i+.ux-tip-i{margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+.ux-tip-i.err b{color:var(--err)}.ux-tip-i.warn b{color:var(--warn)}
+.ux-tip-fix{margin-top:3px;color:var(--ok)}
+.ux-gt{border-collapse:collapse;font-family:"JetBrains Mono",Consolas,monospace;font-size:11.5px}
+.ux-gt th,.ux-gt td{padding:1px 8px;text-align:center;border-bottom:1px solid var(--line)}
+.ux-gt th{color:var(--muted);font-weight:600}
+.ux-gt .o{border-left:1px solid var(--line-2);font-weight:700}
+.ux-gt .v1,.ux-v.v1{color:var(--ok)}
+.ux-v{font-family:"JetBrains Mono",Consolas,monospace;font-size:14px}
+.ux-marks .ux-mp{fill:var(--err);stroke:var(--bg-0);stroke-width:1.5;opacity:.9;pointer-events:none}
+.ux-marks .ux-mw{fill:none;stroke:#f5a623;stroke-width:6;stroke-opacity:.55;stroke-linecap:round;cursor:help}
+.ux-marks .ux-mc{cursor:help}
+.ux-marks .ux-mc circle{stroke:var(--bg-0);stroke-width:1.5}
+.ux-marks .ux-mc.err circle{fill:var(--err)}.ux-marks .ux-mc.warn circle{fill:#f5a623}
+.ux-marks .ux-mc text{fill:#fff;font-size:9.5px;font-weight:800;pointer-events:none}
+.ex-i{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;font-size:12.5px;line-height:1.55}
+.ex-i .ex-b{flex:1;min-width:0}
+.ex-i .ex-ico{width:22px;height:22px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px;background:var(--bg-3)}
+.ex-i.err{border-color:color-mix(in srgb,var(--err) 50%,var(--line))}.ex-i.err .ex-ico{color:var(--err)}
+.ex-i.warn .ex-ico{color:var(--warn)}.ex-i.info .ex-ico{color:var(--info)}.ex-i.ok .ex-ico{color:var(--ok)}
+.ex-fix{color:var(--ok);margin-top:2px}
+.cmdk-bg{position:fixed;inset:0;background:#0006;z-index:2600;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+.cmdk{width:560px;max-width:92vw;background:var(--bg-1);border:1px solid var(--line-2);border-radius:12px;box-shadow:var(--sh-3);overflow:hidden}
+.cmdk-in{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:15px;padding:14px 16px;outline:none}
+.cmdk-list{max-height:52vh;overflow:auto;padding:6px}
+.cmdk-i{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px}
+.cmdk-i.on{background:var(--bg-3)}
+.cmdk-i span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdk-h{font-size:11px;color:var(--muted);white-space:nowrap}
+.cmdk-foot{font-size:11px;padding:6px 12px;border-top:1px solid var(--line)}
+.kbd-t{border-collapse:collapse;width:100%;font-size:12.5px}
+.kbd-t td{padding:4px 6px;border-bottom:1px solid var(--line)}
+.kbd-t kbd{font-family:"JetBrains Mono",Consolas,monospace;font-size:11.5px;background:var(--bg-2);border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+.ar-chain{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px}
+.ar-shared{display:flex;flex-wrap:wrap;gap:10px;font-size:12px}
+.modal select,.modal input[type=number]{background:var(--bg-2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:inherit}
+.cmdk-btn{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:3px 9px;background:var(--bg-2);cursor:pointer;white-space:nowrap}
+.cmdk-btn:hover{color:var(--ink);border-color:var(--accent)}
+@media (max-width:1440px){ .proj-lbl,.lbl-wide{display:none} .topbar .proj-name{width:120px} .topbar .btn-ghost[data-act="sync-bridge"]{display:none} }
+@media (max-width:1300px){ .topbar .proj-name{width:96px} .save-chip{padding:3px 8px} }
+.pinpage{background:var(--bg-1);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.pp-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px}
+.pp-wrap{max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.pp-t{margin-top:0!important;width:auto;min-width:520px}
+.sim-page .pp-t td,.sim-page .pp-t th{text-align:left}
+#simPage.sv-pins #simSignals,#simPage.sv-pins [data-act=explain-sim],#simPage.sv-pins .sim-top label{display:none}
+.pp-wrap{display:inline-block;max-width:100%}
+.pp-t th{position:sticky;top:0;background:var(--bg-2);color:var(--muted);text-align:left;padding:4px 8px;border:1px solid var(--line)}
+.pp-t select{min-width:210px}
+.pp-t tr.pp-bus td{background:var(--bg-2)}
+.pp-t td.pp-bit{padding-left:22px!important;font-family:"JetBrains Mono",Consolas,monospace;font-size:11.5px}
+.pp-dir{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px}
+.pp-dir.in{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.pp-dir.out{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.pp-t tr.pp-dup td{background:color-mix(in srgb,var(--err) 12%,transparent)}
+.pp-warn{color:var(--err);font-weight:600;font-size:11.5px}
+</style>
+<script>
+"use strict";
+/* =========================================================================
+   UX LAYER — added on top of the editor without rewriting it. It wraps a few
+   global functions (snapshot, saveProjectToFile, deserialize, …) and adds its
+   own UI. Everything here reads the same `state` the editor uses.
+   ========================================================================= */
+const UX = { savedHash:null, curHash:null, dirty:false, expectFileLoad:false, restoring:false };
+const escA = s => String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+function uxHash(str){ let h=2166136261>>>0; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h.toString(36)+":"+str.length; }
+function uxLS(k, v){ try{ if(v===undefined) return localStorage.getItem(k); if(v===null) localStorage.removeItem(k); else localStorage.setItem(k, v); }catch(_){ return null; } }
+function uxModal(title, bodyHtml, opts){
+  opts=opts||{};
+  const m=document.createElement("div"); m.className="modal-bg";
+  m.innerHTML=`<div class="modal" style="${opts.width?`width:${opts.width}px`:""}"><h2>${title}<button class="close" title="ปิด">×</button></h2>
+    <div class="modal-body">${bodyHtml}</div>${opts.foot?`<div class="modal-foot">${opts.foot}</div>`:""}</div>`;
+  const close=()=>{ m.remove(); document.removeEventListener("keydown",onKey,true); if(opts.onClose) opts.onClose(); };
+  const onKey=e=>{ if(e.key==="Escape"){ e.stopPropagation(); close(); } };
+  m.addEventListener("mousedown",e=>{ if(e.target===m && !opts.sticky) close(); });
+  m.querySelector(".close").onclick=close;
+  document.addEventListener("keydown",onKey,true);
+  document.body.appendChild(m);
+  m.close=close;
+  return m;
+}
+
+/* ---------- 1a. saved / unsaved tracking ---------- */
+function uxWorkHash(){ try{ return uxHash(serialize()); }catch(_){ return null; } }
+function uxMarkSaved(){
+  UX.savedHash=UX.curHash=uxWorkHash();
+  uxLS("schstudio.savedHash", UX.savedHash);
+  uxLS("schstudio.savedAt", String(Date.now()));
+  uxSetDirty(false);
+}
+function uxSetDirty(d){
+  UX.dirty=d;
+  const chip=$("#saveChip"); if(!chip) return;
+  const at=+uxLS("schstudio.savedAt")||0;
+  const empty=!uxHasWork();
+  chip.classList.toggle("dirty", d && !empty);
+  chip.classList.toggle("clean", !d || empty);
+  if(d && !empty){ chip.innerHTML='<span class="dot"></span>ยังไม่บันทึก'; chip.title="งานล่าสุดอยู่แค่ในเบราว์เซอร์ (autosave) — กดเพื่อบันทึกเป็นไฟล์ (Ctrl+S)"; }
+  else if(at){ const t=new Date(at); chip.innerHTML='<span class="dot"></span>บันทึกแล้ว '+t.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}); chip.title="บันทึกเป็นไฟล์ล่าสุด "+t.toLocaleString("th-TH"); }
+  else { chip.innerHTML='<span class="dot"></span>ไม่มีงานค้าง'; chip.title="ยังไม่มีงานที่ต้องบันทึก"; }
+}
+/* the editor opens on a demo half adder — that alone is not "work" worth a warning */
+function uxHasWork(){
+  try{ return Object.values(state.projects||{}).some(p=>Object.values(p.schematics||{}).some(s=>(s.components||[]).length)); }catch(_){ return true; }
+}
+let _uxDirtyT=null;
+function uxCheckDirty(){
+  clearTimeout(_uxDirtyT);
+  _uxDirtyT=setTimeout(()=>{ UX.curHash=uxWorkHash(); uxSetDirty(UX.curHash!==UX.savedHash); }, 600);
+}
+{
+  const _snapshot=snapshot;
+  snapshot=function(){ const r=_snapshot.apply(this, arguments); uxCheckDirty(); return r; };
+  const _undo=undo, _redo=redo;
+  undo=function(){ const r=_undo.apply(this, arguments); uxCheckDirty(); return r; };
+  redo=function(){ const r=_redo.apply(this, arguments); uxCheckDirty(); return r; };
+  const _save=saveProjectToFile;
+  saveProjectToFile=function(){ const r=_save.apply(this, arguments); uxMarkSaved(); uxTimelineAdd("บันทึกเป็นไฟล์", true); return r; };
+  const _open=openProjectFromFile;
+  openProjectFromFile=function(){ UX.expectFileLoad=true; return _open.apply(this, arguments); };
+  const _deser=deserialize;
+  deserialize=function(json){
+    // opening a file replaces what is on screen — keep a way back first
+    if(!UX.restoring && uxHasWork()) uxTimelineAdd("ก่อนเปิดไฟล์/โปรเจกต์อื่น", true);
+    const r=_deser.apply(this, arguments);
+    if(UX.expectFileLoad){ UX.expectFileLoad=false; uxMarkSaved(); } else uxCheckDirty();
+    return r;
+  };
+  $("#projectName").addEventListener("change", uxCheckDirty);
+}
+window.addEventListener("beforeunload", e=>{
+  if(UX.dirty && uxHasWork()){ e.preventDefault(); e.returnValue=""; return ""; }
+});
+
+/* ---------- 1b. timeline: snapshots you can jump back to ---------- */
+const TL = { db:null, lastHash:null, timer:null, MAX:60 };
+function tlDb(){
+  if(TL.db) return Promise.resolve(TL.db);
+  return new Promise((res, rej)=>{
+    let rq; try{ rq=indexedDB.open("schstudio-timeline", 1); }catch(e){ return rej(e); }
+    rq.onupgradeneeded=()=>{ const db=rq.result; if(!db.objectStoreNames.contains("snaps")) db.createObjectStore("snaps",{keyPath:"id",autoIncrement:true}); };
+    rq.onsuccess=()=>{ TL.db=rq.result; res(TL.db); };
+    rq.onerror=()=>rej(rq.error);
+  });
+}
+function tlTx(mode, fn){
+  return tlDb().then(db=>new Promise((res, rej)=>{
+    const tx=db.transaction("snaps", mode), st=tx.objectStore("snaps"); let out;
+    Promise.resolve(fn(st, v=>{ out=v; })).catch(rej);
+    tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error);
+  }));
+}
+function tlCounts(){
+  let c=0, w=0, s=0;
+  Object.values(state.projects||{}).forEach(p=>Object.values(p.schematics||{}).forEach(sch=>{ s++; c+=(sch.components||[]).filter(x=>x.type!=="JUNCTION").length; w+=(sch.wires||[]).length; }));
+  return {c, w, s};
+}
+/* force=true: a checkpoint before something drastic, taken even if nothing changed since the last one */
+function uxTimelineAdd(reason, force){
+  if(!uxHasWork()) return Promise.resolve();
+  let data; try{ data=serialize(); }catch(_){ return Promise.resolve(); }
+  const h=uxHash(data);
+  if(!force && h===TL.lastHash) return Promise.resolve();
+  if(force && h===TL.lastHash && reason===TL.lastReason) return Promise.resolve();
+  TL.lastHash=h; TL.lastReason=reason;
+  const rec={t:Date.now(), reason, name:(state.project&&state.project.name)||"", counts:tlCounts(), hash:h, data};
+  return tlTx("readwrite", st=>{ st.add(rec); }).then(tlTrim).catch(e=>console.warn("timeline",e));
+}
+function tlList(){
+  return tlTx("readonly", (st, done)=>new Promise(res=>{
+    const out=[]; const cur=st.openCursor(null,"prev");
+    cur.onsuccess=()=>{ const c=cur.result; if(!c){ done(out); return res(); }
+      const v=c.value; out.push({id:v.id,t:v.t,reason:v.reason,name:v.name,counts:v.counts}); c.continue(); };
+  }));
+}
+function tlGet(id){ return tlTx("readonly", (st, done)=>new Promise(res=>{ const r=st.get(id); r.onsuccess=()=>{ done(r.result); res(); }; })); }
+function tlTrim(){
+  return tlList().then(list=>{
+    // keep every checkpoint of the last 2 hours, then at most MAX overall
+    const old=list.filter((x,i)=>i>=TL.MAX || (i>=20 && Date.now()-x.t>7*864e5));
+    if(!old.length) return;
+    return tlTx("readwrite", st=>{ old.forEach(x=>st.delete(x.id)); });
+  });
+}
+function tlStart(){
+  clearInterval(TL.timer);
+  TL.timer=setInterval(()=>uxTimelineAdd("อัตโนมัติทุก 5 นาที"), 5*60*1000);
+  setTimeout(()=>uxTimelineAdd("เปิดโปรแกรม"), 3000);
+}
+/* checkpoint BEFORE the editor's own handler runs (capture phase) */
+const TL_BEFORE = {
+  "auto-route":"ก่อนจัดสายอัตโนมัติ", "relayout":"ก่อนจัดสายใหม่ทั้งแผ่น", "clear-sch":"ก่อนล้างแผ่น",
+  "new-project":"ก่อนสร้างโปรเจกต์ใหม่", "import-vhdl":"ก่อนนำเข้า VHDL", "split-project":"ก่อนแยกโปรเจกต์",
+  "ai-send":"ก่อนให้ AI วาด", "delete-sel":"ก่อนลบ",
+};
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  const why=TL_BEFORE[a.dataset.act];
+  if(why && (a.dataset.act!=="delete-sel" || state.selection.size>=5)) uxTimelineAdd(why, true);
+}, true);
+{
+  const _drawIntent = typeof aiDrawIntent==="function" ? aiDrawIntent : null;
+  if(_drawIntent) aiDrawIntent=function(){ uxTimelineAdd("ก่อนให้ AI วาด", true); return _drawIntent.apply(this, arguments); };
+}
+function tlFmt(t){
+  const d=new Date(t), now=new Date();
+  const hm=d.toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"});
+  if(d.toDateString()===now.toDateString()) return "วันนี้ "+hm;
+  const y=new Date(now); y.setDate(now.getDate()-1);
+  if(d.toDateString()===y.toDateString()) return "เมื่อวาน "+hm;
+  return d.toLocaleDateString("th-TH",{day:"numeric",month:"short"})+" "+hm;
+}
+async function openTimeline(){
+  await uxTimelineAdd("ตอนเปิดหน้าต่างประวัติ");
+  let list=[]; try{ list=await tlList(); }catch(e){ toast("เปิดประวัติไม่ได้: "+e.message,"err"); return; }
+  const rows=list.length ? list.map((x,i)=>`
+      <div class="tl-row">
+        <div class="tl-when">${tlFmt(x.t)}</div>
+        <div class="tl-what"><b>${escA(x.reason)}</b><span>${escA(x.name)} · ${x.counts.s} แผ่น · ${x.counts.c} ชิ้น · ${x.counts.w} สาย</span></div>
+        ${i===0?'<span class="tl-now">ล่าสุด</span>':`<button class="btn" data-tl="${x.id}">ย้อนไปจุดนี้</button>`}
+      </div>`).join("")
+    : '<div class="muted" style="padding:14px">ยังไม่มีประวัติ — จะเริ่มเก็บเมื่อมีวงจรบนแผ่น</div>';
+  const m=uxModal("🕘 ประวัติย้อนเวลา",
+    `<p class="muted" style="margin:0 0 10px">เก็บให้อัตโนมัติทุก 5 นาที และก่อนคำสั่งที่เปลี่ยนงานเยอะ (จัดสาย, ล้างแผ่น, เปิดไฟล์อื่น, AI วาด) · เก็บในเบราว์เซอร์นี้ ${TL.MAX} จุดล่าสุด · ย้อนแล้วกลับมาได้ เพราะจะเก็บจุดปัจจุบันไว้ก่อนเสมอ</p>
+     <div class="tl-list">${rows}</div>`,
+    {width:620, foot:'<button class="btn" id="tlSaveNow">เก็บจุดนี้ไว้ตอนนี้</button><button class="btn btn-primary" id="tlClose">ปิด</button>'});
+  m.querySelector("#tlClose").onclick=()=>m.close();
+  m.querySelector("#tlSaveNow").onclick=async()=>{ await uxTimelineAdd("เก็บเอง", true); m.close(); openTimeline(); };
+  m.querySelectorAll("[data-tl]").forEach(b=>b.onclick=async()=>{
+    const rec=await tlGet(+b.dataset.tl); if(!rec){ toast("ไม่พบจุดนี้แล้ว","err"); return; }
+    await uxTimelineAdd("ก่อนย้อนเวลา", true);
+    UX.restoring=true;
+    try{ deserialize(rec.data); toast("ย้อนไปที่ "+tlFmt(rec.t)+" แล้ว — ถ้าไม่ใช่ เปิดประวัติแล้วเลือก “ก่อนย้อนเวลา”","ok",4200); }
+    catch(e){ toast("ย้อนไม่ได้: "+e.message,"err"); }
+    finally{ UX.restoring=false; }
+    m.close();
+  });
+}
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  if(a.dataset.act==="history-open") openTimeline();
+});
+
+/* start: what is on screen now was restored from autosave — compare to the last file save */
+UX.savedHash=uxLS("schstudio.savedHash");
+if(new URLSearchParams(location.search).get("open")) UX.expectFileLoad=true;   // launcher opens a saved file
+UX.curHash=uxWorkHash();
+UX.hadSession=!!uxLS(AUTOSAVE_KEY);      // autosave only writes every 4 s, so this is last session's
+if(!UX.savedHash){
+  // never saved to a file: restored autosave = unsaved work; a fresh demo sheet = nothing yet
+  if(!UX.hadSession) UX.savedHash=UX.curHash;
+}
+uxSetDirty(UX.curHash!==UX.savedHash);
+tlStart();
+
+/* =========================================================================
+   2. WORKS WITHOUT THE PYTHON BACKEND
+   ========================================================================= */
+
+/* ---------- 2a. combinational truth table in the browser ----------
+   Same evaluator as probe mode (probeModel over the flattened sheet). Returns the
+   backend's /sim shape so the board page and chat render it unchanged.
+   {ok:false, fallback:true} = something this engine can't evaluate (bus ports,
+   encoder/decoder/comparator blocks) → the caller may still try the backend. */
+const CLIENT_SIM_MAX_IN = 12;
+function clientCombSim(sch){
+  let flat; try{ flat=flattenSchematic(sch); }catch(e){ return {ok:false, fallback:true, reason:"ยกวงจรไม่ได้: "+e.message}; }
+  const fs=flat.sch;
+  const nm=c=>(c.params&&c.params.name)||c.label||c.id;
+  const ins=sch.components.filter(c=>c.type==="IN"), outs=sch.components.filter(c=>c.type==="OUT");
+  if(!outs.length) return {ok:false, reason:"ยังไม่มี OUTPUT บนแผ่น — วาง OUTPUT แล้วต่อสายจากวงจรเข้าไป"};
+  const wide=[...ins,...outs].filter(c=>((c.params&&c.params.width)||1)>1);
+  if(wide.length) return {ok:false, fallback:true, reason:"มีพอร์ตหลายบิต ("+wide.map(nm).join(", ")+") — ตัวจำลองในเบราว์เซอร์รองรับเฉพาะสัญญาณ 1 บิต"};
+  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","JUNCTION","BUSTAP"].includes(t);
+  const odd=[...new Set(fs.components.filter(c=>!known(c.type)).map(c=>c.type))];
+  if(odd.length) return {ok:false, fallback:true, reason:"มีบล็อกที่ตัวจำลองในเบราว์เซอร์ยังไม่รองรับ: "+odd.join(", ")};
+  if(ins.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุต "+ins.length+" ตัว = "+(1<<ins.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" ตัว)"};
+  const saved=Object.assign({}, PROBE_VALS);
+  const st=probeStruct(fs), rows=[], floating=new Set();
+  try{
+    for(let r=0;r<(1<<ins.length);r++){
+      const bits=ins.map((c,i)=>(r>>(ins.length-1-i))&1);          // first input = MSB (same as the backend)
+      ins.forEach((c,i)=>{ PROBE_VALS[c.id]=bits[i]; });
+      const m=probeModel(fs, st);
+      const o=outs.map(c=>{ const v=m.inVal(c.id,"i"); if(v==null){ floating.add(nm(c)); return 0; } return v; });
+      rows.push([bits, o]);
+    }
+  } finally {
+    Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved);
+  }
+  return {ok:true, sequential:false, client:true,
+    note: floating.size ? ("เอาต์พุตที่ไม่มีอะไรขับ (ถือเป็น 0): "+[...floating].join(", ")+" — ตรวจว่าต่อสายครบ") : "",
+    truth_table:{inputs:ins.map(nm), outputs:outs.map(nm), rows}};
+}
+/* one entry point for every "simulate this sheet" button: browser first, backend only
+   for what the browser can't do. Throws {backend:true} if that backend isn't running. */
+async function uxSimSheet(sch, intent, cycles){
+  const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
+  if(hasFF) return clientSeqSim(sch, cycles||8);
+  const j=clientCombSim(sch);
+  if(j.ok || !j.fallback) return j;
+  try{
+    const r=await fetch(aiEndpoint()+"/sim",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({intent:intent||schematicToIntent(sch).intent, cycles:cycles||8})});
+    return await r.json();
+  }catch(e){ const err=new Error(j.reason); err.backend=true; err.why=j.reason; throw err; }
+}
+
+/* ---------- 2d. "this needs the backend" — say what to do, not just that it failed ---------- */
+const BACKEND_CMD = "python ai/chat_server.py";
+function uxBackendHelpHtml(what, why){
+  return `<div class="ux-need">
+    <div class="ux-need-h">⚙️ ${escA(what||"ฟีเจอร์นี้")} ต้องใช้ตัวช่วยฝั่ง Python (backend)</div>
+    ${why?`<div class="ux-need-why">${escA(why)}</div>`:""}
+    <ol>
+      <li>ถ้าใช้โปรแกรม <b>FPGA Ecosystem</b> — เปิดผ่านโปรแกรมนั้น แล้วเปิดฟีเจอร์ AI ในหน้าตั้งค่า (มี backend ในตัว)</li>
+      <li>หรือเปิด Terminal ที่โฟลเดอร์โปรเจกต์ แล้วรัน
+        <span class="ux-cmd"><code>${BACKEND_CMD}</code><button type="button" class="ux-copy" data-copy="${escA(BACKEND_CMD)}">คัดลอก</button></span></li>
+    </ol>
+    <div class="ux-need-ok">ใช้ได้โดยไม่ต้องมี backend: จำลองวงจร (หน้า "จำลอง"), ตารางความจริง / K-map และตัวสร้างวงจรในแท็บ Components</div>
+  </div>`;
+}
+document.addEventListener("click", ev=>{
+  const b=ev.target.closest && ev.target.closest("[data-copy]"); if(!b) return;
+  const t=b.dataset.copy;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(
+    ()=>{ const o=b.textContent; b.textContent="คัดลอกแล้ว ✓"; setTimeout(()=>b.textContent=o,1500); },
+    ()=>{ prompt("คัดลอกคำสั่งนี้:", t); });
+});
+{
+  const _aiAppend=aiAppend;
+  aiAppend=function(role, content, opts){
+    if(role==="ai" && !(opts&&opts.html) && /ต่อ backend ไม่ได้/.test(String(content)))
+      return _aiAppend.call(this, role, uxBackendHelpHtml("คำสั่งนี้"), {html:true});
+    return _aiAppend.apply(this, arguments);
+  };
+  // the chat's status dot tooltip: point at the fix too
+  const _health=aiHealth;
+  aiHealth=async function(){ const r=await _health.apply(this, arguments);
+    const dot=$("#acDot"); if(dot && !r) dot.title="ไม่มี backend — วาดจากสมการ/ตาราง/ชื่อวงจรมาตรฐานได้ในเครื่อง · AI แบบพิมพ์อิสระต้องรัน "+BACKEND_CMD;
+    return r; };
+}
+
+/* ---------- 2b. truth table / K-map → circuit (Quine–McCluskey, no backend) ---------- */
+const GRAY=[[0],[0,1],[0,1,3,2]];
+/* rows: {out: ["0"|"1"|"x", …]} indexed by row r, first input = MSB */
+function ttToIntent(inputs, outputs, rows, module){
+  const n=inputs.length, C=[], N=[], used=new Set();
+  const inId=i=>"in_"+i, notId=i=>"n_"+i;
+  inputs.forEach((nm,i)=>C.push({id:inId(i), type:"IN", name:nm}));
+  const lit=l=>{ const i=n-1-l.v; if(!l.neg) return inId(i); used.add(i); return notId(i); };  // qm var k = bit k (LSB)
+  const andCache=new Map(); let g=0; const exprs={};
+  const litTxt=l=>inputs[n-1-l.v]+(l.neg?"'":"");
+  outputs.forEach((on,oi)=>{
+    const col=rows[on]||[], ones=[], dcs=[];
+    col.forEach((v,r)=>{ if(v==="1") ones.push(r); else if(v==="x") dcs.push(r); });
+    const res=qmMinimize(ones, dcs, n), oid="out_"+oi;
+    C.push({id:oid, type:"OUT", name:on});
+    if(res.const0){ C.push({id:"gnd_"+oi,type:"GND"}); N.push({from:"gnd_"+oi,to:oid}); exprs[on]="0"; return; }
+    if(res.const1){ C.push({id:"vcc_"+oi,type:"VCC"}); N.push({from:"vcc_"+oi,to:oid}); exprs[on]="1"; return; }
+    exprs[on]=res.terms.map(t=>t.slice().sort((x,y)=>y.v-x.v).map(litTxt).join("·")).join(" + ");   // in input order
+    const srcs=res.terms.map(t=>{
+      if(t.length===1) return lit(t[0]);
+      const key=t.map(l=>l.v+(l.neg?"n":"p")).sort().join(",");
+      if(andCache.has(key)) return andCache.get(key);               // shared product term (7-seg!)
+      const a="and_"+(g++); C.push({id:a,type:"AND"}); t.forEach(l=>N.push({from:lit(l),to:a})); andCache.set(key,a); return a;
+    });
+    if(srcs.length===1) N.push({from:srcs[0], to:oid});
+    else { const o="or_"+oi; C.push({id:o,type:"OR"}); srcs.forEach(s=>N.push({from:s,to:o})); N.push({from:o,to:oid}); }
+  });
+  used.forEach(i=>{ C.push({id:notId(i),type:"NOT"}); N.push({from:inId(i),to:notId(i)}); });
+  // self-check: the minimised SOP must match every cared-for row
+  for(const on of outputs){ const col=rows[on]||[];
+    for(let r=0;r<(1<<n);r++){ if(col[r]!=="0" && col[r]!=="1") continue;
+      const ex=exprs[on]; let v;
+      if(ex==="0") v=0; else if(ex==="1") v=1;
+      else v=ex.split(" + ").some(term=>term.split("·").every(tok=>{ const neg=tok.endsWith("'"), name=neg?tok.slice(0,-1):tok, i=inputs.indexOf(name);
+        const bit=(r>>(n-1-i))&1; return neg?bit===0:bit===1; }))?1:0;
+      if(String(v)!==col[r]) return {error:`ตรวจไม่ผ่านที่ ${on} แถว ${r}`}; } }
+  return {intent:{module:sanId(module||"truth_table")||"truth_table", components:C, nets:N}, exprs};
+}
+const SEG7 = { // BCD 0-9 → a..g (active-high), 10-15 don't care
+  a:"1011011111", b:"1111100111", c:"1101111111", d:"1011011011", e:"1010001010", f:"1000111011", g:"0011111011" };
+function seg7Preset(activeLow){
+  const rows={};
+  for(const s of "abcdefg"){ rows[s]=[]; for(let r=0;r<16;r++){ const v=r<10?SEG7[s][r]:"x"; rows[s].push(v==="x"?"x":(activeLow?(v==="1"?"0":"1"):v)); } }
+  return {inputs:["b3","b2","b1","b0"], outputs:"abcdefg".split(""), rows, module:activeLow?"bcd_7seg_al":"bcd_7seg"};
+}
+function openTruthTableTool(preset){
+  const T=preset?JSON.parse(JSON.stringify(preset)):{inputs:["a","b"], outputs:["y"], rows:{y:["0","0","0","0"]}, module:"my_logic"};
+  let view="table", kOut=T.outputs[0];
+  const m=uxModal("▦ สร้างวงจรจากตารางความจริง / K-map", `
+    <div class="tt-cfg">
+      <label>อินพุต <input id="ttIns" spellcheck="false" title="คั่นด้วยจุลภาค สูงสุด 6 ตัว"></label>
+      <label>เอาต์พุต <input id="ttOuts" spellcheck="false" title="คั่นด้วยจุลภาค สูงสุด 8 ตัว"></label>
+      <label>ชื่อวงจร <input id="ttMod" spellcheck="false"></label>
+    </div>
+    <div class="tt-bar">
+      <div class="seg-tabs"><button data-ttv="table" class="on">ตาราง</button><button data-ttv="kmap">K-map</button></div>
+      <span class="muted">คลิกช่องเอาต์พุตเพื่อสลับ 0 → 1 → X (don't care)</span>
+      <span style="flex:1"></span>
+      <button class="btn" data-ttfill="0">ทั้งหมด 0</button><button class="btn" data-ttfill="1">ทั้งหมด 1</button>
+      <button class="btn" id="ttFromSheet" title="ใช้ชื่อ INPUT/OUTPUT ของแผ่นที่เปิดอยู่">ใช้พอร์ตจากแผ่นนี้</button>
+    </div>
+    <div id="ttGrid" class="tt-grid"></div>
+    <div id="ttExpr" class="tt-expr"></div>`,
+    {width:760, foot:'<span id="ttMsg" class="muted" style="margin-right:auto"></span><button class="btn" id="ttCancel">ยกเลิก</button><button class="btn btn-primary" id="ttBuild">สร้างวงจร</button>'});
+  const $m=s=>m.querySelector(s);
+  $m("#ttIns").value=T.inputs.join(", "); $m("#ttOuts").value=T.outputs.join(", "); $m("#ttMod").value=T.module||"";
+  const n=()=>T.inputs.length;
+  function normalize(){
+    const rc=1<<n();
+    T.outputs.forEach(o=>{ const col=T.rows[o]||[]; T.rows[o]=Array.from({length:rc},(_,r)=>col[r]||"0"); });
+    if(!T.outputs.includes(kOut)) kOut=T.outputs[0];
+  }
+  const parseNames=(s,max)=>[...new Set(String(s).split(/[,\s]+/).map(x=>sanId(x.trim())).filter(Boolean))].slice(0,max);
+  function cell(o,r){ const v=T.rows[o][r]; return `<button class="tt-c v${v}" data-o="${escA(o)}" data-r="${r}">${v==="x"?"X":v}</button>`; }
+  function draw(){
+    normalize();
+    const g=$m("#ttGrid");
+    if(view==="table"){
+      let h='<table class="tt-t"><tr><th class="rn">#</th>'+T.inputs.map(x=>`<th>${escA(x)}</th>`).join("")+'<th class="sp"></th>'+T.outputs.map(x=>`<th class="o">${escA(x)}</th>`).join("")+'</tr>';
+      for(let r=0;r<(1<<n());r++){
+        h+=`<tr><td class="rn">${r}</td>`+T.inputs.map((_,i)=>`<td>${(r>>(n()-1-i))&1}</td>`).join("")+'<td class="sp"></td>'+T.outputs.map(o=>`<td>${cell(o,r)}</td>`).join("")+'</tr>';
+      }
+      g.innerHTML=h+'</table>';
+    } else {
+      if(n()<2||n()>4){ g.innerHTML='<div class="muted" style="padding:12px">K-map ใช้กับอินพุต 2–4 ตัว (ตอนนี้ '+n()+' ตัว) — ใช้แท็บ “ตาราง” แทน</div>'; }
+      else {
+        const rb=n()>>1, cb=n()-rb, rg=GRAY[rb], cg=GRAY[cb];
+        const rn=T.inputs.slice(0,rb).join(""), cn=T.inputs.slice(rb).join("");
+        const lbl=(v,bits)=>v.toString(2).padStart(bits,"0");
+        let h=`<div class="tt-kbar">เอาต์พุต <select id="ttKOut">${T.outputs.map(o=>`<option ${o===kOut?"selected":""}>${escA(o)}</option>`).join("")}</select></div>`;
+        h+=`<table class="tt-k"><tr><th class="corner">${escA(rn)}＼${escA(cn)}</th>`+cg.map(c=>`<th>${lbl(c,cb)}</th>`).join("")+'</tr>';
+        rg.forEach(rv=>{ h+=`<tr><th>${lbl(rv,rb)}</th>`+cg.map(cv=>{ const r=(rv<<cb)|cv; return `<td>${cell(kOut,r)}<span class="mi">${r}</span></td>`; }).join("")+'</tr>'; });
+        g.innerHTML=h+'</table>';
+        const ks=g.querySelector("#ttKOut"); if(ks) ks.onchange=()=>{ kOut=ks.value; draw(); };
+      }
+    }
+    g.querySelectorAll(".tt-c").forEach(b=>b.onclick=()=>{ const o=b.dataset.o, r=+b.dataset.r, v=T.rows[o][r];
+      T.rows[o][r]= v==="0"?"1": v==="1"?"x":"0"; draw(); });
+    const res=ttToIntent(T.inputs, T.outputs, T.rows, T.module);
+    $m("#ttExpr").innerHTML= res.error ? `<span style="color:var(--err)">${escA(res.error)}</span>`
+      : '<div class="muted" style="margin-bottom:4px">สมการที่ลดรูปแล้ว (Quine–McCluskey):</div>'+T.outputs.map(o=>`<div><b>${escA(o)}</b> = ${escA(res.exprs[o])}</div>`).join("");
+    const gates=res.intent?res.intent.components.filter(c=>!["IN","OUT"].includes(c.type)).length:0;
+    $m("#ttMsg").textContent=res.intent?`${gates} เกต`:"";
+  }
+  $m("#ttIns").onchange=()=>{ const v=parseNames($m("#ttIns").value,6); if(v.length){ T.inputs=v; } $m("#ttIns").value=T.inputs.join(", "); draw(); };
+  $m("#ttOuts").onchange=()=>{ const v=parseNames($m("#ttOuts").value,8); if(v.length){ T.outputs=v; } $m("#ttOuts").value=T.outputs.join(", "); draw(); };
+  $m("#ttMod").onchange=()=>{ T.module=sanId($m("#ttMod").value)||"my_logic"; };
+  m.querySelectorAll("[data-ttv]").forEach(b=>b.onclick=()=>{ view=b.dataset.ttv; m.querySelectorAll("[data-ttv]").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
+  m.querySelectorAll("[data-ttfill]").forEach(b=>b.onclick=()=>{ const v=b.dataset.ttfill;
+    const outs=view==="kmap"?[kOut]:T.outputs; outs.forEach(o=>T.rows[o]=T.rows[o].map(()=>v)); draw(); });
+  $m("#ttCancel").onclick=()=>m.close();
+  const here=uxSheetPortsForTT();
+  if(!here) $m("#ttFromSheet").style.display="none";
+  else $m("#ttFromSheet").onclick=()=>{ T.inputs=here.inputs.slice(0,6); T.outputs=here.outputs.slice(0,8);
+    $m("#ttIns").value=T.inputs.join(", "); $m("#ttOuts").value=T.outputs.join(", "); draw(); };
+  const updBuild=()=>{ const f=uxCanFillSheet(T); $m("#ttBuild").textContent=f?"สร้างลงแผ่นนี้":"สร้างวงจร (แผ่นใหม่)";
+    $m("#ttBuild").title=f?"พอร์ตตรงกับแผ่นที่เปิดอยู่ — วาดลงแผ่นนี้ ขาบอร์ดที่เลือกไว้ยังอยู่":"สร้างเป็นแผ่นใหม่"; };
+  m.addEventListener("change", updBuild); m.addEventListener("click", ()=>setTimeout(updBuild,0));
+  $m("#ttBuild").onclick=()=>{
+    T.module=sanId($m("#ttMod").value)||"my_logic";
+    const res=ttToIntent(T.inputs, T.outputs, T.rows, T.module);
+    if(res.error){ toast(res.error,"err"); return; }
+    if(uxCanFillSheet(T)){ uxFillSheet(activeSch(), res.intent); m.close();
+      toast(`วาดลงแผ่น "${activeSch().name}" แล้ว — ${T.outputs.map(o=>o+" = "+res.exprs[o]).join(" · ")}`,"ok",5200); return; }
+    const dr=aiDrawIntent(res.intent);
+    if(!dr||!dr.ok){ toast("วาดไม่ได้: "+((dr&&(dr.error||(dr.errors||[]).join(", ")))||"?"),"err",4000); return; }
+    m.close();
+    toast(`สร้าง "${dr.sch.name}" แล้ว — ${T.outputs.map(o=>o+" = "+res.exprs[o]).join(" · ")}`,"ok",5200);
+  };
+  draw(); updBuild();
+}
+
+/* ---------- 2c. circuit generators, visible in the Components tab ---------- */
+function uxAsk(title, fields, okText){
+  return new Promise(resolve=>{
+    const m=uxModal(title, fields.map((f,i)=>`<div class="row"><label>${f.label}</label>
+        <input data-i="${i}" type="${f.type||"text"}" value="${escA(f.value)}" ${f.min!=null?`min="${f.min}"`:""} ${f.max!=null?`max="${f.max}"`:""} spellcheck="false"></div>
+        ${f.hint?`<div class="muted" style="margin:-4px 0 10px 140px;font-size:11.5px">${f.hint}</div>`:""}`).join(""),
+      {width:460, foot:`<button class="btn" id="uaNo">ยกเลิก</button><button class="btn btn-primary" id="uaOk">${okText||"สร้าง"}</button>`,
+       onClose:()=>resolve(null)});
+    const ok=()=>{ resolve(fields.map((f,i)=>{ const v=m.querySelector(`[data-i="${i}"]`).value; return f.type==="number"?+v:v; })); m.close(); };
+    m.querySelector("#uaOk").onclick=ok;
+    m.querySelector("#uaNo").onclick=()=>m.close();
+    m.querySelectorAll("input").forEach(inp=>inp.addEventListener("keydown",e=>{ if(e.key==="Enter") ok(); }));
+    setTimeout(()=>{ const f=m.querySelector("input"); if(f){ f.focus(); f.select(); } }, 30);
+  });
+}
+function uxDrawGenerated(intent, title){
+  const dr=aiDrawIntent(intent);
+  if(!dr||!dr.ok){ toast("สร้างไม่ได้: "+((dr&&(dr.error||(dr.errors||[]).join(", ")))||"?"),"err",4000); return null; }
+  const ff=dr.sch.components.filter(c=>PROBE_SEQ[c.type]).length;
+  toast(`สร้าง ${title} ในแผ่น "${dr.sch.name}" แล้ว`+(ff?` — ${ff} flip-flop`:"")+" · กด “จำลอง” เพื่อดูการทำงาน","ok",4200);
+  return dr;
+}
+const GENERATORS = [
+  {id:"tt", icon:"▦", name:"ตารางความจริง / K-map", desc:"กรอกตาราง → ลดรูป → ได้วงจรเกต", run:()=>openTruthTableTool()},
+  {id:"seg7", icon:"8", name:"ถอดรหัส BCD → 7-seg", desc:"4 บิต → a–g เลือก active-low ได้", run:async()=>{
+    const v=await uxAsk("ถอดรหัส BCD → 7-segment",[{label:"ขาแบบ active-low (0 = ติด)",value:"ไม่",hint:"พิมพ์ “ใช่” ถ้าบอร์ดเป็น common anode / ต่อขาให้ติดเมื่อเป็น 0"}],"เปิดตาราง");
+    if(v) openTruthTableTool(seg7Preset(/ใช่|yes|y|1|low/i.test(v[0]))); }},
+  {id:"cnt", icon:"↻", name:"ตัวนับ N บิต", desc:"ripple counter นับขึ้น 0 … 2ᴺ−1", run:async()=>{
+    const v=await uxAsk("ตัวนับ N บิต (ripple)",[{label:"จำนวนบิต",type:"number",value:4,min:1,max:16}]); if(!v) return;
+    const b=seqBuildIntent("counter "+Math.max(1,Math.min(16,v[0]|0))+" bit"); if(b) uxDrawGenerated(b.intent, b.title); }},
+  {id:"mod", icon:"⟳", name:"ตัวนับ mod-N", desc:"synchronous นับ 0 … N−1 แล้ววน", run:async()=>{
+    const v=await uxAsk("ตัวนับ mod-N",[{label:"N (2–64)",type:"number",value:10,min:2,max:64,hint:"เช่น 10 = นับ 0–9, 6 = นับ 0–5"}]); if(!v) return;
+    const N=Math.max(2,Math.min(64,v[0]|0)); const r=fsmCounterIntent(Array.from({length:N},(_,i)=>i));
+    if(!r||r.error){ toast("สร้างไม่ได้: "+((r&&r.error)||"N ใหญ่เกิน"),"err"); return; }
+    r.module="mod"+N; uxDrawGenerated(r, "ตัวนับ mod-"+N); }},
+  {id:"seq", icon:"⤳", name:"ลำดับนับเอง", desc:"เช่น 0 2 5 7 3 — วนตามลำดับ", run:async()=>{
+    const v=await uxAsk("ตัวนับตามลำดับที่กำหนด",[{label:"ลำดับ",value:"0 2 5 7 3",hint:"ตัวเลข 0–63 คั่นด้วยช่องว่าง ไม่ซ้ำกัน · สถานะที่ไม่อยู่ในลำดับเป็น don't care"}]); if(!v) return;
+    const seq=(String(v[0]).match(/\d+/g)||[]).map(Number);
+    if(seq.length<2){ toast("ใส่อย่างน้อย 2 ค่า","warn"); return; }
+    const r=fsmCounterIntent(seq);
+    if(!r||r.error){ toast("สร้างไม่ได้: "+((r&&r.error)||"ค่าสูงสุด 63"),"err"); return; }
+    uxDrawGenerated(r, "ตัวนับลำดับ "+seq.join("→")); }},
+  {id:"shift", icon:"⇉", name:"Shift register", desc:"เลื่อนบิตเข้า sin ทีละ clock", run:async()=>{
+    const v=await uxAsk("Shift register",[{label:"จำนวนบิต",type:"number",value:4,min:2,max:16}]); if(!v) return;
+    const b=seqBuildIntent("shift register "+(v[0]|0)); if(b) uxDrawGenerated(b.intent, b.title); }},
+  {id:"reg", icon:"▤", name:"Register N บิต", desc:"เก็บ d0…dN ทุกขอบ clock", run:async()=>{
+    const v=await uxAsk("Register",[{label:"จำนวนบิต",type:"number",value:4,min:2,max:16}]); if(!v) return;
+    const b=seqBuildIntent("register "+(v[0]|0)+" bit"); if(b) uxDrawGenerated(b.intent, b.title); }},
+];
+function runGenerator(id){ const g=GENERATORS.find(x=>x.id===id); if(g) g.run(); }
+{
+  const _renderPalette=renderPalette;
+  renderPalette=function(){
+    const r=_renderPalette.apply(this, arguments);
+    const pal=$("#palettePane .palette"); if(!pal || pal.querySelector(".gen-group")) return r;
+    const g=document.createElement("div"); g.className="pal-group gen-group";
+    g.innerHTML='<h4>ตัวสร้างวงจร <span class="muted" style="font-weight:400">— ไม่ต้องใช้ AI</span></h4>'+GENERATORS.map(x=>
+      `<button class="gen-btn" data-gen="${x.id}"><span class="gi">${x.icon}</span><span class="gt"><b>${x.name}</b><span>${x.desc}</span></span></button>`).join("");
+    pal.insertBefore(g, pal.firstChild);
+    g.querySelectorAll("[data-gen]").forEach(b=>b.onclick=()=>runGenerator(b.dataset.gen));
+    return r;
+  };
+  try{ renderPalette(); }catch(_){}
+}
+
+/* the open sheet's ports, top to bottom, as the truth-table tool wants them */
+function uxSheetPortsForTT(){
+  const sch=activeSch(); if(!sch) return null;
+  const by=t=>(sch.components||[]).filter(c=>c.type===t&&((c.params&&c.params.width)||1)===1).sort((a,b)=>a.y-b.y).map(c=>c.params.name);
+  const i=by("IN"), o=by("OUT"); return (i.length&&o.length)?{inputs:i, outputs:o}:null;
+}
+/* a sheet that is only ports (a lab template) with the same names → draw the logic INTO it */
+function uxCanFillSheet(T){
+  const sch=activeSch(); if(!sch) return false;
+  if((sch.components||[]).some(c=>!["IN","OUT","GND","VCC","CONST","JUNCTION"].includes(c.type))) return false;
+  const low=a=>a.map(x=>String(x).toLowerCase()).sort().join(",");
+  const h=uxSheetPortsForTT(); return !!h && low(h.inputs)===low(T.inputs) && low(h.outputs)===low(T.outputs);
+}
+function uxFillSheet(sch, intent){
+  uxTimelineAdd("ก่อนวาดลงแผ่นจากตารางความจริง", true);
+  const keep={}; (sch.components||[]).forEach(c=>{ if(c.type==="IN"||c.type==="OUT") keep[String(c.params.name).toLowerCase()]=c.params.name; });
+  const order={in:(uxSheetPortsForTT()||{}).inputs||[], out:(uxSheetPortsForTT()||{}).outputs||[]};
+  const built=buildSchematicFromIntent(intent);
+  built.comps.forEach(c=>{ if((c.type==="IN"||c.type==="OUT") && keep[String(c.params.name).toLowerCase()]) c.params.name=keep[String(c.params.name).toLowerCase()]; });
+  sch.components=built.comps; sch.wires=built.wires; sch.portOrder=order;   // pinmap stays: keyed by port name
+  try{ normalizePortFanout(sch); autoRouteSheet(sch); }catch(e){ console.warn(e); }
+  snapshot(); renderAll(); try{ zoomFit(); }catch(_){}
+}
+
+/* =========================================================================
+   3. GUIDING NEW USERS
+   ========================================================================= */
+
+/* ---------- 3a. pin map saved WITH the sheet + the board's real pins ----------
+   sch.pinmap = {portName: target}. Targets: sw:N pb:N clk | led:N seg:a..g seg:dp an:N buzzer.
+   The sim board's SIM_PINMAP is seeded from it and every change in "เลือกขา" is written back,
+   so the choice survives reloads, lives in the project file, and a lab template can pre-fill it. */
+const BOARD_PINS = (()=>{
+  const p={clk:"H11", buzzer:"B14"};
+  for(let i=0;i<16;i++){ p["sw:"+i]=SIM_SW_PINS[15-i]; p["led:"+i]=SIM_LED_PINS[15-i]; }
+  ["J13","L13","J14","J11","J12"].forEach((pin,i)=>p["pb:"+i]=pin);                 // top bottom left right center
+  ["H4","H3","H2","H1"].forEach((pin,i)=>p["an:"+i]=pin);                            // digit select 0 = rightmost
+  Object.entries({a:"L3",b:"P4",c:"P2",d:"M3",e:"M1",f:"J4",g:"K4",dp:"J2"}).forEach(([s,pin])=>p["seg:"+s]=pin);
+  return p;
+})();
+function pinTargetLabel(t){
+  if(!t) return "—";
+  if(t==="clk") return "นาฬิกา 50 MHz (H11)";
+  const [k,v]=t.split(":"), pin=BOARD_PINS[t]||"?";
+  return ({sw:"SW",led:"LED",pb:"ปุ่ม",seg:"7SEG",an:"หลัก"}[k]||t)+" "+(v!=null?v:"")+" ("+pin+")";
+}
+/* ports that only ever mean one thing on this board */
+function autoSpecialTarget(name, dir){
+  const n=String(name).toLowerCase();
+  if(dir==="in" && /^(clk|clock|clk_?50m?)$/.test(n)) return "clk";
+  let m;
+  if(dir==="out" && (m=n.match(/^(?:an|dig|digit)_?([0-3])$/))) return "an:"+m[1];
+  if(dir==="out" && /^(dp|seg_?dp)$/.test(n)) return "seg:dp";
+  return null;
+}
+function sheetPorts(sch){
+  sch=sch||activeSch(); if(!sch) return [];
+  return (sch.components||[]).filter(c=>c.type==="IN"||c.type==="OUT").sort((a,b)=>a.y-b.y)
+    .map(c=>({name:(c.params&&c.params.name)||c.id, dir:c.type==="IN"?"in":"out", cid:c.id}));
+}
+{
+  const _def=simDefaultPinmap;
+  simDefaultPinmap=function(tt){
+    const pm=_def.apply(this, arguments), own=(activeSch()||{}).pinmap||{};
+    tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.indexOf("sw:")===0) pm.inMap[n]=+t.slice(3); });
+    tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.indexOf("led:")===0||/^seg:[a-g]$/.test(t)||t==="buzzer")) pm.outMap[n]=t; });
+    return pm;
+  };
+  const _pick=renderPinPicker;
+  renderPinPicker=function(tt){
+    const r=_pick.apply(this, arguments);
+    const host=$("#simPinPicker"), sch=activeSch(); if(!host||!sch) return r;
+    host.querySelectorAll("select[data-pmk]").forEach(s=>s.addEventListener("change",()=>{
+      const n=s.dataset.pm; sch.pinmap=sch.pinmap||{};
+      sch.pinmap[n]= s.dataset.pmk==="in" ? "sw:"+s.value : s.value;
+      snapshot(); uxStepperSoon();
+    }));
+    // mark rows the user hasn't confirmed yet, and offer a one-click confirm
+    const own=sch.pinmap||{};
+    host.querySelectorAll("select[data-pmk]").forEach(s=>{ const tr=s.closest("tr"); if(tr) tr.classList.toggle("ux-unconf", !own[s.dataset.pm]); });
+    const det=host.querySelector("details"); if(det && !det.querySelector(".ux-confirm")){
+      const bar=document.createElement("div"); bar.className="ux-confirm";
+      bar.innerHTML='<button class="btn2" type="button">✓ ยืนยันขาตามนี้ทั้งหมด</button><span class="muted">แถวสีส้ม = ยังเป็นค่าอัตโนมัติ ยังไม่ได้ยืนยัน</span>';
+      bar.querySelector("button").onclick=()=>{
+        sch.pinmap=sch.pinmap||{};
+        tt.inputs.forEach(n=>sch.pinmap[n]="sw:"+SIM_PINMAP.inMap[n]);
+        tt.outputs.forEach(n=>sch.pinmap[n]=SIM_PINMAP.outMap[n]);
+        snapshot(); renderPinPicker(tt); uxStepperSoon(); toast("บันทึกการเลือกขาไว้กับแผ่นนี้แล้ว","ok");
+      };
+      det.appendChild(bar);
+    }
+    if(UX.highlightPins){ const miss=UX.highlightPins; UX.highlightPins=null;
+      let first=null; host.querySelectorAll("select[data-pmk]").forEach(s=>{ if(miss.includes(s.dataset.pm)){ const tr=s.closest("tr"); tr.classList.add("ux-flash"); first=first||tr; } });
+      if(first) first.scrollIntoView({block:"center", behavior:"smooth"}); }
+    return r;
+  };
+}
+/* resolve a port to a board pin: sheet's own choice → sim page choice → name rule → order */
+function uxPinFor(name, dir, k){
+  const own=(activeSch()||{}).pinmap||{};
+  let t=pmGet(own,name);
+  if(!t && SIM_PINMAP){ if(dir==="in" && SIM_PINMAP.inMap[name]!=null) t="sw:"+SIM_PINMAP.inMap[name];
+    else if(dir==="out" && SIM_PINMAP.outMap[name]) t=SIM_PINMAP.outMap[name]; }
+  t=t||autoSpecialTarget(name, dir)||(dir==="in"?"sw:"+k:"led:"+k);
+  return {target:t, pin:BOARD_PINS[t]||"?"};
+}
+function uxXdcBody(ins, outs){
+  let x="";
+  const put=(n,p)=>{ x+=`set_property -dict {PACKAGE_PIN ${p.pin} IOSTANDARD LVCMOS33} [get_ports ${n}]   ## ${pinTargetLabel(p.target)}\n`; };
+  ins.forEach((n,k)=>{ const p=uxPinFor(n,"in",k); put(n,p);
+    if(p.target==="clk") x+=`create_clock -period 20.000 -name sys_clk [get_ports ${n}]\n`; });
+  x+="\n";
+  let led=0; outs.forEach(n=>{ const p=uxPinFor(n,"out",led); if(p.target.indexOf("led:")===0) led++; put(n,p); });
+  return x;
+}
+function uxUploadRows(ins, outs){
+  let led=0;
+  return ins.map((n,k)=>`<tr><td style="text-align:left">${esc(n)}</td><td>IN</td><td style="text-align:left">${esc(pinTargetLabel(uxPinFor(n,"in",k).target))}</td></tr>`).join("")
+       + outs.map(n=>{ const p=uxPinFor(n,"out",led); if(p.target.indexOf("led:")===0) led++;
+           return `<tr><td style="text-align:left">${esc(n)}</td><td>OUT</td><td style="text-align:left">${esc(pinTargetLabel(p.target))}</td></tr>`; }).join("");
+}
+
+/* ---------- 3b. lab templates: ports named + pins mapped from the start ---------- */
+const LAB_TEMPLATES = [
+  {id:"gate2", lab:"แลป 1", title:"ลอจิกเกต 2 อินพุต", desc:"a, b → y · ทดลอง AND/OR/XOR…",
+   ins:[["a","sw:0"],["b","sw:1"]], outs:[["y","led:0"]]},
+  {id:"gate3", lab:"แลป 1", title:"วงจร 3 อินพุต", desc:"a, b, c → x, y",
+   ins:[["a","sw:0"],["b","sw:1"],["c","sw:2"]], outs:[["x","led:0"],["y","led:1"]]},
+  {id:"walk", lab:"แลป 2", title:"สัญญาณไฟข้ามถนน", desc:"P C R E S → Walk, Caution",
+   ins:[["P","sw:4"],["C","sw:3"],["R","sw:2"],["E","sw:1"],["S","sw:0"]], outs:[["Walk","led:0"],["Caution","led:1"]]},
+  {id:"f4", lab:"แลป 3", title:"ลดรูปสมการ 4 ตัวแปร", desc:"a b c d → f · ใช้คู่กับตารางความจริง/K-map",
+   ins:[["a","sw:3"],["b","sw:2"],["c","sw:1"],["d","sw:0"]], outs:[["f","led:0"]], after:"tt"},
+  {id:"hex7", lab:"แลป 4-1", title:"HEX → 7-Segment", desc:"D3..D0 → a–g (active-low) + เปิดหลักขวาสุด",
+   ins:[["D3","sw:3"],["D2","sw:2"],["D1","sw:1"],["D0","sw:0"]],
+   outs:[["a","seg:a"],["b","seg:b"],["c","seg:c"],["d","seg:d"],["e","seg:e"],["f","seg:f"],["g","seg:g"],["an0","an:0"]],
+   tie:{an0:"GND"}, note:"an0 ต่อ GND ไว้ให้หลักขวาสุดติด — ถ้าจอไม่ติด ลองเปลี่ยนเป็น VCC"},
+  {id:"fa", lab:"แลป 4-2", title:"Full Adder (FA1)", desc:"A, B, Cin → S, Cout",
+   ins:[["A","sw:2"],["B","sw:1"],["Cin","sw:0"]], outs:[["S","led:0"],["Cout","led:1"]]},
+  {id:"cnt8", lab:"แลป 5", title:"ตัวนับ 0–7 (flip-flop)", desc:"clk → Q2 Q1 Q0 บน LED",
+   ins:[["clk","clk"]], outs:[["Q2","led:2"],["Q1","led:1"],["Q0","led:0"]],
+   note:"clk บนบอร์ดคือ 50 MHz — ต้องมีวงจรหารความถี่ก่อน (ใช้ “ตัวนับ mod-N” ในแท็บ Components ต่อกันเป็นทอด)"},
+];
+function buildTemplateSheet(sch, T){
+  const G=typeof GRID==="number"?GRID:11, sn=v=>Math.round(v/G)*G;
+  sch.components=[]; sch.wires=[]; sch.pinmap={};
+  const mk=(type, x, y, params)=>{ const c={id:uid("c"), type, x:sn(x), y:sn(y), params, label:""}; sch.components.push(c); return c; };
+  T.ins.forEach(([n,t],i)=>{ mk("IN", 88, 110+i*66, {name:n, width:1}); sch.pinmap[sanId(n)]=t; });
+  T.outs.forEach(([n,t],i)=>{
+    const o=mk("OUT", 660, 110+i*66, {name:n, width:1}); sch.pinmap[sanId(n)]=t;
+    const tie=T.tie&&T.tie[n];
+    if(tie){ const s=mk(tie, 540, 110+i*66, JSON.parse(JSON.stringify((TYPES[tie]&&TYPES[tie].defaultParams)||{})));
+      const sp=(getPorts(s).find(p=>p.dir==="out")||{}).id||"o", op=(getPorts(o).find(p=>p.dir==="in")||{}).id||"i";
+      sch.wires.push({id:uid("w"), from:{cid:s.id,pid:sp}, to:{cid:o.id,pid:op}, width:1}); }
+  });
+  try{ if(sch.wires.length) autoRouteSheet(sch); }catch(_){}
+}
+function startLabTemplate(id){
+  const T=LAB_TEMPLATES.find(x=>x.id===id); if(!T) return;
+  const p=addProject("lab"+((T.lab.match(/[0-9-]+/)||[""])[0]).replace("-","_")+"_"+T.id);
+  const sch=p.schematics[p.topId]; sch.name=uniqueSchName(sanId(T.id)||"top", sch.id);
+  buildTemplateSheet(sch, T);
+  openSchTab(sch.id); snapshot(); renderAll(); try{ zoomFit(); }catch(_){}
+  toast(`เริ่ม ${T.lab}: ${T.title} — พอร์ตและขาบอร์ดตั้งไว้ให้แล้ว วาดวงจรตรงกลางได้เลย`,"ok",5000);
+  if(T.note) setTimeout(()=>toast("ℹ "+T.note,"info",7000), 600);
+  if(T.after==="tt") setTimeout(()=>openTruthTableTool({inputs:T.ins.map(x=>x[0]), outputs:T.outs.map(x=>x[0]),
+    rows:{[T.outs[0][0]]:Array(1<<T.ins.length).fill("0")}, module:"f"}), 400);
+  uxStepperSoon();
+}
+
+/* ---------- 3c. welcome screen ---------- */
+const EXAMPLES = [
+  {name:"Half adder", desc:"XOR + AND", run:()=>uxDrawGenerated(ttToIntent(["a","b"],["sum","cout"],{sum:["0","1","1","0"],cout:["0","0","0","1"]},"half_adder").intent,"half adder")},
+  {name:"Full adder", desc:"3 อินพุต", run:()=>uxDrawGenerated(ttToIntent(["a","b","cin"],["s","cout"],{s:"01101001".split(""),cout:"00010111".split("")},"full_adder").intent,"full adder")},
+  {name:"BCD → 7-seg", desc:"ลดรูปด้วย K-map", run:()=>{ const P=seg7Preset(false); uxDrawGenerated(ttToIntent(P.inputs,P.outputs,P.rows,P.module).intent,"BCD → 7-seg"); }},
+  {name:"ตัวนับ mod-10", desc:"synchronous 0–9", run:()=>{ const r=fsmCounterIntent([0,1,2,3,4,5,6,7,8,9]); r.module="mod10"; uxDrawGenerated(r,"ตัวนับ mod-10"); }},
+  {name:"Ripple counter 4 บิต", desc:"D-FF ต่อเป็นทอด", run:()=>{ const b=seqBuildIntent("counter 4 bit"); uxDrawGenerated(b.intent,b.title); }},
+];
+function openWelcome(view){
+  view=view||"home";
+  const tpl=LAB_TEMPLATES.map(T=>`<button class="wl-card" data-tpl="${T.id}"><span class="wl-lab">${esc(T.lab)}</span><b>${esc(T.title)}</b><span>${esc(T.desc)}</span></button>`).join("");
+  const ex=EXAMPLES.map((e,i)=>`<button class="wl-card" data-ex="${i}"><b>${esc(e.name)}</b><span>${esc(e.desc)}</span></button>`).join("");
+  const m=uxModal("ยินดีต้อนรับสู่ Schematic Studio", `
+    <div class="wl-view ${view==="home"?"on":""}" data-v="home">
+      <p class="muted" style="margin:0 0 12px">วาดวงจร → เลือกขา → จำลอง → ลงบอร์ด EDGE Spartan-7 · เริ่มจากตรงไหนดี?</p>
+      <div class="wl-main">
+        <button class="wl-big" data-go="labs"><span class="wl-ico">🧪</span><b>เริ่มแลปใหม่</b><span>เลือกเทมเพลตแลป — ตั้งชื่อขาและแมพขาบอร์ดไว้ให้แล้ว</span></button>
+        <button class="wl-big" data-go="open"><span class="wl-ico">📂</span><b>เปิดไฟล์</b><span>ไฟล์ .schproj.json ที่บันทึกไว้</span></button>
+        <button class="wl-big" data-go="examples"><span class="wl-ico">💡</span><b>ดูตัวอย่าง</b><span>วงจรสำเร็จรูป เปิดดูแล้วลองจำลอง</span></button>
+      </div>
+      <div class="wl-foot"><button class="btn" data-go="blank">เริ่มแผ่นว่าง</button><button class="btn" data-go="tour">▶ ทัวร์ 1 นาที</button>
+        <span style="flex:1"></span><label class="muted"><input type="checkbox" id="wlHide"> ไม่ต้องแสดงตอนเปิดโปรแกรม</label></div>
+    </div>
+    <div class="wl-view ${view==="labs"?"on":""}" data-v="labs">
+      <button class="btn btn-ghost" data-go="home">← กลับ</button>
+      <div class="wl-grid">${tpl}</div>
+      <p class="muted" style="font-size:11.5px">ขาสวิตช์ใช้หมายเลข sw[0]–sw[15] ของบอร์ด (sw[0] = ขวาสุด) — เปลี่ยนได้ที่หน้า “เลือกขา”</p>
+    </div>
+    <div class="wl-view ${view==="examples"?"on":""}" data-v="examples">
+      <button class="btn btn-ghost" data-go="home">← กลับ</button>
+      <div class="wl-grid">${ex}</div>
+    </div>`, {width:720});
+  const show=v=>m.querySelectorAll(".wl-view").forEach(x=>x.classList.toggle("on", x.dataset.v===v));
+  const hide=m.querySelector("#wlHide"); hide.checked=uxLS("schstudio.welcomeHidden")==="1";
+  hide.onchange=()=>uxLS("schstudio.welcomeHidden", hide.checked?"1":null);
+  m.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{
+    const g=b.dataset.go;
+    if(g==="labs"||g==="examples"||g==="home") return show(g);
+    m.close();
+    if(g==="open") openProjectFromFile();
+    else if(g==="blank"){ const p=addProject("project"); toast(`สร้างโปรเจกต์ "${p.name}" แล้ว — เปิดแท็บ Components เพื่อวางเกต`,"ok",3600); }
+    else if(g==="tour") startTour();
+  });
+  m.querySelectorAll("[data-tpl]").forEach(b=>b.onclick=()=>{ m.close(); startLabTemplate(b.dataset.tpl); });
+  m.querySelectorAll("[data-ex]").forEach(b=>b.onclick=()=>{ m.close(); EXAMPLES[+b.dataset.ex].run(); });
+}
+
+/* ---------- 3d. stepper that says what's missing ---------- */
+function uxQuietIssues(){
+  const keep={renderErrors, setRightTab, toast};
+  renderErrors=()=>{}; setRightTab=()=>{}; toast=()=>{};
+  try{ return runSynthesis()||[]; } catch(_){ return []; }
+  finally{ renderErrors=keep.renderErrors; setRightTab=keep.setRightTab; toast=keep.toast; }
+}
+function sheetSig(sch){ try{ return uxHash(JSON.stringify({c:sch.components,w:sch.wires})); }catch(_){ return ""; } }
+const UXSTEP = { simSig:{}, upSig:{} };
+function uxStepState(){
+  const sch=activeSch(); if(!sch) return null;
+  const all=uxQuietIssues().filter(i=>!i.schId || i.schId===sch.id);
+  const errs=all.filter(i=>i.lvl==="err"), warns=all.filter(i=>i.lvl==="warn");
+  const ports=sheetPorts(sch), own=sch.pinmap||{};
+  const conf=ports.filter(p=>pmGet(own,p.name)||autoSpecialTarget(p.name,p.dir));
+  const miss=ports.filter(p=>!conf.includes(p));
+  const sig=sheetSig(sch);
+  const empty=!(sch.components||[]).some(c=>c.type!=="JUNCTION");
+  return {sch, empty, errs, warns, ports, conf, miss, simOk:UXSTEP.simSig[sch.id]===sig, upOk:UXSTEP.upSig[sch.id]===sig};
+}
+function uxRenderStepper(){
+  const s=uxStepState(); if(!s) return;
+  const badge=(stage, cls, text, tip)=>{
+    const b=document.querySelector(`#pipeline .step[data-stage="${stage}"]`); if(!b) return;
+    let e=b.querySelector(".st-b"); if(!e){ e=document.createElement("span"); e.className="st-b"; b.appendChild(e); }
+    e.className="st-b "+cls; e.textContent=text; b.dataset.uxTip=tip; b.title=tip;
+  };
+  const names=a=>a.slice(0,4).map(p=>p.name).join(", ")+(a.length>4?` +${a.length-4}`:"");
+  if(s.empty) badge("draw","todo","•","ยังไม่มีวงจรบนแผ่นนี้ — วางเกตจากแท็บ Components หรือเริ่มจากเทมเพลตแลป");
+  else if(s.errs.length) badge("draw","err",String(s.errs.length),`พบ ${s.errs.length} ปัญหาที่ต้องแก้ — คลิกเพื่อดู\n• `+s.errs.slice(0,4).map(i=>i.msg).join("\n• "));
+  else if(s.warns.length) badge("draw","warn",String(s.warns.length),`ไม่มี error · คำเตือน ${s.warns.length} รายการ — คลิกเพื่อดู`);
+  else badge("draw","ok","✓","วงจรผ่านการตรวจแล้ว");
+  if(!s.ports.length) badge("pins","todo","0","ยังไม่มี INPUT/OUTPUT ให้เลือกขา");
+  else if(s.miss.length) badge("pins","warn",`${s.conf.length}/${s.ports.length}`,`เลือกขา ${s.conf.length}/${s.ports.length} — ยังไม่ได้ยืนยัน: ${names(s.miss)} (คลิกเพื่อไปเลือก)`);
+  else badge("pins","ok","✓",`เลือกขาครบ ${s.ports.length} ขา`);
+  badge("sim", s.simOk?"ok":"todo", s.simOk?"✓":"•", s.simOk?"จำลองแล้ว หลังการแก้ล่าสุด":"ยังไม่ได้จำลองหลังแก้ล่าสุด");
+  badge("upload", s.upOk?"ok":"todo", s.upOk?"✓":"•", s.upOk?"ดาวน์โหลดไฟล์ลงบอร์ดแล้ว":(s.errs.length?"ยังมีปัญหาในวงจร — แก้ก่อนลงบอร์ด":"พร้อมสร้างไฟล์ .vhd + .xdc"));
+  UX.step=s;
+}
+let _uxStepT=null;
+function uxStepperSoon(){ clearTimeout(_uxStepT); _uxStepT=setTimeout(()=>{ try{ uxRenderStepper(); }catch(e){ console.warn("stepper",e); } }, 350); }
+{
+  const _renderAll=renderAll;
+  renderAll=function(){ const r=_renderAll.apply(this, arguments); uxStepperSoon(); return r; };
+  const _runSim=runSim;
+  runSim=async function(){ const r=await _runSim.apply(this, arguments); const sch=activeSch(); if(sch) UXSTEP.simSig[sch.id]=sheetSig(sch); uxStepperSoon(); return r; };
+  const _upDlg=openUploadDialog;
+  openUploadDialog=function(proj, ins, outs, onDownload){
+    const sch=activeSch();
+    const r=_upDlg.call(this, proj, ins, outs, ()=>{ onDownload(); if(sch){ UXSTEP.upSig[sch.id]=sheetSig(sch); uxStepperSoon(); } });
+    // show the pins that will actually be written, not just the port order
+    const dlg=[...document.querySelectorAll(".modal-bg")].pop();
+    const tb=dlg&&dlg.querySelector("table"); if(tb){ const head=tb.querySelector("tr"); tb.innerHTML=""; tb.appendChild(head); tb.insertAdjacentHTML("beforeend", uxUploadRows(ins, outs)); }
+    if(UX.step && UX.step.errs.length){ const body=dlg&&dlg.querySelector(".modal-body");
+      if(body) body.insertAdjacentHTML("afterbegin", `<div class="ux-need" style="border-color:var(--err)">⚠ วงจรยังมี ${UX.step.errs.length} ปัญหา — Vivado อาจ build ไม่ผ่าน กด “Check” เพื่อดูรายการ</div>`); }
+    return r;
+  };
+}
+/* a click on the badge goes to the thing that's missing */
+document.addEventListener("click", ev=>{
+  const b=ev.target.closest && ev.target.closest("#pipeline .st-b"); if(!b) return;
+  const stage=b.parentElement.dataset.stage, s=UX.step; if(!s) return;
+  if(stage==="draw" && (s.errs.length||s.warns.length)){ ev.stopPropagation(); setStage("draw"); runSynthesis(); return; }
+  if(stage==="pins" && s.miss.length){ UX.highlightPins=s.miss.map(p=>p.name); }
+}, true);
+
+/* ---------- 3e. five-stop tour ---------- */
+const TOUR = [
+  {sel:'[data-ltab="palette"]', pre:()=>{ const t=$('[data-ltab="palette"]'); if(t) t.click(); }, title:"1 · วางเกต",
+   text:"แท็บ Components มีเกต ขา I/O และตัวสร้างวงจรสำเร็จรูป — คลิกหรือลากลงแผ่น (หรือกด A = AND, O = OR, N = NOT, I = INPUT, Q = OUTPUT)"},
+  {sel:'[data-tool="wire"]', title:"2 · ต่อสาย", text:"เลือกเครื่องมือสาย (W) แล้วคลิกขาหนึ่งไปอีกขา · ลากออกจากขาที่ยังว่างแล้วปล่อยในที่โล่ง จะได้ INPUT/OUTPUT ชื่อเดียวกับขาทันที"},
+  {sel:'.step[data-stage="sim"]', title:"3 · จำลอง", text:"ดูตารางความจริง สลับสวิตช์บนบอร์ดจำลอง และดูไทม์มิ่งของวงจรที่มี clock — ไม่ต้องติดตั้งอะไรเพิ่ม"},
+  {sel:'.step[data-stage="pins"]', title:"4 · เลือกขา", text:"ผูกแต่ละ INPUT/OUTPUT กับสวิตช์ LED หรือ 7-segment บนบอร์ด · ตัวเลขบนปุ่มบอกว่าเลือกครบกี่ขาแล้ว"},
+  {sel:'.step[data-stage="upload"]', title:"5 · ลงบอร์ด", text:"สร้างไฟล์ .vhd + .xdc สำหรับ Vivado (หรือ FPGA Builder) — ขาตรงกับที่เลือกไว้"},
+];
+function startTour(){
+  let i=0;
+  const ov=document.createElement("div"); ov.className="tour-ov";
+  ov.innerHTML='<div class="tour-hole"></div><div class="tour-tip"><div class="tour-h"></div><div class="tour-t"></div><div class="tour-f"><span class="tour-n muted"></span><span style="flex:1"></span><button class="btn" data-t="skip">ข้าม</button><button class="btn btn-primary" data-t="next">ถัดไป</button></div></div>';
+  document.body.appendChild(ov);
+  const hole=ov.querySelector(".tour-hole"), tip=ov.querySelector(".tour-tip");
+  const end=()=>{ ov.remove(); window.removeEventListener("resize", place); document.removeEventListener("keydown", key, true); uxLS("schstudio.tourDone","1"); };
+  const key=e=>{ if(e.key==="Escape"){ e.stopPropagation(); end(); } else if(e.key==="Enter"||e.key==="ArrowRight"){ e.stopPropagation(); next(); } };
+  function place(){
+    const s=TOUR[i], el=document.querySelector(s.sel); const r=el?el.getBoundingClientRect():{left:innerWidth/2,top:innerHeight/2,width:0,height:0};
+    const pad=6; Object.assign(hole.style,{left:(r.left-pad)+"px",top:(r.top-pad)+"px",width:(r.width+pad*2)+"px",height:(r.height+pad*2)+"px"});
+    const tw=320, below=r.top+r.height+14+170<innerHeight;
+    tip.style.left=Math.max(12,Math.min(innerWidth-tw-12, r.left+r.width/2-tw/2))+"px";
+    tip.style.top=(below? r.top+r.height+14 : Math.max(12, r.top-14-tip.offsetHeight))+"px";
+  }
+  function show(){ const s=TOUR[i]; if(s.pre) s.pre();
+    tip.querySelector(".tour-h").textContent=s.title; tip.querySelector(".tour-t").textContent=s.text;
+    tip.querySelector(".tour-n").textContent=(i+1)+" / "+TOUR.length;
+    tip.querySelector('[data-t="next"]').textContent=i===TOUR.length-1?"เสร็จ":"ถัดไป";
+    requestAnimationFrame(place); }
+  function next(){ if(++i>=TOUR.length) end(); else show(); }
+  tip.querySelector('[data-t="next"]').onclick=next;
+  tip.querySelector('[data-t="skip"]').onclick=end;
+  window.addEventListener("resize", place); document.addEventListener("keydown", key, true);
+  show();
+}
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  if(a.dataset.act==="welcome-open") openWelcome();
+  else if(a.dataset.act==="tour-start") startTour();
+});
+/* first visit (no earlier session, not dismissed) → welcome */
+if(!UX.hadSession && uxLS("schstudio.welcomeHidden")!=="1" && !new URLSearchParams(location.search).get("open"))
+  setTimeout(()=>{ if(!document.querySelector(".modal-bg")) openWelcome(); }, 500);
+uxStepperSoon();
+
+/* =========================================================================
+   4. SAY WHERE IT'S WRONG, NOT JUST THAT IT'S WRONG
+   ========================================================================= */
+
+/* ---------- shared hover tooltip ---------- */
+const UXTIP = { el:null, t:null, key:null };
+function uxTipShow(html, x, y, key){
+  if(!UXTIP.el){ UXTIP.el=document.createElement("div"); UXTIP.el.className="ux-tip"; document.body.appendChild(UXTIP.el); }
+  if(UXTIP.key!==key){ UXTIP.el.innerHTML=html; UXTIP.key=key; }
+  const e=UXTIP.el; e.style.display="block";
+  const w=e.offsetWidth, h=e.offsetHeight;
+  e.style.left=Math.min(innerWidth-w-8, x+16)+"px";
+  e.style.top=(y+18+h>innerHeight ? y-h-12 : y+18)+"px";
+}
+function uxTipHide(){ clearTimeout(UXTIP.t); UXTIP.key=null; if(UXTIP.el) UXTIP.el.style.display="none"; }
+
+/* ---------- 4a. problems drawn on the sheet ---------- */
+const MARK = { on: uxLS("schstudio.marks")!=="0", pins:[], multi:[], comps:new Map() };
+/* plain-Thai "what it means + what to do" for each kind of issue */
+function issueFix(msg){
+  const m=String(msg);
+  if(/ยังไม่ได้ต่อสาย/.test(m) && /OUTPUT/.test(m)) return "ลากสายจากขาเอาต์พุตของเกตมาที่ OUTPUT นี้ — ถ้าไม่ต่อ Vivado จะให้ค่า 0 ตลอด";
+  if(/ยังไม่ได้ต่อสาย/.test(m)) return "ขาอินพุตที่ลอยไว้ไม่มีค่าที่แน่นอน ต่อสายเข้ามา หรือถ้าตั้งใจให้เป็นค่าคงที่ ให้ต่อกับ GND (0) หรือ VCC (1)";
+  if(/ไม่ได้ต่อไปไหน/.test(m)) return "INPUT นี้ไม่ได้ใช้ ลากสายจากขาของมันไปเข้าเกต หรือถ้าไม่ต้องการก็ลบทิ้ง";
+  if(/multi-driver|สายเข้าซ้อน/.test(m)) return "มีเอาต์พุตสองตัวต่อเข้าขาเดียวกัน = สัญญาณชนกัน ลบสายเส้นใดเส้นหนึ่ง หรือใช้เกต (OR/AND) รวมสองสัญญาณก่อน";
+  if(/ปลายลอย|ปลายสายลอย/.test(m)) return "สายเส้นนี้ไม่มีต้นทาง ลากปลายสายที่ลอยไปต่อกับขาเอาต์พุตของอะไรสักอย่าง";
+  if(/ชื่อซ้ำ|ซ้ำกัน/.test(m)) return "เปลี่ยนชื่อพอร์ตให้ไม่ซ้ำกัน (เลือกแล้วแก้ใน Inspector)";
+  if(/ความกว้างบัส/.test(m)) return "บัสสองฝั่งกว้างไม่เท่ากัน ใช้ Bus Tap ดึงเฉพาะบิตที่ต้องการ หรือแก้ความกว้างให้ตรงกัน";
+  if(/combinational loop|ป้อนกลับ/.test(m)) return "สัญญาณวนกลับมาเข้าตัวเองโดยไม่ผ่าน flip-flop — วงจรจะแกว่ง/ค้าง ตัดวงนี้ หรือใส่ D-FF คั่น";
+  if(/clk.*ค่าคงที่/.test(m)) return "นาฬิกาต้องเปลี่ยนค่าได้ ต่อขา clk กับ INPUT clk หรือ Q ของ flip-flop ตัวก่อนหน้า";
+  if(/clk.*ยังไม่ได้ต่อ/.test(m)) return "flip-flop ต้องมีนาฬิกา ต่อขา clk กับ INPUT ชื่อ clk (หรือเอาต์พุตของวงจรหารความถี่)";
+  if(/gated clock/.test(m)) return "นาฬิกาที่ผ่านเกตอาจมี glitch ทำให้นับเกิน ถ้าเป็นไปได้ให้ใช้ clk ตรง แล้วคุมด้วยขา enable/D แทน";
+  if(/Bus Tap/.test(m)) return "ตรวจเลขบิตของ Bus Tap ให้อยู่ในช่วงของบัส";
+  return "";
+}
+function uxCollectMarks(){
+  const sch=activeSch(); MARK.pins=[]; MARK.multi=[]; MARK.comps=new Map();
+  if(!sch) return;
+  // floating input pins (the most common one) — exact pin position, not just the part
+  (sch.components||[]).forEach(c=>{
+    if(c.type==="JUNCTION"||c.type==="BUSTAP"||c.type==="OUT"||c.type==="GND") return;
+    getPorts(c).filter(p=>p.dir==="in").forEach(p=>{
+      if(!sch.wires.some(w=>w.to.cid===c.id&&w.to.pid===p.id))
+        MARK.pins.push({cid:c.id, pid:p.id, lvl:"warn", msg:`${compDisplay(c)} ขา '${p.id}' ยังไม่ได้ต่อสาย`});
+    });
+  });
+  // multi-driver: every wire into a pin that has more than one
+  const into=new Map(); sch.wires.forEach(w=>{ const k=w.to.cid+"|"+w.to.pid; (into.get(k)||into.set(k,[]).get(k)).push(w.id); });
+  into.forEach((ids,k)=>{ if(ids.length>1){ const [cid,pid]=k.split("|"); const c=comp(cid,sch);
+    MARK.multi.push({wids:ids, cid, msg:`${c?compDisplay(c):cid} ขา '${pid}' มีสายเข้าซ้อนกัน ${ids.length} เส้น (multi-driver)`}); } });
+  // everything else the checker found, pinned to its component
+  (UX.step?[...UX.step.errs,...UX.step.warns]:[]).forEach(i=>{
+    if(!i.cid || i.schId!==sch.id) return;
+    if(/ขา '.*' ยังไม่ได้ต่อสาย|multi-driver|สายเข้าซ้อน/.test(i.msg)) return;   // drawn precisely above
+    const a=MARK.comps.get(i.cid)||[]; a.push(i); MARK.comps.set(i.cid,a);
+  });
+}
+function uxDrawMarks(){
+  if(!MARK.on) return;
+  const sch=activeSch(), world=canvas.firstChild; if(!sch||!world) return;
+  const layer=el("g",{class:"ux-marks"});
+  MARK.multi.forEach((m,k)=>m.wids.forEach(wid=>{
+    const g=canvas.querySelector(`.wire-group[data-wid="${wid}"] path.wire`); if(!g) return;
+    const p=el("path",{d:g.getAttribute("d"), class:"ux-mw", "data-mk":"m"+k});
+    layer.appendChild(p);
+  }));
+  MARK.pins.forEach((m,k)=>{ const c=comp(m.cid,sch); if(!c) return; const pp=portPos(c,m.pid); if(!pp) return;
+    layer.appendChild(el("circle",{cx:pp.x, cy:pp.y, r:4.2, class:"ux-mp", "data-mk":"p"+k})); });
+  MARK.comps.forEach((list,cid)=>{ const c=comp(cid,sch); if(!c) return; const sz=getSize(c);
+    const err=list.some(i=>i.lvl==="err");
+    const g=el("g",{class:"ux-mc "+(err?"err":"warn"), "data-mk":"c"+cid, transform:`translate(${c.x+sz.w-2},${c.y-4})`});
+    g.appendChild(el("circle",{r:7}));
+    const t=el("text",{"text-anchor":"middle", y:3.6}); t.textContent=list.length>1?String(list.length):"!"; g.appendChild(t);
+    layer.appendChild(g); });
+  world.appendChild(layer);
+}
+function uxMarkHtml(key){
+  let items=[];
+  if(key[0]==="p"){ const m=MARK.pins[+key.slice(1)]; if(m) items=[m]; }
+  else if(key[0]==="m"){ const m=MARK.multi[+key.slice(1)]; if(m) items=[{lvl:"err",msg:m.msg}]; }
+  else if(key[0]==="c"){ items=MARK.comps.get(key.slice(1))||[]; }
+  return items.map(i=>{ const fix=issueFix(i.msg);
+    return `<div class="ux-tip-i ${i.lvl==="err"?"err":"warn"}"><b>${i.lvl==="err"?"✕ ต้องแก้":"⚠ ควรดู"}</b> ${esc(i.msg)}${fix?`<div class="ux-tip-fix">วิธีแก้: ${esc(fix)}</div>`:""}</div>`; }).join("");
+}
+{
+  const _render=render;
+  render=function(){ const r=_render.apply(this, arguments); try{ uxDrawMarks(); }catch(e){ console.warn("marks",e); } return r; };
+  const _step=uxRenderStepper;
+  uxRenderStepper=function(){ const r=_step.apply(this, arguments); uxCollectMarks(); render(); return r; };
+}
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  if(a.dataset.act==="toggle-marks"){ MARK.on=!MARK.on; uxLS("schstudio.marks", MARK.on?"1":"0"); render();
+    toast(MARK.on?"แสดงปัญหาบนผัง: เปิด":"แสดงปัญหาบนผัง: ปิด","ok",1600); }
+});
+
+/* ---------- 4c. hover: a gate's truth table · probe: a wire's value and where it comes from ---------- */
+function gateTableHtml(c){
+  const ins=getPorts(c).filter(p=>p.dir==="in"), n=ins.length, T=c.type;
+  if(PROBE_GATES[T] && n>=1 && n<=4){
+    const head=ins.map((_,i)=>String.fromCharCode(97+i));
+    let h=`<table class="ux-gt"><tr>${head.map(x=>`<th>${x}</th>`).join("")}<th class="o">y</th></tr>`;
+    for(let r=0;r<(1<<n);r++){ const bits=head.map((_,i)=>(r>>(n-1-i))&1); const y=probeGateOp(T,bits);
+      h+=`<tr>${bits.map(b=>`<td>${b}</td>`).join("")}<td class="o v${y}">${y}</td></tr>`; }
+    const say={AND:"เป็น 1 เมื่อทุกอินพุตเป็น 1",OR:"เป็น 1 เมื่อมีอินพุตใดเป็น 1",NOT:"กลับค่า",BUF:"ส่งค่าผ่าน",
+      NAND:"AND แล้วกลับค่า",NOR:"OR แล้วกลับค่า",XOR:"เป็น 1 เมื่อจำนวน 1 เป็นคี่",XNOR:"เป็น 1 เมื่อจำนวน 1 เป็นคู่"}[T]||"";
+    return `<div class="ux-tip-h">${T} ${n} อินพุต</div><div class="muted" style="margin-bottom:4px">${say}</div>${h}</table>`;
+  }
+  const FT={DFF:[["↑ clk","Q ← D"],["ไม่มีขอบ","Q คงเดิม"]],
+    TFF:[["↑ clk, T=0","คงเดิม"],["↑ clk, T=1","กลับค่า"]],
+    JKFF:[["J=0 K=0","คงเดิม"],["J=0 K=1","Q=0"],["J=1 K=0","Q=1"],["J=1 K=1","กลับค่า"]],
+    SRFF:[["S=0 R=0","คงเดิม"],["S=0 R=1","Q=0"],["S=1 R=0","Q=1"],["S=1 R=1","ห้ามใช้"]]}[T];
+  if(FT){ const edge=(c.params&&c.params.edge==="falling")?"ขอบขาลง ↓":"ขอบขาขึ้น ↑";
+    return `<div class="ux-tip-h">${T} · ทำงานที่${edge}</div><table class="ux-gt">${FT.map(([a,b])=>`<tr><td style="text-align:left">${a}</td><td class="o" style="text-align:left">${b}</td></tr>`).join("")}</table>`
+      +((c.params&&(c.params.reset||c.params.preset))?`<div class="muted" style="margin-top:4px">rst/pre ทำงานทันที ไม่รอ clock</div>`:""); }
+  if(T==="MUX"){ const n2=(c.params&&c.params.inputs)||2; return `<div class="ux-tip-h">MUX ${n2}:1</div><div class="muted">y = d[s] — ขา s เลือกว่าจะส่งอินพุตตัวไหนออก</div>`; }
+  return "";
+}
+function probeWireHtml(wid){
+  const sch=activeSch(); let flat, m;
+  try{ flat=flattenSchematic(sch).sch; m=probeModel(flat, probeStruct(flat)); }catch(_){ return ""; }
+  const w=flat.wires.find(x=>x.id===wid); if(!w) return "";
+  const d=m.netDriver(w); if(!d) return `<div class="ux-tip-h">สายนี้ไม่มีตัวขับ</div><div class="muted">ค่าไม่แน่นอน — ต่อปลายสายเข้ากับขาเอาต์พุต</div>`;
+  const v=m.outVal(d.cid,d.pid,new Set());
+  const src=flat.components.find(c=>c.id===d.cid);
+  const top=comp(d.cid.split("__")[0], sch);
+  const who=src ? (src.type==="IN"||src.type==="OUT" ? `${src.type==="IN"?"INPUT":"OUTPUT"} '${(src.params&&src.params.name)||src.id}'`
+    : (d.cid.includes("__")&&top ? `${compDisplay(top)} (ข้างใน)` : compDisplay(src))) : d.cid;
+  let why="";
+  if(src && (PROBE_GATES[src.type]||src.type==="MUX")){
+    const ins=m.inPortsOf(src).map(p=>`${p.id}=${(x=>x==null?"?":x)(m.inVal(src.id,p.id))}`);
+    why=`<div class="muted">เพราะ ${src.type} ได้ ${ins.join(", ")}</div>`;
+  } else if(src && PROBE_SEQ[src.type]) why=`<div class="muted">ค่าที่ flip-flop เก็บไว้ (เปลี่ยนเมื่อมีขอบ clock)</div>`;
+  return `<div class="ux-tip-h">ค่า = <span class="ux-v v${v}">${v==null?"?":v}</span></div><div>มาจาก ${esc(who)} ขา ${esc(d.pid)}</div>${why}`;
+}
+canvas.addEventListener("mousemove", ev=>{
+  if(state.drag||state.pan||state.wireDrag||state.pendingWire){ uxTipHide(); return; }
+  const mk=ev.target.closest && ev.target.closest("[data-mk]");
+  if(mk){ clearTimeout(UXTIP.t); const k=mk.dataset.mk; uxTipShow(uxMarkHtml(k), ev.clientX, ev.clientY, "mk"+k); return; }
+  // the pin dots let clicks through (so the pin can still be wired) — find them by distance
+  if(MARK.on && MARK.pins.length){ const w=svgPoint(ev), sch=activeSch(); let best=-1, bd=8/Math.max(.4,state.view.k);
+    MARK.pins.forEach((m,k)=>{ const c=comp(m.cid,sch); const pp=c&&portPos(c,m.pid); if(!pp) return; const d=Math.hypot(pp.x-w.x,pp.y-w.y); if(d<bd){ bd=d; best=k; } });
+    if(best>=0){ clearTimeout(UXTIP.t); uxTipShow(uxMarkHtml("p"+best), ev.clientX, ev.clientY, "mkp"+best); return; } }
+  const wg=PROBE && ev.target.closest && ev.target.closest(".wire-group[data-wid]");
+  const nd=!wg && ev.target.closest && ev.target.closest(".node[data-cid]");
+  const key=wg?"w"+wg.dataset.wid : nd?"n"+nd.dataset.cid : null;
+  if(!key){ uxTipHide(); return; }
+  if(UXTIP.key===key){ uxTipShow(null, ev.clientX, ev.clientY, key); return; }
+  clearTimeout(UXTIP.t); if(UXTIP.el) UXTIP.el.style.display="none"; UXTIP.key=null;
+  const x=ev.clientX, y=ev.clientY;
+  UXTIP.t=setTimeout(()=>{
+    let html="";
+    if(wg) html=probeWireHtml(wg.dataset.wid);
+    else { const c=comp(nd.dataset.cid); if(c) html=gateTableHtml(c); }
+    if(html) uxTipShow(html, x, y, key);
+  }, wg?120:450);
+});
+canvas.addEventListener("mouseleave", uxTipHide);
+canvas.addEventListener("mousedown", uxTipHide);
+
+/* ---------- 4b. "why doesn't the sim do what I expect?" ---------- */
+function explainSim(sch){
+  sch=sch||activeSch(); const F=[];   // {lvl, title, why, fix, cid}
+  if(!sch||!(sch.components||[]).some(c=>c.type!=="JUNCTION")) return [{lvl:"info",title:"แผ่นนี้ยังว่าง",why:"ยังไม่มีวงจรให้จำลอง",fix:"วางเกตจากแท็บ Components หรือเริ่มจากเทมเพลตแลป"}];
+  let flat; try{ flat=flattenSchematic(sch); }catch(e){ return [{lvl:"err",title:"อ่านวงจรไม่ได้",why:e.message,fix:""}]; }
+  const fs=flat.sch, nm=c=>(c.params&&c.params.name)||c.label||c.id, top=id=>comp(String(id).split("__")[0],sch)||null;
+  flat.warns.forEach(w=>F.push({lvl:"warn",title:"บางบล็อกจำลองไม่ได้",why:w,fix:"บล็อกที่ข้ามไปจะให้เอาต์พุตเป็น 0 — ตรวจว่าวงจรย่อยมี INPUT/OUTPUT ครบ"}));
+  const ffs=fs.components.filter(c=>PROBE_SEQ[c.type]);
+  const m=probeModel(fs, probeStruct(fs));
+  const outs=sch.components.filter(c=>c.type==="OUT"), ins=sch.components.filter(c=>c.type==="IN");
+  if(!outs.length) F.push({lvl:"err",title:"ไม่มี OUTPUT",why:"ตัวจำลองดูผลที่ OUTPUT เท่านั้น",fix:"วาง OUTPUT แล้วต่อสายจากสัญญาณที่อยากดู"});
+  // wiring faults on this sheet come first: they make every later result meaningless
+  const into=new Map(); sch.wires.forEach(w=>{ const k=w.to.cid+"|"+w.to.pid; into.set(k,(into.get(k)||0)+1); });
+  into.forEach((n,k)=>{ if(n<2) return; const [cid,pid]=k.split("|"), c=comp(cid,sch); if(!c||c.type==="JUNCTION") return;
+    F.push({lvl:"err",title:`${compDisplay(c)} ขา '${pid}' มีสัญญาณเข้า ${n} ทาง (multi-driver)`,why:"สองเอาต์พุตชนกันบนสายเดียว ค่าที่ได้ไม่แน่นอน ตัวจำลองจึงให้ผลที่ไม่ตรงกับที่คิด",fix:issueFix("multi-driver"),cid}); });
+  const floating=[];
+  (sch.components||[]).forEach(c=>{ if(!(PROBE_GATES[c.type]||c.type==="MUX"||PROBE_SEQ[c.type])) return;
+    getPorts(c).filter(p=>p.dir==="in"&&p.id!=="clk").forEach(p=>{ if(!sch.wires.some(w=>w.to.cid===c.id&&w.to.pid===p.id)) floating.push({c,p}); }); });
+  floating.slice(0,3).forEach(({c,p})=>F.push({lvl:"warn",title:`${compDisplay(c)} ขา '${p.id}' ลอย`,why:"ขาที่ไม่ได้ต่อไม่มีค่า เอาต์พุตของเกตนี้จึงไม่แน่นอน (ตัวจำลองถือเป็น 0)",fix:issueFix("ยังไม่ได้ต่อสาย"),cid:c.id}));
+  if(floating.length>3) F.push({lvl:"warn",title:`ยังมีขาลอยอีก ${floating.length-3} ขา`,why:"ดูจุดสีแดงบนผัง",fix:""});
+  outs.forEach(o=>{ const w=sch.wires.find(x=>x.to.cid===o.id); if(!w) F.push({lvl:"err",title:`OUTPUT '${nm(o)}' ไม่ได้ต่อสาย`,why:"จึงเป็น 0 ตลอดทุกแถว",fix:"ลากสายจากเกตมาเข้า OUTPUT นี้",cid:o.id}); });
+  // clocks
+  const clocks=new Set();
+  ffs.forEach(c=>{
+    const s=m.source(c.id,"clk"), T=top(c.id), where=T?compDisplay(T)+(c.id.includes("__")?" (ข้างใน)":""):c.id;
+    if(!s) F.push({lvl:"err",title:`${where}: ขา clk ไม่มีสัญญาณ`,why:"flip-flop ที่ไม่มีขอบนาฬิกาจะไม่เปลี่ยนสถานะเลย",fix:"ต่อขา clk กับ INPUT ชื่อ clk (หรือ Q ของ flip-flop ตัวก่อน ถ้าเป็นตัวนับแบบ ripple)",cid:T&&T.id});
+    else if(["VCC","GND","CONST"].includes(s.type)) F.push({lvl:"err",title:`${where}: clk ต่อกับค่าคงที่ (${s.type})`,why:"ค่าคงที่ไม่มีขอบขึ้น/ลง flip-flop จึงไม่ทำงาน",fix:"ต่อ clk กับ INPUT clk",cid:T&&T.id});
+    else if(PROBE_GATES[s.type]&&s.type!=="BUF") F.push({lvl:"warn",title:`${where}: clk ผ่านเกต ${s.type} (gated clock)`,why:"เมื่ออินพุตอื่นของเกตเป็นค่าที่บล็อก นาฬิกาจะหยุด และบนบอร์ดจริงอาจมี glitch ทำให้นับเกิน",fix:"ต่อ clk ตรงเข้าขา clk แล้วใช้สัญญาณควบคุมกับขา D/T/J/K หรือ enable แทน",cid:T&&T.id});
+    else if(s.type==="IN") clocks.add(s.cid);
+  });
+  // resets that never let go (inputs are 0 in the sim; a VCC / inverted input keeps it active)
+  const zero=Object.assign({},PROBE_VALS); Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]);
+  try{
+    const m0=probeModel(fs, probeStruct(fs));
+    ffs.forEach(c=>{ const p=c.params||{}, T=top(c.id), where=T?compDisplay(T):c.id;
+      if(p.reset && m0.inVal(c.id,"rst")===1) F.push({lvl:"err",title:`${where}: reset ค้างอยู่ที่ 1`,why:"ขณะจำลอง INPUT ทุกตัวเริ่มที่ 0 แต่ขา rst ยังเป็น 1 (ต่อ VCC หรือผ่าน NOT) flip-flop จึงถูกล้างเป็น 0 ตลอด",fix:"ให้ rst เป็น 1 เฉพาะตอนต้องการล้าง — ต่อกับ INPUT/ปุ่ม หรือวงจรตรวจค่าที่ต้องการรีเซ็ต",cid:T&&T.id});
+      if(p.preset && m0.inVal(c.id,"pre")===1) F.push({lvl:"err",title:`${where}: preset ค้างอยู่ที่ 1`,why:"flip-flop ถูกตั้งเป็น 1 ตลอด ไม่สนนาฬิกา",fix:"ให้ pre เป็น 0 ตามปกติ",cid:T&&T.id});
+      if(c.type==="DFF"){ const s=m0.source(c.id,"d"); if(s&&["VCC","GND"].includes(s.type)) F.push({lvl:"warn",title:`${where}: D ต่อค่าคงที่ ${s.type}`,why:"Q จะเป็นค่านั้นตลอดหลัง clock แรก",fix:"ถ้าต้องการให้สลับค่า ต่อ D กับ Q' (qn)",cid:T&&T.id}); }
+      if(c.type==="JKFF"){ const j=m0.inVal(c.id,"j"), k=m0.inVal(c.id,"k"); if(j===0&&k===0) F.push({lvl:"warn",title:`${where}: J=K=0 ตลอด`,why:"JK-FF ที่ J=K=0 จะคงค่าเดิม ไม่นับ",fix:"ตัวนับแบบ toggle ให้ต่อ J และ K กับ VCC",cid:T&&T.id}); }
+      if(c.type==="TFF"){ if(m0.inVal(c.id,"t")===0) F.push({lvl:"warn",title:`${where}: T=0 ตลอด`,why:"T-FF จะไม่กลับค่า",fix:"ต่อ T กับ VCC เพื่อให้กลับค่าทุก clock",cid:T&&T.id}); }
+    });
+  } finally { Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, zero); }
+  // run it and look at the result
+  if(ffs.length){
+    if(!clocks.size && !F.some(f=>/clk/.test(f.title))) F.push({lvl:"warn",title:"หา INPUT ที่เป็นนาฬิกาไม่เจอ",why:"ตัวจำลองจะกด clock ให้เฉพาะ INPUT ที่ต่อเข้าขา clk ของ flip-flop",fix:"ตั้งชื่อ INPUT ว่า clk แล้วต่อเข้าขา clk"});
+    try{
+      const j=clientSeqSim(sch, 16);
+      if(j.ok && j.sequence.rows.length>1){
+        const st=j.sequence.rows.map(r=>r[2].join(""));
+        if(st.every(x=>x===st[0])) F.push({lvl:"err",title:"flip-flop ไม่เปลี่ยนสถานะเลยใน 16 clock",why:"มักเกิดจาก clk ไม่ถึง, reset ค้าง หรือ D/J/K/T ต่อค่าที่ทำให้คงเดิม (ดูรายการด้านบน)",fix:"เปิดโหมดตรวจค่า 🔬 แล้วคลิก clk ดูว่าค่าเดินถึงขาไหน"});
+        else { const outsCh=j.sequence.outputs.filter((o,k)=>new Set(j.sequence.rows.map(r=>r[3][k])).size>1);
+          if(j.sequence.outputs.length && !outsCh.length) F.push({lvl:"warn",title:"flip-flop เปลี่ยนค่า แต่ OUTPUT ไม่เปลี่ยน",why:"สถานะภายในเดินอยู่ แต่ OUTPUT ไม่ได้ต่อกับ Q ที่เปลี่ยน",fix:"ต่อ OUTPUT กับขา Q ของ flip-flop"}); }
+      }
+    }catch(_){}
+    let div=null; try{ div=analyzeDividerChain(sch); }catch(_){}
+    if(div){ let total=1; try{ total=divChainFreqs(div).total||1; }catch(_){}
+      F.push({lvl:"info",title:"วงจรนี้มีตัวหารความถี่ต่อกันเป็นทอด",why:`นาฬิกาถูกหารหลายชั้น${total>1?` (รวมราว ÷${total.toLocaleString()})`:""} การจำลองทีละ clock จึงต้องเดินเป็นล้านรอบกว่าจอจะเปลี่ยน ดูเหมือนค้าง`,
+        fix:"ใช้แผงคำนวณความถี่ในหน้า จำลอง (แสดงความถี่แต่ละชั้น) หรือทดสอบบล็อกนับแต่ละตัวแยกกัน"}); }
+  } else if(outs.length && ins.length){
+    const j=clientCombSim(sch);
+    if(j.ok){ const tt=j.truth_table;
+      tt.outputs.forEach((o,k)=>{ const vals=new Set(tt.rows.map(r=>r[1][k]));
+        if(vals.size===1) F.push({lvl:"warn",title:`OUTPUT '${o}' เป็น ${[...vals][0]} ทุกแถว`,why:"ไม่ว่าอินพุตเป็นอะไร ผลเท่าเดิม — มักเกิดจากสายไม่ครบหรือต่อผิดขา",fix:"เปิดโหมดตรวจค่า 🔬 แล้วลองสลับ INPUT ดูว่าค่าไปหยุดที่ไหน",cid:(outs.find(c=>nm(c)===o)||{}).id}); });
+      const unused=tt.inputs.filter((n,i)=>tt.rows.every(([b,o])=>{ const r2=tt.rows.find(([b2])=>b2.every((x,t)=>t===i?x!==b[i]:x===b[t])); return !r2 || r2[1].join("")===o.join(""); }));
+      unused.forEach(n=>F.push({lvl:"info",title:`INPUT '${n}' ไม่มีผลต่อ OUTPUT เลย`,why:"สลับค่า INPUT นี้แล้วผลไม่เปลี่ยนในทุกแถว",fix:"ถ้าไม่ได้ตั้งใจ ตรวจสายจาก INPUT นี้",cid:(ins.find(c=>nm(c)===n)||{}).id}));
+      if(j.note) F.push({lvl:"warn",title:"มีเอาต์พุตที่ไม่มีอะไรขับ",why:j.note,fix:""});
+    } else if(j.reason) F.push({lvl:"info",title:"จำลองในเบราว์เซอร์ไม่ได้",why:j.reason,fix:""});
+  }
+  try{ combinationalLoops(sch).forEach(cyc=>F.push({lvl:"err",title:"สัญญาณวนกลับโดยไม่ผ่าน flip-flop",why:"ผลของวงจรจะไม่นิ่ง ตัวจำลองอาจให้ค่าที่ไม่ตรงกับบอร์ด",fix:issueFix("combinational loop"),cid:cyc[0]})); }catch(_){}
+  if(!F.length) F.push({lvl:"ok",title:"ไม่พบสาเหตุที่ชัดเจน",why:"วงจรต่อครบและจำลองได้ตามโครงสร้างที่วาด — ถ้าผลยังไม่ตรงที่คิด ให้เทียบตารางความจริงกับที่ออกแบบทีละแถว",fix:"ลองใช้ ตารางความจริง / K-map สร้างวงจรจากผลที่ต้องการ แล้วเทียบกัน"});
+  const rank={err:0,warn:1,info:2,ok:3}; return F.sort((a,b)=>rank[a.lvl]-rank[b.lvl]);
+}
+function openExplainSim(){
+  const sch=activeSch(), list=explainSim(sch);
+  const ico={err:"✕",warn:"⚠",info:"ℹ",ok:"✓"};
+  const m=uxModal("🩺 ทำไมผลจำลองไม่เป็นอย่างที่คิด?", `<p class="muted" style="margin:0 0 10px">ตรวจแผ่น “${esc(sch?sch.name:"")}” — เรียงจากเรื่องที่น่าจะเป็นสาเหตุมากที่สุด</p>`
+    +list.map((f,i)=>`<div class="ex-i ${f.lvl}"><span class="ex-ico">${ico[f.lvl]}</span><div class="ex-b"><b>${esc(f.title)}</b>
+      ${f.why?`<div>${esc(f.why)}</div>`:""}${f.fix?`<div class="ex-fix">ลองแก้: ${esc(f.fix)}</div>`:""}</div>
+      ${f.cid&&sch?`<button class="btn" data-exgo="${i}">ไปที่จุดนี้</button>`:""}</div>`).join(""), {width:640});
+  m.querySelectorAll("[data-exgo]").forEach(b=>b.onclick=()=>{ const f=list[+b.dataset.exgo]; m.close(); hideSimPage(); setStage("draw",true); focusComp(sch.id, f.cid); });
+}
+/* entry points: sim page button, chat /why, and the chat noticing the question */
+{
+  const top=$("#simPage .sim-top");
+  if(top && !top.querySelector("[data-act=explain-sim]")){
+    const b=document.createElement("button"); b.className="btn2"; b.dataset.act="explain-sim"; b.textContent="🩺 ทำไมผลไม่ตรง?";
+    b.title="ตรวจหาสาเหตุที่ผลจำลองไม่เป็นอย่างที่คิด (clock, reset, สายขาด, ตัวหารความถี่…)";
+    top.insertBefore(b, top.querySelector(".grow"));
+  }
+  const _send=aiSend;
+  aiSend=async function(){
+    const t=$("#acInput"), msg=((t&&t.value)||"").trim();
+    const why=/^\/(why|ทำไม)\b/i.test(msg) || (/(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg) && /(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ทำไม|ผิด|ค้าง)/.test(msg));
+    if(!why) return _send.apply(this, arguments);
+    aiAppend("user", msg); t.value="";
+    const list=explainSim(activeSch()).slice(0,6);
+    const ico={err:"✕",warn:"⚠",info:"ℹ",ok:"✓"};
+    aiAppend("ai", '<span class="ac-badge v">ตรวจแผ่นนี้</span><br>'+list.map(f=>`<div style="margin-top:6px">${ico[f.lvl]} <b>${esc(f.title)}</b><br><span class="ac-hint">${esc(f.why)}${f.fix?" — "+esc(f.fix):""}</span></div>`).join("")
+      +'<div class="ac-hint" style="margin-top:6px">ดูรายละเอียดและกดไปยังจุดนั้นได้ที่หน้า จำลอง ▸ 🩺</div>', {html:true});
+  };
+}
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  if(a.dataset.act==="explain-sim") openExplainSim();
+});
+
+/* =========================================================================
+   5. FASTER EVERYDAY WORK
+   ========================================================================= */
+function uxBusy(){   // a dialog / tour / palette owns the keyboard
+  return !!document.querySelector(".modal-bg, .tour-ov, .cmdk-bg") || (typeof manualOpen==="function" && manualOpen());
+}
+function uxTyping(){ const a=document.activeElement; return a && (/INPUT|TEXTAREA|SELECT/.test(a.tagName) || a.isContentEditable); }
+function uxViewCenter(){ const r=canvas.getBoundingClientRect(); return {x:(r.width/2-state.view.x)/state.view.k, y:(r.height/2-state.view.y)/state.view.k}; }
+let UX_MOUSE_IN=false;
+canvas.addEventListener("mouseenter",()=>UX_MOUSE_IN=true);
+canvas.addEventListener("mouseleave",()=>UX_MOUSE_IN=false);
+/* place a part centred under the mouse (or mid-view when the mouse is elsewhere) */
+function uxPlace(type){
+  const at=UX_MOUSE_IN?state.mouse:uxViewCenter();
+  const td=TYPES[type]; let w=60,h=40; try{ const s=td.size(td.defaultParams||{}); w=s.w; h=s.h; }catch(_){}
+  const id=addComp(type, at.x-w/2, at.y-h/2);
+  if(id && type!=="IN" && type!=="OUT") setTool("select", true);
+  return id;
+}
+
+/* ---------- 5b. single-letter placement ---------- */
+const PLACE_KEYS = {
+  KeyA:["AND","NAND"], KeyO:["OR","NOR"], KeyX:["XOR","XNOR"], KeyN:["NOT","BUF"],
+  KeyI:["IN",null], KeyQ:["OUT",null], KeyD:["DFF",null], KeyC:["CONST",null],
+};
+window.addEventListener("keydown", ev=>{
+  if(uxTyping()) return;
+  const ctl=ev.ctrlKey||ev.metaKey;
+  if(ctl && (ev.code==="KeyK" || (ev.key||"").toLowerCase()==="k")){ ev.preventDefault(); ev.stopImmediatePropagation(); openCmdK(); return; }
+  if(ctl||ev.altKey||uxBusy()) return;
+  if(ev.code==="Slash" && ev.shiftKey){ ev.preventDefault(); ev.stopImmediatePropagation(); openShortcutHelp(); return; }
+  // the ISE-style tools that used N and I move to Shift+N / Shift+I
+  if(ev.shiftKey && ev.code==="KeyN"){ ev.preventDefault(); ev.stopImmediatePropagation(); setTool("netname"); return; }
+  if(ev.shiftKey && ev.code==="KeyI"){ ev.preventDefault(); ev.stopImmediatePropagation(); setTool("iomarker"); return; }
+  const pk=PLACE_KEYS[ev.code]; if(!pk) return;
+  if(state.pendingWire) return;                       // keys mean nothing mid-wire
+  const type=ev.shiftKey?pk[1]:pk[0]; if(!type||!TYPES[type]) return;
+  ev.preventDefault(); ev.stopImmediatePropagation();
+  uxPlace(type);
+}, true);
+function openShortcutHelp(){
+  const rows=[["A / Shift+A","AND / NAND"],["O / Shift+O","OR / NOR"],["X / Shift+X","XOR / XNOR"],["N / Shift+N","NOT / เครื่องมือตั้งชื่อสาย"],
+    ["I / Shift+I","INPUT / เครื่องมือ I/O marker"],["Q","OUTPUT"],["D","D flip-flop"],["C","ค่าคงที่ (CONST)"],["W","เครื่องมือสาย"],["B","Bus tap"],["R / M","หมุน / กลับด้าน"],
+    ["Ctrl+K","ค้นหาคำสั่ง"],["Ctrl+S","บันทึก"],["Ctrl+Z / Ctrl+Y","ย้อน / ทำซ้ำ"],["F7","ตรวจวงจร"],["Home","ย่อให้พอดีจอ"],["?","หน้านี้"]];
+  uxModal("⌨ คีย์ลัด", `<p class="muted" style="margin:0 0 8px">ตัวอักษรจะวางชิ้นส่วนตรงตำแหน่งเมาส์</p><table class="kbd-t">${rows.map(([k,v])=>`<tr><td><kbd>${esc(k)}</kbd></td><td>${esc(v)}</td></tr>`).join("")}</table>`,{width:460});
+}
+
+/* ---------- 5c. drag out of a free pin → a named INPUT/OUTPUT ---------- */
+const PINDRAG = { from:null };
+canvas.addEventListener("mousedown", ev=>{
+  PINDRAG.from=null;
+  const pg=ev.target.closest && ev.target.closest(".port"); if(!pg || ev.button!==0) return;
+  if(state.tool!=="select" && state.tool!=="wire") return;
+  setTimeout(()=>{   // after the editor's own handler has started the wire
+    const pw=state.pendingWire; if(!pw||pw.onWire) return;
+    PINDRAG.from={cid:pw.cid, pid:pw.pid, x:ev.clientX, y:ev.clientY};
+  },0);
+}, true);
+function uxNameForPin(sch, c, p, dir){
+  const taken=new Set(sch.components.filter(x=>x.type==="IN"||x.type==="OUT").map(x=>(x.params&&x.params.name)||""));
+  const generic=/^(i\d*|o\d*|y|a|b|d\d*|q|qn|in\d*|out\d*)$/i.test(p.id) && !String(c.type).startsWith("SCH:") && !String(c.type).startsWith("CUSTOM:");
+  let base = generic ? null : sanId(p.label||p.id);
+  if(PROBE_SEQ[c.type] && p.id==="clk") base="clk";
+  if(!base){
+    if(dir==="IN"){ for(let i=0;i<26;i++){ const n=String.fromCharCode(97+i); if(!taken.has(n)) return n; } base="in"; }
+    else base="y";
+  }
+  if(!taken.has(base)) return base;
+  // taken (the same pin on another copy): prefix the block's label → mod10_2_q1, not q11
+  const pre=sanId(c.label||"");
+  let n=pre?`${pre}_${base}`:`${base}_2`, k=2; const root=n;
+  while(taken.has(n)) n=`${root}_${k++}`;
+  return n;
+}
+canvas.addEventListener("mouseup", ev=>{
+  const f=PINDRAG.from; PINDRAG.from=null;
+  if(!f || ev.button!==0) return;
+  const pw=state.pendingWire; if(!pw || pw.cid!==f.cid || pw.pid!==f.pid || (pw.pts&&pw.pts.length)) return;
+  if(Math.hypot(ev.clientX-f.x, ev.clientY-f.y)<28) return;             // a click, not a drag
+  if(ev.target.closest && ev.target.closest(".node,.port,.wire-group")) return;   // landed on something
+  const sch=activeSch(), c=comp(f.cid, sch); if(!c) return;
+  const p=getPort(c, f.pid); if(!p || (p.width||1)>1) return;
+  if(sch.wires.some(w=>(w.to.cid===c.id&&w.to.pid===p.id)||(w.from.cid===c.id&&w.from.pid===p.id))) return;   // only free pins
+  const dir=p.dir==="in"?"IN":"OUT";
+  const at=svgPoint(ev);
+  const nm=uxNameForPin(sch, c, p, dir);
+  const io={id:uid("c"), type:dir, x:0, y:0, params:{name:nm, width:1}, label:""};
+  const ip=getPorts(io)[0];
+  io.x=snap(at.x-ip.dx); io.y=snap(at.y-ip.dy);
+  uxNudgeFree(sch, io);
+  sch.components.push(io);
+  const w = dir==="IN" ? {id:uid("w"), from:{cid:io.id,pid:ip.id}, to:{cid:c.id,pid:p.id}, name:""}
+                       : {id:uid("w"), from:{cid:c.id,pid:p.id}, to:{cid:io.id,pid:ip.id}, name:""};
+  sch.wires.push(w);
+  state.pendingWire=null; state.selection=new Set([io.id]);
+  try{ healLayout(sch, scopeOf(sch,{wires:[w]})); }catch(_){}
+  snapshot(); render(); renderInspector(); uxStepperSoon();
+  toast(`สร้าง ${dir==="IN"?"INPUT":"OUTPUT"} '${nm}' ต่อกับขา ${p.id} แล้ว — ดับเบิลคลิกเพื่อเปลี่ยนชื่อ`,"ok",2600);
+  ev.stopPropagation();
+}, true);
+
+/* ---------- 5d. place N copies in a row, optionally chained ---------- */
+function arrayTypeOptions(){
+  const o=[];
+  Object.values(state.project.schematics).forEach(s=>{ if(s.id!==state.activeId) o.push({v:"SCH:"+s.id, t:"บล็อก: "+s.name}); });
+  Object.keys(state.project.customs||{}).forEach(n=>o.push({v:"CUSTOM:"+n, t:"คอมโพเนนต์: "+n}));
+  ["DFF","JKFF","TFF","SRFF","AND","OR","XOR","NOT","MUX"].forEach(t=>{ if(TYPES[t]) o.push({v:t, t:TYPES[t].label}); });
+  return o;
+}
+function uxTypePorts(type){
+  const probe={id:"_probe", type, x:0, y:0, params:{}};
+  if(TYPES[type]) probe.params=JSON.parse(JSON.stringify(TYPES[type].defaultParams||{}));
+  try{ return getPorts(probe); }catch(_){ return []; }
+}
+function openArrayPlace(preset){
+  const opts=arrayTypeOptions();
+  if(!opts.length){ toast("ยังไม่มีบล็อกให้วางซ้ำ","warn"); return; }
+  const sel=(preset&&preset.type)||(opts.find(o=>o.v.startsWith("SCH:"))||opts[0]).v;
+  const m=uxModal("▦ วางซ้ำเป็นชุด", `
+    <div class="row"><label>ชิ้นที่จะวาง</label><select id="arType">${opts.map(o=>`<option value="${escA(o.v)}" ${o.v===sel?"selected":""}>${esc(o.t)}</option>`).join("")}</select></div>
+    <div class="row"><label>จำนวน</label><input id="arN" type="number" min="2" max="16" value="${(preset&&preset.n)||4}"></div>
+    <div class="row"><label>เรียง</label><select id="arDir"><option value="h">แนวนอน (ซ้าย → ขวา)</option><option value="v">แนวตั้ง (บน → ล่าง)</option></select></div>
+    <div class="row"><label>ต่อเป็นทอด</label><span class="ar-chain"><select id="arFrom"></select> <span class="muted">ของตัวที่ k →</span> <select id="arTo"></select> <span class="muted">ของตัวที่ k+1</span></span></div>
+    <div class="row"><label>ขาที่ต่อร่วมกัน</label><div id="arShared" class="ar-shared"></div></div>
+    <div class="muted" style="font-size:11.5px;margin-left:140px">เช่น mod_10 × 4: ต่อทอดจาก carry/clk_out → clk ของหลักถัดไป · ขาที่ติ๊ก = สร้าง INPUT หนึ่งตัวต่อเข้าทุกชิ้น (เช่น rst)</div>`,
+    {width:600, foot:'<button class="btn" id="arNo">ยกเลิก</button><button class="btn btn-primary" id="arOk">วาง</button>'});
+  const $m=s=>m.querySelector(s);
+  function fill(){
+    const ports=uxTypePorts($m("#arType").value), outs=ports.filter(p=>p.dir==="out"), ins=ports.filter(p=>p.dir==="in");
+    const pickOut=outs.find(p=>/carry|co|tc|clk_?out|cout|rco|q\d*$|^q$/i.test(p.id)) , pickIn=ins.find(p=>/clk|clock|cin|en/i.test(p.id));
+    $m("#arFrom").innerHTML='<option value="">— ไม่ต่อ —</option>'+outs.map(p=>`<option ${pickOut===p?"selected":""}>${escA(p.id)}</option>`).join("");
+    $m("#arTo").innerHTML='<option value="">—</option>'+ins.map(p=>`<option ${pickIn===p?"selected":""}>${escA(p.id)}</option>`).join("");
+    $m("#arShared").innerHTML=ins.map(p=>`<label><input type="checkbox" value="${escA(p.id)}" ${/^(rst|reset|clr|en)$/i.test(p.id)?"checked":""}> ${esc(p.id)}</label>`).join("")||'<span class="muted">—</span>';
+  }
+  $m("#arType").onchange=fill; fill();
+  $m("#arNo").onclick=()=>m.close();
+  $m("#arOk").onclick=()=>{
+    const type=$m("#arType").value, n=Math.max(2,Math.min(16,+$m("#arN").value||4)), dir=$m("#arDir").value;
+    const chain=[$m("#arFrom").value,$m("#arTo").value], shared=[...m.querySelectorAll("#arShared input:checked")].map(x=>x.value);
+    m.close(); arrayPlace(type, n, dir, chain[0]&&chain[1]?chain:null, shared);
+  };
+}
+function arrayPlace(type, n, dir, chain, shared){
+  const sch=activeSch(); if(!sch) return;
+  const start=UX_MOUSE_IN?state.mouse:uxViewCenter();
+  const before=new Set(sch.wires.map(w=>w.id)), made=[];
+  let sz={w:80,h:60};
+  for(let k=0;k<n;k++){
+    const id=addComp(type, start.x, start.y); if(!id) return;
+    const c=comp(id, sch); if(k===0) sz=getSize(c);
+    const gapX=sz.w+264, gapY=sz.h+110;     // room between copies for I/O markers and labels
+    c.x=snap(start.x-(dir==="h"?((n-1)*gapX)/2:0)+(dir==="h"?k*gapX:0));
+    c.y=snap(start.y+(dir==="v"?k*gapY:0));
+    const base=String(type).startsWith("SCH:") ? (state.project.schematics[type.slice(4)]||{}).name : (TYPES[type]?TYPES[type].label:String(type).split(":").pop());
+    c.label=uniqueLabel(sch, sanId(base||"u")+"_"+(k+1), c);
+    made.push(c);
+  }
+  if(chain) for(let k=0;k<n-1;k++) sch.wires.push({id:uid("w"), from:{cid:made[k].id,pid:chain[0]}, to:{cid:made[k+1].id,pid:chain[1]}, name:""});
+  (shared||[]).forEach((pid,si)=>{
+    const p0=getPort(made[0],pid); if(!p0) return;
+    const taken=new Set(sch.components.filter(x=>x.type==="IN").map(x=>x.params.name));
+    let nm=sanId(pid), q=1; while(taken.has(nm)) nm=sanId(pid)+(q++);
+    const io={id:uid("c"), type:"IN", x:snap(made[0].x-160), y:snap(made[0].y+sz.h+44+si*44), params:{name:nm,width:1}, label:""};
+    sch.components.push(io);
+    made.forEach(c=>{ if(chain && pid===chain[1] && c!==made[0]) return;   // chained pin is taken by the cascade
+      sch.wires.push({id:uid("w"), from:{cid:io.id,pid:"o"}, to:{cid:c.id,pid}, name:""}); });
+  });
+  try{ normalizePortFanout(sch); }catch(_){}
+  const fresh=sch.wires.filter(w=>!before.has(w.id));
+  try{ healLayout(sch, scopeOf(sch,{wires:fresh})); }catch(_){}
+  state.selection=new Set(made.map(c=>c.id));
+  snapshot(); renderAll();
+  toast(`วาง ${n} ชิ้น${chain?` ต่อทอด ${chain[0]} → ${chain[1]}`:""}${shared&&shared.length?` · ขาร่วม: ${shared.join(", ")}`:""}`,"ok",3200);
+}
+
+/* ---------- 5a. Ctrl+K: search every command, Thai or English ---------- */
+const CMD_WORDS = {   // extra words people actually type
+  "auto-route":"จัดสาย จัดเส้น route auto wire", "relayout":"จัดสายใหม่", "export-vhdl":"ส่งออก vhdl export vhd โค้ด",
+  "export-all":"ส่งออก vhdl ทั้งหมด export all", "save-project":"บันทึก save เซฟ", "open-project":"เปิด open ไฟล์",
+  "new-project":"ใหม่ new project โปรเจกต์", "synth":"ตรวจ check synthesis error", "undo":"ย้อน undo", "redo":"ทำซ้ำ redo",
+  "probe":"ตรวจค่า probe 01 ค่า", "net-color":"สี color net", "topdown-open":"top-down ผังบล็อก block", "import-vhdl":"นำเข้า import vhdl",
+  "zoom-fit":"พอดีจอ fit zoom", "ai-chat":"ai แชต chat ผู้ช่วย", "history-open":"ประวัติ history ย้อนเวลา restore",
+  "clear-sch":"ล้าง clear", "welcome-open":"ต้อนรับ welcome เทมเพลต template แลป lab", "tour-start":"ทัวร์ tour สอน", "toggle-marks":"ปัญหา marker issue",
+  "explain-sim":"ทำไม why sim จำลอง ไม่ได้", "open-manual":"คู่มือ manual help ช่วย",
+};
+function cmdkCommands(){
+  const L=[], seen=new Set();
+  const add=(label, hint, run, words)=>{ const k=label+"|"+hint; if(seen.has(k)) return; seen.add(k); L.push({label, hint, run, hay:(label+" "+hint+" "+(words||"")).toLowerCase()}); };
+  document.querySelectorAll("#menu .dd button[data-act], .topbar > button[data-act], #canvasToolbar button[data-act]").forEach(b=>{
+    const act=b.dataset.act; if(act==="theme") return;
+    const kbd=b.querySelector(".kbd"); const label=(b.childNodes[0]&&b.childNodes[0].textContent||b.textContent).trim()||b.title;
+    const inBar=b.closest("#canvasToolbar"), shown=inBar ? ((b.title||"").split("—")[0].trim()||label) : label.replace(/…$/,"");
+    add(shown, kbd?kbd.textContent:(inBar?"แถบเครื่องมือ":"คำสั่ง"), ()=>b.click(), (CMD_WORDS[act]||"")+" "+act+" "+(b.title||""));
+  });
+  document.querySelectorAll("#canvasToolbar button[data-tool]").forEach(b=>add("เครื่องมือ: "+(b.title||b.dataset.tool).split("—")[0].trim(), "เครื่องมือ", ()=>setTool(b.dataset.tool), b.dataset.tool+" "+(b.title||"")));
+  [["draw","วาด"],["pins","เลือกขา pin mapping"],["sim","จำลอง sim simulate"],["upload","ลงบอร์ด upload xdc board"]].forEach(([s,w])=>add("ไปขั้น: "+w.split(" ")[0], "ขั้นตอน", ()=>setStage(s), w));
+  const keyOf={}; Object.entries(PLACE_KEYS).forEach(([code,[a,b]])=>{ keyOf[a]=code.slice(3); if(b) keyOf[b]="Shift+"+code.slice(3); });
+  Object.keys(TYPES).forEach(t=>{ const td=TYPES[t]; if(!td||["wire","custom","sch"].includes(td.category)) return;
+    add("วาง "+td.label, keyOf[t]||"ชิ้นส่วน", ()=>uxPlace(t), t+" "+td.category+" วาง place gate เกต"); });
+  Object.values(state.project.schematics).forEach(s=>{ if(s.id!==state.activeId) add("วางบล็อก "+s.name, "บล็อก", ()=>uxPlace("SCH:"+s.id), "block sub schematic"); });
+  GENERATORS.forEach(g=>add(g.name, "ตัวสร้างวงจร", g.run, g.desc+" generator สร้าง"));
+  LAB_TEMPLATES.forEach(T=>add("เทมเพลต "+T.lab+": "+T.title, "เทมเพลตแลป", ()=>startLabTemplate(T.id), "template lab "+T.desc));
+  EXAMPLES.forEach(e=>add("ตัวอย่าง: "+e.name, "ตัวอย่าง", e.run, "example "+e.desc));
+  add("วางซ้ำเป็นชุด…", "จัดวาง", ()=>openArrayPlace(), "array repeat ซ้ำ ชุด cascade ทอด mod");
+  add("ทำไมผลจำลองไม่เป็นอย่างที่คิด?", "ผู้ช่วย", ()=>openExplainSim(), CMD_WORDS["explain-sim"]);
+  add("คีย์ลัดทั้งหมด", "?", ()=>openShortcutHelp(), "shortcut keyboard คีย์");
+  Object.values(state.project.schematics).forEach(s=>add("เปิดแผ่น "+s.name, "แผ่น", ()=>openSchTab(s.id), "sheet tab open"));
+  return L;
+}
+function openCmdK(){
+  if(document.querySelector(".cmdk-bg")) return;
+  const cmds=cmdkCommands();
+  const bg=document.createElement("div"); bg.className="cmdk-bg";
+  bg.innerHTML='<div class="cmdk"><input class="cmdk-in" placeholder="พิมพ์คำสั่ง เช่น and, จัดสาย, ส่งออก vhdl, mod 10…" spellcheck="false"><div class="cmdk-list"></div><div class="cmdk-foot muted">↑↓ เลือก · Enter ทำ · Esc ปิด</div></div>';
+  document.body.appendChild(bg);
+  const inp=bg.querySelector(".cmdk-in"), list=bg.querySelector(".cmdk-list");
+  let hits=[], idx=0;
+  const close=()=>bg.remove();
+  function search(){
+    const q=inp.value.toLowerCase().trim(), toks=q.split(/\s+/).filter(Boolean);
+    hits=(toks.length?cmds.filter(c=>toks.every(t=>c.hay.includes(t))):cmds.slice())
+      .map(c=>({c, s:(c.label.toLowerCase().startsWith(q)?0:c.label.toLowerCase().includes(q)?1:2)+c.label.length/1000}))
+      .sort((a,b)=>a.s-b.s).slice(0,14).map(x=>x.c);
+    idx=0; draw();
+  }
+  function draw(){
+    list.innerHTML=hits.length?hits.map((c,i)=>`<div class="cmdk-i ${i===idx?"on":""}" data-i="${i}"><span>${esc(c.label)}</span><span class="cmdk-h">${esc(c.hint)}</span></div>`).join("")
+      :'<div class="muted" style="padding:12px">ไม่พบคำสั่ง</div>';
+    list.querySelectorAll(".cmdk-i").forEach(e=>{ e.onmousemove=()=>{ if(idx!==+e.dataset.i){ idx=+e.dataset.i; draw(); } }; e.onclick=()=>run(); });
+    const on=list.querySelector(".on"); if(on) on.scrollIntoView({block:"nearest"});
+  }
+  function run(){ const c=hits[idx]; close(); if(c) setTimeout(()=>{ try{ c.run(); }catch(e){ toast("ทำคำสั่งไม่ได้: "+e.message,"err"); } }, 0); }
+  inp.addEventListener("input", search);
+  inp.addEventListener("keydown", e=>{
+    if(e.key==="ArrowDown"){ idx=Math.min(hits.length-1, idx+1); draw(); e.preventDefault(); }
+    else if(e.key==="ArrowUp"){ idx=Math.max(0, idx-1); draw(); e.preventDefault(); }
+    else if(e.key==="Enter"){ run(); e.preventDefault(); }
+    else if(e.key==="Escape"){ close(); e.preventDefault(); }
+    e.stopPropagation();
+  });
+  bg.addEventListener("mousedown", e=>{ if(e.target===bg) close(); });
+  search(); inp.focus();
+}
+document.addEventListener("click", ev=>{
+  const a=ev.target.closest && ev.target.closest("[data-act]"); if(!a) return;
+  if(a.dataset.act==="cmdk") openCmdK();
+  else if(a.dataset.act==="array-place") openArrayPlace();
+  else if(a.dataset.act==="shortcuts") openShortcutHelp();
+});
+/* the toolbar tooltips still said N / I for the old tools */
+{
+  const nn=document.querySelector('#canvasToolbar [data-tool="netname"]'); if(nn) nn.title=nn.title.replace("(N)","(Shift+N)");
+  const io=document.querySelector('#canvasToolbar [data-tool="iomarker"]'); if(io) io.title=io.title.replace("(I)","(Shift+I)");
+  if(typeof TOOL_INFO==="object"){ Object.values(TOOL_INFO).forEach(t=>{ if(t&&typeof t.hint==="string") t.hint=t.hint.replace(/\(N\)/g,"(Shift+N)").replace(/\(I\)/g,"(Shift+I)"); }); }
+}
+
+/* move a new part off anything it would sit on: try small vertical steps, then to the side */
+function uxNudgeFree(sch, nc){
+  const G=typeof GRID==="number"?GRID:11, M=G;
+  const box=c=>{ const z=getSize(c); return {x0:c.x-M, y0:c.y-M, x1:c.x+z.w+M, y1:c.y+z.h+M}; };
+  // existing wire segments too — a marker dropped on a passing wire reads as connected to it
+  const segs=[]; (sch.wires||[]).forEach(w=>{ const a=comp(w.from.cid,sch), b=comp(w.to.cid,sch); if(!a||!b) return;
+    const pa=portPos(a,w.from.pid), pb=portPos(b,w.to.pid); if(!pa||!pb) return;
+    const pts=[pa,...(w.pts||[]),pb]; for(let i=1;i<pts.length;i++) segs.push([pts[i-1],pts[i]]); });
+  const segHit=a=>segs.some(([p,q])=>{ const x0=Math.min(p.x,q.x), x1=Math.max(p.x,q.x), y0=Math.min(p.y,q.y), y1=Math.max(p.y,q.y);
+    return x0<a.x1-M && x1>a.x0+M && y0<a.y1-M && y1>a.y0+M; });
+  const hit=()=>{ const a=box(nc); return segHit(a) || (sch.components||[]).some(o=>o!==nc && o.type!=="JUNCTION" && (()=>{ const b=box(o); return a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0; })()); };
+  if(!hit()) return;
+  const x0=nc.x, y0=nc.y;
+  // stay on the pin's row first (a straight wire), moving away from the part: OUT → right, IN → left
+  const away=nc.type==="IN"?-1:1;
+  for(let k=1;k<=3;k++){ nc.y=y0; nc.x=x0+away*k*3*G; if(!hit()) return; }   // a little only — never past the next part
+  for(let k=1;k<=12;k++){ for(const d of [k,-k]){ nc.x=x0; nc.y=y0+d*4*G; if(!hit()) return; } }
+  nc.x=x0; nc.y=y0;
+}
+
+/* =========================================================================
+   6. PIN PAGE FROM THE ENTITY PORTS (works for every sheet)
+   The old picker was built from the truth table, so a top sheet with flip-flops,
+   sub-blocks or bus ports (no truth table) showed nothing to pick. This one lists
+   every port of the sheet's VHDL entity — buses split into bits — and every pin the
+   board has, independent of whether the sheet can be simulated.
+   ========================================================================= */
+const PIN_IN_TARGETS  = [...Array.from({length:16},(_,i)=>"sw:"+i), ...Array.from({length:5},(_,i)=>"pb:"+i), "clk"];
+const PIN_OUT_TARGETS = [...Array.from({length:16},(_,i)=>"led:"+i), ..."abcdefg".split("").map(s=>"seg:"+s), "seg:dp",
+                         ...Array.from({length:4},(_,i)=>"an:"+i), "buzzer"];
+const PB_NAMES = ["บน","ล่าง","ซ้าย","ขวา","กลาง"];
+function pinOptLabel(t){
+  const pin=BOARD_PINS[t]||"?", [k,v]=t.split(":");
+  if(t==="clk") return `นาฬิกา 50 MHz · ${pin}`;
+  if(k==="sw") return `SW ${v} · ${pin}`;
+  if(k==="pb") return `ปุ่ม${PB_NAMES[+v]||v} · ${pin}`;
+  if(k==="led") return `LED ${v} · ${pin}`;
+  if(k==="seg") return `7-seg ${v==="dp"?"จุด (dp)":v} · ${pin}`;
+  if(k==="an") return `เลือกหลัก ${v} · ${pin}`;
+  if(t==="buzzer") return `Buzzer · ${pin}`;
+  return t;
+}
+/* every bit the entity exposes: {key, port, bit, dir, vhdl} · key = "a" or "d[3]" (what sch.pinmap stores) */
+function uxPortBits(sch){
+  sch=sch||activeSch(); if(!sch) return [];
+  const out=[];
+  // inputs first, then outputs, each in natural name order (q2 before q10) — easy to scan
+  schPortList(sch).slice().sort((a,b)=>(a.dir===b.dir?0:a.dir==="in"?-1:1)||natCmp(a.id,b.id)).forEach(p=>{
+    const w=p.width||1;
+    if(w===1) out.push({key:p.id, port:p.id, bit:null, dir:p.dir, vhdl:p.id, width:1});
+    else for(let i=w-1;i>=0;i--) out.push({key:`${p.id}[${i}]`, port:p.id, bit:i, dir:p.dir, vhdl:`${p.id}[${i}]`, width:w});
+  });
+  return out;
+}
+/* sensible first guess for one bit, given what's already taken */
+function uxGuessTarget(b, used){
+  const n=b.port.toLowerCase(), free=t=>!used.has(t)&&t;
+  let t=null;
+  if(b.dir==="in"){
+    if(/^(clk|clock|clk_?50m?|sys_?clk)$/.test(n)) t="clk";
+    else if(/^(rst|reset|btn|pb|key)/.test(n)){ for(let i=4;i>=0&&!t;i--) t=free("pb:"+i); }
+  } else {
+    let m;
+    // bus on the 7-seg: top bit = a (the board's own Seven_Segment[7]=A … [0]=DP convention)
+    if(/^(seg|seven|sseg|hex)/.test(n) && b.bit!=null){ const L=["a","b","c","d","e","f","g","dp"][b.width-1-b.bit]; t=(L&&b.width<=8)?free("seg:"+L):null; }
+    else if((m=n.match(/^seg_?([a-g]|dp)$/))||(m=n.match(/^([a-g]|dp)$/))) t=free("seg:"+m[1]);
+    else if(/^(an|dig|digit|com)/.test(n)){ if(b.bit!=null) t=free("an:"+b.bit); else { const d=n.match(/(\d)$/); t=free("an:"+(d?d[1]:"0")); } }
+    else if(/^(buz|beep)/.test(n)) t=free("buzzer");
+  }
+  if(!t){ const pool=b.dir==="in"?PIN_IN_TARGETS.filter(x=>x.startsWith("sw:")):PIN_OUT_TARGETS.filter(x=>x.startsWith("led:"));
+    // a bus lands on consecutive switches/LEDs with its bit 0 on the lowest free one
+    t=pool.find(x=>!used.has(x))||null; }
+  return t;
+}
+function uxAutoPins(sch, onlyMissing){
+  uxNormPinmap(sch);
+  const bits=uxPortBits(sch), keep=new Set(bits.map(b=>b.key));
+  const own={}; if(onlyMissing) Object.entries(sch.pinmap||{}).forEach(([k,v])=>{ if(keep.has(k)) own[k]=v; });   // ports that no longer exist free their pins
+  const used=new Set(Object.values(own));
+  // buses low bit first so d[0] gets SW0, d[1] SW1 …
+  bits.slice().sort((a,b)=>(a.port===b.port?(a.bit||0)-(b.bit||0):0)).forEach(b=>{
+    if(own[b.key]) return; const t=uxGuessTarget(b, used); if(t){ own[b.key]=t; used.add(t); } });
+  sch.pinmap=own;
+}
+/* keep the sim board (scalar ports on SW/LED/7-seg) in step with the sheet's map */
+function uxSyncSimPinmap(){
+  if(!SIM_PINMAP || !UX.lastTT) return;
+  const own=(activeSch()||{}).pinmap||{}, tt=UX.lastTT;
+  tt.inputs.forEach(n=>{ const t=pmGet(own,n); if(t&&t.startsWith("sw:")) SIM_PINMAP.inMap[n]=+t.slice(3); });
+  tt.outputs.forEach(n=>{ const t=pmGet(own,n); if(t&&(t.startsWith("led:")||/^seg:[a-g]$/.test(t)||t==="buzzer")) SIM_PINMAP.outMap[n]=t; });
+  if(SIM_REDRAW) try{ SIM_REDRAW(); }catch(_){}
+}
+function uxRenderPinPage(){
+  const host=$("#simPinPicker"), sch=activeSch(); if(!host||!sch) return;
+  uxNormPinmap(sch);
+  const bits=uxPortBits(sch), own=sch.pinmap||{};
+  const top=state.project.schematics[state.project.topId];
+  const count={}; bits.forEach(b=>{ const t=own[b.key]; if(t) count[t]=(count[t]||0)+1; });
+  const opt=(list,cur)=>'<option value="">— ไม่ต่อขา —</option>'+list.map(t=>`<option value="${t}" ${t===cur?"selected":""}>${esc(pinOptLabel(t))}${count[t]&&t!==cur?" (ใช้แล้ว)":""}</option>`).join("");
+  const busOpt=(dir,w)=>{   // one choice fills the whole bus with consecutive pins
+    const pool=dir==="in"?["sw"]:["led"], o=[];
+    pool.forEach(k=>{ for(let s=0;s+w<=16;s+=(w<=4?4:8)) o.push(`<option value="${k}:${s}">${k==="sw"?"SW":"LED"} ${s+w-1}…${s}</option>`); });
+    if(dir==="out"&&(w===7||w===8)){ o.push(`<option value="seg-a">7-seg a…g${w===8?",dp":""} (บิตบนสุด = a)</option>`); o.push(`<option value="seg-g">7-seg ${w===8?"dp,":""}g…a (บิต 0 = a)</option>`); }
+    if(dir==="out"&&w===4) o.push('<option value="an">เลือกหลัก 3…0</option>');
+    return '<option value="">ตั้งทั้งบัส…</option>'+o.join("");
+  };
+  let rows="", lastPort=null;
+  bits.forEach(b=>{
+    if(b.bit!=null && b.port!==lastPort){
+      rows+=`<tr class="pp-bus"><td colspan="2"><b>${esc(b.port)}</b> <span class="muted">${b.dir==="in"?"in":"out"} ${b.width} บิต</span></td><td><select data-bus="${escA(b.port)}" data-dir="${b.dir}" data-w="${b.width}">${busOpt(b.dir,b.width)}</select></td></tr>`;
+    }
+    lastPort=b.port;
+    const cur=own[b.key]||"", dup=cur&&count[cur]>1;
+    rows+=`<tr class="${cur?"":"ux-unconf"} ${dup?"pp-dup":""}" data-key="${escA(b.key)}"><td class="${b.bit!=null?"pp-bit":""}">${esc(b.bit!=null?`${b.port}(${b.bit})`:b.port)}</td>`
+      +`<td><span class="pp-dir ${b.dir}">${b.dir==="in"?"IN":"OUT"}</span></td>`
+      +`<td><select data-pk="${escA(b.key)}">${opt(b.dir==="in"?PIN_IN_TARGETS:PIN_OUT_TARGETS, cur)}</select>${dup?' <span class="pp-warn">ขาซ้ำ</span>':""}</td></tr>`;
+  });
+  const done=bits.filter(b=>own[b.key]).length, dups=Object.values(count).filter(n=>n>1).length;
+  host.innerHTML=`<div class="pinpage">
+    <div class="pp-head">
+      <div><b>เลือกขา — แผ่น “${esc(sch.name)}”</b> <span class="muted">${bits.length} ขา · เลือกแล้ว ${done}${dups?` · <span class="pp-warn">ขาซ้ำ ${dups}</span>`:""}</span></div>
+      <span style="flex:1"></span>
+      ${top&&top.id!==sch.id?`<button class="btn2" data-pp="top">ไปแผ่น top “${esc(top.name)}”</button>`:""}
+      <button class="btn2" data-pp="auto" title="เติมเฉพาะขาที่ยังไม่ได้เลือก">✨ จัดขาที่เหลืออัตโนมัติ</button>
+      <button class="btn2" data-pp="reset" title="ล้างแล้วจัดใหม่ทั้งหมด">↺ จัดใหม่ทั้งหมด</button>
+      <button class="btn2" data-pp="clear">ล้าง</button>
+    </div>
+    ${!bits.length?`<div class="sim-note">แผ่นนี้ยังไม่มี INPUT/OUTPUT — ขาของ entity มาจากบล็อก INPUT/OUTPUT บนแผ่น${top&&top.id!==sch.id?" หรือไปที่แผ่น top":""}</div>`:
+    `<div class="pp-wrap"><table class="pintbl pp-t"><tr><th>ขาใน VHDL</th><th>ทิศ</th><th>ขาบนบอร์ด</th></tr>${rows}</table></div>`}
+    <div class="muted" style="font-size:11.5px;margin-top:6px">บันทึกกับแผ่นนี้ทันที · ไฟล์ .xdc ตอน “ลงบอร์ด” ใช้ขาตามนี้ · บัสเลือกทีละบิตหรือใช้ “ตั้งทั้งบัส”</div>
+  </div>`;
+  const commit=()=>{ snapshot(); uxSyncSimPinmap(); uxRenderPinPage(); uxStepperSoon(); };
+  host.querySelectorAll("select[data-pk]").forEach(s=>s.onchange=()=>{
+    sch.pinmap=sch.pinmap||{}; if(s.value) sch.pinmap[s.dataset.pk]=s.value; else delete sch.pinmap[s.dataset.pk]; commit(); });
+  host.querySelectorAll("select[data-bus]").forEach(s=>s.onchange=()=>{
+    const port=s.dataset.bus, w=+s.dataset.w, v=s.value; if(!v) return;
+    sch.pinmap=sch.pinmap||{};
+    for(let i=0;i<w;i++){ let t;
+      if(v==="seg-a"||v==="seg-g"){ const L=["a","b","c","d","e","f","g","dp"]; t="seg:"+(v==="seg-a"?L[w-1-i]:L[i]); }
+      else if(v==="an") t="an:"+i;
+      else { const [k,s0]=v.split(":"); t=k+":"+(+s0+i); }
+      sch.pinmap[`${port}[${i}]`]=t; }
+    commit(); });
+  host.querySelectorAll("[data-pp]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.pp;
+    if(a==="top"){ openSchTab(top.id); renderAll(); runSim(); uxRenderPinPage(); return; }
+    if(a==="auto") uxAutoPins(sch, true);
+    else if(a==="reset") uxAutoPins(sch, false);
+    else if(a==="clear") sch.pinmap={};
+    commit();
+  });
+  if(UX.highlightPins){ const miss=UX.highlightPins; let first=null;
+    // the sim re-renders this page right after it opens — keep the highlight alive a moment
+    clearTimeout(UX._hlT); UX._hlT=setTimeout(()=>{ UX.highlightPins=null; }, 2500);
+    host.querySelectorAll("tr[data-key]").forEach(tr=>{ if(miss.includes(tr.dataset.key)){ tr.classList.add("ux-flash"); first=first||tr; } });
+    if(first) first.scrollIntoView({block:"center", behavior:"smooth"}); }
+}
+{
+  // the sim still calls renderPinPicker(tt) for combinational sheets — draw ours instead
+  renderPinPicker=function(tt){ UX.lastTT=tt; uxSyncSimPinmap(); uxRenderPinPage(); };
+  const _show=showSimPage;
+  showSimPage=function(tab){ const r=_show.apply(this, arguments);
+    if(tab==="board"||tab==="pins"){ const sch=activeSch();
+      const bits=sch?uxPortBits(sch):[];
+      if(bits.length && !bits.some(b=>pmGet(sch.pinmap||{},b.key))){ uxAutoPins(sch, true); snapshot(); }   // nothing mapped yet: a starting guess to edit
+      uxRenderPinPage(); }
+    return r; };
+}
+/* pins resolved per BIT, for the .xdc and the upload dialog */
+function uxPinTarget(b, sch){
+  const own=(sch||activeSch()||{}).pinmap||{};
+  return pmGet(own,b.key) || (b.bit==null ? autoSpecialTarget(b.port, b.dir) : null);
+}
+uxXdcBody=function(){
+  const sch=activeSch(); let x="", clk=false; const miss=[];
+  const bits=uxPortBits(sch);
+  ["in","out"].forEach(dir=>{
+    bits.filter(b=>b.dir===dir).forEach(b=>{ const t=uxPinTarget(b, sch), port=b.bit==null?b.port:`{${b.vhdl}}`;
+      if(!t){ miss.push(b.key); x+=`## ${b.key}: ยังไม่ได้เลือกขา (หน้า “เลือกขา”)\n`; return; }
+      x+=`set_property -dict {PACKAGE_PIN ${BOARD_PINS[t]||"?"} IOSTANDARD LVCMOS33} [get_ports ${port}]   ## ${pinTargetLabel(t)}\n`;
+      if(t==="clk" && !clk){ clk=true; x+=`create_clock -period 20.000 -name sys_clk [get_ports ${port}]\n`; } });
+    x+="\n"; });
+  UX.xdcMissing=miss;
+  return x;
+};
+uxUploadRows=function(){
+  const sch=activeSch();
+  return uxPortBits(sch).map(b=>{ const t=uxPinTarget(b, sch);
+    return `<tr><td style="text-align:left">${esc(b.bit==null?b.port:`${b.port}(${b.bit})`)}</td><td>${b.dir==="in"?"IN":"OUT"}</td><td style="text-align:left;${t?"":"color:var(--warn)"}">${t?esc(pinTargetLabel(t)):"ยังไม่ได้เลือก"}</td></tr>`; }).join("");
+};
+/* stepper counts bits too */
+sheetPorts=function(sch){ return uxPortBits(sch).map(b=>({name:b.key, dir:b.dir})); };
+{
+  const _dlg=openUploadDialog;
+  openUploadDialog=function(){ const r=_dlg.apply(this, arguments);
+    const miss=UX.xdcMissing||[], dlg=[...document.querySelectorAll(".modal-bg")].pop(), body=dlg&&dlg.querySelector(".modal-body");
+    if(body && miss.length){
+      body.insertAdjacentHTML("afterbegin", `<div class="ux-need">⚠ ยังไม่ได้เลือกขา ${miss.length} ขา (${esc(miss.slice(0,6).join(", "))}${miss.length>6?" …":""}) — ในไฟล์ .xdc จะเป็นคอมเมนต์ไว้ Vivado จะ error ตอน build <button class="btn2" type="button" data-pp-go>ไปเลือกขา</button></div>`);
+      const go=body.querySelector("[data-pp-go]"); if(go) go.onclick=()=>{ dlg.remove(); UX.highlightPins=miss; setStage("pins"); };
+    }
+    return r; };
+}
+
+/* pin maps are keyed by the VHDL port name (sanId: lower case). Older files and the first
+   lab templates used the name as typed ("P", "Walk") — read those too, and migrate on sight. */
+function pmGet(own, name){
+  if(!own||name==null) return undefined;
+  if(own[name]) return own[name];
+  const k=sanId(String(name).replace(/\[(\d+)\]$/,"")) + (String(name).match(/\[\d+\]$/)||[""])[0];
+  if(own[k]) return own[k];
+  const low=String(name).toLowerCase(); const hit=Object.keys(own).find(x=>x.toLowerCase()===low);
+  return hit?own[hit]:undefined;
+}
+function uxNormPinmap(sch){
+  const own=sch&&sch.pinmap; if(!own) return;
+  uxPortBits(sch).forEach(b=>{ if(own[b.key]) return; const v=pmGet(own,b.key); if(v){
+    Object.keys(own).forEach(x=>{ if(x!==b.key && x.toLowerCase()===b.key.toLowerCase()) delete own[x]; }); own[b.key]=v; } });
+}
+
+/* =========================================================================
+   7. TIDIER GENERATED DRAWINGS
+   ========================================================================= */
+/* Ports in the order they were declared. The placer orders the IN / OUT columns to
+   minimise crossings, which on a generated sheet scrambles them (b, cin, a · a, e, g, f …)
+   and reads badly. A sheet that carries sch.portOrder gets its IN and OUT columns put
+   back in that order (same slots, same column), then the router runs as usual. */
+{
+  // (the placer itself honours sch.portOrder — see autoPlaceSheet)
+  // every drawn intent remembers its declared port order
+  const _draw=drawIntent;
+  drawIntent=function(intent, opts){
+    const ord={in:[],out:[]};
+    (intent&&intent.components||[]).forEach(c=>{ if(c.type==="IN") ord.in.push(sanId(c.name||c.id)); else if(c.type==="OUT") ord.out.push(sanId(c.name||c.id)); });
+    const sort=intent&&intent._outNatural; if(sort) ord.out.sort(natCmp);
+    // stash on the intent so the sheet gets it before its first route
+    let A;
+    UX.pendingPortOrder=ord;
+    try{ A=_draw.apply(this, arguments); } finally { UX.pendingPortOrder=null; }
+    if(!A||!A.ok||(opts&&opts.noRoute)||ord.in.length+ord.out.length<3) return A;
+    const numbered=ord.out.length>1 && ord.out.every(n=>/^[a-z_]+\d+$/i.test(n)) && new Set(ord.out.map(n=>n.replace(/\d+$/,""))).size===1;
+    if(numbered) return A;   // q0..qN become a block's pins: keep them in order, no second try
+    // a pinned order can cost a lot on a dense sheet — draw it free as well, keep the ordered one
+    // unless it is clearly worse (longer wiring / taller / more crossings)
+    let B; try{ B=_draw.apply(this, arguments); }catch(_){ B=null; }
+    if(!B||!B.ok) return A;
+    const sa=uxLayoutScore(A.sch), sb=uxLayoutScore(B.sch);
+    const keepA = sa <= sb*1.12;   // q0..qN end up as a block's pins: order matters more there
+    const win=keepA?A:B, lose=keepA?B:A, name=A.sch.name;
+    delete state.project.schematics[lose.id];
+    win.sch.name=name; if(!keepA) delete win.sch.portOrder;
+    return win;
+  };
+  const _blank=blankSchematic;
+  blankSchematic=function(id, name){ const s=_blank.apply(this, arguments); if(UX.pendingPortOrder) s.portOrder=UX.pendingPortOrder; return s; };
+}
+function natCmp(a,b){ return String(a).localeCompare(String(b), undefined, {numeric:true}); }
+
+/* lower = tidier: Manhattan wire length + crossings between different nets + sheet height */
+function uxLayoutScore(sch){
+  const segs=[]; let len=0;
+  (sch.wires||[]).forEach(w=>{
+    const a=comp(w.from.cid,sch), b=comp(w.to.cid,sch); if(!a||!b) return;
+    const pa=portPos(a,w.from.pid)||{x:a.x+6,y:a.y+6}, pb=portPos(b,w.to.pid)||{x:b.x+6,y:b.y+6};
+    const pts=[pa, ...(w.pts||[]), pb];
+    for(let i=1;i<pts.length;i++){ const p=pts[i-1], q=pts[i]; len+=Math.abs(p.x-q.x)+Math.abs(p.y-q.y); segs.push({p,q,w}); }
+  });
+  let net={}; try{ (sch.wires||[]).forEach(w=>{ if(net[w.id]) return; const ids=netWires(sch,w); ids.forEach(id=>net[id]=w.id); }); }catch(_){}
+  let cross=0;
+  const H=segs.filter(s=>s.p.y===s.q.y&&s.p.x!==s.q.x), V=segs.filter(s=>s.p.x===s.q.x&&s.p.y!==s.q.y);
+  H.forEach(h=>{ const x0=Math.min(h.p.x,h.q.x), x1=Math.max(h.p.x,h.q.x);
+    V.forEach(v=>{ if(net[v.w.id]&&net[v.w.id]===net[h.w.id]) return; const y0=Math.min(v.p.y,v.q.y), y1=Math.max(v.p.y,v.q.y);
+      if(v.p.x>x0&&v.p.x<x1&&h.p.y>y0&&h.p.y<y1) cross++; }); });
+  const ys=(sch.components||[]).map(c=>c.y), hgt=ys.length?Math.max(...ys)-Math.min(...ys):0;
+  return len + cross*60 + hgt*2;
+}
+
+</script>
+<!-- UX-LAYER:END -->
 </body>
 </html>

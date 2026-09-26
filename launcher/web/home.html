@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FPGA Ecosystem</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#1b1f24; --muted:#5d6670; --line:#dde1e6;
+  --accent:#1a66d2; --accent-ink:#fff; --ok:#1f7a45; --warn:#9a6700; --bad:#b3261e;
+  --chip-ok:#e3f4ea; --chip-warn:#fff4d6; --chip-bad:#fde8e6; --hover:#eef2f7;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15181c; --panel:#1e2227; --ink:#e7eaee; --muted:#9aa4ae; --line:#2f353c;
+    --accent:#5b9cf5; --accent-ink:#0d1117; --ok:#5cc98a; --warn:#e3b341; --bad:#f08b83;
+    --chip-ok:#18342a; --chip-warn:#3a3014; --chip-bad:#3d1d1b; --hover:#262b31;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI","Noto Sans Thai",system-ui,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:17px;margin:0;font-weight:650}
+header .ver{color:var(--muted);font-size:12px}
+nav{margin-left:auto;display:flex;gap:4px}
+nav button{background:none;border:0;color:var(--muted);padding:7px 12px;border-radius:7px;font:inherit;cursor:pointer}
+nav button.on{background:var(--hover);color:var(--ink);font-weight:600}
+main{max-width:1040px;margin:0 auto;padding:20px}
+section{display:none} section.on{display:block}
+h2{font-size:15px;margin:22px 0 10px}
+.apps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.app{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.app:hover{border-color:var(--accent)}
+.app:disabled{opacity:.5;cursor:not-allowed}
+.app b{display:block;font-size:15px;margin-bottom:4px}
+.app span{color:var(--muted);font-size:13px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.bar .grow{flex:1}
+input[type=text],select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 10px;min-width:0}
+input[type=text]{width:100%}
+.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .name{font-weight:600}
+.row .meta{color:var(--muted);font-size:12px}
+.row .grow{flex:1;min-width:0}
+.empty{padding:22px;color:var(--muted);text-align:center}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+.card h3{margin:0 0 2px;font-size:14px;display:flex;align-items:center;gap:8px}
+.card p{margin:0 0 10px;color:var(--muted);font-size:13px}
+.field{display:grid;grid-template-columns:150px 1fr;gap:8px;align-items:center;margin-top:8px}
+.chip{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600}
+.chip.ok{background:var(--chip-ok);color:var(--ok)} .chip.warn{background:var(--chip-warn);color:var(--warn)} .chip.bad{background:var(--chip-bad);color:var(--bad)}
+.switch{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
+.switch input{width:16px;height:16px}
+.path{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:var(--muted);word-break:break-all}
+.upd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:14px}
+.upd[hidden]{display:none}
+.upd .grow{flex:1}
+.upd-body{flex-basis:100%;white-space:pre-wrap;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;max-height:220px;overflow:auto}
+#toast{position:fixed;right:16px;bottom:16px;padding:10px 14px;border-radius:8px;background:var(--ink);color:var(--bg);display:none;max-width:70vw}
+@media (max-width:640px){ .field{grid-template-columns:1fr} header{flex-wrap:wrap} nav{margin-left:0} }
+</style>
+</head>
+<body>
+<header>
+  <h1>FPGA Ecosystem</h1><span class="ver" id="ver"></span>
+  <nav>
+    <button data-tab="home" class="on">หน้าหลัก</button>
+    <button data-tab="settings">ตั้งค่า</button>
+  </nav>
+</header>
+<main>
+<div class="upd" id="updBanner" hidden>
+  <div class="upd-t"><b>มีเวอร์ชันใหม่ <span id="updVer"></span></b> <span class="muted" id="updCur"></span></div>
+  <span class="grow"></span>
+  <button class="btn" id="updNotes">มีอะไรใหม่</button>
+  <button class="btn" id="updSkip">ข้ามเวอร์ชันนี้</button>
+  <button class="btn primary" id="updGo">อัปเดตเลย</button>
+  <div class="upd-body" id="updBody" hidden></div>
+</div>
+<section id="tab-home" class="on">
+  <h2 style="margin-top:4px">เปิดโปรแกรม</h2>
+  <div class="apps">
+    <button class="app" data-open="studio"><b>Schematic Studio</b><span>วาดวงจรเกต · จำลอง · เลือกขา · สร้าง VHDL/XDC · AI ช่วยวาด</span></button>
+    <button class="app" data-open="topdown"><b>Top-Down</b><span>ผังบล็อกสำหรับทำรายงาน A4 / PDF / G-code</span></button>
+    <button class="app" id="appFpga"><b>FPGA Builder</b><span>VHDL → .bit → โหลดลงบอร์ด</span></button>
+  </div>
+
+  <h2>โปรเจกต์</h2>
+  <div class="bar" style="margin-bottom:10px">
+    <input type="text" id="newName" placeholder="ชื่อโปรเจกต์ใหม่ เช่น lab4_counter" style="max-width:320px">
+    <button class="btn primary" id="btnNew">สร้าง</button>
+    <span class="grow"></span>
+    <button class="btn" id="btnReveal">เปิดโฟลเดอร์โปรเจกต์</button>
+  </div>
+  <div class="path" id="projDir" style="margin-bottom:8px"></div>
+  <div class="list" id="projects"><div class="empty">กำลังโหลด…</div></div>
+</section>
+
+<section id="tab-settings">
+  <h2 style="margin-top:4px">ฟีเจอร์</h2>
+
+  <div class="card">
+    <h3>AI ช่วยวาดวงจร <span id="st-ai"></span>
+      <label class="switch"><input type="checkbox" data-f="ai"> เปิด</label></h3>
+    <p>แชตในตัววาดวงจร: พิมพ์สมการ / ตารางความจริง / ชื่อวงจร แล้ววาดให้ ใช้ได้ทันทีโดยไม่ต้องมีโมเดล</p>
+    <div class="field"><label>โมเดลภาษา (LLM)</label>
+      <select data-f="llm">
+        <option value="off">ไม่ใช้ (สมการ/ตาราง/วงจรมาตรฐานเท่านั้น)</option>
+        <option value="endpoint">ต่อเซิร์ฟเวอร์ที่มีอยู่ (OpenAI-compatible URL)</option>
+        <option value="local">รันโมเดลในเครื่อง (llama.cpp)</option>
+      </select></div>
+    <div class="field llm-endpoint llm-local"><label>Endpoint</label><input type="text" data-f="llm_endpoint"></div>
+    <div class="field llm-local"><label>llama-server</label><input type="text" data-f="llama_server" placeholder="เว้นว่าง = หาอัตโนมัติ"></div>
+    <div class="field llm-local"><label>ไฟล์โมเดล .gguf</label><input type="text" data-f="llama_model" placeholder="เว้นว่าง = หาอัตโนมัติ"></div>
+    <div class="field llm-local"><label>อาร์กิวเมนต์</label><input type="text" data-f="llama_args"></div>
+    <div class="field"><label>สถานะ LLM</label><span id="st-llm"></span></div>
+  </div>
+
+  <div class="card">
+    <h3>จำลองวงจร (backend) <span id="st-sim"></span>
+      <label class="switch"><input type="checkbox" data-f="sim"> เปิด</label></h3>
+    <p>จำลอง netlist ฝั่ง Python (ตารางความจริง / ลำดับ clock) ตัววาดวงจรมีตัวจำลองในตัวอยู่แล้ว ส่วนนี้ใช้ตรวจซ้ำ</p>
+  </div>
+
+  <div class="card">
+    <h3>Co-simulation ด้วย GHDL <span id="st-ghdl"></span>
+      <label class="switch"><input type="checkbox" data-f="cosim"> เปิด</label></h3>
+    <p>ตรวจว่า VHDL ที่สร้างทำงานตรงกับวงจรจริง ต้องมี GHDL</p>
+    <div class="field"><label>ghdl</label><input type="text" data-f="ghdl" placeholder="เว้นว่าง = หาอัตโนมัติ"></div>
+  </div>
+
+  <div class="card">
+    <h3>สร้าง .bit และลงบอร์ด <span id="st-viv"></span>
+      <label class="switch"><input type="checkbox" data-f="fpga"> เปิด</label></h3>
+    <p>ใช้ FPGA Builder ต้องติดตั้ง Vivado (ML Standard ฟรี รองรับ Spartan-7 XC7S15) แยกเอง</p>
+    <div class="field"><label>vivado.bat</label><input type="text" data-f="vivado" placeholder="เว้นว่าง = หาอัตโนมัติ"></div>
+  </div>
+
+  <h2>อัปเดตโปรแกรม</h2>
+  <div class="card">
+    <h3>เวอร์ชัน <span id="verNow"></span> <span id="st-upd"></span>
+      <label class="switch"><input type="checkbox" id="updAuto"> ตรวจอัปเดตเองตอนเปิดโปรแกรม</label></h3>
+    <p>ดึงเวอร์ชันใหม่จาก GitHub Releases — โปรเจกต์และการตั้งค่าไม่หายเมื่ออัปเดต</p>
+    <div class="bar"><button class="btn" id="updNow">ตรวจตอนนี้</button><span class="muted" id="updMsg"></span></div>
+  </div>
+
+  <h2>ที่เก็บไฟล์</h2>
+  <div class="card">
+    <div class="field" style="margin-top:0"><label>โฟลเดอร์ workspace</label><input type="text" id="workspace"></div>
+    <div class="field"><label></label><label class="switch" style="margin-left:0">
+      <input type="checkbox" id="saveWs"> บันทึก/ส่งออกไฟล์จากตัววาดลงโฟลเดอร์โปรเจกต์อัตโนมัติ</label></div>
+    <div class="field"><label>ไฟล์ตั้งค่า</label><span class="path" id="cfgFile"></span></div>
+  </div>
+
+  <div class="bar" style="margin-top:14px">
+    <button class="btn primary" id="btnSave">บันทึกและรีสตาร์ท</button>
+    <span class="grow"></span>
+    <button class="btn" id="btnQuit">ปิดโปรแกรม</button>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const api = (p, body) => fetch(p, body === undefined ? {cache:"no-store"} :
+  {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}).then(r => r.json());
+let CFG = null, ST = null;
+
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = "none", 3000); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function chip(kind, txt){ return `<span class="chip ${kind}">${esc(txt)}</span>`; }
+
+$$("nav button").forEach(b => b.onclick = () => {
+  $$("nav button").forEach(x => x.classList.toggle("on", x === b));
+  $$("section").forEach(s => s.classList.toggle("on", s.id === "tab-" + b.dataset.tab));
+});
+
+$$("[data-open]").forEach(b => b.onclick = () => api("/api/open", {page: b.dataset.open}));
+$("#appFpga").onclick = () => api("/api/fpga_builder", {}).then(j => { if(!j.ok) toast(j.error); });
+$("#btnReveal").onclick = () => api("/api/reveal", {});
+$("#btnNew").onclick = async () => {
+  const name = $("#newName").value.trim(); if(!name) return $("#newName").focus();
+  const j = await api("/api/projects/new", {name});
+  if(!j.ok) return toast(j.error);
+  $("#newName").value = ""; await loadProjects();
+  toast("สร้างโปรเจกต์ " + j.name + " แล้ว — เปิด Schematic Studio แล้วตั้งชื่อโปรเจกต์เป็นชื่อเดียวกัน");
+};
+
+function ago(t){
+  const s = (Date.now()/1000 - t);
+  if(s < 60) return "เมื่อสักครู่"; if(s < 3600) return Math.floor(s/60) + " นาทีที่แล้ว";
+  if(s < 86400) return Math.floor(s/3600) + " ชั่วโมงที่แล้ว";
+  return new Date(t*1000).toLocaleDateString("th-TH");
+}
+async function loadProjects(){
+  const j = await api("/api/projects");
+  $("#projDir").textContent = j.dir;
+  const el = $("#projects");
+  if(!j.projects.length){ el.innerHTML = `<div class="empty">ยังไม่มีโปรเจกต์ — กด “บันทึก” ใน Schematic Studio แล้วไฟล์จะมาอยู่ที่นี่</div>`; return; }
+  el.innerHTML = j.projects.map((p, i) => `
+    <div class="row">
+      <div class="grow"><div class="name">${esc(p.name)}</div>
+        <div class="meta">${ago(p.mtime)} · ${p.files.length} ไฟล์${p.files.length ? " · " + esc(p.files.slice(0,4).map(f=>f.name).join(", ")) : ""}</div></div>
+      ${p.main ? `<button class="btn primary" data-i="${i}" data-act="open">เปิด</button>` : ""}
+      <button class="btn" data-i="${i}" data-act="reveal">โฟลเดอร์</button>
+    </div>`).join("");
+  el.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const p = j.projects[+b.dataset.i];
+    if(b.dataset.act === "open") api("/api/open_project", {path: p.main});
+    else api("/api/reveal", {path: p.name});
+  });
+}
+
+function fillSettings(){
+  $$("[data-f]").forEach(el => {
+    const v = CFG.features[el.dataset.f];
+    if(el.type === "checkbox") el.checked = !!v; else el.value = v ?? "";
+  });
+  $("#workspace").value = CFG.workspace;
+  $("#saveWs").checked = CFG.save_to_workspace;
+  showLlmFields();
+}
+function showLlmFields(){
+  const m = $('[data-f="llm"]').value;
+  $$(".llm-endpoint,.llm-local").forEach(el => el.style.display = el.classList.contains("llm-" + m) ? "" : "none");
+}
+$('[data-f="llm"]').onchange = showLlmFields;
+
+function fillStatus(){
+  $("#ver").textContent = "v" + ST.version;
+  $("#cfgFile").textContent = ST.config_file;
+  const f = ST.features;
+  $("#st-ai").innerHTML = !f.ai ? chip("warn","ปิด") : ST.backend ? chip("ok","พร้อม") : chip("bad","backend เสีย");
+  $("#st-sim").innerHTML = !f.sim ? chip("warn","ปิด") : ST.backend ? chip("ok","พร้อม") : chip("bad","backend เสีย");
+  $("#st-llm").innerHTML = f.llm === "off" ? chip("warn","ไม่ใช้") :
+    ST.llm_up ? chip("ok","เชื่อมต่อแล้ว") + ` <span class="path">${esc(ST.llm_endpoint)}</span>` :
+    chip("bad","ยังไม่ตอบ") + (f.llm === "local" && !(ST.llama_server && ST.llama_model) ? " ไม่พบ llama-server หรือไฟล์ .gguf" : "");
+  $("#st-ghdl").innerHTML = ST.ghdl ? chip("ok","พบ GHDL") : chip("warn","ไม่พบ GHDL");
+  $("#st-viv").innerHTML = !f.fpga ? chip("warn","ปิด") : ST.vivado ? chip("ok","พบ Vivado") : chip("warn","ไม่พบ Vivado");
+  $("#appFpga").disabled = !f.fpga || !ST.fpga_builder;
+  if(ST.backend_error) toast("backend: " + ST.backend_error);
+}
+
+$("#btnSave").onclick = async () => {
+  const features = {};
+  $$("[data-f]").forEach(el => features[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value.trim());
+  await api("/api/config", {features, workspace: $("#workspace").value.trim(), save_to_workspace: $("#saveWs").checked,
+    update: {auto_check: $("#updAuto").checked}});
+  await api("/api/restart", {});
+  toast("กำลังรีสตาร์ท…");
+  const t0 = Date.now();
+  const wait = async () => {
+    try { await new Promise(r => setTimeout(r, 900)); ST = await api("/api/status"); CFG = await api("/api/config");
+      fillSettings(); fillStatus(); loadProjects(); toast("บันทึกแล้ว"); }
+    catch(_){ if(Date.now() - t0 < 15000) wait(); else toast("รีสตาร์ทไม่สำเร็จ — ปิดแล้วเปิดโปรแกรมใหม่"); }
+  };
+  wait();
+};
+$("#btnQuit").onclick = async () => { await api("/api/quit", {}); document.body.innerHTML = "<main><p>ปิดโปรแกรมแล้ว ปิดหน้าต่างนี้ได้เลย</p></main>"; };
+
+setInterval(() => fetch("/api/ping", {cache:"no-store"}).catch(()=>{}), 15000);
+window.addEventListener("focus", () => loadProjects().catch(()=>{}));
+(async () => {
+  fetch("/api/ping").catch(()=>{});
+  [CFG, ST] = await Promise.all([api("/api/config"), api("/api/status")]);
+  fillSettings(); fillStatus(); loadProjects();
+  checkUpdate(false);
+})();
+
+/* ---- updates ---- */
+let UPD=null;
+async function checkUpdate(force){
+  $("#verNow").textContent="v"+(ST?ST.version:"");
+  $("#updAuto").checked=!CFG.update || CFG.update.auto_check!==false;
+  if(force) $("#updMsg").textContent="กำลังตรวจ…";
+  try{ UPD=await api("/api/update/check"+(force?"?force=1":"")); }catch(_){ UPD={ok:false,error:"เช็กไม่ได้"}; }
+  const st=$("#st-upd");
+  if(UPD.disabled){ st.innerHTML=chip("warn","ปิดการตรวจอัตโนมัติ"); $("#updMsg").textContent=""; }
+  else if(!UPD.ok){ st.innerHTML=chip("warn","ตรวจไม่ได้"); $("#updMsg").textContent=UPD.error||""; }
+  else if(UPD.available){ st.innerHTML=chip("ok","มี v"+UPD.latest); $("#updMsg").textContent=""; }
+  else { st.innerHTML=chip("ok","ล่าสุดแล้ว"); $("#updMsg").textContent=force?"ใช้เวอร์ชันล่าสุดอยู่แล้ว":""; }
+  const show=UPD.ok && UPD.available && (force || !UPD.skipped);
+  $("#updBanner").hidden=!show;
+  if(show){ $("#updVer").textContent="v"+UPD.latest; $("#updCur").textContent="(ตอนนี้ v"+UPD.current+")";
+    $("#updBody").textContent=UPD.notes||"—";
+    $("#updGo").textContent=UPD.can_install?"อัปเดตเลย":"ไปหน้าดาวน์โหลด"; }
+}
+$("#updNow").onclick=()=>checkUpdate(true);
+$("#updNotes").onclick=()=>{ $("#updBody").hidden=!$("#updBody").hidden; };
+$("#updSkip").onclick=async()=>{ await api("/api/update/skip",{version:UPD.latest}); $("#updBanner").hidden=true; toast("ข้าม v"+UPD.latest+" — ตรวจเองได้ที่หน้าตั้งค่า"); };
+$("#updGo").onclick=async()=>{
+  const r=await api("/api/update/install",{});
+  if(r.manual){ window.open(r.url,"_blank"); return; }
+  if(!r.ok){ toast(r.error||"อัปเดตไม่ได้"); return; }
+  const b=$("#updGo"); b.disabled=true;
+  const poll=async()=>{ let p; try{ p=await api("/api/update/progress"); }catch(_){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; return; }
+    if(p.phase==="downloading"){ b.textContent="ดาวน์โหลด "+(p.total?Math.round(p.done*100/p.total)+"%":Math.round(p.done/1e6)+" MB"); setTimeout(poll,500); }
+    else if(p.phase==="installing"){ b.textContent="กำลังติดตั้ง… โปรแกรมจะเปิดใหม่เอง"; }
+    else if(p.phase==="error"){ b.disabled=false; b.textContent="อัปเดตเลย"; toast(p.error); }
+    else setTimeout(poll,500); };
+  poll();
+};
+</script>
+</body>
+</html>

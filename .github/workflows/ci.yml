@@ -1,0 +1,45 @@
+name: CI
+
+# Every push / PR: the editor html must match its sources, the backend must import,
+# and the browser tests (editor + launcher) must pass.
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Editor html is built from editor/ux
+        run: python editor/build.py --check
+
+      - name: Python compiles
+        run: python -m compileall -q launcher ai hub
+
+      - name: Python unit tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Install test deps
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/

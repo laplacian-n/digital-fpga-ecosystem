@@ -15,9 +15,14 @@
 | `designs_gate/` | ชุดวงจรตัวอย่าง/golden (`*.schproj.json`) |
 | `_ecosystem_docs/` | เอกสารสถาปัตยกรรม, data model, router, board pinout |
 | `schematic_mcp.py`, `mcp_config.reference.json` | MCP server ของตัววาดเกต + ตัวอย่าง config |
+| `launcher/` | **โปรแกรมรวม**: เปิดตัวเดียว ได้ทั้งตัววาด, Top-Down, backend AI/sim, FPGA Builder, หน้าตั้งค่า และที่เก็บโปรเจกต์ พร้อมสคริปต์ build ตัวติดตั้ง Windows |
 | `sketch-handoff/` | ไฟล์ส่งต่องานออกแบบ UI |
 
 ## เริ่มใช้งาน
+
+**สำหรับผู้ใช้ทั่วไป** ให้โหลด `FPGAEcosystem-Setup-x.y.z.exe` จากหน้า Releases แล้วติดตั้ง (ไม่ต้องใช้สิทธิ์ admin และไม่ต้องลง Python) หรือจะโหลด zip แบบ portable มาแตกไฟล์ก็ได้ จากนั้นเปิด **FPGA Ecosystem** ใช้งานได้เลย มีหน้าตั้งค่าให้เลือกฟีเจอร์ (AI / sim / FPGA build) และเก็บโปรเจกต์ไว้ที่ `Documents\FPGA Ecosystem\Projects` ดูรายละเอียดที่ [`launcher/README.md`](launcher/README.md)
+
+**สำหรับนักพัฒนา** รัน `python launcher/app.py` จะได้โปรแกรมเดียวกัน หรือใช้แต่ละส่วนแยกกันแบบเดิมตามนี้
 
 1. เปิด `schematic&bus2vhdl.html` ใน Chrome/Edge — ใช้งานได้ทันที (ไม่ต้องติดตั้ง)
 2. (ถ้าจะใช้ AI / backend sim) `python ai/chat_server.py` แล้วตั้ง endpoint ใน AI chat ด้วย `/endpoint http://127.0.0.1:8770`
