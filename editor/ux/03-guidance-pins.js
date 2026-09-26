@@ -114,7 +114,7 @@ const LAB_TEMPLATES = [
    ins:[["A","sw:2"],["B","sw:1"],["Cin","sw:0"]], outs:[["S","led:0"],["Cout","led:1"]]},
   {id:"cnt8", lab:"แลป 5", title:"ตัวนับ 0–7 (flip-flop)", desc:"clk → Q2 Q1 Q0 บน LED",
    ins:[["clk","clk"]], outs:[["Q2","led:2"],["Q1","led:1"],["Q0","led:0"]],
-   note:"clk บนบอร์ดคือ 50 MHz — ต้องมีวงจรหารความถี่ก่อน (ใช้ “ตัวนับ mod-N” ในแท็บ Components ต่อกันเป็นทอด)"},
+   note:"clk บนบอร์ดคือ 50 MHz — ต้องมีวงจรหารความถี่ก่อน (ใช้ “ตัวนับ mod-N” ในเมนู Tools ต่อกันเป็นทอด)"},
 ];
 function buildTemplateSheet(sch, T){
   const G=typeof GRID==="number"?GRID:11, sn=v=>Math.round(v/G)*G;
@@ -259,7 +259,7 @@ document.addEventListener("click", ev=>{
 /* ---------- 3e. five-stop tour ---------- */
 const TOUR = [
   {sel:'[data-ltab="palette"]', pre:()=>{ const t=$('[data-ltab="palette"]'); if(t) t.click(); }, title:"1 · วางเกต",
-   text:"แท็บ Components มีเกต ขา I/O และตัวสร้างวงจรสำเร็จรูป — คลิกหรือลากลงแผ่น (หรือกด A = AND, O = OR, N = NOT, I = INPUT, Q = OUTPUT)"},
+   text:"แท็บ Components มีเกตและขา I/O (ตัวสร้างวงจรสำเร็จรูปอยู่ในเมนู Tools) — คลิกหรือลากลงแผ่น (หรือกด A = AND, O = OR, N = NOT, I = INPUT, Q = OUTPUT)"},
   {sel:'[data-tool="wire"]', title:"2 · ต่อสาย", text:"เลือกเครื่องมือสาย (W) แล้วคลิกขาหนึ่งไปอีกขา · ลากออกจากขาที่ยังว่างแล้วปล่อยในที่โล่ง จะได้ INPUT/OUTPUT ชื่อเดียวกับขาทันที"},
   {sel:'.step[data-stage="sim"]', title:"3 · จำลอง", text:"ดูตารางความจริง สลับสวิตช์บนบอร์ดจำลอง และดูไทม์มิ่งของวงจรที่มี clock — ไม่ต้องติดตั้งอะไรเพิ่ม"},
   {sel:'.step[data-stage="pins"]', title:"4 · เลือกขา", text:"ผูกแต่ละ INPUT/OUTPUT กับสวิตช์ LED หรือ 7-segment บนบอร์ด · ตัวเลขบนปุ่มบอกว่าเลือกครบกี่ขาแล้ว"},

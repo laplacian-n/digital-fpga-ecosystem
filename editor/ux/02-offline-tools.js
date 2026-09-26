@@ -62,7 +62,7 @@ function uxBackendHelpHtml(what, why){
       <li>หรือเปิด Terminal ที่โฟลเดอร์โปรเจกต์ แล้วรัน
         <span class="ux-cmd"><code>${BACKEND_CMD}</code><button type="button" class="ux-copy" data-copy="${escA(BACKEND_CMD)}">คัดลอก</button></span></li>
     </ol>
-    <div class="ux-need-ok">ใช้ได้โดยไม่ต้องมี backend: จำลองวงจร (หน้า "จำลอง"), ตารางความจริง / K-map และตัวสร้างวงจรในแท็บ Components</div>
+    <div class="ux-need-ok">ใช้ได้โดยไม่ต้องมี backend: จำลองวงจร (หน้า "จำลอง"), ตารางความจริง / K-map และตัวสร้างวงจรในเมนู Tools</div>
   </div>`;
 }
 document.addEventListener("click", ev=>{

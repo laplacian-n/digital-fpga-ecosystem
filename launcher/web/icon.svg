@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- FPGA Ecosystem: a chip carrying a logic gate. Source of icon.ico / icon-*.png (see launcher/README.md). -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f7cf6"/>
+      <stop offset="1" stop-color="#6b4ff0"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#g)"/>
+  <g stroke="#fff" stroke-width="3.2" stroke-linecap="round">
+    <path d="M24 11v5M32 11v5M40 11v5M24 48v5M32 48v5M40 48v5M11 24h5M11 32h5M11 40h5M48 24h5M48 32h5M48 40h5"/>
+  </g>
+  <rect x="16" y="16" width="32" height="32" rx="5" fill="#fff"/>
+  <path d="M23 25h7a7 7 0 0 1 0 14h-7z" fill="none" stroke="#3b5fe0" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M37 32h4M19 28.5h4M19 35.5h4" stroke="#3b5fe0" stroke-width="3" stroke-linecap="round"/>
+</svg>
