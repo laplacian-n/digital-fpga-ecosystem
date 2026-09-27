@@ -63,3 +63,15 @@ def live_sheet(name: str | None) -> str | None:
     if res is None:
         return None
     return json.dumps(res, ensure_ascii=False, indent=1)
+
+
+SAVE_REFUSED = ("NOT SAVED. The FPGA Ecosystem app is running with the user's circuit open, and saving a file here "
+                "then syncing it would REPLACE their sheet — including the placement and wiring they arranged by hand. "
+                "Edit the open sheet live instead with the 'fpga-ecosystem' MCP server (add_component / connect / "
+                "disconnect / update_component / apply): the user watches every change appear. If that server is not "
+                "connected, ask the user to set it up: FPGA Ecosystem ▸ Home ▸ Claude / MCP ▸ 'ติดตั้งให้ Claude Desktop', "
+                "then restart Claude Desktop.")
+
+
+def running() -> bool:
+    return _app() is not None

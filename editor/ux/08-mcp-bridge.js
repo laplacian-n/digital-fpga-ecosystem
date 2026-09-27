@@ -157,7 +157,9 @@ MCP_OPS.status = ()=>({
 MCP_OPS.list_component_types = ()=>Object.entries(TYPES).filter(([,t])=>!["wire","custom","sch"].includes(t.category)).map(([k,t])=>{
   const p=JSON.parse(JSON.stringify(t.defaultParams||{}));
   let pins=[]; try{ pins=t.ports(p).map(q=>q.id+"("+q.dir+((q.width||1)>1?","+q.width+"b":"")+")"); }catch(_){}
-  return {type:k, label:t.label, category:t.category, params:p, param_help:(t.paramSchema||[]).map(s=>s.key+": "+s.label), pins};
+  // every setting with its allowed values, so Claude knows e.g. that a MUX has a bit width
+  const help=(t.paramSchema||[]).map(s=>s.key+": "+s.label+(s.options?" (one of "+s.options.join("/")+")":s.type==="int"?" ("+(s.min!=null?s.min:"")+".."+(s.max!=null?s.max:"")+")":""));
+  return {type:k, label:t.label, category:t.category, params:p, param_help:help, pins};
 });
 MCP_OPS.get_sheet = a=>mcpSheetInfo(mcpSheet(a.sheet), a.detail||"full");
 MCP_OPS.get_netlist = a=>{ const s=mcpSheet(a.sheet); return {sheet:s.name, nets:mcpNets(s)}; };
@@ -351,13 +353,30 @@ MCP_OPS.verify_truth_table = a=>{
   });
   return {sheet:sim.sheet, pass:!mism.length, checked_outputs:Object.keys(exp), mismatches:mism.slice(0,64), inputs:sim.inputs};
 };
+/* an input value for probe: a bus takes its whole value — 5 (a number), "0101" (a string of
+   0/1 is binary), "0b0101", "0x5" or "9"; a 1-bit input is 0/1. (Every value used to be squashed to 0/1,
+   so a=0101 on a 4-bit bus probed as a=1.) */
+function mcpProbeVal(c, v){
+  const w=probeWidth(c,"o"), m=probeMask(w);
+  if(w<=1) return (+v || v===true || /^(1|true|high|h)$/i.test(String(v))) ? 1 : 0;
+  if(typeof v==="number") return (v>>>0)&m;
+  const t=String(v).trim().replace(/_/g,"");
+  let n;
+  if(/^0b[01]+$/i.test(t)) n=parseInt(t.slice(2),2);
+  else if(/^0x[0-9a-f]+$/i.test(t)) n=parseInt(t.slice(2),16);
+  else if(/^[01]{2,}$/.test(t)) n=parseInt(t,2);            // "0101" is binary — how the lab writes values
+  else if(/^\d+$/.test(t)) n=parseInt(t,10);
+  else mcpFail(`value '${v}' for bus INPUT '${c.params.name}' (${w} bits) — use a number (5), binary as wide as the bus ("${"0".repeat(w-1)}1"), "0b…" or "0x…"`);
+  return (n>>>0)&m;
+}
 MCP_OPS.probe = a=>{
   const sch=mcpSheet(a.sheet), fs=flattenSchematic(sch).sch, saved=Object.assign({},PROBE_VALS);
   try{
     Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]);
-    Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=+v?1:0; });
+    Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=mcpProbeVal(c, v); });
     const m=probeModel(fs, probeStruct(fs));
-    const outs={}; sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"); outs[c.params.name]=v==null?"undriven":v; });
+    const outs={}; sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"), w=probeWidth(c,"i");
+      outs[c.params.name]=v==null?"undriven":(w>1?{value:v, bin:v.toString(2).padStart(w,"0")}:v); });
     const nets=mcpNets(sch).map(n=>{ if(!n.driver) return Object.assign({value:"undriven"},n);
       const [cn,pid]=[n.driver.slice(0,n.driver.lastIndexOf(".")), n.driver.slice(n.driver.lastIndexOf(".")+1)];
       const c=findCompRef(sch,cn); let v=null; try{ v=c?m.outVal(c.id,pid,new Set()):null; }catch(_){}
@@ -607,7 +626,45 @@ MCP_OPS.make_topdown = a=>{
 function mcpSheetState(){
   const sch=activeSch(); if(!sch) return null;
   const m=new Map(); sch.components.forEach(c=>{ if(c.type!=="JUNCTION") m.set(c.id, c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{})); });
-  return {id:sch.id, m, w:new Set(sch.wires.map(w=>w.id))};
+  return {id:sch.id, m, c:new Set(sch.components.map(c=>c.id)), w:new Set(sch.wires.map(w=>w.id)),
+          sheets:new Set(Object.keys(state.project.schematics||{}))};
+}
+/* "ค่อยๆโผล่มา": a call that adds many things at once (apply, build_circuit, a generator) is
+   committed in one go, but drawn in: parts appear one by one left to right, then the wires,
+   each dot with its first wire. Purely visual — the sheet is already complete, so the next
+   call (or a save) never waits on it; a new call shows whatever is still hidden at once. */
+function mcpRevealFlush(){
+  const R=MCPB.reveal; if(!R) return;
+  clearTimeout(R.t); MCPB.reveal=null;
+  document.querySelectorAll(".mcp-hide").forEach(e=>e.classList.remove("mcp-hide"));
+}
+function mcpRevealApply(){
+  const R=MCPB.reveal; if(!R) return;
+  R.hidden.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"],.wire-group[data-wid="'+id+'"]'); if(el) el.classList.add("mcp-hide"); });
+}
+function mcpReveal(sch, pre){
+  mcpRevealFlush();
+  if(!pre || !pre.c) return;
+  if(pre.id!==sch.id){
+    if(pre.sheets.has(sch.id)) return;                        // just switched to a sheet that was there
+    pre={id:sch.id, c:new Set(), w:new Set()};                // a brand-new sheet: all of it draws in
+  }
+  const parts=sch.components.filter(c=>c.type!=="JUNCTION" && !pre.c.has(c.id)).sort((a,b)=>(a.x-b.x)||(a.y-b.y));
+  const dots=new Set(sch.components.filter(c=>c.type==="JUNCTION" && !pre.c.has(c.id)).map(c=>c.id));
+  const minX=w=>{ const a=comp(w.from.cid,sch), b=comp(w.to.cid,sch); return Math.min(a?a.x:0, b?b.x:0); };
+  const wires=sch.wires.filter(w=>!pre.w.has(w.id)).sort((a,b)=>minX(a)-minX(b));
+  if(parts.length+wires.length<4) return;                     // one or two things: the glow says enough
+  const steps=[]; parts.forEach(c=>steps.push([c.id]));
+  wires.forEach(w=>{ const st=[w.id]; [w.from.cid,w.to.cid].forEach(id=>{ if(dots.has(id)){ st.push(id); dots.delete(id); } }); steps.push(st); });
+  if(dots.size) steps.push([...dots]);
+  const dt=Math.max(35, Math.min(160, 2600/steps.length));    // the whole drawing-in stays under ~3 s
+  const R=MCPB.reveal={hidden:new Set(steps.flat()), t:null};
+  mcpRevealApply();
+  let i=0;
+  const tick=()=>{ if(MCPB.reveal!==R) return;
+    steps[i++].forEach(id=>{ R.hidden.delete(id); const el=document.querySelector('.node[data-cid="'+id+'"],.wire-group[data-wid="'+id+'"]'); if(el) el.classList.remove("mcp-hide"); });
+    if(i<steps.length) R.t=setTimeout(tick, dt); else MCPB.reveal=null; };
+  R.t=setTimeout(tick, 60);
 }
 function mcpShowChange(pre){
   const sch=activeSch(); if(!sch) return;
@@ -636,6 +693,7 @@ function mcpShowChange(pre){
       const v=state.view; v.x=r.width/2-(x1+x2)/2*v.k; v.y=r.height/2-(y1+y2)/2*v.k; render();
     }
   }
+  mcpReveal(sch, pre);
   // glow on what changed, for a moment
   // (kept in MCPB.flash so a re-render inside that moment — which rebuilds every node — keeps it)
   MCPB.flash={ids:new Set(cs.map(c=>c.id)), until:Date.now()+1800};
@@ -646,6 +704,7 @@ function mcpShowChange(pre){
   const _render=render;
   render=function(){ const r=_render.apply(this, arguments);
     const f=MCPB.flash; if(f && Date.now()<f.until) f.ids.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"]'); if(el) el.classList.add("mcp-flash"); });
+    mcpRevealApply();
     return r; };
 }
 
@@ -664,6 +723,7 @@ async function mcpLoop(){
     if(!job||!job.id) continue;
     let reply;
     MCPB.busy=true; MCPB.calls++;
+    mcpRevealFlush();
     const pre=mcpSheetState();
     try{
       const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);

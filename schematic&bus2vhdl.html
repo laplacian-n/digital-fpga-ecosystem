@@ -449,6 +449,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <button data-act="topdown-open">Top-Down (ผังบล็อก)…</button>
           <button data-act="topdown-send">ส่งแผ่นนี้ไป Top-Down เป็นบล็อก</button>
           <button data-act="import-vhdl">Import VHDL as Schematic…</button>
+          <button data-act="realize-block" title="เลือกบล็อก (แผ่นย่อย) ก่อน แล้วสร้างวงจรเกตข้างในจากชื่อบล็อก เช่น 'counter 4 บิต', 'shift register 8', 'd flip flop'">✨ วาดวงจรในบล็อกจากชื่อ…</button>
           <hr>
           <button data-act="synth">Run Synthesis Check<span class="kbd">F7</span></button>
           <button data-act="rename-wire">Rename Selected Wire</button>
@@ -1729,8 +1730,11 @@ const TYPES = {
      the 11px grid and always sits on the body edge — same as the gates. */
   MUX: {
     label:"MUX", category:"mux",
-    defaultParams:{inputs:2},
-    paramSchema:[{key:"inputs",label:"Data inputs",type:"select",options:[2,4,8,16]}],
+    /* width: every data input and y are that many bits (a 4-bit 2:1 mux picks a whole nibble);
+       the select pins stay 1 bit each. */
+    defaultParams:{inputs:2, width:1},
+    paramSchema:[{key:"inputs",label:"Data inputs",type:"select",options:[2,4,8,16]},
+                 {key:"width", label:"ความกว้าง (bit)", type:"int", min:1, max:32}],
     size(p){ const n=p.inputs; const sel=Math.ceil(Math.log2(n));
       return blockSize(99, 22*(n+sel+2)); },
     ports(p){
@@ -1738,9 +1742,10 @@ const TYPES = {
       const h = 22*(n+sel+2);
       const w = 99;
       const ports = [];
-      for(let i=0;i<n;i++)   ports.push({id:"d"+i, dir:"in", dx:0, dy: 22*(i+1), label:"d"+i});
+      const bw = Math.max(1, Math.min(32, p.width||1));
+      for(let i=0;i<n;i++)   ports.push({id:"d"+i, dir:"in", dx:0, dy: 22*(i+1), label:"d"+i, width:bw});
       for(let i=0;i<sel;i++) ports.push({id:"s"+i, dir:"in", dx:0, dy: h - 22*(sel-i), label:"s"+i});
-      ports.push({id:"y", dir:"out", dx:w, dy: h/2, label:"y"});
+      ports.push({id:"y", dir:"out", dx:w, dy: h/2, label:"y", width:bw});
       return ports;
     },
     shape(p){
@@ -1751,7 +1756,7 @@ const TYPES = {
       return `<path class="glow" d="M6,4 L${w-6},${4+taper} L${w-6},${h-4-taper} L6,${h-4} Z"
               fill="var(--gate-fill)" stroke="var(--gate-stroke)" stroke-width="1.7"/>
               <text x="${w/2}" y="${h/2-6}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">MUX</text>
-              <text x="${w/2}" y="${h/2+9}" text-anchor="middle" font-size="9.5" fill="var(--ink-dim)">${n}:1</text>`;
+              <text x="${w/2}" y="${h/2+9}" text-anchor="middle" font-size="9.5" fill="var(--ink-dim)">${n}:1${(p.width||1)>1?" ×"+p.width+"b":""}</text>`;
     }
   },
   DEMUX: {
@@ -6862,7 +6867,7 @@ function probeReset(){ Object.keys(PROBE_FF).forEach(k=>delete PROBE_FF[k]); Obj
 function toggleProbe(){
   PROBE=!PROBE; const b=$("#btnProbe"); if(b) b.classList.toggle("active",PROBE);
   if(PROBE){
-    toast("โหมดตรวจค่า 🔬 — คลิกที่ INPUT เพื่อสลับ 0/1 · คลิก clk เพื่อเดินสัญญาณนาฬิกา (1→2→4 Hz→หยุด) · Alt+คลิก = ขึ้น/ลง ทีละครั้ง","info",5200);
+    toast("โหมดตรวจค่า 🔬 — คลิกที่ INPUT เพื่อสลับ 0/1 (INPUT แบบบัส = เลือกค่าทีละบิต) · คลิก clk เพื่อเดินสัญญาณนาฬิกา (1→2→4 Hz→หยุด) · Alt+คลิก = ขึ้น/ลง ทีละครั้ง","info",5200);
     try{ const fw=flattenSchematic(activeSch()).warns; if(fw.length) setTimeout(()=>toast("⚠ "+fw[0]+(fw.length>1?" (+"+(fw.length-1)+")":""),"warn",5000),400); }catch(_){}
     probeReset(); try{ probeSettle(flattenSchematic(activeSch()).sch); }catch(_){}   // learn the starting clock levels
   } else probeStopClocks();
@@ -6874,7 +6879,23 @@ function constBit(c){
   const n=parseInt(String(v==null?"0":v).replace(/^0x/i,""),16);
   return isNaN(n)?0:(n&1);
 }
-function probeBit(c){ return PROBE_VALS[c.id]!==undefined ? (PROBE_VALS[c.id]?1:0) : (c.type==="CONST"?constBit(c):0); }
+/* Probe values are bit VECTORS (an integer masked to the port width): a 1-bit signal is 0/1
+   as before, swt(3:0) is 0..15. The probe used to be 1-bit only, so a bus input could not be
+   set and everything behind its bus taps read "unknown". */
+function probeWidth(c, pid){ try{ const p=getPort(c, pid||(getPorts(c).find(q=>q.dir==="out")||{}).id); return Math.max(1, (p&&p.width)||1); }catch(_){ return 1; } }
+function probeMask(w){ return w>=32 ? 0xFFFFFFFF : ((1<<w)>>>0)-1; }
+function constVal(c){
+  const v=c.params&&c.params.value, w=probeWidth(c);
+  if(typeof v==="number") return (v>>>0)&probeMask(w);
+  const t=String(v==null?"0":v).trim();
+  const n=/^[01]+$/.test(t)&&t.length>1 ? parseInt(t,2) : parseInt(t.replace(/^0x/i,""),16);
+  return isNaN(n)?0:((n>>>0)&probeMask(w));
+}
+function probeBit(c){
+  const w=probeWidth(c);
+  if(PROBE_VALS[c.id]!==undefined) return w>1 ? ((PROBE_VALS[c.id]>>>0)&probeMask(w)) : (PROBE_VALS[c.id]?1:0);
+  return c.type==="CONST" ? (w>1 ? constVal(c) : constBit(c)) : 0;
+}
 function probeApply(){ try{ probeSettle(flattenSchematic(activeSch()).sch); }catch(e){ console.warn("probe",e); } render(); }
 function toggleProbeInput(c, ev){
   const sch=activeSch();
@@ -6893,8 +6914,43 @@ function toggleProbeInput(c, ev){
     toast(nxt?("⏱ สัญญาณนาฬิกา "+nxt+" Hz"):"⏹ หยุดสัญญาณนาฬิกา","info",1400);
     render(); return;
   }
+  if(c.type==="IN" && probeWidth(c)>1){ probeBusPicker(c, ev); return; }
   PROBE_VALS[c.id]=probeBit(c)?0:1;
   probeApply();
+}
+/* a bus INPUT: one button per bit (MSB first, like the name swt(3:0)), plus all-0 / all-1 */
+function probeBusPicker(c, ev){
+  let box=$("#probeBusPick");
+  if(!box){ box=document.createElement("div"); box.id="probeBusPick"; box.className="probe-bus-pick"; document.body.appendChild(box);
+    document.addEventListener("mousedown", e=>{ const b=$("#probeBusPick"); if(b && b.style.display!=="none" && !b.contains(e.target)) b.style.display="none"; }, true);
+    document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ const b=$("#probeBusPick"); if(b) b.style.display="none"; } }, true); }
+  const w=Math.min(32, probeWidth(c)), name=(c.params&&c.params.name)||"in";
+  const draw=()=>{
+    const v=probeBit(c);
+    let h=`<div class="pbp-h"><b>${esc(name)}(${w-1}:0)</b> = ${v} <span class="muted">· 0b${v.toString(2).padStart(w,"0")}${w>4?" · 0x"+v.toString(16).toUpperCase():""}</span></div><div class="pbp-bits">`;
+    for(let i=w-1;i>=0;i--) h+=`<button data-bit="${i}" class="${(v>>>i)&1?"on":""}" title="บิต ${i}"><small>${i}</small>${(v>>>i)&1}</button>`;
+    h+=`</div><div class="pbp-row"><button data-all="0">ทั้งหมด 0</button><button data-all="1">ทั้งหมด 1</button><button data-step="-1">−1</button><button data-step="1">+1</button></div>`;
+    box.innerHTML=h;
+    box.querySelectorAll("button").forEach(b=>b.onclick=e2=>{ e2.stopPropagation();
+      const m=probeMask(w); let v2=probeBit(c);
+      if(b.dataset.bit!=null) v2=(v2 ^ (1<<(+b.dataset.bit)))>>>0;
+      else if(b.dataset.all!=null) v2=b.dataset.all==="1"?m:0;
+      else if(b.dataset.step) v2=((v2+(+b.dataset.step))>>>0)&m;
+      PROBE_VALS[c.id]=v2&m; probeApply(); draw(); });
+  };
+  draw();
+  box.style.display="block";
+  const x=(ev&&ev.clientX)||200, y=(ev&&ev.clientY)||200;
+  box.style.left=Math.max(8, Math.min(window.innerWidth-box.offsetWidth-8, x+12))+"px";
+  box.style.top =Math.max(8, Math.min(window.innerHeight-box.offsetHeight-8, y+12))+"px";
+}
+function probeGateOpW(type, ins, w){
+  if(w<=1) return probeGateOp(type, ins.map(x=>x?1:0));
+  const m=probeMask(w), a=(ins[0]>>>0)&m;
+  const and=ins.reduce((p,x)=>(p&x)>>>0, m), or=ins.reduce((p,x)=>(p|x)>>>0, 0), xor=ins.reduce((p,x)=>(p^x)>>>0, 0);
+  switch(type){ case"AND":return and&m; case"OR":return or&m; case"XOR":return xor&m;
+    case"NAND":return (~and)&m; case"NOR":return (~or)&m; case"XNOR":return (~xor)&m;
+    case"NOT":return (~a)&m; case"BUF":return a; } return null;
 }
 function probeGateOp(type, ins){
   const a=ins[0]?1:0, and=ins.every(x=>x), or=ins.some(x=>x), xor=ins.reduce((p,x)=>p^(x?1:0),0);
@@ -6930,7 +6986,7 @@ function probeModel(sch, st){
     if(st&&st.drv.has(wire.id)) return st.drv.get(wire.id);
     const ids=netWires(sch,wire); let res=null;
     scan: for(const id of ids){ const w=st?st.wById.get(id):sch.wires.find(x=>x.id===id); if(!w) continue;
-      for(const ep of [w.from,w.to]){ const c=C(ep.cid); if(!c||c.type==="JUNCTION"||c.type==="BUSTAP") continue;
+      for(const ep of [w.from,w.to]){ const c=C(ep.cid); if(!c||c.type==="JUNCTION") continue;   // a split tap's bit pin drives
         if(outPortsOf(c).some(p=>p.id===ep.pid)){ res={cid:ep.cid,pid:ep.pid}; break scan; } } }
     if(st) ids.forEach(id=>st.drv.set(id,res));
     return res;
@@ -6938,7 +6994,21 @@ function probeModel(sch, st){
   function wireOf(cid,pid){ if(st) return st.pinWire.get(cid+"|"+pid)||null;
     return sch.wires.find(w=>(w.to.cid===cid&&w.to.pid===pid)||(w.from.cid===cid&&w.from.pid===pid)); }
   function inVal(cid,pid,guard){
-    const w=wireOf(cid,pid); if(!w) return null; const d=netDriver(w); if(!d) return null; return outVal(d.cid,d.pid,guard||new Set());
+    const w=wireOf(cid,pid); if(!w) return null; const d=netDriver(w);
+    if(!d) return mergeVal(w, guard||new Set());
+    return outVal(d.cid,d.pid,guard||new Set());
+  }
+  /* a bus with no driving port, assembled bit by bit by merge taps */
+  function mergeVal(w, guard){
+    const ids=netWires(sch,w); let v=0, any=false;
+    for(const id of ids){ const x=st?st.wById.get(id):sch.wires.find(y=>y.id===id); if(!x) continue;
+      for(const ep of [x.from,x.to]){ const c=C(ep.cid);
+        if(!c || c.type!=="BUSTAP" || ep.pid!=="d" || (c.params&&c.params.mode)!=="merge") continue;
+        const key="merge|"+c.id; if(guard.has(key)) continue; guard.add(key);
+        const p=c.params||{}, nb=Math.max(1,p.nbit||1), b=p.bit||0, y=inVal(c.id,"y",guard); guard.delete(key);
+        if(y==null) return null;
+        v=(v | (((y>>>0)&probeMask(nb))<<b))>>>0; any=true; } }
+    return any ? v : null;
   }
   function outVal(cid,pid,guard){
     const key=cid+"."+pid; if(memo.has(key)) return memo.get(key);
@@ -6948,7 +7018,23 @@ function probeModel(sch, st){
       if(c.type==="IN"||c.type==="CONST") v=probeBit(c);
       else if(c.type==="VCC") v=1;
       else if(c.type==="GND") v=0;
-      else if(PROBE_GATES[c.type]){ const ins=inPortsOf(c).map(p=>inVal(cid,p.id,guard)); v=ins.some(x=>x==null)?null:probeGateOp(c.type,ins); }
+      else if(PROBE_GATES[c.type]){ const ins=inPortsOf(c).map(p=>inVal(cid,p.id,guard)); v=ins.some(x=>x==null)?null:probeGateOpW(c.type,ins,probeWidth(c,pid)); }
+      /* the coded blocks, mirroring exactly what the VHDL generator writes for them */
+      else if(c.type==="DEMUX"){ const n=(c.params&&c.params.outputs)||2, sb=Math.ceil(Math.log2(n)); let sel=0, ok=true;
+        for(let i=0;i<sb;i++){ const x=inVal(cid,"s"+i,guard); if(x==null){ ok=false; break; } sel|=(x?1:0)<<i; }
+        const d=inVal(cid,"d",guard); v = (!ok||d==null) ? null : (("y"+sel)===pid ? (d?1:0) : 0); }
+      else if(c.type==="COMP" || c.type==="COMPM"){ const p=c.params||{}, n=Math.max(1,p.width||2); let A=0, B=0, ok=true;
+        if(cmpIsBus(p)){ A=inVal(cid,"a",guard); B=inVal(cid,"b",guard); ok=A!=null&&B!=null; }
+        else for(let i=0;i<n;i++){ const a=inVal(cid,"a"+i,guard), b=inVal(cid,"b"+i,guard); if(a==null||b==null){ ok=false; break; } A|=(a?1:0)<<i; B|=(b?1:0)<<i; }
+        v = !ok ? null : pid==="eq" ? (A===B?1:0) : pid==="gt" ? ((A>>>0)>(B>>>0)?1:0) : pid==="lt" ? ((A>>>0)<(B>>>0)?1:0) : null; }
+      else if(c.type==="ENC"){ const n=(c.params&&c.params.inputs)||4, b=+String(pid).slice(1); let k=-1, ok=true;
+        for(let i=n-1;i>=0;i--){ const x=inVal(cid,"i"+i,guard); if(x==null){ ok=false; break; } if(x && k<0) k=i; }
+        v = !ok ? null : (k<0 ? 0 : ((k>>b)&1)); }            // priority: the highest active input wins; none → 0
+      else if(c.type==="DEC"){ const n=(c.params&&c.params.outputs)||4, iw=Math.ceil(Math.log2(n)); let a=0, ok=true;
+        for(let i=0;i<iw;i++){ const x=inVal(cid,"a"+i,guard); if(x==null){ ok=false; break; } a|=(x?1:0)<<i; }
+        const en=inVal(cid,"en",guard); v = (!ok||en==null) ? null : (("y"+a)===pid && en ? 1 : 0); }
+      else if(c.type==="BUSTAP"){ const p=c.params||{}, bus=inVal(cid,"d",guard);
+        v = bus==null ? null : ((bus>>>(p.bit||0)) & probeMask(Math.max(1,p.nbit||1))); }
       else if(c.type==="MUX"){
         const n=(c.params&&c.params.inputs)||2, sb=Math.ceil(Math.log2(n)); let sel=0, ok=true;
         for(let i=0;i<sb;i++){ const s=inVal(cid,"s"+i,guard); if(s==null){ ok=false; break; } sel|=(s?1:0)<<i; }
@@ -6972,7 +7058,7 @@ function probeModel(sch, st){
     }
     return null;
   }
-  return {inVal,outVal,netDriver,source,inPortsOf};
+  return {inVal,outVal,netDriver,source,inPortsOf,mergeVal};
 }
 /* Let the flip-flops react: async clear/preset first, then every flip-flop that sees its
    clock edge this round samples the SAME pre-edge values, then look again (a Q that just
@@ -7022,7 +7108,7 @@ function probeEval(sch){
   // per-wire value from its net driver
   const done=new Set();
   sch.wires.forEach(w=>{ if(done.has(w.id)) return; const ids=netWires(sch,w); const d=m.netDriver(w);
-    const v=d?m.outVal(d.cid,d.pid,new Set()):null; ids.forEach(id=>{ done.add(id); wireVal.set(id,v); }); });
+    const v=d?m.outVal(d.cid,d.pid,new Set()):m.mergeVal(w,new Set()); ids.forEach(id=>{ done.add(id); wireVal.set(id,v); }); });
   // a sub-block node lights up when any of its outputs is 1 (faint when all 0, neutral if unknown)
   Object.keys(blocks).forEach(bid=>{
     const vs=Object.values(blocks[bid]).filter(t=>t.dir==="out").map(t=>m.outVal(t.cid,t.pid,new Set()));
@@ -7040,7 +7126,7 @@ function probeColorize(sch){
   root.querySelectorAll('.wire-group[data-wid]').forEach(g=>{
     const v=wireVal.get(g.getAttribute('data-wid'));
     const path=g.querySelector('path.wire'); if(!path) return;
-    if(v===1){ if(!NETCOLOR) path.setAttribute('stroke','var(--ok)'); path.setAttribute('stroke-width','2.8'); g.style.opacity='1'; }
+    if(v!=null && v!==0){ if(!NETCOLOR) path.setAttribute('stroke','var(--ok)'); path.setAttribute('stroke-width','2.8'); g.style.opacity='1'; }
     else if(v===0){ if(!NETCOLOR) path.setAttribute('stroke','var(--wire)'); g.style.opacity='0.22'; }
     else { g.style.opacity='0.55'; }
   });
@@ -7052,8 +7138,22 @@ function probeColorize(sch){
       const w=sch.wires.find(w=>w.from.cid===cid||w.to.cid===cid);
       v = w ? wireVal.get(w.id) : undefined;
     }
-    g.style.opacity=(v===0)?'0.22':(v===1?'1':'0.55');
-    g.classList.toggle('probe-on', v===1);
+    g.style.opacity=(v===0)?'0.22':(v!=null?'1':'0.55');
+    g.classList.toggle('probe-on', v!=null && v!==0);
+  });
+  // the value of every bus, written on it once per net (binary up to 8 bits, then hex)
+  const world0=root.firstChild, seenNet=new Set();
+  if(world0) sch.wires.forEach(w=>{
+    const v=wireVal.get(w.id); if(v==null) return;
+    let bw=1; try{ bw=wireWidth(w, sch)||1; }catch(_){}
+    if(bw<=1) return;
+    const ids=[...netWires(sch,w)].sort().join(","); if(seenNet.has(ids)) return; seenNet.add(ids);
+    const pts=drawnPoints(sch,w); if(!pts||pts.length<2) return;
+    const a=pts[0], b=pts[1];
+    const lab=bw<=8 ? v.toString(2).padStart(bw,"0") : "0x"+v.toString(16).toUpperCase();
+    const t=txt((a.x+b.x)/2, Math.min(a.y,b.y)-5, lab, {anchor:"middle", size:10, fill:v?"var(--ok)":"var(--ink-dim)"});
+    t.setAttribute("pointer-events","none"); t.setAttribute("font-weight","700"); t.setAttribute("class","probe-busval");
+    world0.appendChild(t);
   });
   // frequency badge above every clock: running → "⏱ n Hz", stopped → a hint to click
   const world=root.firstChild;
@@ -7650,7 +7750,7 @@ function renderInspector(){
         <button class="btn" id="iMirror" title="พลิกซ้าย-ขวา (M)">⇋ พลิก</button></span></div>`;
       if(typeof c.type==="string" && (c.type.indexOf("SCH:")===0 || c.type.indexOf("CUSTOM:")===0))
         html += `<div class="row"><label>ต่อขา</label><button class="btn" id="iAutoWire" title="สร้าง INPUT/OUTPUT ชื่อตรงกับขาที่ยังไม่ได้ต่อ แล้วลากสายให้อัตโนมัติ">⎘ ต่อขาอัตโนมัติ</button></div>`;
-        html += `<div class="row"><label>วาดอัตโนมัติ</label><button class="btn btn-primary" id="iRealize" title="สร้างวงจรเกตในบล็อกนี้อัตโนมัติจากชื่อบล็อก เช่น 'counter 4 บิต', 'shift register 8', 'counter 0-9 ไม่เอา 0 5 2', 'd flip flop'">✨ วาดวงจรจากชื่อ</button></div>`;
+        // ("✨ วาดวงจรจากชื่อ" moved to Tools ▸ — it only ever applies to a sub-sheet block)
       // #3 — reorder module pins straight from the symbol (SCH:/CUSTOM: with a sub-sheet)
       const _sub = subSchOf(c);
       if(_sub){
@@ -8614,7 +8714,8 @@ function generateSchVhdl(sch){
           : `(${selIns.slice().reverse().map((s,k)=>eq(s, bits[k])).join(" and ")})`;
         condChain.push(`${dataIns[i]} when ${cond}`);
       }
-      concurrent.push(`  ${c._nets.y} <= ${condChain.join(" else\n             ")} else '0';`);
+      const muxZero = (c.params.width||1)>1 ? "(others => '0')" : "'0'";
+      concurrent.push(`  ${c._nets.y} <= ${condChain.join(" else\n             ")} else ${muxZero};`);
       return;
     }
     /* ----- DEMUX ----- */
@@ -11045,7 +11146,7 @@ async function aiSend(){
       const lift=schematicToIntent(sch);
       AICHAT.busy=true; aiSetBusy(true);
       try{ const j=await uxSimSheet(sch, lift.intent);
-        if(!j.ok){ aiAppend("ai","จำลองไม่ได้: "+(j.reason||JSON.stringify(j.errors||j)),{html:false,err:true}); }
+        if(!j.ok){ aiAppend("ai",simFailHtml(j),{html:true,err:true}); }
         else { let h='<span class="ac-badge v">จำลองแผ่นปัจจุบัน</span>'+(j.truth_table?aiTruthTableHtml(j.truth_table):aiSeqHtml(j.sequence)); aiAppend("ai",h,{html:true}); }
       }catch(e){ aiAppend("ai","ต่อ backend ไม่ได้ — รัน python ai/chat_server.py",{err:true}); }
       finally{ AICHAT.busy=false; aiSetBusy(false); }
@@ -12113,6 +12214,18 @@ function seqWaveSvg(title, tracks, n){
   tracks.forEach((t,k)=>{ const pts=[]; t.vals.forEach((v,c)=>{ pts.push([left+c*cw,v],[left+(c+1)*cw,v]); }); p+=row(k+1,t.name,pts,"#7ee787"); });
   return p+"</svg>";
 }
+/* "ERC failed" alone told the user nothing. ERC = Electrical Rule Check: the Python simulator
+   checks the circuit before running it; say so, and list what it found, with its hints. */
+function simFailHtml(j){
+  const errs=(j&&j.errors)||[];
+  const erc=/ERC/i.test((j&&j.reason)||"");
+  let h='<div style="color:var(--err)">จำลองไม่ได้: '+esc(erc?"วงจรไม่ผ่านการตรวจกฎทางไฟฟ้า (ERC) ก่อนจำลอง":((j&&j.reason)||"ไม่ทราบสาเหตุ"))+'</div>';
+  if(errs.length) h+='<ul style="margin:4px 0 0 18px;padding:0">'+errs.slice(0,8).map(e=>typeof e==="string"?'<li>'+esc(e)+'</li>'
+      :'<li>'+esc(e.msg||e.code||JSON.stringify(e))+(e.hint?' <span class="muted">— '+esc(e.hint)+'</span>':'')+'</li>').join("")
+      +(errs.length>8?'<li class="muted">… อีก '+(errs.length-8)+' ข้อ</li>':'')+'</ul>';
+  if(erc) h+='<div class="muted" style="margin-top:4px">ลองกด <b>Check</b> (F7) เพื่อดูจุดที่ต้องแก้บนแผ่น</div>';
+  return h;
+}
 async function runSim(){
   const sig=$("#simSignals"), msg=$("#simBoardMsg");
   const sch=(typeof activeSch==="function")?activeSch():null;
@@ -12127,7 +12240,7 @@ async function runSim(){
   // combinational: simulated in the browser (probe engine); the backend only for what it can't evaluate
   else try{ j=await uxSimSheet(sch, intent, cyc); }
   catch(e){ sig.innerHTML=''; if(msg) msg.innerHTML=uxBackendHelpHtml("การจำลองวงจรนี้", e.why||e.message); return; }
-  if(!j.ok){ sig.innerHTML='<span style="color:var(--err)">จำลองไม่ได้: '+(j.reason||JSON.stringify(j.errors||j))+'</span>'; return; }
+  if(!j.ok){ sig.innerHTML=simFailHtml(j); return; }
   // status line: normally clear (table + timing live on the board page) — but never hide a
   // warning that changes the meaning of the result (skipped block, floating pin, multi-bit port)
   sig.innerHTML = (j.note?'<span style="color:var(--warn)">⚠ '+j.note+'</span><br>':'') + (liftWarns.length
@@ -12594,6 +12707,12 @@ document.addEventListener("click",ev=>{
     case "import-custom": importCustomComponent(); break;
     case "import-vhdl": importVhdlFile(); break;
     case "topdown-open": openTopdownWithSheet(); break;
+    case "realize-block": {
+      const sch=activeSch(), sel=sch && sch.components.filter(c=>state.selection.has(c.id));
+      const blk=sel && sel.find(c=>subSchOf(c));
+      if(!blk){ toast("เลือกบล็อกที่เป็นแผ่นย่อยก่อน (ตั้งชื่อบล็อกเป็นชนิดวงจร เช่น 'counter 4 บิต') แล้วค่อยกดคำสั่งนี้","warn",4200); break; }
+      realizeBlock(blk); renderInspector(); break;
+    }
     case "topdown-close": closeTopdown(); break;
     case "topdown-send": sendSheetToTopdown(); break;
     case "export-active-custom": exportActiveAsCustom(); break;
@@ -12911,6 +13030,36 @@ init();
 .wt-rats-bar .wt-go{background:var(--accent,#5b6cff);color:#fff;border-color:transparent;font-weight:600}
 .dbg-fix{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 2px}
 .dbg-fix button{border:1px solid var(--line,#ccd);background:var(--bg-0);border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;font-size:12px}
+/* MCP drawing-in: hidden until its turn, then fades in */
+#canvas .mcp-hide{opacity:0 !important;pointer-events:none}
+#canvas .node,#canvas .wire-group{transition:opacity .18s ease-out}
+/* ===== 13. dragging sheets in the project tree ===== */
+#projectPane .tree-item.sch[draggable=true]{cursor:grab}
+#projectPane .tree-item.sch.sd-drag{opacity:.45}
+#projectPane .tree-item.sch.sd-before{box-shadow:inset 0 2px 0 var(--accent,#5b6cff)}
+#projectPane .tree-item.sch.sd-after{box-shadow:inset 0 -2px 0 var(--accent,#5b6cff)}
+/* probe: per-bit picker for a bus INPUT */
+.probe-bus-pick{position:fixed;z-index:1000;display:none;background:var(--bg-1);border:1px solid var(--line,#ccd);border-radius:10px;
+  padding:8px 10px;box-shadow:0 8px 24px rgba(0,0,0,.2);font-size:12.5px;color:var(--ink)}
+.probe-bus-pick .pbp-h{margin-bottom:6px}
+.probe-bus-pick .pbp-bits{display:flex;gap:4px;margin-bottom:6px}
+.probe-bus-pick .pbp-bits button{width:30px;height:36px;border:1px solid var(--line,#ccd);border-radius:6px;background:var(--bg-0);cursor:pointer;
+  font:600 14px/1 ui-monospace,monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink)}
+.probe-bus-pick .pbp-bits button small{font:400 9px/1 system-ui;color:var(--muted)}
+.probe-bus-pick .pbp-bits button.on{background:var(--ok,#2da44e);color:#fff;border-color:transparent}
+.probe-bus-pick .pbp-bits button.on small{color:#e8ffe8}
+.probe-bus-pick .pbp-row{display:flex;gap:4px}
+.probe-bus-pick .pbp-row button{border:1px solid var(--line,#ccd);border-radius:6px;background:var(--bg-0);padding:3px 8px;cursor:pointer;font:inherit;font-size:11.5px;color:var(--ink)}
+/* ===== 14. a part's truth table ===== */
+.part-tt{max-height:60vh;overflow:auto;border:1px solid var(--line,#ccd);border-radius:8px}
+.part-tt table{border-collapse:collapse;font:12.5px/1.2 ui-monospace,monospace;width:100%}
+.part-tt th{position:sticky;top:0;background:var(--bg-2,#eef);padding:5px 6px;font-weight:700;z-index:1}
+.part-tt th.out{color:#2f81f7}
+.part-tt td{text-align:center;padding:3px 6px;color:var(--ink-dim)}
+.part-tt td.one{color:var(--ink);font-weight:700}
+.part-tt td.o.one{color:var(--ok,#2da44e)}
+.part-tt td.sep,.part-tt th.sep{width:6px;padding:0;border-left:2px solid var(--line,#ccd)}
+.part-tt tr:nth-child(even) td{background:rgba(127,127,127,.06)}
 </style>
 <script>
 "use strict";
@@ -13127,20 +13276,26 @@ function clientCombSim(sch){
   const nm=c=>(c.params&&c.params.name)||c.label||c.id;
   const ins=sch.components.filter(c=>c.type==="IN"), outs=sch.components.filter(c=>c.type==="OUT");
   if(!outs.length) return {ok:false, reason:"ยังไม่มี OUTPUT บนแผ่น — วาง OUTPUT แล้วต่อสายจากวงจรเข้าไป"};
-  const wide=[...ins,...outs].filter(c=>((c.params&&c.params.width)||1)>1);
-  if(wide.length) return {ok:false, fallback:true, reason:"มีพอร์ตหลายบิต ("+wide.map(nm).join(", ")+") — ตัวจำลองในเบราว์เซอร์รองรับเฉพาะสัญญาณ 1 บิต"};
-  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","JUNCTION","BUSTAP"].includes(t);
+  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","DEMUX","COMP","COMPM","ENC","DEC","JUNCTION","BUSTAP"].includes(t);
   const odd=[...new Set(fs.components.filter(c=>!known(c.type)).map(c=>c.type))];
   if(odd.length) return {ok:false, fallback:true, reason:"มีบล็อกที่ตัวจำลองในเบราว์เซอร์ยังไม่รองรับ: "+odd.join(", ")};
-  if(ins.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุต "+ins.length+" ตัว = "+(1<<ins.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" ตัว)"};
+  /* a bus port is its bits, MSB first — swt(3:0) → swt[3] … swt[0], the same names the pin map
+     uses. (Multi-bit ports used to be sent to the Python backend, which cannot express bus
+     taps and answered "ERC failed".) */
+  const cols=cs=>{ const L=[]; cs.forEach(c=>{ const w=probeWidth(c, c.type==="IN"?"o":"i");
+    if(w<=1) L.push({c, bit:null, name:nm(c)}); else for(let b=w-1;b>=0;b--) L.push({c, bit:b, name:nm(c)+"["+b+"]"}); }); return L; };
+  const inC=cols(ins), outC=cols(outs);
+  if(inC.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุตรวม "+inC.length+" บิต = "+(2**inC.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" บิต)"};
   const saved=Object.assign({}, PROBE_VALS);
   const st=probeStruct(fs), rows=[], floating=new Set();
   try{
-    for(let r=0;r<(1<<ins.length);r++){
-      const bits=ins.map((c,i)=>(r>>(ins.length-1-i))&1);          // first input = MSB (same as the backend)
-      ins.forEach((c,i)=>{ PROBE_VALS[c.id]=bits[i]; });
-      const m=probeModel(fs, st);
-      const o=outs.map(c=>{ const v=m.inVal(c.id,"i"); if(v==null){ floating.add(nm(c)); return 0; } return v; });
+    for(let r=0;r<(1<<inC.length);r++){
+      const bits=inC.map((x,i)=>(r>>(inC.length-1-i))&1);          // first input = MSB (same as the backend)
+      ins.forEach(c=>{ PROBE_VALS[c.id]=0; });
+      inC.forEach((x,i)=>{ if(x.bit==null) PROBE_VALS[x.c.id]=bits[i]; else PROBE_VALS[x.c.id]=(PROBE_VALS[x.c.id]|(bits[i]<<x.bit))>>>0; });
+      const m=probeModel(fs, st), got=new Map();
+      outs.forEach(c=>got.set(c.id, m.inVal(c.id,"i")));
+      const o=outC.map(x=>{ const v=got.get(x.c.id); if(v==null){ floating.add(nm(x.c)); return 0; } return x.bit==null ? (v?1:0) : ((v>>>x.bit)&1); });
       rows.push([bits, o]);
     }
   } finally {
@@ -13148,7 +13303,7 @@ function clientCombSim(sch){
   }
   return {ok:true, sequential:false, client:true,
     note: floating.size ? ("เอาต์พุตที่ไม่มีอะไรขับ (ถือเป็น 0): "+[...floating].join(", ")+" — ตรวจว่าต่อสายครบ") : "",
-    truth_table:{inputs:ins.map(nm), outputs:outs.map(nm), rows}};
+    truth_table:{inputs:inC.map(x=>x.name), outputs:outC.map(x=>x.name), rows}};
 }
 /* one entry point for every "simulate this sheet" button: browser first, backend only
    for what the browser can't do. Throws {backend:true} if that backend isn't running. */
@@ -14672,7 +14827,9 @@ MCP_OPS.status = ()=>({
 MCP_OPS.list_component_types = ()=>Object.entries(TYPES).filter(([,t])=>!["wire","custom","sch"].includes(t.category)).map(([k,t])=>{
   const p=JSON.parse(JSON.stringify(t.defaultParams||{}));
   let pins=[]; try{ pins=t.ports(p).map(q=>q.id+"("+q.dir+((q.width||1)>1?","+q.width+"b":"")+")"); }catch(_){}
-  return {type:k, label:t.label, category:t.category, params:p, param_help:(t.paramSchema||[]).map(s=>s.key+": "+s.label), pins};
+  // every setting with its allowed values, so Claude knows e.g. that a MUX has a bit width
+  const help=(t.paramSchema||[]).map(s=>s.key+": "+s.label+(s.options?" (one of "+s.options.join("/")+")":s.type==="int"?" ("+(s.min!=null?s.min:"")+".."+(s.max!=null?s.max:"")+")":""));
+  return {type:k, label:t.label, category:t.category, params:p, param_help:help, pins};
 });
 MCP_OPS.get_sheet = a=>mcpSheetInfo(mcpSheet(a.sheet), a.detail||"full");
 MCP_OPS.get_netlist = a=>{ const s=mcpSheet(a.sheet); return {sheet:s.name, nets:mcpNets(s)}; };
@@ -14866,13 +15023,30 @@ MCP_OPS.verify_truth_table = a=>{
   });
   return {sheet:sim.sheet, pass:!mism.length, checked_outputs:Object.keys(exp), mismatches:mism.slice(0,64), inputs:sim.inputs};
 };
+/* an input value for probe: a bus takes its whole value — 5 (a number), "0101" (a string of
+   0/1 is binary), "0b0101", "0x5" or "9"; a 1-bit input is 0/1. (Every value used to be squashed to 0/1,
+   so a=0101 on a 4-bit bus probed as a=1.) */
+function mcpProbeVal(c, v){
+  const w=probeWidth(c,"o"), m=probeMask(w);
+  if(w<=1) return (+v || v===true || /^(1|true|high|h)$/i.test(String(v))) ? 1 : 0;
+  if(typeof v==="number") return (v>>>0)&m;
+  const t=String(v).trim().replace(/_/g,"");
+  let n;
+  if(/^0b[01]+$/i.test(t)) n=parseInt(t.slice(2),2);
+  else if(/^0x[0-9a-f]+$/i.test(t)) n=parseInt(t.slice(2),16);
+  else if(/^[01]{2,}$/.test(t)) n=parseInt(t,2);            // "0101" is binary — how the lab writes values
+  else if(/^\d+$/.test(t)) n=parseInt(t,10);
+  else mcpFail(`value '${v}' for bus INPUT '${c.params.name}' (${w} bits) — use a number (5), binary as wide as the bus ("${"0".repeat(w-1)}1"), "0b…" or "0x…"`);
+  return (n>>>0)&m;
+}
 MCP_OPS.probe = a=>{
   const sch=mcpSheet(a.sheet), fs=flattenSchematic(sch).sch, saved=Object.assign({},PROBE_VALS);
   try{
     Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]);
-    Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=+v?1:0; });
+    Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=mcpProbeVal(c, v); });
     const m=probeModel(fs, probeStruct(fs));
-    const outs={}; sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"); outs[c.params.name]=v==null?"undriven":v; });
+    const outs={}; sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"), w=probeWidth(c,"i");
+      outs[c.params.name]=v==null?"undriven":(w>1?{value:v, bin:v.toString(2).padStart(w,"0")}:v); });
     const nets=mcpNets(sch).map(n=>{ if(!n.driver) return Object.assign({value:"undriven"},n);
       const [cn,pid]=[n.driver.slice(0,n.driver.lastIndexOf(".")), n.driver.slice(n.driver.lastIndexOf(".")+1)];
       const c=findCompRef(sch,cn); let v=null; try{ v=c?m.outVal(c.id,pid,new Set()):null; }catch(_){}
@@ -15122,7 +15296,45 @@ MCP_OPS.make_topdown = a=>{
 function mcpSheetState(){
   const sch=activeSch(); if(!sch) return null;
   const m=new Map(); sch.components.forEach(c=>{ if(c.type!=="JUNCTION") m.set(c.id, c.x+","+c.y+","+c.type+","+(c.rot||0)+","+JSON.stringify(c.params||{})); });
-  return {id:sch.id, m, w:new Set(sch.wires.map(w=>w.id))};
+  return {id:sch.id, m, c:new Set(sch.components.map(c=>c.id)), w:new Set(sch.wires.map(w=>w.id)),
+          sheets:new Set(Object.keys(state.project.schematics||{}))};
+}
+/* "ค่อยๆโผล่มา": a call that adds many things at once (apply, build_circuit, a generator) is
+   committed in one go, but drawn in: parts appear one by one left to right, then the wires,
+   each dot with its first wire. Purely visual — the sheet is already complete, so the next
+   call (or a save) never waits on it; a new call shows whatever is still hidden at once. */
+function mcpRevealFlush(){
+  const R=MCPB.reveal; if(!R) return;
+  clearTimeout(R.t); MCPB.reveal=null;
+  document.querySelectorAll(".mcp-hide").forEach(e=>e.classList.remove("mcp-hide"));
+}
+function mcpRevealApply(){
+  const R=MCPB.reveal; if(!R) return;
+  R.hidden.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"],.wire-group[data-wid="'+id+'"]'); if(el) el.classList.add("mcp-hide"); });
+}
+function mcpReveal(sch, pre){
+  mcpRevealFlush();
+  if(!pre || !pre.c) return;
+  if(pre.id!==sch.id){
+    if(pre.sheets.has(sch.id)) return;                        // just switched to a sheet that was there
+    pre={id:sch.id, c:new Set(), w:new Set()};                // a brand-new sheet: all of it draws in
+  }
+  const parts=sch.components.filter(c=>c.type!=="JUNCTION" && !pre.c.has(c.id)).sort((a,b)=>(a.x-b.x)||(a.y-b.y));
+  const dots=new Set(sch.components.filter(c=>c.type==="JUNCTION" && !pre.c.has(c.id)).map(c=>c.id));
+  const minX=w=>{ const a=comp(w.from.cid,sch), b=comp(w.to.cid,sch); return Math.min(a?a.x:0, b?b.x:0); };
+  const wires=sch.wires.filter(w=>!pre.w.has(w.id)).sort((a,b)=>minX(a)-minX(b));
+  if(parts.length+wires.length<4) return;                     // one or two things: the glow says enough
+  const steps=[]; parts.forEach(c=>steps.push([c.id]));
+  wires.forEach(w=>{ const st=[w.id]; [w.from.cid,w.to.cid].forEach(id=>{ if(dots.has(id)){ st.push(id); dots.delete(id); } }); steps.push(st); });
+  if(dots.size) steps.push([...dots]);
+  const dt=Math.max(35, Math.min(160, 2600/steps.length));    // the whole drawing-in stays under ~3 s
+  const R=MCPB.reveal={hidden:new Set(steps.flat()), t:null};
+  mcpRevealApply();
+  let i=0;
+  const tick=()=>{ if(MCPB.reveal!==R) return;
+    steps[i++].forEach(id=>{ R.hidden.delete(id); const el=document.querySelector('.node[data-cid="'+id+'"],.wire-group[data-wid="'+id+'"]'); if(el) el.classList.remove("mcp-hide"); });
+    if(i<steps.length) R.t=setTimeout(tick, dt); else MCPB.reveal=null; };
+  R.t=setTimeout(tick, 60);
 }
 function mcpShowChange(pre){
   const sch=activeSch(); if(!sch) return;
@@ -15151,6 +15363,7 @@ function mcpShowChange(pre){
       const v=state.view; v.x=r.width/2-(x1+x2)/2*v.k; v.y=r.height/2-(y1+y2)/2*v.k; render();
     }
   }
+  mcpReveal(sch, pre);
   // glow on what changed, for a moment
   // (kept in MCPB.flash so a re-render inside that moment — which rebuilds every node — keeps it)
   MCPB.flash={ids:new Set(cs.map(c=>c.id)), until:Date.now()+1800};
@@ -15161,6 +15374,7 @@ function mcpShowChange(pre){
   const _render=render;
   render=function(){ const r=_render.apply(this, arguments);
     const f=MCPB.flash; if(f && Date.now()<f.until) f.ids.forEach(id=>{ const el=document.querySelector('.node[data-cid="'+id+'"]'); if(el) el.classList.add("mcp-flash"); });
+    mcpRevealApply();
     return r; };
 }
 
@@ -15179,6 +15393,7 @@ async function mcpLoop(){
     if(!job||!job.id) continue;
     let reply;
     MCPB.busy=true; MCPB.calls++;
+    mcpRevealFlush();
     const pre=mcpSheetState();
     try{
       const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);
@@ -16006,6 +16221,126 @@ canvas.addEventListener("mouseover", ev=>{
   canvas.classList.toggle("wt-focus", !!hit && !state.drag && !state.wireDrag && !state.pan);
 });
 canvas.addEventListener("mouseleave", ()=>canvas.classList.remove("wt-focus"));
+
+/* ===== 13. Drag sheets to reorder them in the project tree ================================
+   "ทำให้เลื่อนวางไอ่ตัวพวกนี้ได้ด้วย": the sheets of a project are listed in the order they were
+   made, so a lab's sub-circuits ended up scattered (top in the middle, bcd_dec at the bottom).
+   Grab a sheet and drop it above / below another one of the SAME project. The order is simply the
+   order of the keys of `schematics` — rewritten in place, so every reference to that object stays
+   valid and the order is saved with the project. Ctrl+Z undoes it. */
+function sheetReorder(pid, dragId, targetId, after){
+  const pr = state.projects[pid]; if(!pr || !pr.schematics) return false;
+  const S = pr.schematics, keys = Object.keys(S);
+  if(dragId===targetId || !S[dragId] || !S[targetId]) return false;
+  const rest = keys.filter(k=>k!==dragId);
+  rest.splice(rest.indexOf(targetId) + (after ? 1 : 0), 0, dragId);
+  if(rest.join("\n")===keys.join("\n")) return false;
+  const vals = rest.map(k=>S[k]);
+  keys.forEach(k=>{ delete S[k]; });
+  rest.forEach((k,i)=>{ S[k] = vals[i]; });
+  return true;
+}
+const SHEETDRAG = { id:null, pid:null };
+{
+  const _tree = renderProjectTree;
+  renderProjectTree = function(){
+    const r = _tree.apply(this, arguments);
+    document.querySelectorAll('#projectPane .tree-item.sch[data-open]').forEach(el=>{
+      el.draggable = true;
+      el.title = el.title || "ลากเพื่อเลื่อนลำดับ";
+    });
+    return r;
+  };
+  const pane = document.getElementById("projectPane");
+  const clear = ()=>pane.querySelectorAll(".sd-before,.sd-after,.sd-drag").forEach(e=>e.classList.remove("sd-before","sd-after","sd-drag"));
+  const target = ev=>{ const el = ev.target.closest && ev.target.closest(".tree-item.sch[data-open]");
+    return (el && SHEETDRAG.id && el.dataset.prj===SHEETDRAG.pid && el.dataset.open!==SHEETDRAG.id) ? el : null; };
+  const below = (el, ev)=>{ const b = el.getBoundingClientRect(); return ev.clientY > b.top + b.height/2; };
+  pane.addEventListener("dragstart", ev=>{
+    const el = ev.target.closest && ev.target.closest(".tree-item.sch[data-open]"); if(!el) return;
+    SHEETDRAG.id = el.dataset.open; SHEETDRAG.pid = el.dataset.prj;
+    el.classList.add("sd-drag");
+    try{ ev.dataTransfer.effectAllowed = "move"; ev.dataTransfer.setData("text/plain", SHEETDRAG.id); }catch(_){}
+  });
+  pane.addEventListener("dragover", ev=>{
+    const el = target(ev); if(!el) return;
+    ev.preventDefault();
+    try{ ev.dataTransfer.dropEffect = "move"; }catch(_){}
+    pane.querySelectorAll(".sd-before,.sd-after").forEach(e=>e.classList.remove("sd-before","sd-after"));
+    el.classList.add(below(el, ev) ? "sd-after" : "sd-before");
+  });
+  pane.addEventListener("drop", ev=>{
+    const el = target(ev); if(!el) return;
+    ev.preventDefault();
+    const ok = sheetReorder(SHEETDRAG.pid, SHEETDRAG.id, el.dataset.open, below(el, ev));
+    SHEETDRAG.id = SHEETDRAG.pid = null; clear();
+    if(ok){ snapshot(); renderAll(); }
+  });
+  pane.addEventListener("dragend", ()=>{ SHEETDRAG.id = SHEETDRAG.pid = null; clear(); });
+}
+try{ renderProjectTree(); }catch(_){}   // the tree drawn before this layer loaded
+
+/* ===== 14. A part's truth table, one click from the Inspector ==============================
+   "ทำให้กดดูตารางความจริงได้": select a part (COMPM4, a MUX, a decoder, a gate, a sub-sheet
+   block…) and "📋 ตารางความจริง" shows what it does. The part is copied onto a scratch sheet
+   with an INPUT on every input pin and an OUTPUT on every output pin, and run through the same
+   browser simulator the sim page uses — so the table is exactly how the design will simulate.
+   Flip-flops have no truth table (their output depends on the clock and what they hold). */
+const PART_TT_MAX_BITS = 10;          // 1024 rows is still readable in a scroll box
+function partTruthTable(c){
+  if(!c || c.type==="JUNCTION" || c.type==="IN" || c.type==="OUT") return {ok:false, reason:"เลือกชิ้นส่วนที่มีขาเข้าและขาออก"};
+  if(PROBE_SEQ[c.type]) return {ok:false, reason:"flip-flop ไม่มีตารางความจริงแบบวงจรผสม — ค่าออกขึ้นกับ clock และค่าที่เก็บไว้ ดูได้ในหน้า จำลอง (ไทม์มิง)"};
+  let ports=[]; try{ ports=getPorts(c); }catch(_){}
+  // a numbered group reads as a number: A3 A2 A1 A0, then B3 … B0 (MSB first, like the rows)
+  const msbFirst=L=>{ const key=p=>String(p.label||p.id), m=p=>/^(.*?)(\d+)$/.exec(key(p));
+    const order=[]; L.forEach(p=>{ const g=m(p)?m(p)[1]:key(p); if(!order.includes(g)) order.push(g); });
+    return L.slice().sort((a,b)=>{ const ga=m(a)?m(a)[1]:key(a), gb=m(b)?m(b)[1]:key(b);
+      if(ga!==gb) return order.indexOf(ga)-order.indexOf(gb);
+      return (m(b)?+m(b)[2]:0)-(m(a)?+m(a)[2]:0); }); };
+  const ins=msbFirst(ports.filter(p=>p.dir==="in")), outs=msbFirst(ports.filter(p=>p.dir==="out"));
+  if(!ins.length || !outs.length) return {ok:false, reason:"ชิ้นส่วนนี้ไม่มีขาเข้าหรือขาออก"};
+  const bits=ins.reduce((n,p)=>n+Math.max(1,p.width||1),0);
+  if(bits>PART_TT_MAX_BITS) return {ok:false, reason:`ขาเข้ารวม ${bits} บิต = ${2**bits} แถว มากเกินกว่าจะแสดงเป็นตาราง (สูงสุด ${PART_TT_MAX_BITS} บิต) — ลองใช้โหมดตรวจค่า 🔬 ป้อนค่าทีละชุดแทน`};
+  const pinName=p=>String(p.label||p.id).replace(/\(.*\)$/,"");
+  const scratch={id:"__tt", name:"__tt", components:[], wires:[]};
+  const part=JSON.parse(JSON.stringify(c)); part.id="__ttp"; part.x=400; part.y=200; scratch.components.push(part);
+  ins.forEach((p,k)=>{ const id="__tti"+k; scratch.components.push({id, type:"IN", x:100, y:100+k*44, label:"", params:{name:pinName(p), width:Math.max(1,p.width||1)}});
+    scratch.wires.push({id:"__ttw"+id, from:{cid:id, pid:"o"}, to:{cid:part.id, pid:p.id}, name:""}); });
+  outs.forEach((p,k)=>{ const id="__tto"+k; scratch.components.push({id, type:"OUT", x:700, y:100+k*44, label:"", params:{name:pinName(p), width:Math.max(1,p.width||1)}});
+    scratch.wires.push({id:"__ttw"+id, from:{cid:part.id, pid:p.id}, to:{cid:id, pid:"i"}, name:""}); });
+  const r=clientCombSim(scratch);
+  if(!r.ok) return {ok:false, reason:r.reason||"จำลองชิ้นส่วนนี้ไม่ได้"};
+  return {ok:true, table:r.truth_table};
+}
+function partTruthShow(c){
+  const r=partTruthTable(c), name=(c.label||compDisplay(c));
+  if(!r.ok){ toast(r.reason, "warn", 5000); return; }
+  const T=r.table;
+  const head=`<tr>${T.inputs.map(n=>`<th class="in">${esc(n)}</th>`).join("")}<th class="sep"></th>${T.outputs.map(n=>`<th class="out">${esc(n)}</th>`).join("")}</tr>`;
+  const body=T.rows.map(([a,b])=>`<tr>${a.map(v=>`<td class="${v?"one":""}">${v}</td>`).join("")}<td class="sep"></td>${b.map(v=>`<td class="o ${v?"one":""}">${v}</td>`).join("")}</tr>`).join("");
+  uxModal(`📋 ตารางความจริง — ${esc(name)}`,
+    `<div class="muted" style="margin-bottom:6px">${T.rows.length} แถว · อินพุตตัวแรกเป็นบิตสูงสุด (MSB) · คำนวณด้วยตัวจำลองเดียวกับหน้า จำลอง</div>
+     <div class="part-tt"><table>${head}${body}</table></div>`, {width:Math.min(900, 120+(T.inputs.length+T.outputs.length)*46)});
+}
+{
+  const _insp = renderInspector;
+  renderInspector = function(){
+    const r = _insp.apply(this, arguments);
+    try{
+      const sch=activeSch(); if(!sch) return r;
+      const sel=sch.components.filter(c=>state.selection.has(c.id));
+      if(sel.length!==1) return r;
+      const c=sel[0];
+      if(c.type==="JUNCTION"||c.type==="IN"||c.type==="OUT"||c.type==="VCC"||c.type==="GND"||c.type==="CONST"||c.type==="BUSTAP") return r;
+      const del=document.querySelector('#inspectorPane [data-act="delete-sel"]'); if(!del) return r;
+      const row=document.createElement("div"); row.className="row";
+      row.innerHTML=`<label>ตารางความจริง</label><button class="btn" id="iTruth" title="ดูว่าชิ้นส่วนนี้ให้ค่าออกอะไร ในทุกกรณีของขาเข้า">📋 ดูตารางความจริง</button>`;
+      del.closest(".row").before(row);
+      row.querySelector("#iTruth").onclick=()=>partTruthShow(c);
+    }catch(e){ console.warn("truth table", e); }
+    return r;
+  };
+}
 
 </script>
 <!-- UX-LAYER:END -->

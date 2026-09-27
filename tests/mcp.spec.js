@@ -240,4 +240,46 @@ test("the retired offline servers read the LIVE sheet, not their stale files", a
   expect(sheet).toContain("g_live");
   expect(sheets).toContain("live_one");
   expect(fs.readFileSync(path.join(ROOT, "schematic_mcp.py"), "utf-8")).toContain("legacy_live.live_sheet(name)");
+  // and they refuse to save a file that a Sync would paste over the user's arranged sheet
+  const run = execFileSync(PY, ["-c", "import legacy_live; print(legacy_live.running())"], { cwd: ROOT, env, encoding: "utf-8" });
+  expect(run.trim()).toBe("True");
+  for (const f of ["schematic_mcp.py", path.join("topdown", "topdown_mcp.py")])
+    expect(fs.readFileSync(path.join(ROOT, f), "utf-8")).toContain("return legacy_live.SAVE_REFUSED");
+});
+
+test("a big change draws in piece by piece (ค่อยๆโผล่มา), and ends fully shown", async () => {
+  await mcp.tool("build_circuit", { name: "reveal", truth_table: { inputs: ["a", "b", "c"], outputs: ["y", "z"], columns: { y: "01101001", z: "00010111" } } });
+  const seen = await page.evaluate(() => new Promise(res => { let max = 0; const t0 = Date.now();
+    const f = () => { const n = document.querySelectorAll("#canvas .mcp-hide").length; max = Math.max(max, n);
+      if (Date.now() - t0 > 4000 || (max && !n)) res({ max, left: n }); else requestAnimationFrame(f); }; f(); }));
+  expect(seen.max).toBeGreaterThan(2);       // things were still hidden, waiting their turn
+  expect(seen.left).toBe(0);                 // and everything ended up on screen
+  // the sheet itself was complete from the start: reading it does not wait for the animation
+  const g = await mcp.tool("get_sheet", { sheet: "reveal" });
+  expect(g.error).toBe(false);
+});
+
+test("probe a comparator through MCP with bus values (a=0101, b=0011 → GT=1, LT=0)", async () => {
+  // what Claude reported as "unknown": COMPM4 / COMP were not evaluated, and a=0101 was squashed to 1
+  await mcp.tool("new_sheet", { name: "cmp_probe" });
+  const put = async (type, name, params) => (await mcp.tool("add_component", { type, name, params })).data;
+  await put("IN", "a", { width: 8 }); await put("IN", "b", { width: 8 });
+  const m = await put("COMPM", "", { width: 8 });   // 8 bits → bus pins a / b
+  const e = await put("COMP", "", { width: 8 });
+  await put("OUT", "gt"); await put("OUT", "lt"); await put("OUT", "eq");
+  const q = await put("IN", "q", { width: 8 });     // 8-bit operands
+  const id = x => x.id || x.component || x;
+  const mid = id(m), eid = id(e);
+  const conn = async (f, t) => { const r = await mcp.tool("connect", { from: f, to: t }); expect(r.error, r.text).toBe(false); };
+  await conn("a", mid + ".a"); await conn("b", mid + ".b");
+  await conn("a", eid + ".a"); await conn("q", eid + ".b");
+  await conn(mid + ".gt", "gt"); await conn(mid + ".lt", "lt"); await conn(eid + ".eq", "eq");
+  let p = await mcp.tool("probe", { sheet: "cmp_probe", inputs: { a: "0101", b: "00000011", q: 5 } });
+  expect(p.error, p.text).toBe(false);
+  expect(p.data.outputs).toEqual({ gt: 1, lt: 0, eq: 1 });
+  p = await mcp.tool("probe", { sheet: "cmp_probe", inputs: { a: "0x3", b: "0b101", q: 4 } });
+  expect(p.data.outputs).toEqual({ gt: 0, lt: 1, eq: 0 });
+  const bad = await mcp.tool("probe", { sheet: "cmp_probe", inputs: { a: "01x1" } });
+  expect(bad.error).toBe(true);
+  expect(bad.text).toContain("bus INPUT 'a'");
 });

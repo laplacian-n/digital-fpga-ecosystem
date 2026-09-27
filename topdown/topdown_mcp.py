@@ -243,6 +243,8 @@ def save_design(name: str, design: str) -> str:
     Writes ./designs/<name>.json and updates ./designs/latest.json (which the
     editor's "Sync ⇳" button loads when this server runs with --serve).
     """
+    if legacy_live and legacy_live.running():
+        return legacy_live.SAVE_REFUSED
     try:
         obj = json.loads(design)
     except json.JSONDecodeError as e:
