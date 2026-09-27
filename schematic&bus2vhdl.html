@@ -99,8 +99,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .proj-name{background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;width:160px}
 
 .workspace{display:grid;grid-template-columns:var(--w-left,260px) minmax(0,1fr) var(--w-right,380px);overflow:hidden;position:relative}
-.workspace.lcol{--w-left:0px}
-.workspace.rcol{--w-right:0px}
+/* Collapsed panes set the COLUMNS, not the width variables: a pane the user resized carries
+   its width as an inline style (--w-right:420px), which beats any class rule for the same
+   variable — so collapsing hid the Inspector's content but kept its column, a blank strip where
+   the sheet should continue. */
+.workspace.lcol{--w-left:0px;grid-template-columns:0px minmax(0,1fr) var(--w-right,380px)}
+.workspace.rcol{--w-right:0px;grid-template-columns:var(--w-left,260px) minmax(0,1fr) 0px}
+.workspace.lcol.rcol{grid-template-columns:0px minmax(0,1fr) 0px}
 .pane{background:var(--bg-1);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;position:relative;min-width:0}
 .pane.right{border-right:none;border-left:1px solid var(--line)}
 /* collapsed: keep the pane as a 0-width grid cell (do NOT display:none, or the
