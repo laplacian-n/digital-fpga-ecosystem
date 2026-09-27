@@ -7109,6 +7109,8 @@ function probeEval(sch){
     else if(PROBE_GATES[c.type]||c.type==="MUX"){ compVal.set(c.id, m.outVal(c.id,c.type==="MUX"?"y":"o",new Set())); }
     else if(PROBE_SEQ[c.type]) compVal.set(c.id, m.outVal(c.id,"q",new Set()));
     else if(c.type==="OUT"){ compVal.set(c.id, m.inVal(c.id,(inPortsOf(c)[0]||{}).id)); }
+    // a bus tap shows ITS bit, never the whole bus (tap 0 lit up on 1000 because the bus is non-zero)
+    else if(c.type==="BUSTAP"){ compVal.set(c.id, (c.params&&c.params.mode)==="merge" ? m.inVal(c.id,"y") : m.outVal(c.id,"y",new Set())); }
   });
   // per-wire value from its net driver
   const done=new Set();
@@ -7139,7 +7141,7 @@ function probeColorize(sch){
     const cid=g.getAttribute('data-cid'); const c=comp(cid,sch);
     let v=compVal.get(cid);
     // junction / bus-tap fan-out dots follow their net's value (else they stay solid & shout)
-    if(c && (c.type==="JUNCTION"||c.type==="BUSTAP")){
+    if(c && c.type==="JUNCTION"){
       const w=sch.wires.find(w=>w.from.cid===cid||w.to.cid===cid);
       v = w ? wireVal.get(w.id) : undefined;
     }
