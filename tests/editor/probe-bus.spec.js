@@ -55,3 +55,35 @@ test("click a bus INPUT in probe mode: set bits one by one; taps, gates and merg
   await expect(page.locator("#probeBusPick")).toBeHidden();
   expect(page.errors).toEqual([]);
 });
+
+test("a sheet with bus ports simulates in the browser (no more 'ERC failed')", async ({ page }) => {
+  await openEditor(page);
+  await busSheet(page);
+  const r = await page.evaluate(() => clientCombSim(activeSch()));
+  expect(r.ok).toBe(true);
+  expect(r.truth_table.inputs).toEqual(["swt[3]", "swt[2]", "swt[1]", "swt[0]"]);
+  expect(r.truth_table.outputs).toEqual(["y[3]", "y[2]", "y[1]", "y[0]"]);
+  expect(r.truth_table.rows.length).toBe(16);
+  const row5 = r.truth_table.rows.find(([b]) => b.join("") === "0101");
+  expect(row5[1].join("")).toBe("1010");                    // y = NOT swt, bit by bit
+  // and a backend refusal now says what it means and what is wrong
+  const html = await page.evaluate(() => simFailHtml({ ok: false, reason: "ERC failed", errors: [{ code: "X", msg: "pin not found", hint: "check the pin id" }] }));
+  expect(html).toContain("ERC");
+  expect(html).toContain("pin not found");
+  expect(html).toContain("check the pin id");
+});
+
+test("the sim page runs a bus sheet: switches per bit, outputs follow", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 860 });
+  await openEditor(page);
+  await busSheet(page);
+  await page.evaluate(() => showSimPage("signals"));
+  await expect(page.locator("#simSignals")).not.toContainText("จำลองไม่ได้");
+  const sw = page.locator('#simPcb .swUnit.mapped', { hasText: "swt[1]" });
+  await expect(sw).toHaveCount(1);
+  await sw.click();
+  await expect(page.locator("#simValbar")).toContainText("swt[1]=1");
+  await expect(page.locator("#simValbar")).toContainText("y[1]=0");
+  await expect(page.locator("#simValbar")).toContainText("y[0]=1");
+  expect(page.errors).toEqual([]);
+});

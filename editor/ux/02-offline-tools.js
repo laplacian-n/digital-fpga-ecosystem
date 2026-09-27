@@ -14,20 +14,26 @@ function clientCombSim(sch){
   const nm=c=>(c.params&&c.params.name)||c.label||c.id;
   const ins=sch.components.filter(c=>c.type==="IN"), outs=sch.components.filter(c=>c.type==="OUT");
   if(!outs.length) return {ok:false, reason:"ยังไม่มี OUTPUT บนแผ่น — วาง OUTPUT แล้วต่อสายจากวงจรเข้าไป"};
-  const wide=[...ins,...outs].filter(c=>((c.params&&c.params.width)||1)>1);
-  if(wide.length) return {ok:false, fallback:true, reason:"มีพอร์ตหลายบิต ("+wide.map(nm).join(", ")+") — ตัวจำลองในเบราว์เซอร์รองรับเฉพาะสัญญาณ 1 บิต"};
   const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","JUNCTION","BUSTAP"].includes(t);
   const odd=[...new Set(fs.components.filter(c=>!known(c.type)).map(c=>c.type))];
   if(odd.length) return {ok:false, fallback:true, reason:"มีบล็อกที่ตัวจำลองในเบราว์เซอร์ยังไม่รองรับ: "+odd.join(", ")};
-  if(ins.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุต "+ins.length+" ตัว = "+(1<<ins.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" ตัว)"};
+  /* a bus port is its bits, MSB first — swt(3:0) → swt[3] … swt[0], the same names the pin map
+     uses. (Multi-bit ports used to be sent to the Python backend, which cannot express bus
+     taps and answered "ERC failed".) */
+  const cols=cs=>{ const L=[]; cs.forEach(c=>{ const w=probeWidth(c, c.type==="IN"?"o":"i");
+    if(w<=1) L.push({c, bit:null, name:nm(c)}); else for(let b=w-1;b>=0;b--) L.push({c, bit:b, name:nm(c)+"["+b+"]"}); }); return L; };
+  const inC=cols(ins), outC=cols(outs);
+  if(inC.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุตรวม "+inC.length+" บิต = "+(2**inC.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" บิต)"};
   const saved=Object.assign({}, PROBE_VALS);
   const st=probeStruct(fs), rows=[], floating=new Set();
   try{
-    for(let r=0;r<(1<<ins.length);r++){
-      const bits=ins.map((c,i)=>(r>>(ins.length-1-i))&1);          // first input = MSB (same as the backend)
-      ins.forEach((c,i)=>{ PROBE_VALS[c.id]=bits[i]; });
-      const m=probeModel(fs, st);
-      const o=outs.map(c=>{ const v=m.inVal(c.id,"i"); if(v==null){ floating.add(nm(c)); return 0; } return v; });
+    for(let r=0;r<(1<<inC.length);r++){
+      const bits=inC.map((x,i)=>(r>>(inC.length-1-i))&1);          // first input = MSB (same as the backend)
+      ins.forEach(c=>{ PROBE_VALS[c.id]=0; });
+      inC.forEach((x,i)=>{ if(x.bit==null) PROBE_VALS[x.c.id]=bits[i]; else PROBE_VALS[x.c.id]=(PROBE_VALS[x.c.id]|(bits[i]<<x.bit))>>>0; });
+      const m=probeModel(fs, st), got=new Map();
+      outs.forEach(c=>got.set(c.id, m.inVal(c.id,"i")));
+      const o=outC.map(x=>{ const v=got.get(x.c.id); if(v==null){ floating.add(nm(x.c)); return 0; } return x.bit==null ? (v?1:0) : ((v>>>x.bit)&1); });
       rows.push([bits, o]);
     }
   } finally {
@@ -35,7 +41,7 @@ function clientCombSim(sch){
   }
   return {ok:true, sequential:false, client:true,
     note: floating.size ? ("เอาต์พุตที่ไม่มีอะไรขับ (ถือเป็น 0): "+[...floating].join(", ")+" — ตรวจว่าต่อสายครบ") : "",
-    truth_table:{inputs:ins.map(nm), outputs:outs.map(nm), rows}};
+    truth_table:{inputs:inC.map(x=>x.name), outputs:outC.map(x=>x.name), rows}};
 }
 /* one entry point for every "simulate this sheet" button: browser first, backend only
    for what the browser can't do. Throws {backend:true} if that backend isn't running. */
