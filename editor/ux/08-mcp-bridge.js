@@ -738,6 +738,7 @@ async function mcpLoop(){
       const result=await fn(job.args||{});
       reply={id:job.id, ok:true, result};
       try{ mcpShowChange(pre); }catch(e){ console.warn("mcp view", e); }
+      try{ uxRefreshPages(); }catch(_){}               // a pin / board page on screen shows the new state
     }catch(e){
       reply={id:job.id, ok:false, error:String(e&&e.message||e), hint:e&&e.hint||undefined};
       if(!(e instanceof McpError)) console.warn("mcp op failed", job.op, e);

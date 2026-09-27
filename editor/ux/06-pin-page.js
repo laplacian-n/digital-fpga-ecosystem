@@ -196,3 +196,15 @@ function uxNormPinmap(sch){
   uxPortBits(sch).forEach(b=>{ if(own[b.key]) return; const v=pmGet(own,b.key); if(v){
     Object.keys(own).forEach(x=>{ if(x!==b.key && x.toLowerCase()===b.key.toLowerCase()) delete own[x]; }); own[b.key]=v; } });
 }
+/* Whatever changes the pins from OUTSIDE the page (Claude over MCP, Undo/Redo) must show on it:
+   the page used to be drawn once, so it kept listing the old pins while the sheet held the new
+   ones ("หน้าจัดพินไม่ซิงค์อัตโนมัติ"). The board page's pin summary follows the same way. */
+function uxRefreshPages(){
+  try{ if(document.querySelector("#simPage.show.sv-pins")){ uxSyncSimPinmap(); uxRenderPinPage(); } }catch(e){ console.warn("pin page", e); }
+  try{ if(document.querySelector("#boardPage.show") && typeof brdRefresh==="function") brdRefresh(); }catch(e){ console.warn("board page", e); }
+}
+{
+  const _undo=undo, _redo=redo;
+  undo=function(){ const r=_undo.apply(this, arguments); uxRefreshPages(); return r; };
+  redo=function(){ const r=_redo.apply(this, arguments); uxRefreshPages(); return r; };
+}
