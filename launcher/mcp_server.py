@@ -144,7 +144,8 @@ TOOLS = [
     T("build_circuit", "Create a whole circuit, minimised and laid out by the editor, on a new sheet. One of:\n"
       "• truth_table: {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; "
       "into:\"current\" fills a sheet that has exactly those ports, e.g. a lab template)\n"
-      "• generator: {kind: mod_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low}\n"
+      "• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — "
+      "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename)\n"
       "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]}}, timeout=90),
@@ -178,12 +179,14 @@ TOOLS = [
       {"sheet": SHEET, "mode": {"type": "string", "enum": ["missing", "all"]}}),
     T("get_xdc", "The Vivado constraints (.xdc) the sheet's pin map produces, and which ports are still unassigned.", {"sheet": SHEET}),
     # --- the real board
-    T("board_build", "Build the .bit for the top sheet with Vivado (the ลงบอร์ด page opens so the user sees the log). "
-      "Every port needs a board pin first (get_pins / auto_pins). Returns at once — then call board_status.",
-      {}, timeout=40),
+    T("board_build", "Build the .bit with Vivado (the ลงบอร์ด page opens so the user sees the log). `sheet` = which "
+      "sheet is the top entity — a sub-circuit can be built and tested on the board by itself (default: the sheet "
+      "the board page has, else top). Every port of that sheet needs a board pin first (get_pins / auto_pins). "
+      "Returns at once — then call board_status.",
+      {"sheet": SHEET}, timeout=40),
     T("board_program", "Load the last .bit into the FPGA over USB (temporary, lost at power-off), or 'detect' to "
       "check the board answers. Permanent Flash writing is left to the user (💾 on the ลงบอร์ด page).",
-      {"mode": {"type": "string", "enum": ["sram", "detect"]},
+      {"sheet": SHEET, "mode": {"type": "string", "enum": ["sram", "detect"]},
        "cable": {"type": "string", "description": "openFPGALoader cable (default ft2232)"}}, timeout=40),
     T("board_status", "Wait (≤`wait` s, max 40) for the running build / program job, then report state "
       "(running / ok / error), the last log lines, a Thai explanation of an error, and whether a .bit exists and "

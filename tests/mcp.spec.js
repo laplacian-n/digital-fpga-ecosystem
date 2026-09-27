@@ -283,3 +283,20 @@ test("probe a comparator through MCP with bus values (a=0101, b=0011 → GT=1, L
   expect(bad.error).toBe(true);
   expect(bad.text).toContain("bus INPUT 'a'");
 });
+
+test("the pin page on screen follows set_pins from Claude (and Undo)", async () => {
+  await mcp.tool("new_sheet", { name: "pins_live" });
+  await mcp.tool("add_component", { type: "IN", name: "a" });
+  await mcp.tool("add_component", { type: "OUT", name: "y" });
+  await mcp.tool("connect", { from: "a", to: "y" });
+  await mcp.tool("set_pins", { map: { a: "sw:0", y: "led:0" } });
+  await page.evaluate(() => showSimPage("pins"));
+  const sel = page.locator('#simPinPicker select[data-pk="a"]');
+  await expect(sel).toHaveValue("sw:0");
+  const r = await mcp.tool("set_pins", { map: { a: "sw:5" } });           // Claude changes it while the page is open
+  expect(r.error, r.text).toBe(false);
+  await expect(sel).toHaveValue("sw:5");
+  await page.evaluate(() => undo());
+  await expect(sel).toHaveValue("sw:0");
+  await page.evaluate(() => hideSimPage());
+});

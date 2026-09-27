@@ -4,21 +4,32 @@
    launcher/board.py) — no second program, no copying files around. Opened from disk (no app)
    the step keeps the old dialog that downloads .vhd + .xdc.
    Also: ?view=topdown / ?view=board open that view on start (the launcher's Home buttons). */
-const BRD = {tools:null, since:0, timer:null, top:"", sheet:null};
+const BRD = {tools:null, since:0, timer:null, top:"", sheet:null, sheetId:null};
 
 async function brdTools(){
   if(!/^https?:/.test(location.protocol)) return null;
   try{ const r=await fetch("/api/board/tools"); if(!r.ok) return null; return await r.json(); }catch(_){ return null; }
 }
 function brdProject(){ return sanId(($("#projectName")||{}).value||state.project.name||"design")||"design"; }
-/* the design that goes on the board: the top sheet (VHDL is generated from it) */
-function brdSheet(){ return state.project.schematics[state.project.topId] || activeSch(); }
+/* the design that goes on the board: the sheet the user was on when they came here — a
+   sub-circuit can be put on the board by itself to test it ("อยู่ใน sim ของวงจรย่อย กดลงบอร์ด
+   ก็ให้ลงวงจรย่อย ไม่ใช่วิ่งไป top"). The header's sheet menu switches; top is marked ★. */
+function brdSheet(){ const S=state.project.schematics; return S[BRD.sheetId] || S[state.project.topId] || activeSch(); }
+function brdSheetMenu(){
+  const sel=$("#brdSheetSel"); if(!sel) return;
+  const S=state.project.schematics, cur=brdSheet();
+  sel.innerHTML=Object.keys(S).map(id=>`<option value="${esc(id)}" ${cur&&cur.id===id?"selected":""}>${esc(S[id].name)}${id===state.project.topId?" ★ top":""}</option>`).join("");
+}
 function brdDesign(){
   const sch=brdSheet(); if(!sch) return null;
   if(state.activeId!==sch.id){ try{ openSchTab(sch.id); renderAll(); }catch(_){} }
   const pb=uxPortBits(sch);                             // nothing mapped yet: the pin page's starting guess
   if(pb.length && !pb.some(b=>pmGet(sch.pinmap||{},b.key))){ uxAutoPins(sch, true); snapshot(); }
-  const all=generateAllVhdl(), names=Object.keys(all);
+  // VHDL + XDC for THIS sheet as the top entity (its own sub-blocks come along)
+  const realTop=state.project.topId; let all;
+  try{ state.project.topId=sch.id; all=generateAllVhdl(); }
+  finally{ state.project.topId=realTop; }
+  const names=Object.keys(all);
   const top=names.find(n=>n.toLowerCase()===sanId(sch.name).toLowerCase()) || names[names.length-1] || sanId(sch.name);
   const body=uxXdcBody();
   const bits=uxPortBits(sch).map(b=>({key:b.key, dir:b.dir, t:uxPinTarget(b, sch)}));
@@ -32,7 +43,8 @@ function brdEnsurePage(){
   pg=document.createElement("div"); pg.id="boardPage"; pg.className="sim-page brd-page";
   pg.innerHTML=`<div class="sim-top">
       <button class="btn2" data-brd="close">← กลับไปวาดวงจร</button>
-      <b>ลงบอร์ด</b><span class="muted" id="brdSheet"></span><span class="grow"></span>
+      <b>ลงบอร์ด</b><label class="muted" title="แผ่นที่จะลงบอร์ด — วงจรย่อยลงทดสอบเดี่ยวๆ ได้">แผ่น <select id="brdSheetSel"></select></label>
+      <span class="muted" id="brdSheet"></span><span class="grow"></span>
       <span class="muted" id="brdTools"></span>
     </div>
     <div class="brd-body">
@@ -64,6 +76,7 @@ function brdEnsurePage(){
     </div>`;
   document.body.appendChild(pg);
   pg.addEventListener("click", e=>{ const b=e.target.closest("[data-brd]"); if(!b) return; brdAct(b.dataset.brd); });
+  pg.querySelector("#brdSheetSel").addEventListener("change", e=>{ BRD.sheetId=e.target.value; brdRefresh(); });
   return pg;
 }
 function brdShow(on){ const pg=brdEnsurePage(); pg.classList.toggle("show", on); if(!on){ clearInterval(BRD.timer); BRD.timer=null; setStage("draw", true); } }
@@ -72,6 +85,7 @@ async function openBoardPage(){
   const t=await brdTools();
   if(!t) return false;                                  // no app: caller falls back to the download dialog
   BRD.tools=t; brdEnsurePage();
+  BRD.sheetId=(activeSch()||{}).id || state.project.topId;   // the sheet the user is on
   const cab=$("#brdCable"); if(cab && !cab.options.length) cab.innerHTML=(t.cables||["ft2232"]).map(c=>`<option>${esc(c)}</option>`).join("");
   $("#brdTools").innerHTML=(t.vivado?'<span class="ok">● Vivado</span>':'<span class="bad">● ไม่พบ Vivado</span>')+" · "
     +(t.openfpgaloader?'<span class="ok">● openFPGALoader</span>':'<span class="bad">● ไม่พบ openFPGALoader</span>');
@@ -81,7 +95,8 @@ async function openBoardPage(){
 }
 function brdRefresh(){
   const d=brdDesign(); if(!d) return;
-  BRD.top=d.top; $("#brdSheet").textContent="แผ่น "+d.sch.name+" · entity "+d.top;
+  BRD.top=d.top; brdSheetMenu();
+  $("#brdSheet").textContent="entity "+d.top+(d.sch.id!==state.project.topId?" · ทดสอบวงจรย่อยเดี่ยวๆ (ไม่ใช่ top)":"");
   const ok=d.bits.filter(b=>b.t).length;
   $("#brdPinSum").textContent=`${ok}/${d.bits.length} ขา`;
   $("#brdPins").innerHTML=d.bits.length?d.bits.map(b=>`<div class="brd-pin ${b.t?"":"miss"}"><b>${esc(b.key)}</b><span>${b.dir==="in"?"IN":"OUT"}</span><em>${b.t?esc(pinTargetLabel(b.t)):"ยังไม่ได้เลือก"}</em></div>`).join(""):'<div class="muted">วงจรนี้ยังไม่มี INPUT / OUTPUT</div>';
