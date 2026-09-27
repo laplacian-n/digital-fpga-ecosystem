@@ -18,6 +18,8 @@ test.beforeAll(async () => {
 echo "fake vivado $*"; cat build.tcl | grep -q read_xdc || exit 3
 top=$(sed -n 's/^write_bitstream -force "\\(.*\\)"$/\\1/p' build.tcl)
 grep -q PACKAGE_PIN *.xdc || { echo "ERROR: [Place 30-58] unconstrained"; exit 1; }
+# Tcl, like the real read_xdc: a '#' after a command is not a comment — the constraint is dropped
+if grep -E '^[^#].*\] +#' *.xdc; then echo "ERROR: [DRC NSTD-1] Unspecified I/O Standard"; exit 1; fi
 echo "write_bitstream ok"; printf 'BIT' > "$top"; echo "Vivado log" > vivado_build.log
 `, { mode: 0o755 });
   fs.writeFileSync(path.join(bin, "openFPGALoader"), `#!/bin/sh\necho "ofl $*"\n`, { mode: 0o755 });

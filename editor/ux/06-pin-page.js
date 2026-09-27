@@ -157,7 +157,10 @@ uxXdcBody=function(){
   ["in","out"].forEach(dir=>{
     bits.filter(b=>b.dir===dir).forEach(b=>{ const t=uxPinTarget(b, sch), port=b.bit==null?b.port:`{${b.vhdl}}`;
       if(!t){ miss.push(b.key); x+=`## ${b.key}: ยังไม่ได้เลือกขา (หน้า “เลือกขา”)\n`; return; }
-      x+=`set_property -dict {PACKAGE_PIN ${BOARD_PINS[t]||"?"} IOSTANDARD LVCMOS33} [get_ports ${port}]   ## ${pinTargetLabel(t)}\n`;
+      // the label on its OWN line: XDC is Tcl, where `#` starts a comment only at the start of a
+      // command — "[get_ports x]   ## SW 0" hands "##", "SW", "0" to set_property as arguments,
+      // the command fails and Vivado ends with every port unconstrained (NSTD-1 / UCIO-1)
+      x+=`## ${pinTargetLabel(t)}\nset_property -dict {PACKAGE_PIN ${BOARD_PINS[t]||"?"} IOSTANDARD LVCMOS33} [get_ports ${port}]\n`;
       if(t==="clk" && !clk){ clk=true; x+=`create_clock -period 20.000 -name sys_clk [get_ports ${port}]\n`; } });
     x+="\n"; });
   UX.xdcMissing=miss;

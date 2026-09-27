@@ -25,5 +25,9 @@ test("top sheet with buses lists every bit and writes a per-bit xdc", async ({ p
 test("old files keyed by typed names still map (case-insensitive)", async ({ page }) => {
   await openEditor(page);
   await page.evaluate(() => { startLabTemplate("walk"); const s = activeSch(); s.pinmap = { P: "sw:9", Walk: "led:5" }; });
-  expect(await page.evaluate(() => uxXdcBody())).toContain("[get_ports p]   ## SW 9");
+  const xdc = await page.evaluate(() => uxXdcBody());
+  expect(xdc).toContain("## SW 9");
+  expect(xdc).toContain("[get_ports p]\n");
+  // XDC is Tcl: a `#` after a command is NOT a comment — it becomes arguments and the constraint is lost
+  expect(xdc.split("\n").filter(l => /^\s*set_property/.test(l) && /#/.test(l))).toEqual([]);
 });
