@@ -15023,13 +15023,30 @@ MCP_OPS.verify_truth_table = a=>{
   });
   return {sheet:sim.sheet, pass:!mism.length, checked_outputs:Object.keys(exp), mismatches:mism.slice(0,64), inputs:sim.inputs};
 };
+/* an input value for probe: a bus takes its whole value — 5 (a number), "0101" (a string of
+   0/1 is binary), "0b0101", "0x5" or "9"; a 1-bit input is 0/1. (Every value used to be squashed to 0/1,
+   so a=0101 on a 4-bit bus probed as a=1.) */
+function mcpProbeVal(c, v){
+  const w=probeWidth(c,"o"), m=probeMask(w);
+  if(w<=1) return (+v || v===true || /^(1|true|high|h)$/i.test(String(v))) ? 1 : 0;
+  if(typeof v==="number") return (v>>>0)&m;
+  const t=String(v).trim().replace(/_/g,"");
+  let n;
+  if(/^0b[01]+$/i.test(t)) n=parseInt(t.slice(2),2);
+  else if(/^0x[0-9a-f]+$/i.test(t)) n=parseInt(t.slice(2),16);
+  else if(/^[01]{2,}$/.test(t)) n=parseInt(t,2);            // "0101" is binary — how the lab writes values
+  else if(/^\d+$/.test(t)) n=parseInt(t,10);
+  else mcpFail(`value '${v}' for bus INPUT '${c.params.name}' (${w} bits) — use a number (5), binary as wide as the bus ("${"0".repeat(w-1)}1"), "0b…" or "0x…"`);
+  return (n>>>0)&m;
+}
 MCP_OPS.probe = a=>{
   const sch=mcpSheet(a.sheet), fs=flattenSchematic(sch).sch, saved=Object.assign({},PROBE_VALS);
   try{
     Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]);
-    Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=+v?1:0; });
+    Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=mcpProbeVal(c, v); });
     const m=probeModel(fs, probeStruct(fs));
-    const outs={}; sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"); outs[c.params.name]=v==null?"undriven":v; });
+    const outs={}; sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"), w=probeWidth(c,"i");
+      outs[c.params.name]=v==null?"undriven":(w>1?{value:v, bin:v.toString(2).padStart(w,"0")}:v); });
     const nets=mcpNets(sch).map(n=>{ if(!n.driver) return Object.assign({value:"undriven"},n);
       const [cn,pid]=[n.driver.slice(0,n.driver.lastIndexOf(".")), n.driver.slice(n.driver.lastIndexOf(".")+1)];
       const c=findCompRef(sch,cn); let v=null; try{ v=c?m.outVal(c.id,pid,new Set()):null; }catch(_){}

@@ -162,7 +162,9 @@ TOOLS = [
       {"sheet": SHEET, "cycles": {"type": "integer", "minimum": 1, "maximum": 256}, "inputs": INPUTS}),
     T("verify_truth_table", "Compare a combinational sheet against expected output columns ({out:\"0110…\"}, x = don't care). "
       "Returns pass and the mismatching rows.", {"sheet": SHEET, "expected": {"type": "object"}}, ["expected"]),
-    T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong.",
+    T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong. "
+      "A bus INPUT takes its whole value: 5, \"0101\" (binary as wide as the bus), \"0b0101\" or \"0x5\"; "
+      "a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated.",
       {"sheet": SHEET, "inputs": INPUTS}),
     T("explain_simulation", "Likely reasons a simulation doesn't behave as expected (clock not reaching FFs, reset stuck, "
       "gated clock, floating pins, multi-driver, constant outputs, unused inputs, divider chains).", {"sheet": SHEET}),

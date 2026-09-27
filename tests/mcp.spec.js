@@ -258,3 +258,28 @@ test("a big change draws in piece by piece (ค่อยๆโผล่มา), 
   const g = await mcp.tool("get_sheet", { sheet: "reveal" });
   expect(g.error).toBe(false);
 });
+
+test("probe a comparator through MCP with bus values (a=0101, b=0011 → GT=1, LT=0)", async () => {
+  // what Claude reported as "unknown": COMPM4 / COMP were not evaluated, and a=0101 was squashed to 1
+  await mcp.tool("new_sheet", { name: "cmp_probe" });
+  const put = async (type, name, params) => (await mcp.tool("add_component", { type, name, params })).data;
+  await put("IN", "a", { width: 8 }); await put("IN", "b", { width: 8 });
+  const m = await put("COMPM", "", { width: 8 });   // 8 bits → bus pins a / b
+  const e = await put("COMP", "", { width: 8 });
+  await put("OUT", "gt"); await put("OUT", "lt"); await put("OUT", "eq");
+  const q = await put("IN", "q", { width: 8 });     // 8-bit operands
+  const id = x => x.id || x.component || x;
+  const mid = id(m), eid = id(e);
+  const conn = async (f, t) => { const r = await mcp.tool("connect", { from: f, to: t }); expect(r.error, r.text).toBe(false); };
+  await conn("a", mid + ".a"); await conn("b", mid + ".b");
+  await conn("a", eid + ".a"); await conn("q", eid + ".b");
+  await conn(mid + ".gt", "gt"); await conn(mid + ".lt", "lt"); await conn(eid + ".eq", "eq");
+  let p = await mcp.tool("probe", { sheet: "cmp_probe", inputs: { a: "0101", b: "00000011", q: 5 } });
+  expect(p.error, p.text).toBe(false);
+  expect(p.data.outputs).toEqual({ gt: 1, lt: 0, eq: 1 });
+  p = await mcp.tool("probe", { sheet: "cmp_probe", inputs: { a: "0x3", b: "0b101", q: 4 } });
+  expect(p.data.outputs).toEqual({ gt: 0, lt: 1, eq: 0 });
+  const bad = await mcp.tool("probe", { sheet: "cmp_probe", inputs: { a: "01x1" } });
+  expect(bad.error).toBe(true);
+  expect(bad.text).toContain("bus INPUT 'a'");
+});
