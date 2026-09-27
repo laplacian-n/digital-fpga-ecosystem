@@ -6862,7 +6862,7 @@ function probeReset(){ Object.keys(PROBE_FF).forEach(k=>delete PROBE_FF[k]); Obj
 function toggleProbe(){
   PROBE=!PROBE; const b=$("#btnProbe"); if(b) b.classList.toggle("active",PROBE);
   if(PROBE){
-    toast("โหมดตรวจค่า 🔬 — คลิกที่ INPUT เพื่อสลับ 0/1 · คลิก clk เพื่อเดินสัญญาณนาฬิกา (1→2→4 Hz→หยุด) · Alt+คลิก = ขึ้น/ลง ทีละครั้ง","info",5200);
+    toast("โหมดตรวจค่า 🔬 — คลิกที่ INPUT เพื่อสลับ 0/1 (INPUT แบบบัส = เลือกค่าทีละบิต) · คลิก clk เพื่อเดินสัญญาณนาฬิกา (1→2→4 Hz→หยุด) · Alt+คลิก = ขึ้น/ลง ทีละครั้ง","info",5200);
     try{ const fw=flattenSchematic(activeSch()).warns; if(fw.length) setTimeout(()=>toast("⚠ "+fw[0]+(fw.length>1?" (+"+(fw.length-1)+")":""),"warn",5000),400); }catch(_){}
     probeReset(); try{ probeSettle(flattenSchematic(activeSch()).sch); }catch(_){}   // learn the starting clock levels
   } else probeStopClocks();
@@ -6874,7 +6874,23 @@ function constBit(c){
   const n=parseInt(String(v==null?"0":v).replace(/^0x/i,""),16);
   return isNaN(n)?0:(n&1);
 }
-function probeBit(c){ return PROBE_VALS[c.id]!==undefined ? (PROBE_VALS[c.id]?1:0) : (c.type==="CONST"?constBit(c):0); }
+/* Probe values are bit VECTORS (an integer masked to the port width): a 1-bit signal is 0/1
+   as before, swt(3:0) is 0..15. The probe used to be 1-bit only, so a bus input could not be
+   set and everything behind its bus taps read "unknown". */
+function probeWidth(c, pid){ try{ const p=getPort(c, pid||(getPorts(c).find(q=>q.dir==="out")||{}).id); return Math.max(1, (p&&p.width)||1); }catch(_){ return 1; } }
+function probeMask(w){ return w>=32 ? 0xFFFFFFFF : ((1<<w)>>>0)-1; }
+function constVal(c){
+  const v=c.params&&c.params.value, w=probeWidth(c);
+  if(typeof v==="number") return (v>>>0)&probeMask(w);
+  const t=String(v==null?"0":v).trim();
+  const n=/^[01]+$/.test(t)&&t.length>1 ? parseInt(t,2) : parseInt(t.replace(/^0x/i,""),16);
+  return isNaN(n)?0:((n>>>0)&probeMask(w));
+}
+function probeBit(c){
+  const w=probeWidth(c);
+  if(PROBE_VALS[c.id]!==undefined) return w>1 ? ((PROBE_VALS[c.id]>>>0)&probeMask(w)) : (PROBE_VALS[c.id]?1:0);
+  return c.type==="CONST" ? (w>1 ? constVal(c) : constBit(c)) : 0;
+}
 function probeApply(){ try{ probeSettle(flattenSchematic(activeSch()).sch); }catch(e){ console.warn("probe",e); } render(); }
 function toggleProbeInput(c, ev){
   const sch=activeSch();
@@ -6893,8 +6909,43 @@ function toggleProbeInput(c, ev){
     toast(nxt?("⏱ สัญญาณนาฬิกา "+nxt+" Hz"):"⏹ หยุดสัญญาณนาฬิกา","info",1400);
     render(); return;
   }
+  if(c.type==="IN" && probeWidth(c)>1){ probeBusPicker(c, ev); return; }
   PROBE_VALS[c.id]=probeBit(c)?0:1;
   probeApply();
+}
+/* a bus INPUT: one button per bit (MSB first, like the name swt(3:0)), plus all-0 / all-1 */
+function probeBusPicker(c, ev){
+  let box=$("#probeBusPick");
+  if(!box){ box=document.createElement("div"); box.id="probeBusPick"; box.className="probe-bus-pick"; document.body.appendChild(box);
+    document.addEventListener("mousedown", e=>{ const b=$("#probeBusPick"); if(b && b.style.display!=="none" && !b.contains(e.target)) b.style.display="none"; }, true);
+    document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ const b=$("#probeBusPick"); if(b) b.style.display="none"; } }, true); }
+  const w=Math.min(32, probeWidth(c)), name=(c.params&&c.params.name)||"in";
+  const draw=()=>{
+    const v=probeBit(c);
+    let h=`<div class="pbp-h"><b>${esc(name)}(${w-1}:0)</b> = ${v} <span class="muted">· 0b${v.toString(2).padStart(w,"0")}${w>4?" · 0x"+v.toString(16).toUpperCase():""}</span></div><div class="pbp-bits">`;
+    for(let i=w-1;i>=0;i--) h+=`<button data-bit="${i}" class="${(v>>>i)&1?"on":""}" title="บิต ${i}"><small>${i}</small>${(v>>>i)&1}</button>`;
+    h+=`</div><div class="pbp-row"><button data-all="0">ทั้งหมด 0</button><button data-all="1">ทั้งหมด 1</button><button data-step="-1">−1</button><button data-step="1">+1</button></div>`;
+    box.innerHTML=h;
+    box.querySelectorAll("button").forEach(b=>b.onclick=e2=>{ e2.stopPropagation();
+      const m=probeMask(w); let v2=probeBit(c);
+      if(b.dataset.bit!=null) v2=(v2 ^ (1<<(+b.dataset.bit)))>>>0;
+      else if(b.dataset.all!=null) v2=b.dataset.all==="1"?m:0;
+      else if(b.dataset.step) v2=((v2+(+b.dataset.step))>>>0)&m;
+      PROBE_VALS[c.id]=v2&m; probeApply(); draw(); });
+  };
+  draw();
+  box.style.display="block";
+  const x=(ev&&ev.clientX)||200, y=(ev&&ev.clientY)||200;
+  box.style.left=Math.max(8, Math.min(window.innerWidth-box.offsetWidth-8, x+12))+"px";
+  box.style.top =Math.max(8, Math.min(window.innerHeight-box.offsetHeight-8, y+12))+"px";
+}
+function probeGateOpW(type, ins, w){
+  if(w<=1) return probeGateOp(type, ins.map(x=>x?1:0));
+  const m=probeMask(w), a=(ins[0]>>>0)&m;
+  const and=ins.reduce((p,x)=>(p&x)>>>0, m), or=ins.reduce((p,x)=>(p|x)>>>0, 0), xor=ins.reduce((p,x)=>(p^x)>>>0, 0);
+  switch(type){ case"AND":return and&m; case"OR":return or&m; case"XOR":return xor&m;
+    case"NAND":return (~and)&m; case"NOR":return (~or)&m; case"XNOR":return (~xor)&m;
+    case"NOT":return (~a)&m; case"BUF":return a; } return null;
 }
 function probeGateOp(type, ins){
   const a=ins[0]?1:0, and=ins.every(x=>x), or=ins.some(x=>x), xor=ins.reduce((p,x)=>p^(x?1:0),0);
@@ -6930,7 +6981,7 @@ function probeModel(sch, st){
     if(st&&st.drv.has(wire.id)) return st.drv.get(wire.id);
     const ids=netWires(sch,wire); let res=null;
     scan: for(const id of ids){ const w=st?st.wById.get(id):sch.wires.find(x=>x.id===id); if(!w) continue;
-      for(const ep of [w.from,w.to]){ const c=C(ep.cid); if(!c||c.type==="JUNCTION"||c.type==="BUSTAP") continue;
+      for(const ep of [w.from,w.to]){ const c=C(ep.cid); if(!c||c.type==="JUNCTION") continue;   // a split tap's bit pin drives
         if(outPortsOf(c).some(p=>p.id===ep.pid)){ res={cid:ep.cid,pid:ep.pid}; break scan; } } }
     if(st) ids.forEach(id=>st.drv.set(id,res));
     return res;
@@ -6938,7 +6989,21 @@ function probeModel(sch, st){
   function wireOf(cid,pid){ if(st) return st.pinWire.get(cid+"|"+pid)||null;
     return sch.wires.find(w=>(w.to.cid===cid&&w.to.pid===pid)||(w.from.cid===cid&&w.from.pid===pid)); }
   function inVal(cid,pid,guard){
-    const w=wireOf(cid,pid); if(!w) return null; const d=netDriver(w); if(!d) return null; return outVal(d.cid,d.pid,guard||new Set());
+    const w=wireOf(cid,pid); if(!w) return null; const d=netDriver(w);
+    if(!d) return mergeVal(w, guard||new Set());
+    return outVal(d.cid,d.pid,guard||new Set());
+  }
+  /* a bus with no driving port, assembled bit by bit by merge taps */
+  function mergeVal(w, guard){
+    const ids=netWires(sch,w); let v=0, any=false;
+    for(const id of ids){ const x=st?st.wById.get(id):sch.wires.find(y=>y.id===id); if(!x) continue;
+      for(const ep of [x.from,x.to]){ const c=C(ep.cid);
+        if(!c || c.type!=="BUSTAP" || ep.pid!=="d" || (c.params&&c.params.mode)!=="merge") continue;
+        const key="merge|"+c.id; if(guard.has(key)) continue; guard.add(key);
+        const p=c.params||{}, nb=Math.max(1,p.nbit||1), b=p.bit||0, y=inVal(c.id,"y",guard); guard.delete(key);
+        if(y==null) return null;
+        v=(v | (((y>>>0)&probeMask(nb))<<b))>>>0; any=true; } }
+    return any ? v : null;
   }
   function outVal(cid,pid,guard){
     const key=cid+"."+pid; if(memo.has(key)) return memo.get(key);
@@ -6948,7 +7013,9 @@ function probeModel(sch, st){
       if(c.type==="IN"||c.type==="CONST") v=probeBit(c);
       else if(c.type==="VCC") v=1;
       else if(c.type==="GND") v=0;
-      else if(PROBE_GATES[c.type]){ const ins=inPortsOf(c).map(p=>inVal(cid,p.id,guard)); v=ins.some(x=>x==null)?null:probeGateOp(c.type,ins); }
+      else if(PROBE_GATES[c.type]){ const ins=inPortsOf(c).map(p=>inVal(cid,p.id,guard)); v=ins.some(x=>x==null)?null:probeGateOpW(c.type,ins,probeWidth(c,pid)); }
+      else if(c.type==="BUSTAP"){ const p=c.params||{}, bus=inVal(cid,"d",guard);
+        v = bus==null ? null : ((bus>>>(p.bit||0)) & probeMask(Math.max(1,p.nbit||1))); }
       else if(c.type==="MUX"){
         const n=(c.params&&c.params.inputs)||2, sb=Math.ceil(Math.log2(n)); let sel=0, ok=true;
         for(let i=0;i<sb;i++){ const s=inVal(cid,"s"+i,guard); if(s==null){ ok=false; break; } sel|=(s?1:0)<<i; }
@@ -6972,7 +7039,7 @@ function probeModel(sch, st){
     }
     return null;
   }
-  return {inVal,outVal,netDriver,source,inPortsOf};
+  return {inVal,outVal,netDriver,source,inPortsOf,mergeVal};
 }
 /* Let the flip-flops react: async clear/preset first, then every flip-flop that sees its
    clock edge this round samples the SAME pre-edge values, then look again (a Q that just
@@ -7022,7 +7089,7 @@ function probeEval(sch){
   // per-wire value from its net driver
   const done=new Set();
   sch.wires.forEach(w=>{ if(done.has(w.id)) return; const ids=netWires(sch,w); const d=m.netDriver(w);
-    const v=d?m.outVal(d.cid,d.pid,new Set()):null; ids.forEach(id=>{ done.add(id); wireVal.set(id,v); }); });
+    const v=d?m.outVal(d.cid,d.pid,new Set()):m.mergeVal(w,new Set()); ids.forEach(id=>{ done.add(id); wireVal.set(id,v); }); });
   // a sub-block node lights up when any of its outputs is 1 (faint when all 0, neutral if unknown)
   Object.keys(blocks).forEach(bid=>{
     const vs=Object.values(blocks[bid]).filter(t=>t.dir==="out").map(t=>m.outVal(t.cid,t.pid,new Set()));
@@ -7040,7 +7107,7 @@ function probeColorize(sch){
   root.querySelectorAll('.wire-group[data-wid]').forEach(g=>{
     const v=wireVal.get(g.getAttribute('data-wid'));
     const path=g.querySelector('path.wire'); if(!path) return;
-    if(v===1){ if(!NETCOLOR) path.setAttribute('stroke','var(--ok)'); path.setAttribute('stroke-width','2.8'); g.style.opacity='1'; }
+    if(v!=null && v!==0){ if(!NETCOLOR) path.setAttribute('stroke','var(--ok)'); path.setAttribute('stroke-width','2.8'); g.style.opacity='1'; }
     else if(v===0){ if(!NETCOLOR) path.setAttribute('stroke','var(--wire)'); g.style.opacity='0.22'; }
     else { g.style.opacity='0.55'; }
   });
@@ -7052,8 +7119,22 @@ function probeColorize(sch){
       const w=sch.wires.find(w=>w.from.cid===cid||w.to.cid===cid);
       v = w ? wireVal.get(w.id) : undefined;
     }
-    g.style.opacity=(v===0)?'0.22':(v===1?'1':'0.55');
-    g.classList.toggle('probe-on', v===1);
+    g.style.opacity=(v===0)?'0.22':(v!=null?'1':'0.55');
+    g.classList.toggle('probe-on', v!=null && v!==0);
+  });
+  // the value of every bus, written on it once per net (binary up to 8 bits, then hex)
+  const world0=root.firstChild, seenNet=new Set();
+  if(world0) sch.wires.forEach(w=>{
+    const v=wireVal.get(w.id); if(v==null) return;
+    let bw=1; try{ bw=wireWidth(w, sch)||1; }catch(_){}
+    if(bw<=1) return;
+    const ids=[...netWires(sch,w)].sort().join(","); if(seenNet.has(ids)) return; seenNet.add(ids);
+    const pts=drawnPoints(sch,w); if(!pts||pts.length<2) return;
+    const a=pts[0], b=pts[1];
+    const lab=bw<=8 ? v.toString(2).padStart(bw,"0") : "0x"+v.toString(16).toUpperCase();
+    const t=txt((a.x+b.x)/2, Math.min(a.y,b.y)-5, lab, {anchor:"middle", size:10, fill:v?"var(--ok)":"var(--ink-dim)"});
+    t.setAttribute("pointer-events","none"); t.setAttribute("font-weight","700"); t.setAttribute("class","probe-busval");
+    world0.appendChild(t);
   });
   // frequency badge above every clock: running → "⏱ n Hz", stopped → a hint to click
   const world=root.firstChild;
@@ -12919,6 +13000,18 @@ init();
 #projectPane .tree-item.sch.sd-drag{opacity:.45}
 #projectPane .tree-item.sch.sd-before{box-shadow:inset 0 2px 0 var(--accent,#5b6cff)}
 #projectPane .tree-item.sch.sd-after{box-shadow:inset 0 -2px 0 var(--accent,#5b6cff)}
+/* probe: per-bit picker for a bus INPUT */
+.probe-bus-pick{position:fixed;z-index:1000;display:none;background:var(--bg-1);border:1px solid var(--line,#ccd);border-radius:10px;
+  padding:8px 10px;box-shadow:0 8px 24px rgba(0,0,0,.2);font-size:12.5px;color:var(--ink)}
+.probe-bus-pick .pbp-h{margin-bottom:6px}
+.probe-bus-pick .pbp-bits{display:flex;gap:4px;margin-bottom:6px}
+.probe-bus-pick .pbp-bits button{width:30px;height:36px;border:1px solid var(--line,#ccd);border-radius:6px;background:var(--bg-0);cursor:pointer;
+  font:600 14px/1 ui-monospace,monospace;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--ink)}
+.probe-bus-pick .pbp-bits button small{font:400 9px/1 system-ui;color:var(--muted)}
+.probe-bus-pick .pbp-bits button.on{background:var(--ok,#2da44e);color:#fff;border-color:transparent}
+.probe-bus-pick .pbp-bits button.on small{color:#e8ffe8}
+.probe-bus-pick .pbp-row{display:flex;gap:4px}
+.probe-bus-pick .pbp-row button{border:1px solid var(--line,#ccd);border-radius:6px;background:var(--bg-0);padding:3px 8px;cursor:pointer;font:inherit;font-size:11.5px;color:var(--ink)}
 </style>
 <script>
 "use strict";
