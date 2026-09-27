@@ -456,7 +456,7 @@ def start_program(project: str, top: str, mode: str = "sram", cable: str = "ft22
         bridge = find_bridge(ofl)
         if not bridge:
             return {"ok": False, "error": f"เขียนถาวรต้องมีไฟล์ {name} วางไว้ข้าง openFPGALoader"}
-        cmd = [ofl, "-c", cable, "-f", "-B", bridge.replace("\\", "/"), str(bit)]
+        cmd = flash_cmd(ofl, cable, bridge, bit)
         done = "เขียนลง Flash สำเร็จ — วงจรอยู่ถาวรแม้ถอดปลั๊ก"
     else:
         cmd = [ofl, "-c", cable, "-m", str(bit)]
@@ -469,6 +469,35 @@ def start_program(project: str, top: str, mode: str = "sram", cable: str = "ft22
     _run("program", cmd, Path(ofl).parent, on_ok=lambda: JOB.log(done),
          env=_clean_env(str(Path(ofl).parent)))
     return {"ok": True}
+
+
+def _cli_path(p, cwd) -> str:
+    """A path openFPGALoader can open. The MSYS2 build runs paths through cygpath, and a space
+    splits them: "…/Programs/FPGA Ecosystem/tools/…/spiOverJtag_….bit" failed with
+    "Error: fail to open" although the file was there. A file in the working folder goes by its
+    bare name; any other path with a space goes by its 8.3 short name (no spaces) on Windows."""
+    p = Path(p)
+    try:
+        if p.parent.resolve() == Path(cwd).resolve():
+            return p.name
+    except OSError:
+        pass
+    s = str(p)
+    if " " in s and IS_WIN:
+        try:
+            import ctypes
+            buf = ctypes.create_unicode_buffer(1024)
+            if ctypes.windll.kernel32.GetShortPathNameW(s, buf, 1024) and " " not in buf.value:
+                return buf.value
+        except Exception:  # noqa: BLE001
+            pass
+    return s
+
+
+def flash_cmd(ofl: str, cable: str, bridge: str, bit) -> list:
+    """openFPGALoader command to write the board's SPI flash (run with cwd = openFPGALoader's folder)"""
+    cwd = Path(ofl).parent
+    return [ofl, "-c", cable, "-f", "-B", _cli_path(bridge, cwd), _cli_path(bit, cwd)]
 
 
 def start_detect(cable: str = "ft2232") -> dict:
