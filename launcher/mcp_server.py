@@ -178,12 +178,14 @@ TOOLS = [
       {"sheet": SHEET, "mode": {"type": "string", "enum": ["missing", "all"]}}),
     T("get_xdc", "The Vivado constraints (.xdc) the sheet's pin map produces, and which ports are still unassigned.", {"sheet": SHEET}),
     # --- the real board
-    T("board_build", "Build the .bit for the top sheet with Vivado (the ลงบอร์ด page opens so the user sees the log). "
-      "Every port needs a board pin first (get_pins / auto_pins). Returns at once — then call board_status.",
-      {}, timeout=40),
+    T("board_build", "Build the .bit with Vivado (the ลงบอร์ด page opens so the user sees the log). `sheet` = which "
+      "sheet is the top entity — a sub-circuit can be built and tested on the board by itself (default: the sheet "
+      "the board page has, else top). Every port of that sheet needs a board pin first (get_pins / auto_pins). "
+      "Returns at once — then call board_status.",
+      {"sheet": SHEET}, timeout=40),
     T("board_program", "Load the last .bit into the FPGA over USB (temporary, lost at power-off), or 'detect' to "
       "check the board answers. Permanent Flash writing is left to the user (💾 on the ลงบอร์ด page).",
-      {"mode": {"type": "string", "enum": ["sram", "detect"]},
+      {"sheet": SHEET, "mode": {"type": "string", "enum": ["sram", "detect"]},
        "cable": {"type": "string", "description": "openFPGALoader cable (default ft2232)"}}, timeout=40),
     T("board_status", "Wait (≤`wait` s, max 40) for the running build / program job, then report state "
       "(running / ok / error), the last log lines, a Thai explanation of an error, and whether a .bit exists and "

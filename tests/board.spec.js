@@ -110,3 +110,37 @@ test("first run opens the setup checklist until it is dismissed", async ({ page 
   await expect(page.locator("#tab-setup")).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test("on a sub-circuit's sheet, ลงบอร์ด builds THAT sheet as the top entity (and the menu can switch)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(BASE + "/studio.html");
+  await page.waitForFunction(() => typeof openBoardPage === "function");
+  await page.waitForTimeout(800);
+  await page.evaluate(() => { document.querySelectorAll(".modal-bg").forEach(m => m.remove());
+    document.querySelector("#projectName").value = "subtest";
+    // a second sheet "inv": x → NOT → y, and we stay on it (like being in its sim)
+    const id = uid("sch"); state.project.schematics[id] = blankSchematic(id, "inv"); openSchTab(id);
+    const s = activeSch(); const put = (type, x, y, params) => { const c = { id: uid("c"), type, x, y, label: "", params: Object.assign({}, TYPES[type].defaultParams || {}, params || {}) }; s.components.push(c); return c; };
+    const x = put("IN", 88, 110, { name: "x" }), n = put("NOT", 300, 99), y = put("OUT", 500, 110, { name: "y" });
+    s.wires.push({ id: uid("w"), from: { cid: x.id, pid: "o" }, to: { cid: n.id, pid: getPorts(n).find(p => p.dir === "in").id }, name: "" },
+                 { id: uid("w"), from: { cid: n.id, pid: "o" }, to: { cid: y.id, pid: "i" }, name: "" });
+    snapshot(); renderAll(); });
+  await page.click('.step[data-stage="upload"]');
+  await expect(page.locator("#brdSheetSel")).toHaveValue(await page.evaluate(() => activeSch().id));
+  await expect(page.locator("#brdSheet")).toContainText("entity inv");
+  await expect(page.locator("#brdSheet")).toContainText("วงจรย่อย");
+  await expect(page.locator("#brdPins .brd-pin")).toHaveCount(2);             // x, y — not top's ports
+  const d = await page.evaluate(() => { const d = brdDesign(); return { top: d.top, vhdl: d.vhdl, topId: state.project.topId, inv: activeSch().id }; });
+  expect(d.top).toBe("inv");
+  expect(d.vhdl).toMatch(/entity inv is/);
+  expect(d.topId).not.toBe(d.inv);                                          // the project's real top is untouched
+  await page.click('[data-brd="build"]');
+  await expect(page.locator("#brdStatus")).toContainText("สร้าง .bit" + "สำเร็จ", { timeout: 15000 });
+  const dir = path.join((await (await fetch(BASE + "/api/projects")).json()).dir, "subtest");
+  expect(fs.readdirSync(dir)).toContain("inv.bit");
+  // the menu switches to top
+  const topId = d.topId;
+  await page.selectOption("#brdSheetSel", topId);
+  await expect(page.locator("#brdSheet")).not.toContainText("entity inv");
+  await page.click('[data-brd="close"]');
+});

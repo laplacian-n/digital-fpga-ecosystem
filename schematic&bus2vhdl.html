@@ -12312,7 +12312,7 @@ function buildSimBoard(){
   h+=`<div class="lbl" style="left:116px;top:190px;font-size:26px;letter-spacing:1px">SPARTAN 7</div>`;
   h+=`<div class="blk" style="left:490px;top:198px;width:190px;height:190px;border-width:1.5px"><div style="position:absolute;top:8px;left:8px;width:8px;height:8px;border-radius:50%;border:1px solid #666"></div><div style="position:absolute;top:24px;left:20px;font-size:9.5px;color:#555;line-height:1.7"><div>XILINX®</div><div>SPARTAN®-7</div><div>XC7S15</div><div style="font-size:8.5px">FTGB196</div><div style="font-size:8.5px">D6O06053A</div><div style="margin-top:5px;font-size:8.5px">TAIWAN</div></div><div style="position:absolute;bottom:5px;left:8px;font-size:8px;color:#999">U14</div></div>`;
   // 7-seg
-  h+=`<div class="lbl" style="left:120px;top:246px;font-size:10px">7 SEGMENT DISP</div><div id="simSegbox" style="position:absolute;left:120px;top:259px;width:181px;height:54px;border:1.5px solid #222;border-radius:2px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px"></div><div class="pin" style="left:120px;top:316px;font-size:8px">digit: H4 H3 H2 H1</div>`;
+  h+=`<div class="lbl" style="left:120px;top:246px;font-size:10px">7 SEGMENT DISP</div><div id="simSegbox" style="position:absolute;left:120px;top:259px;width:181px;height:54px;border:1.5px solid #222;border-radius:2px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px"></div><div class="pin" style="left:120px;top:316px;font-size:8px">digit: H4 H3 H2 H1 · active-low (0 = ติด)</div>`;
   // Buttons cross + reset
   h+=`<div class="lbl" style="left:820px;top:180px;font-size:11px">BUTTONS</div><div style="position:absolute;left:833px;top:198px;width:100px;height:100px">`
     +simBtn(33,0,'J13',15,6)+simBtn(0,34,'',0,0)+simBtn(33,34,'J12',48,69)+simBtn(66,34,'',0,0)+simBtn(33,68,'L13',12,82)+`</div>`;
@@ -12394,9 +12394,11 @@ function wireSimBoard(j){
     document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ d.style.background='#fff'; d.style.boxShadow='none'; });
     const segOn={digits:simSegDigits(tt.outputs, out)};
     const bz=$("#simBuzzer"); if(bz){ bz.style.background='#fff'; bz.style.boxShadow='none'; }
+    // 7-seg segments are ACTIVE-LOW on this board (common anode): a segment lights while its pin is 0
+    tt.outputs.forEach((n,k)=>{ const t0=SIM_PINMAP.outMap[n]||''; if(t0.slice(0,4)==='seg:'){ const s=SEGL.indexOf(t0.slice(4)); if(s>=0 && !out[k]) segOn[s]=1; } });
     tt.outputs.forEach((n,k)=>{ if(!out[k]) return; const t=SIM_PINMAP.outMap[n]||'';
       if(t.slice(0,4)==='led:'){ const d=document.querySelector('#simPcb .ledDot[data-led="'+t.slice(4)+'"]'); if(d){ d.style.background='#222'; d.style.boxShadow='0 0 8px 3px rgba(0,0,0,.35)'; } }
-      else if(t.slice(0,4)==='seg:'){ const s=SEGL.indexOf(t.slice(4)); if(s>=0) segOn[s]=1; }
+      else if(t.slice(0,4)==='seg:'){ /* painted above: lit on 0 */ }
       else if(t==='buzzer' && bz){ bz.style.background='#ffe08a'; bz.style.boxShadow='0 0 10px 3px rgba(245,180,40,.6)'; }
     });
     simPaintSeg(segOn);
@@ -12530,7 +12532,7 @@ function seqShow(i){
   SIM_SEQ.inputs.forEach((name,k)=>{ const u=document.querySelector('#simPcb .swUnit[data-sw="'+SIM_SEQ.swOf[k]+'"]'); if(u){ const th=u.querySelector('.swThumb'); th.style.top=ins[k]?'1px':'12px'; th.style.background=ins[k]?'#222':'#aaa'; }});
   const ledOn={}; SIM_SEQ.ledOf.forEach((l,k)=>{ if(l!=null && out[k]) ledOn[l]=1; });
   document.querySelectorAll('#simPcb .ledDot').forEach(d=>{ const on=ledOn[+d.dataset.led]; d.style.background=on?'#222':'#fff'; d.style.boxShadow=on?'0 0 8px 3px rgba(0,0,0,.35)':'none'; });
-  if(segMap){ const on={digits:simSegDigits(SIM_SEQ.outputs, out)}; for(let s=0;s<7;s++) on[s]=segMap[s]!=null?out[segMap[s]]:0; simPaintSeg(on); }
+  if(segMap){ const on={digits:simSegDigits(SIM_SEQ.outputs, out)}; for(let s=0;s<7;s++) on[s]=segMap[s]!=null?(out[segMap[s]]?0:1):0; simPaintSeg(on); }   // active-low, like the board
   $("#simValbar").innerHTML='<b style="color:var(--accent)">clock '+r[0]+'</b>'
     +(SIM_SEQ.inputs.length?(' &nbsp; <b style="color:var(--ok)">IN</b> '+SIM_SEQ.inputs.map((nm,i)=>esc(nm)+'='+ins[i]).join(' ')):'')
     +' &nbsp;→&nbsp; <b style="color:#2f81f7">OUT</b> '+SIM_SEQ.outputs.map((nm,i)=>esc(nm)+'='+out[i]).join(' ')+(SIM_SEQ.dffs.length?(' &nbsp; <b style="color:var(--warn)">state</b> '+SIM_SEQ.dffs.map((d,i)=>esc(d)+'='+st[i]).join(' ')):'');
@@ -15180,8 +15182,12 @@ MCP_OPS.new_project = a=>{
    board_program start the job and board_status follows it (≤40 s per call). The page opens so
    the user watches the same log. Writing the Flash (permanent) stays a click of the user's. */
 async function mcpBoardPage(){ try{ if(!$("#boardPage.show")) await openBoardPage(); }catch(_){} }
-MCP_OPS.board_build = async ()=>{
+/* which sheet goes on the board: `sheet` if given (a sub-circuit can be tested on its own),
+   else the one the board page already has, else top */
+function mcpBoardSheet(a){ if(a && a.sheet){ BRD.sheetId=mcpUse(a.sheet).id; } else if(!BRD.sheetId) BRD.sheetId=state.project.topId; }   // mcpUse opens it, so the page picks the same one
+MCP_OPS.board_build = async (a)=>{
   if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("building needs the FPGA Ecosystem app (the editor was opened from disk)");
+  mcpBoardSheet(a);
   const d=brdDesign(); if(!d) mcpFail("no top sheet");
   if(d.missing.length) mcpFail(`${d.missing.length} port(s) have no board pin: ${d.missing.slice(0,8).join(", ")}`, "get_pins, then set_pins or auto_pins");
   await mcpBoardPage();
@@ -15194,6 +15200,7 @@ MCP_OPS.board_build = async ()=>{
 MCP_OPS.board_program = async a=>{
   if(typeof brdDesign!=="function" || !/^https?:/.test(location.protocol)) mcpFail("programming needs the FPGA Ecosystem app");
   const mode=a.mode||"sram", cable=a.cable||"ft2232";
+  mcpBoardSheet(a);
   await mcpBoardPage();
   let r;
   if(mode==="detect") r=await brdPost("/api/board/detect",{cable});
@@ -15430,21 +15437,32 @@ function mcpSetChip(up){ const el=$("#mcpChip"); if(!el) return; el.hidden=false
    launcher/board.py) — no second program, no copying files around. Opened from disk (no app)
    the step keeps the old dialog that downloads .vhd + .xdc.
    Also: ?view=topdown / ?view=board open that view on start (the launcher's Home buttons). */
-const BRD = {tools:null, since:0, timer:null, top:"", sheet:null};
+const BRD = {tools:null, since:0, timer:null, top:"", sheet:null, sheetId:null};
 
 async function brdTools(){
   if(!/^https?:/.test(location.protocol)) return null;
   try{ const r=await fetch("/api/board/tools"); if(!r.ok) return null; return await r.json(); }catch(_){ return null; }
 }
 function brdProject(){ return sanId(($("#projectName")||{}).value||state.project.name||"design")||"design"; }
-/* the design that goes on the board: the top sheet (VHDL is generated from it) */
-function brdSheet(){ return state.project.schematics[state.project.topId] || activeSch(); }
+/* the design that goes on the board: the sheet the user was on when they came here — a
+   sub-circuit can be put on the board by itself to test it ("อยู่ใน sim ของวงจรย่อย กดลงบอร์ด
+   ก็ให้ลงวงจรย่อย ไม่ใช่วิ่งไป top"). The header's sheet menu switches; top is marked ★. */
+function brdSheet(){ const S=state.project.schematics; return S[BRD.sheetId] || S[state.project.topId] || activeSch(); }
+function brdSheetMenu(){
+  const sel=$("#brdSheetSel"); if(!sel) return;
+  const S=state.project.schematics, cur=brdSheet();
+  sel.innerHTML=Object.keys(S).map(id=>`<option value="${esc(id)}" ${cur&&cur.id===id?"selected":""}>${esc(S[id].name)}${id===state.project.topId?" ★ top":""}</option>`).join("");
+}
 function brdDesign(){
   const sch=brdSheet(); if(!sch) return null;
   if(state.activeId!==sch.id){ try{ openSchTab(sch.id); renderAll(); }catch(_){} }
   const pb=uxPortBits(sch);                             // nothing mapped yet: the pin page's starting guess
   if(pb.length && !pb.some(b=>pmGet(sch.pinmap||{},b.key))){ uxAutoPins(sch, true); snapshot(); }
-  const all=generateAllVhdl(), names=Object.keys(all);
+  // VHDL + XDC for THIS sheet as the top entity (its own sub-blocks come along)
+  const realTop=state.project.topId; let all;
+  try{ state.project.topId=sch.id; all=generateAllVhdl(); }
+  finally{ state.project.topId=realTop; }
+  const names=Object.keys(all);
   const top=names.find(n=>n.toLowerCase()===sanId(sch.name).toLowerCase()) || names[names.length-1] || sanId(sch.name);
   const body=uxXdcBody();
   const bits=uxPortBits(sch).map(b=>({key:b.key, dir:b.dir, t:uxPinTarget(b, sch)}));
@@ -15458,7 +15476,8 @@ function brdEnsurePage(){
   pg=document.createElement("div"); pg.id="boardPage"; pg.className="sim-page brd-page";
   pg.innerHTML=`<div class="sim-top">
       <button class="btn2" data-brd="close">← กลับไปวาดวงจร</button>
-      <b>ลงบอร์ด</b><span class="muted" id="brdSheet"></span><span class="grow"></span>
+      <b>ลงบอร์ด</b><label class="muted" title="แผ่นที่จะลงบอร์ด — วงจรย่อยลงทดสอบเดี่ยวๆ ได้">แผ่น <select id="brdSheetSel"></select></label>
+      <span class="muted" id="brdSheet"></span><span class="grow"></span>
       <span class="muted" id="brdTools"></span>
     </div>
     <div class="brd-body">
@@ -15490,6 +15509,7 @@ function brdEnsurePage(){
     </div>`;
   document.body.appendChild(pg);
   pg.addEventListener("click", e=>{ const b=e.target.closest("[data-brd]"); if(!b) return; brdAct(b.dataset.brd); });
+  pg.querySelector("#brdSheetSel").addEventListener("change", e=>{ BRD.sheetId=e.target.value; brdRefresh(); });
   return pg;
 }
 function brdShow(on){ const pg=brdEnsurePage(); pg.classList.toggle("show", on); if(!on){ clearInterval(BRD.timer); BRD.timer=null; setStage("draw", true); } }
@@ -15498,6 +15518,7 @@ async function openBoardPage(){
   const t=await brdTools();
   if(!t) return false;                                  // no app: caller falls back to the download dialog
   BRD.tools=t; brdEnsurePage();
+  BRD.sheetId=(activeSch()||{}).id || state.project.topId;   // the sheet the user is on
   const cab=$("#brdCable"); if(cab && !cab.options.length) cab.innerHTML=(t.cables||["ft2232"]).map(c=>`<option>${esc(c)}</option>`).join("");
   $("#brdTools").innerHTML=(t.vivado?'<span class="ok">● Vivado</span>':'<span class="bad">● ไม่พบ Vivado</span>')+" · "
     +(t.openfpgaloader?'<span class="ok">● openFPGALoader</span>':'<span class="bad">● ไม่พบ openFPGALoader</span>');
@@ -15507,7 +15528,8 @@ async function openBoardPage(){
 }
 function brdRefresh(){
   const d=brdDesign(); if(!d) return;
-  BRD.top=d.top; $("#brdSheet").textContent="แผ่น "+d.sch.name+" · entity "+d.top;
+  BRD.top=d.top; brdSheetMenu();
+  $("#brdSheet").textContent="entity "+d.top+(d.sch.id!==state.project.topId?" · ทดสอบวงจรย่อยเดี่ยวๆ (ไม่ใช่ top)":"");
   const ok=d.bits.filter(b=>b.t).length;
   $("#brdPinSum").textContent=`${ok}/${d.bits.length} ขา`;
   $("#brdPins").innerHTML=d.bits.length?d.bits.map(b=>`<div class="brd-pin ${b.t?"":"miss"}"><b>${esc(b.key)}</b><span>${b.dir==="in"?"IN":"OUT"}</span><em>${b.t?esc(pinTargetLabel(b.t)):"ยังไม่ได้เลือก"}</em></div>`).join(""):'<div class="muted">วงจรนี้ยังไม่มี INPUT / OUTPUT</div>';
