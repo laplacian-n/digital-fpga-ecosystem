@@ -144,7 +144,8 @@ TOOLS = [
     T("build_circuit", "Create a whole circuit, minimised and laid out by the editor, on a new sheet. One of:\n"
       "• truth_table: {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; "
       "into:\"current\" fills a sheet that has exactly those ports, e.g. a lab template)\n"
-      "• generator: {kind: mod_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low}\n"
+      "• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — "
+      "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename)\n"
       "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]}}, timeout=90),

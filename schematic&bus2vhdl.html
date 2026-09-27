@@ -10353,7 +10353,7 @@ function buildSchematicFromVhdl(ast){
     }
   });
   outPorts.forEach(p=>{ const id=add("OUT",{name:p.name,width:p.width}); need.push({cid:id,pid:"i",net:outAlias[p.name]||p.name}); });
-  comps.forEach(c=>{ if(c.type==="IN") c.depth=0; if((c.type==="DFF"||c.type==="MUX") && c.depth==null) c.depth=2; });
+  comps.forEach(c=>{ if(c.type==="IN") c.depth=0; if((c.type==="DFF"||c.type==="JKFF"||c.type==="MUX") && c.depth==null) c.depth=2; });
   need.forEach(nd=>{ const drv=driver[nd.net]; if(drv) wires.push({id:uid("w"),from:{cid:drv.cid,pid:drv.pid},to:{cid:nd.cid,pid:nd.pid},name:""}); });
   const maxD=Math.max(0, ...comps.filter(c=>c.type!=="OUT").map(c=>c.depth||0));
   comps.forEach(c=>{ if(c.type==="OUT") c.depth=maxD+1; });
@@ -10382,9 +10382,10 @@ const INTENT_SOURCES = new Set(["IN","VCC","GND","CONST"]);   // have an output 
 // data-input count → inputs param rounded up to 2/4/8/16). Combinational vocab is unchanged.
 const INTENT_BLOCKS = {
   DFF: { ins:new Set(["d","clk","rst","pre"]), outs:new Set(["q","qn"]), primaryOut:"q" },
+  JKFF:{ ins:new Set(["j","k","clk","rst","pre"]), outs:new Set(["q","qn"]), primaryOut:"q" },
   MUX: { insTest:pid=>/^d\d+$/.test(pid)||/^s\d+$/.test(pid), outs:new Set(["y"]), primaryOut:"y" }
 };
-const INTENT_TYPES = new Set(["IN","OUT","VCC","GND","CONST","AND","OR","XOR","NAND","NOR","XNOR","NOT","BUF","DFF","MUX"]);
+const INTENT_TYPES = new Set(["IN","OUT","VCC","GND","CONST","AND","OR","XOR","NAND","NOR","XNOR","NOT","BUF","DFF","JKFF","MUX"]);
 function intentValidIn(type,pid){ const b=INTENT_BLOCKS[type]; if(!b) return true; return b.insTest?b.insTest(pid):b.ins.has(pid); }
 function intentPrimaryOut(type){ const b=INTENT_BLOCKS[type]; return b?b.primaryOut:"o"; }
 function intentRef(s){ const t=String(s==null?"":s).trim(); const d=t.indexOf("."); return d<0?{id:t,pin:null}:{id:t.slice(0,d),pin:t.slice(d+1)}; }
@@ -10422,6 +10423,8 @@ function validateIntent(intent){
       if(fixed===1 && n>1) E("GATE_ARITY",c.type+" "+c.id+" รับ input ได้ตัวเดียว แต่ได้ "+n,"NOT/BUF มีขาเดียว"); }
     if(c.type==="DFF"){ const ps=pinSeen[c.id]||new Set();
       if(!ps.has("clk")) warns.push("DFF "+c.id+" ไม่มี clk"); if(!ps.has("d")) warns.push("DFF "+c.id+" ไม่มี d"); }
+    if(c.type==="JKFF"){ const ps=pinSeen[c.id]||new Set();
+      if(!ps.has("clk")) warns.push("JKFF "+c.id+" ไม่มี clk"); if(!ps.has("j")||!ps.has("k")) warns.push("JKFF "+c.id+" ต่อ j/k ไม่ครบ"); }
     if(c.type==="MUX"){ const ps=[...(pinSeen[c.id]||new Set())];
       if(ps.filter(x=>/^d\d+$/.test(x)).length<2) warns.push("MUX "+c.id+" data input < 2");
       if(ps.filter(x=>/^s\d+$/.test(x)).length<1) warns.push("MUX "+c.id+" ไม่มี select (s0..)"); }
@@ -10438,6 +10441,7 @@ function buildSchematicFromIntent(intent){
     else if(c.type==="VCC")  add(c.id,"VCC",{});
     else if(c.type==="GND")  add(c.id,"GND",{});
     else if(c.type==="CONST")add(c.id,"CONST",c.params||{});
+    else if(c.type==="JKFF") add(c.id,"JKFF",{edge:((c.params&&c.params.edge)==="falling")?"falling":"rising", reset:!!(c.params&&c.params.reset), preset:!!(c.params&&c.params.preset)});
     else if(c.type==="DFF")  add(c.id,"DFF",{edge:((c.params&&c.params.edge)==="falling")?"falling":"rising", reset:!!(c.params&&c.params.reset), preset:!!(c.params&&c.params.preset)});
     else if(c.type==="MUX")  add(c.id,"MUX",{inputs:(c.params&&[2,4,8,16].includes(c.params.inputs))?c.params.inputs:2});
     else                     add(c.id,c.type,{inputs:(INTENT_GATES[c.type]===1?1:2),width:1});
@@ -10451,7 +10455,7 @@ function buildSchematicFromIntent(intent){
     else if(tc.type==="OUT") pin="i";
     else { const k=nextIn[t.id]||0; pin="i"+k; nextIn[t.id]=k+1; } // auto-index gate inputs
     const m=/^i(\d+)$/.exec(pin); if(m) maxIn[t.id]=Math.max(maxIn[t.id]||0,+m[1]);
-    if(tc.type==="DFF"){ if(pin==="rst")needReset[t.id]=true; if(pin==="pre")needPreset[t.id]=true; }
+    if(tc.type==="DFF"||tc.type==="JKFF"){ if(pin==="rst")needReset[t.id]=true; if(pin==="pre")needPreset[t.id]=true; }
     if(tc.type==="MUX"){ const dm=/^d(\d+)$/.exec(pin); if(dm) muxData[t.id]=Math.max(muxData[t.id]||0,+dm[1]+1); }
     const opin = f.pin || intentPrimaryOut(fc.type);           // named block output (q/qn/y) or implicit "o"
     wires.push({id:uid("w"),from:{cid:fc.id,pid:opin},to:{cid:tc.id,pid:pin},name:""});
@@ -10459,7 +10463,7 @@ function buildSchematicFromIntent(intent){
   comps.forEach(c=>{
     if(INTENT_GATES.hasOwnProperty(c.type)){ const fixed=INTENT_GATES[c.type];
       c.params.inputs = fixed===1 ? 1 : Math.max(2,(maxIn[c.id]||0)+1); }
-    else if(c.type==="DFF"){ if(needReset[c.id])c.params.reset=true; if(needPreset[c.id])c.params.preset=true; }
+    else if(c.type==="DFF"||c.type==="JKFF"){ if(needReset[c.id])c.params.reset=true; if(needPreset[c.id])c.params.preset=true; }
     else if(c.type==="MUX"){ const dc=muxData[c.id]||2; const n=[2,4,8,16].find(v=>v>=dc)||16; c.params.inputs=Math.max(c.params.inputs||2,n); }
   });
   return {comps, wires};
@@ -14973,13 +14977,16 @@ MCP_OPS.build_circuit = a=>{
     if(g.kind==="mod_counter"){ if(n<2||n>64) mcpFail("mod_counter n must be 2..64"); intent=fsmCounterIntent(Array.from({length:n},(_,i)=>i)); intent.module=a.name||("mod"+n); title="mod-"+n; }
     else if(g.kind==="sequence_counter"){ const seq=(g.sequence||[]).map(Number); if(seq.length<2) mcpFail("sequence_counter needs sequence: [≥2 numbers 0..63]"); intent=fsmCounterIntent(seq); if(!intent||intent.error) mcpFail((intent&&intent.error)||"sequence too large"); intent.module=a.name||"seqcount"; title="sequence "+seq.join("→"); }
     else if(g.kind==="ripple_counter"||g.kind==="shift_register"||g.kind==="register"){ const b=seqBuildIntent(({ripple_counter:"counter ",shift_register:"shift register ",register:"register "})[g.kind]+(n||4)+" bit"); intent=b.intent; if(a.name) intent.module=a.name; title=b.title; }
+    else if(g.kind==="jk_counter"){ if(n<2||n>64) mcpFail("jk_counter n must be 2..64"); const r=jkCounterIntent(Array.from({length:n},(_,i)=>i), g.output==="q"?{outputs:"q"}:{out:sanId(g.output||"clk_out"), clk:sanId(g.clk||"clk_in")});
+      if(r.error) mcpFail(r.error); intent=r; intent.module=a.name||("jkmod"+n); title="JK-FF mod-"+n; }
     else if(g.kind==="bcd_7seg"){ const P=seg7Preset(!!g.active_low); intent=ttToIntent(P.inputs,P.outputs,P.rows,a.name||P.module).intent; title="BCD→7seg"; }
-    else mcpFail(`unknown generator '${g.kind}'`, "mod_counter, sequence_counter, ripple_counter, shift_register, register, bcd_7seg");
+    else mcpFail(`unknown generator '${g.kind}'`, "mod_counter, jk_counter, sequence_counter, ripple_counter, shift_register, register, bcd_7seg");
   }
   if(a.intent){ intent=a.intent; title="intent"; }
   if(!intent) mcpFail("give one of: truth_table, generator, intent");
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
+  if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
   mcpActivity("สร้าง "+title);
   return {sheet:dr.sch.name, into:"new", parts:dr.sch.components.filter(c=>c.type!=="JUNCTION").length, layout:mcpLayoutMetrics(dr.sch)};
 };
@@ -16367,6 +16374,112 @@ function partTruthShow(c){
     }catch(e){ console.warn("truth table", e); }
     return r;
   };
+}
+
+/* ===== 15. Synchronous JK-FF counter / clock divider, from "count to N" =====================
+   The lab's hand-drawn divider (clk_in → 4 JK-FFs on one clock → clk_out): each J and K comes
+   from the JK excitation table and a K-map, e.g. mod 10 gives the textbook
+     J0=K0=1 · J1=Q0·Q3' K1=Q0 · J2=K2=Q0·Q1 · J3=Q0·Q1·Q2 K3=Q0      clk_out = Q3
+   Excitation, per bit i and state s in the sequence:
+     Q_i=0 → J = next_i, K = don't care        Q_i=1 → K = not next_i, J = don't care
+   States outside the sequence are don't care. Identical terms share one AND gate and a J that
+   equals its K shares the net (as drawn in the lab); a constant 1 is one VCC. The equations are
+   checked on every state of the sequence before anything is drawn. */
+function jkCounterIntent(seq, opts){
+  opts=opts||{};
+  seq=seq.filter((v,i)=>seq.indexOf(v)===i);
+  if(seq.length<2) return {error:"ต้องนับอย่างน้อย 2 สถานะ"};
+  const maxv=Math.max(...seq), n=Math.max(1, maxv.toString(2).length);
+  if(n>6) return {error:"นับได้สูงสุด 64 สถานะ (6 flip-flop)"};
+  const next={}; seq.forEach((s,i)=>next[s]=seq[(i+1)%seq.length]);
+  const inSeq=new Set(seq), unused=[]; for(let s=0;s<(1<<n);s++) if(!inSeq.has(s)) unused.push(s);
+  const J=[], K=[];
+  for(let i=0;i<n;i++){
+    const jOnes=[], jDc=unused.slice(), kOnes=[], kDc=unused.slice();
+    seq.forEach(s=>{ const q=(s>>i)&1, nx=(next[s]>>i)&1;
+      if(!q){ if(nx) jOnes.push(s); kDc.push(s); }
+      else  { if(!nx) kOnes.push(s); jDc.push(s); } });
+    J.push(qmMinimize(jOnes, jDc, n)); K.push(qmMinimize(kOnes, kDc, n));
+  }
+  // check: Q+ = J·Q' + K'·Q must give next[s] for every state in the sequence
+  const ev=(r,s)=> r.const1?1 : r.const0?0 : (r.terms.some(L=>L.every(l=>((s>>l.v)&1)===(l.neg?0:1)))?1:0);
+  for(const s of seq){ let nx=0; for(let i=0;i<n;i++){ const q=(s>>i)&1, j=ev(J[i],s), k=ev(K[i],s); nx|=((j&&!q)||(!k&&q)?1:0)<<i; }
+    if(nx!==next[s]) return {error:"สังเคราะห์ผิดที่สถานะ "+s}; }
+  const clkName=opts.clk||"clk_in";
+  const comps=[{id:"clk",type:"IN",name:clkName}], nets=[];
+  for(let i=0;i<n;i++){ comps.push({id:"ff"+i,type:"JKFF"}); nets.push({from:"clk",to:"ff"+i+".clk"}); }
+  const lit=l=>"ff"+l.v+(l.neg?".qn":".q");
+  let vcc=null, gnd=null; const andOf=new Map(), orOf=new Map(); let gc=0;
+  const termSrc=L=>{ if(L.length===1) return lit(L[0]);
+    const key=L.map(l=>l.v+(l.neg?"'":"")).sort().join("·");
+    if(andOf.has(key)) return andOf.get(key);
+    const a="a"+(gc++); comps.push({id:a,type:"AND"}); L.forEach(l=>nets.push({from:lit(l),to:a})); andOf.set(key,a); return a; };
+  const srcOf=r=>{
+    if(r.const1){ if(!vcc){ vcc="vcc"; comps.push({id:vcc,type:"VCC"}); } return vcc; }
+    if(r.const0){ if(!gnd){ gnd="gnd"; comps.push({id:gnd,type:"GND"}); } return gnd; }
+    const outs=r.terms.map(termSrc); if(outs.length===1) return outs[0];
+    const key=outs.slice().sort().join("+"); if(orOf.has(key)) return orOf.get(key);
+    const o="o"+(gc++); comps.push({id:o,type:"OR"}); outs.forEach(t=>nets.push({from:t,to:o})); orOf.set(key,o); return o; };
+  const eqs=[];
+  const txt=r=>r.const1?"1":r.const0?"0":r.terms.map(L=>L.map(l=>"Q"+l.v+(l.neg?"'":"")).join("·")).join(" + ");
+  for(let i=0;i<n;i++){ nets.push({from:srcOf(J[i]),to:"ff"+i+".j"}); nets.push({from:srcOf(K[i]),to:"ff"+i+".k"});
+    eqs.push(`J${i}=${txt(J[i])} K${i}=${txt(K[i])}`); }
+  if(opts.outputs==="q"){ for(let i=n-1;i>=0;i--){ comps.push({id:"q"+i,type:"OUT",name:"q"+i}); nets.push({from:"ff"+i+".q",to:"q"+i}); } }
+  else { comps.push({id:"out",type:"OUT",name:opts.out||"clk_out"}); nets.push({from:"ff"+(n-1)+".q",to:"out"}); }
+  return {module:"jkcount", components:comps, nets, equations:eqs, bits:n};
+}
+GENERATORS.splice(GENERATORS.findIndex(g=>g.id==="mod")+1, 0,
+  {id:"jkmod", icon:"÷", name:"ตัวนับ/หารความถี่ JK-FF", desc:"synchronous JK-FF นับ 0 … N−1 · clk_in → clk_out (บิตสูงสุด) แบบในแลป", run:async()=>{
+    const v=await uxAsk("ตัวนับ / หารความถี่ด้วย JK-FF",[
+      {label:"นับถึง (N)",type:"number",value:10,min:2,max:64,hint:"นับ 0 … N−1 แล้ววน · 10 = หารความถี่ 10"},
+      {label:"ขาออก",value:"clk_out",hint:"ชื่อขาออก = บิตสูงสุด (หารความถี่) · พิมพ์ q เพื่อได้ q0…qN ทุกบิต"}]);
+    if(!v) return;
+    const N=Math.max(2,Math.min(64,v[0]|0)), out=String(v[1]||"clk_out").trim()||"clk_out";
+    const r=jkCounterIntent(Array.from({length:N},(_,i)=>i), out==="q"?{outputs:"q"}:{out:sanId(out)});
+    if(r.error){ toast("สร้างไม่ได้: "+r.error,"err"); return; }
+    r.module="jkmod"+N;
+    const dr=uxDrawGenerated(r, "ตัวนับ JK-FF mod-"+N);
+    if(dr){ jkLayout(dr.sch, r.bits); snapshot(); renderAll(); try{ zoomFit(); }catch(_){} toast(r.equations.join(" · "),"info",8000); } }});
+{ // the Tools menu was filled before this file loaded: add the new entry next to "mod-N"
+  const b=document.querySelector('#menu [data-gen="mod"]');
+  if(b && !document.querySelector('#menu [data-gen="jkmod"]')){
+    const g=GENERATORS.find(x=>x.id==="jkmod");
+    b.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="jkmod" title="${escA(g.desc)}"><span class="gi">${g.icon}</span>${g.name}…</button>`);
+    document.querySelector('#menu [data-gen="jkmod"]').addEventListener("click",()=>runGenerator("jkmod"));
+  }
+}
+/* Place it like the lab sheet, then let the wire router (12-wire-tidy) draw every net:
+   the flip-flops in ONE column, MSB on top (clk_out beside it), each gate just left of the
+   flip-flop it feeds with its output level with that J/K pin, VCC above, clk_in at the bottom. */
+function jkLayout(sch, n){
+  const G=GRID, by=id=>sch.components.find(c=>c.id===id), sz=c=>getSize(c);
+  const X_FF=G*50, X_G=G*30, X_OR=G*38, Y0=G*14, ROW=G*14;
+  for(let i=0;i<n;i++){ const f=by("ff"+i); if(f){ f.x=X_FF; f.y=Y0+(n-1-i)*ROW; } }
+  // where each gate's output goes: the FF pin it feeds (through an OR if there is one)
+  const feeds=cid=>sch.wires.filter(w=>w.from.cid===cid).map(w=>w.to);
+  const pinY=(cid,pid)=>{ const c=by(cid); const p=c&&portPos(c,pid); return p?p.y:null; };
+  const target=cid=>{ for(const t of feeds(cid)){ const c=by(t.cid); if(!c) continue;
+      if(c.type==="JKFF") return pinY(t.cid,t.pid);
+      if(c.type==="OR"){ const y=target(c.id); if(y!=null) return y; }
+      if(c.type==="JUNCTION"){ const y=target(c.id); if(y!=null) return y; } } return null; };
+  const used=[];                                              // occupied y-ranges per column
+  const free=(x,y,h)=>!used.some(u=>u.x===x && y<u.y+u.h+G && u.y<y+h+G);
+  const put=(c,x,yOut)=>{ c.x=x; c.y=0; const o=portPos(c,"o")||{y:sz(c).h/2}; let y=snap(yOut-o.y);
+    for(let k=0;k<60 && !free(x,y,sz(c).h);k++) y+=G;
+    c.y=y; used.push({x,y,h:sz(c).h}); };
+  sch.components.filter(c=>c.type==="OR").forEach(c=>{ const y=target(c.id); put(c, X_OR, y!=null?y:Y0); });
+  sch.components.filter(c=>c.type==="AND").sort((a,b)=>(target(a.id)||0)-(target(b.id)||0))
+    .forEach(c=>{ const y=target(c.id), toOr=feeds(c.id).some(t=>{ const d=by(t.cid); return d&&d.type==="OR"; });
+      put(c, toOr?X_G-G*8:X_G, y!=null?y:Y0); });
+  const vcc=by("vcc"); if(vcc){ vcc.x=X_OR+G*4; vcc.y=Y0-G*7; }
+  const gnd=by("gnd"); if(gnd){ gnd.x=X_OR+G*6; gnd.y=Y0-G*7; }
+  const clk=by("clk"); const f0=by("ff0");
+  if(clk && f0){ clk.x=G*4; clk.y=snap(f0.y+sz(f0).h+G*3); }
+  const top=by("ff"+(n-1)), out=by("out");
+  if(out && top){ const q=portPos(top,"q"); out.x=X_FF+G*18; out.y=0; const pi=portPos(out,"i"); out.y=snap(q.y-pi.y); }
+  for(let i=0;i<n;i++){ const o=by("q"+i), f=by("ff"+i); if(o&&f){ const q=portPos(f,"q"); o.x=X_FF+G*18; o.y=0; const pi=portPos(o,"i"); o.y=snap(q.y-pi.y); } }
+  try{ wtTidySheet(sch); }catch(e){ console.warn("jk layout", e); }
+  sch.locked=true;                                            // keep the drawing as placed
 }
 
 </script>

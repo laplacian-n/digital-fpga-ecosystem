@@ -296,13 +296,16 @@ MCP_OPS.build_circuit = a=>{
     if(g.kind==="mod_counter"){ if(n<2||n>64) mcpFail("mod_counter n must be 2..64"); intent=fsmCounterIntent(Array.from({length:n},(_,i)=>i)); intent.module=a.name||("mod"+n); title="mod-"+n; }
     else if(g.kind==="sequence_counter"){ const seq=(g.sequence||[]).map(Number); if(seq.length<2) mcpFail("sequence_counter needs sequence: [≥2 numbers 0..63]"); intent=fsmCounterIntent(seq); if(!intent||intent.error) mcpFail((intent&&intent.error)||"sequence too large"); intent.module=a.name||"seqcount"; title="sequence "+seq.join("→"); }
     else if(g.kind==="ripple_counter"||g.kind==="shift_register"||g.kind==="register"){ const b=seqBuildIntent(({ripple_counter:"counter ",shift_register:"shift register ",register:"register "})[g.kind]+(n||4)+" bit"); intent=b.intent; if(a.name) intent.module=a.name; title=b.title; }
+    else if(g.kind==="jk_counter"){ if(n<2||n>64) mcpFail("jk_counter n must be 2..64"); const r=jkCounterIntent(Array.from({length:n},(_,i)=>i), g.output==="q"?{outputs:"q"}:{out:sanId(g.output||"clk_out"), clk:sanId(g.clk||"clk_in")});
+      if(r.error) mcpFail(r.error); intent=r; intent.module=a.name||("jkmod"+n); title="JK-FF mod-"+n; }
     else if(g.kind==="bcd_7seg"){ const P=seg7Preset(!!g.active_low); intent=ttToIntent(P.inputs,P.outputs,P.rows,a.name||P.module).intent; title="BCD→7seg"; }
-    else mcpFail(`unknown generator '${g.kind}'`, "mod_counter, sequence_counter, ripple_counter, shift_register, register, bcd_7seg");
+    else mcpFail(`unknown generator '${g.kind}'`, "mod_counter, jk_counter, sequence_counter, ripple_counter, shift_register, register, bcd_7seg");
   }
   if(a.intent){ intent=a.intent; title="intent"; }
   if(!intent) mcpFail("give one of: truth_table, generator, intent");
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
+  if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
   mcpActivity("สร้าง "+title);
   return {sheet:dr.sch.name, into:"new", parts:dr.sch.components.filter(c=>c.type!=="JUNCTION").length, layout:mcpLayoutMetrics(dr.sch)};
 };
