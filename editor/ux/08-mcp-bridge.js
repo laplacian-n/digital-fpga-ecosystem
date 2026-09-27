@@ -157,7 +157,9 @@ MCP_OPS.status = ()=>({
 MCP_OPS.list_component_types = ()=>Object.entries(TYPES).filter(([,t])=>!["wire","custom","sch"].includes(t.category)).map(([k,t])=>{
   const p=JSON.parse(JSON.stringify(t.defaultParams||{}));
   let pins=[]; try{ pins=t.ports(p).map(q=>q.id+"("+q.dir+((q.width||1)>1?","+q.width+"b":"")+")"); }catch(_){}
-  return {type:k, label:t.label, category:t.category, params:p, param_help:(t.paramSchema||[]).map(s=>s.key+": "+s.label), pins};
+  // every setting with its allowed values, so Claude knows e.g. that a MUX has a bit width
+  const help=(t.paramSchema||[]).map(s=>s.key+": "+s.label+(s.options?" (one of "+s.options.join("/")+")":s.type==="int"?" ("+(s.min!=null?s.min:"")+".."+(s.max!=null?s.max:"")+")":""));
+  return {type:k, label:t.label, category:t.category, params:p, param_help:help, pins};
 });
 MCP_OPS.get_sheet = a=>mcpSheetInfo(mcpSheet(a.sheet), a.detail||"full");
 MCP_OPS.get_netlist = a=>{ const s=mcpSheet(a.sheet); return {sheet:s.name, nets:mcpNets(s)}; };

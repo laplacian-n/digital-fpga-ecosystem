@@ -1729,8 +1729,11 @@ const TYPES = {
      the 11px grid and always sits on the body edge — same as the gates. */
   MUX: {
     label:"MUX", category:"mux",
-    defaultParams:{inputs:2},
-    paramSchema:[{key:"inputs",label:"Data inputs",type:"select",options:[2,4,8,16]}],
+    /* width: every data input and y are that many bits (a 4-bit 2:1 mux picks a whole nibble);
+       the select pins stay 1 bit each. */
+    defaultParams:{inputs:2, width:1},
+    paramSchema:[{key:"inputs",label:"Data inputs",type:"select",options:[2,4,8,16]},
+                 {key:"width", label:"ความกว้าง (bit)", type:"int", min:1, max:32}],
     size(p){ const n=p.inputs; const sel=Math.ceil(Math.log2(n));
       return blockSize(99, 22*(n+sel+2)); },
     ports(p){
@@ -1738,9 +1741,10 @@ const TYPES = {
       const h = 22*(n+sel+2);
       const w = 99;
       const ports = [];
-      for(let i=0;i<n;i++)   ports.push({id:"d"+i, dir:"in", dx:0, dy: 22*(i+1), label:"d"+i});
+      const bw = Math.max(1, Math.min(32, p.width||1));
+      for(let i=0;i<n;i++)   ports.push({id:"d"+i, dir:"in", dx:0, dy: 22*(i+1), label:"d"+i, width:bw});
       for(let i=0;i<sel;i++) ports.push({id:"s"+i, dir:"in", dx:0, dy: h - 22*(sel-i), label:"s"+i});
-      ports.push({id:"y", dir:"out", dx:w, dy: h/2, label:"y"});
+      ports.push({id:"y", dir:"out", dx:w, dy: h/2, label:"y", width:bw});
       return ports;
     },
     shape(p){
@@ -1751,7 +1755,7 @@ const TYPES = {
       return `<path class="glow" d="M6,4 L${w-6},${4+taper} L${w-6},${h-4-taper} L6,${h-4} Z"
               fill="var(--gate-fill)" stroke="var(--gate-stroke)" stroke-width="1.7"/>
               <text x="${w/2}" y="${h/2-6}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">MUX</text>
-              <text x="${w/2}" y="${h/2+9}" text-anchor="middle" font-size="9.5" fill="var(--ink-dim)">${n}:1</text>`;
+              <text x="${w/2}" y="${h/2+9}" text-anchor="middle" font-size="9.5" fill="var(--ink-dim)">${n}:1${(p.width||1)>1?" ×"+p.width+"b":""}</text>`;
     }
   },
   DEMUX: {
@@ -8695,7 +8699,8 @@ function generateSchVhdl(sch){
           : `(${selIns.slice().reverse().map((s,k)=>eq(s, bits[k])).join(" and ")})`;
         condChain.push(`${dataIns[i]} when ${cond}`);
       }
-      concurrent.push(`  ${c._nets.y} <= ${condChain.join(" else\n             ")} else '0';`);
+      const muxZero = (c.params.width||1)>1 ? "(others => '0')" : "'0'";
+      concurrent.push(`  ${c._nets.y} <= ${condChain.join(" else\n             ")} else ${muxZero};`);
       return;
     }
     /* ----- DEMUX ----- */
@@ -14791,7 +14796,9 @@ MCP_OPS.status = ()=>({
 MCP_OPS.list_component_types = ()=>Object.entries(TYPES).filter(([,t])=>!["wire","custom","sch"].includes(t.category)).map(([k,t])=>{
   const p=JSON.parse(JSON.stringify(t.defaultParams||{}));
   let pins=[]; try{ pins=t.ports(p).map(q=>q.id+"("+q.dir+((q.width||1)>1?","+q.width+"b":"")+")"); }catch(_){}
-  return {type:k, label:t.label, category:t.category, params:p, param_help:(t.paramSchema||[]).map(s=>s.key+": "+s.label), pins};
+  // every setting with its allowed values, so Claude knows e.g. that a MUX has a bit width
+  const help=(t.paramSchema||[]).map(s=>s.key+": "+s.label+(s.options?" (one of "+s.options.join("/")+")":s.type==="int"?" ("+(s.min!=null?s.min:"")+".."+(s.max!=null?s.max:"")+")":""));
+  return {type:k, label:t.label, category:t.category, params:p, param_help:help, pins};
 });
 MCP_OPS.get_sheet = a=>mcpSheetInfo(mcpSheet(a.sheet), a.detail||"full");
 MCP_OPS.get_netlist = a=>{ const s=mcpSheet(a.sheet); return {sheet:s.name, nets:mcpNets(s)}; };
