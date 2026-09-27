@@ -82,7 +82,7 @@ function uxPinFor(name, dir, k){
 }
 function uxXdcBody(ins, outs){
   let x="";
-  const put=(n,p)=>{ x+=`set_property -dict {PACKAGE_PIN ${p.pin} IOSTANDARD LVCMOS33} [get_ports ${n}]   ## ${pinTargetLabel(p.target)}\n`; };
+  const put=(n,p)=>{ x+=`## ${pinTargetLabel(p.target)}\nset_property -dict {PACKAGE_PIN ${p.pin} IOSTANDARD LVCMOS33} [get_ports ${n}]\n`; };   // comment on its own line (Tcl)
   ins.forEach((n,k)=>{ const p=uxPinFor(n,"in",k); put(n,p);
     if(p.target==="clk") x+=`create_clock -period 20.000 -name sys_clk [get_ports ${n}]\n`; });
   x+="\n";
