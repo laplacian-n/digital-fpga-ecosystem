@@ -39,7 +39,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 APP_NAME = "FPGA Ecosystem"
 APP_ID = "fpga-ecosystem"
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 FROZEN = getattr(sys, "frozen", False)
 # ROOT = where the bundled content lives (repo root in dev, _MEIPASS when frozen)
