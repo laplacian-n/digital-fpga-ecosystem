@@ -51,6 +51,9 @@ test("click a bus INPUT in probe mode: set bits one by one; taps, gates and merg
   await expect(page.locator(".probe-busval").first()).toBeVisible();
   expect(await page.locator(".probe-busval").allTextContents()).toEqual(expect.arrayContaining(["1110", "0001"]));
   // each split tap shows its own bit, not the bus: set swt = 1000 → only tap 3 lights
+  // (the bus wire listed first on every tap — the order that made the old code show the bus)
+  await page.evaluate(() => { const s = activeSch(), onD = w => w.to.pid === "d" && (s.components.find(c => c.id === w.to.cid) || {}).type === "BUSTAP";
+    s.wires.sort((a, b) => onD(b) - onD(a)); render(); });
   await page.click('#probeBusPick button[data-all="0"]');
   await page.click('#probeBusPick button[data-bit="3"]');
   const taps = await page.evaluate(() => [0, 1, 2, 3].map(i => { const t = activeSch().components.find(c => c.type === "BUSTAP" && c.params.mode === "split" && c.params.bit === i);
