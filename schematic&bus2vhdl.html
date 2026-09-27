@@ -449,6 +449,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
           <button data-act="topdown-open">Top-Down (ผังบล็อก)…</button>
           <button data-act="topdown-send">ส่งแผ่นนี้ไป Top-Down เป็นบล็อก</button>
           <button data-act="import-vhdl">Import VHDL as Schematic…</button>
+          <button data-act="realize-block" title="เลือกบล็อก (แผ่นย่อย) ก่อน แล้วสร้างวงจรเกตข้างในจากชื่อบล็อก เช่น 'counter 4 บิต', 'shift register 8', 'd flip flop'">✨ วาดวงจรในบล็อกจากชื่อ…</button>
           <hr>
           <button data-act="synth">Run Synthesis Check<span class="kbd">F7</span></button>
           <button data-act="rename-wire">Rename Selected Wire</button>
@@ -7018,6 +7019,20 @@ function probeModel(sch, st){
       else if(c.type==="VCC") v=1;
       else if(c.type==="GND") v=0;
       else if(PROBE_GATES[c.type]){ const ins=inPortsOf(c).map(p=>inVal(cid,p.id,guard)); v=ins.some(x=>x==null)?null:probeGateOpW(c.type,ins,probeWidth(c,pid)); }
+      /* the coded blocks, mirroring exactly what the VHDL generator writes for them */
+      else if(c.type==="DEMUX"){ const n=(c.params&&c.params.outputs)||2, sb=Math.ceil(Math.log2(n)); let sel=0, ok=true;
+        for(let i=0;i<sb;i++){ const x=inVal(cid,"s"+i,guard); if(x==null){ ok=false; break; } sel|=(x?1:0)<<i; }
+        const d=inVal(cid,"d",guard); v = (!ok||d==null) ? null : (("y"+sel)===pid ? (d?1:0) : 0); }
+      else if(c.type==="COMP" || c.type==="COMPM"){ const p=c.params||{}, n=Math.max(1,p.width||2); let A=0, B=0, ok=true;
+        if(cmpIsBus(p)){ A=inVal(cid,"a",guard); B=inVal(cid,"b",guard); ok=A!=null&&B!=null; }
+        else for(let i=0;i<n;i++){ const a=inVal(cid,"a"+i,guard), b=inVal(cid,"b"+i,guard); if(a==null||b==null){ ok=false; break; } A|=(a?1:0)<<i; B|=(b?1:0)<<i; }
+        v = !ok ? null : pid==="eq" ? (A===B?1:0) : pid==="gt" ? ((A>>>0)>(B>>>0)?1:0) : pid==="lt" ? ((A>>>0)<(B>>>0)?1:0) : null; }
+      else if(c.type==="ENC"){ const n=(c.params&&c.params.inputs)||4, b=+String(pid).slice(1); let k=-1, ok=true;
+        for(let i=n-1;i>=0;i--){ const x=inVal(cid,"i"+i,guard); if(x==null){ ok=false; break; } if(x && k<0) k=i; }
+        v = !ok ? null : (k<0 ? 0 : ((k>>b)&1)); }            // priority: the highest active input wins; none → 0
+      else if(c.type==="DEC"){ const n=(c.params&&c.params.outputs)||4, iw=Math.ceil(Math.log2(n)); let a=0, ok=true;
+        for(let i=0;i<iw;i++){ const x=inVal(cid,"a"+i,guard); if(x==null){ ok=false; break; } a|=(x?1:0)<<i; }
+        const en=inVal(cid,"en",guard); v = (!ok||en==null) ? null : (("y"+a)===pid && en ? 1 : 0); }
       else if(c.type==="BUSTAP"){ const p=c.params||{}, bus=inVal(cid,"d",guard);
         v = bus==null ? null : ((bus>>>(p.bit||0)) & probeMask(Math.max(1,p.nbit||1))); }
       else if(c.type==="MUX"){
@@ -7735,7 +7750,7 @@ function renderInspector(){
         <button class="btn" id="iMirror" title="พลิกซ้าย-ขวา (M)">⇋ พลิก</button></span></div>`;
       if(typeof c.type==="string" && (c.type.indexOf("SCH:")===0 || c.type.indexOf("CUSTOM:")===0))
         html += `<div class="row"><label>ต่อขา</label><button class="btn" id="iAutoWire" title="สร้าง INPUT/OUTPUT ชื่อตรงกับขาที่ยังไม่ได้ต่อ แล้วลากสายให้อัตโนมัติ">⎘ ต่อขาอัตโนมัติ</button></div>`;
-        html += `<div class="row"><label>วาดอัตโนมัติ</label><button class="btn btn-primary" id="iRealize" title="สร้างวงจรเกตในบล็อกนี้อัตโนมัติจากชื่อบล็อก เช่น 'counter 4 บิต', 'shift register 8', 'counter 0-9 ไม่เอา 0 5 2', 'd flip flop'">✨ วาดวงจรจากชื่อ</button></div>`;
+        // ("✨ วาดวงจรจากชื่อ" moved to Tools ▸ — it only ever applies to a sub-sheet block)
       // #3 — reorder module pins straight from the symbol (SCH:/CUSTOM: with a sub-sheet)
       const _sub = subSchOf(c);
       if(_sub){
@@ -12692,6 +12707,12 @@ document.addEventListener("click",ev=>{
     case "import-custom": importCustomComponent(); break;
     case "import-vhdl": importVhdlFile(); break;
     case "topdown-open": openTopdownWithSheet(); break;
+    case "realize-block": {
+      const sch=activeSch(), sel=sch && sch.components.filter(c=>state.selection.has(c.id));
+      const blk=sel && sel.find(c=>subSchOf(c));
+      if(!blk){ toast("เลือกบล็อกที่เป็นแผ่นย่อยก่อน (ตั้งชื่อบล็อกเป็นชนิดวงจร เช่น 'counter 4 บิต') แล้วค่อยกดคำสั่งนี้","warn",4200); break; }
+      realizeBlock(blk); renderInspector(); break;
+    }
     case "topdown-close": closeTopdown(); break;
     case "topdown-send": sendSheetToTopdown(); break;
     case "export-active-custom": exportActiveAsCustom(); break;
@@ -13029,6 +13050,16 @@ init();
 .probe-bus-pick .pbp-bits button.on small{color:#e8ffe8}
 .probe-bus-pick .pbp-row{display:flex;gap:4px}
 .probe-bus-pick .pbp-row button{border:1px solid var(--line,#ccd);border-radius:6px;background:var(--bg-0);padding:3px 8px;cursor:pointer;font:inherit;font-size:11.5px;color:var(--ink)}
+/* ===== 14. a part's truth table ===== */
+.part-tt{max-height:60vh;overflow:auto;border:1px solid var(--line,#ccd);border-radius:8px}
+.part-tt table{border-collapse:collapse;font:12.5px/1.2 ui-monospace,monospace;width:100%}
+.part-tt th{position:sticky;top:0;background:var(--bg-2,#eef);padding:5px 6px;font-weight:700;z-index:1}
+.part-tt th.out{color:#2f81f7}
+.part-tt td{text-align:center;padding:3px 6px;color:var(--ink-dim)}
+.part-tt td.one{color:var(--ink);font-weight:700}
+.part-tt td.o.one{color:var(--ok,#2da44e)}
+.part-tt td.sep,.part-tt th.sep{width:6px;padding:0;border-left:2px solid var(--line,#ccd)}
+.part-tt tr:nth-child(even) td{background:rgba(127,127,127,.06)}
 </style>
 <script>
 "use strict";
@@ -13245,7 +13276,7 @@ function clientCombSim(sch){
   const nm=c=>(c.params&&c.params.name)||c.label||c.id;
   const ins=sch.components.filter(c=>c.type==="IN"), outs=sch.components.filter(c=>c.type==="OUT");
   if(!outs.length) return {ok:false, reason:"ยังไม่มี OUTPUT บนแผ่น — วาง OUTPUT แล้วต่อสายจากวงจรเข้าไป"};
-  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","JUNCTION","BUSTAP"].includes(t);
+  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","DEMUX","COMP","COMPM","ENC","DEC","JUNCTION","BUSTAP"].includes(t);
   const odd=[...new Set(fs.components.filter(c=>!known(c.type)).map(c=>c.type))];
   if(odd.length) return {ok:false, fallback:true, reason:"มีบล็อกที่ตัวจำลองในเบราว์เซอร์ยังไม่รองรับ: "+odd.join(", ")};
   /* a bus port is its bits, MSB first — swt(3:0) → swt[3] … swt[0], the same names the pin map
@@ -16231,6 +16262,68 @@ const SHEETDRAG = { id:null, pid:null };
   pane.addEventListener("dragend", ()=>{ SHEETDRAG.id = SHEETDRAG.pid = null; clear(); });
 }
 try{ renderProjectTree(); }catch(_){}   // the tree drawn before this layer loaded
+
+/* ===== 14. A part's truth table, one click from the Inspector ==============================
+   "ทำให้กดดูตารางความจริงได้": select a part (COMPM4, a MUX, a decoder, a gate, a sub-sheet
+   block…) and "📋 ตารางความจริง" shows what it does. The part is copied onto a scratch sheet
+   with an INPUT on every input pin and an OUTPUT on every output pin, and run through the same
+   browser simulator the sim page uses — so the table is exactly how the design will simulate.
+   Flip-flops have no truth table (their output depends on the clock and what they hold). */
+const PART_TT_MAX_BITS = 10;          // 1024 rows is still readable in a scroll box
+function partTruthTable(c){
+  if(!c || c.type==="JUNCTION" || c.type==="IN" || c.type==="OUT") return {ok:false, reason:"เลือกชิ้นส่วนที่มีขาเข้าและขาออก"};
+  if(PROBE_SEQ[c.type]) return {ok:false, reason:"flip-flop ไม่มีตารางความจริงแบบวงจรผสม — ค่าออกขึ้นกับ clock และค่าที่เก็บไว้ ดูได้ในหน้า จำลอง (ไทม์มิง)"};
+  let ports=[]; try{ ports=getPorts(c); }catch(_){}
+  // a numbered group reads as a number: A3 A2 A1 A0, then B3 … B0 (MSB first, like the rows)
+  const msbFirst=L=>{ const key=p=>String(p.label||p.id), m=p=>/^(.*?)(\d+)$/.exec(key(p));
+    const order=[]; L.forEach(p=>{ const g=m(p)?m(p)[1]:key(p); if(!order.includes(g)) order.push(g); });
+    return L.slice().sort((a,b)=>{ const ga=m(a)?m(a)[1]:key(a), gb=m(b)?m(b)[1]:key(b);
+      if(ga!==gb) return order.indexOf(ga)-order.indexOf(gb);
+      return (m(b)?+m(b)[2]:0)-(m(a)?+m(a)[2]:0); }); };
+  const ins=msbFirst(ports.filter(p=>p.dir==="in")), outs=msbFirst(ports.filter(p=>p.dir==="out"));
+  if(!ins.length || !outs.length) return {ok:false, reason:"ชิ้นส่วนนี้ไม่มีขาเข้าหรือขาออก"};
+  const bits=ins.reduce((n,p)=>n+Math.max(1,p.width||1),0);
+  if(bits>PART_TT_MAX_BITS) return {ok:false, reason:`ขาเข้ารวม ${bits} บิต = ${2**bits} แถว มากเกินกว่าจะแสดงเป็นตาราง (สูงสุด ${PART_TT_MAX_BITS} บิต) — ลองใช้โหมดตรวจค่า 🔬 ป้อนค่าทีละชุดแทน`};
+  const pinName=p=>String(p.label||p.id).replace(/\(.*\)$/,"");
+  const scratch={id:"__tt", name:"__tt", components:[], wires:[]};
+  const part=JSON.parse(JSON.stringify(c)); part.id="__ttp"; part.x=400; part.y=200; scratch.components.push(part);
+  ins.forEach((p,k)=>{ const id="__tti"+k; scratch.components.push({id, type:"IN", x:100, y:100+k*44, label:"", params:{name:pinName(p), width:Math.max(1,p.width||1)}});
+    scratch.wires.push({id:"__ttw"+id, from:{cid:id, pid:"o"}, to:{cid:part.id, pid:p.id}, name:""}); });
+  outs.forEach((p,k)=>{ const id="__tto"+k; scratch.components.push({id, type:"OUT", x:700, y:100+k*44, label:"", params:{name:pinName(p), width:Math.max(1,p.width||1)}});
+    scratch.wires.push({id:"__ttw"+id, from:{cid:part.id, pid:p.id}, to:{cid:id, pid:"i"}, name:""}); });
+  const r=clientCombSim(scratch);
+  if(!r.ok) return {ok:false, reason:r.reason||"จำลองชิ้นส่วนนี้ไม่ได้"};
+  return {ok:true, table:r.truth_table};
+}
+function partTruthShow(c){
+  const r=partTruthTable(c), name=(c.label||compDisplay(c));
+  if(!r.ok){ toast(r.reason, "warn", 5000); return; }
+  const T=r.table;
+  const head=`<tr>${T.inputs.map(n=>`<th class="in">${esc(n)}</th>`).join("")}<th class="sep"></th>${T.outputs.map(n=>`<th class="out">${esc(n)}</th>`).join("")}</tr>`;
+  const body=T.rows.map(([a,b])=>`<tr>${a.map(v=>`<td class="${v?"one":""}">${v}</td>`).join("")}<td class="sep"></td>${b.map(v=>`<td class="o ${v?"one":""}">${v}</td>`).join("")}</tr>`).join("");
+  uxModal(`📋 ตารางความจริง — ${esc(name)}`,
+    `<div class="muted" style="margin-bottom:6px">${T.rows.length} แถว · อินพุตตัวแรกเป็นบิตสูงสุด (MSB) · คำนวณด้วยตัวจำลองเดียวกับหน้า จำลอง</div>
+     <div class="part-tt"><table>${head}${body}</table></div>`, {width:Math.min(900, 120+(T.inputs.length+T.outputs.length)*46)});
+}
+{
+  const _insp = renderInspector;
+  renderInspector = function(){
+    const r = _insp.apply(this, arguments);
+    try{
+      const sch=activeSch(); if(!sch) return r;
+      const sel=sch.components.filter(c=>state.selection.has(c.id));
+      if(sel.length!==1) return r;
+      const c=sel[0];
+      if(c.type==="JUNCTION"||c.type==="IN"||c.type==="OUT"||c.type==="VCC"||c.type==="GND"||c.type==="CONST"||c.type==="BUSTAP") return r;
+      const del=document.querySelector('#inspectorPane [data-act="delete-sel"]'); if(!del) return r;
+      const row=document.createElement("div"); row.className="row";
+      row.innerHTML=`<label>ตารางความจริง</label><button class="btn" id="iTruth" title="ดูว่าชิ้นส่วนนี้ให้ค่าออกอะไร ในทุกกรณีของขาเข้า">📋 ดูตารางความจริง</button>`;
+      del.closest(".row").before(row);
+      row.querySelector("#iTruth").onclick=()=>partTruthShow(c);
+    }catch(e){ console.warn("truth table", e); }
+    return r;
+  };
+}
 
 </script>
 <!-- UX-LAYER:END -->

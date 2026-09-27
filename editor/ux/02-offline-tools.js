@@ -14,7 +14,7 @@ function clientCombSim(sch){
   const nm=c=>(c.params&&c.params.name)||c.label||c.id;
   const ins=sch.components.filter(c=>c.type==="IN"), outs=sch.components.filter(c=>c.type==="OUT");
   if(!outs.length) return {ok:false, reason:"ยังไม่มี OUTPUT บนแผ่น — วาง OUTPUT แล้วต่อสายจากวงจรเข้าไป"};
-  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","JUNCTION","BUSTAP"].includes(t);
+  const known=t=>PROBE_GATES[t]||PROBE_SEQ[t]||["IN","OUT","CONST","VCC","GND","MUX","DEMUX","COMP","COMPM","ENC","DEC","JUNCTION","BUSTAP"].includes(t);
   const odd=[...new Set(fs.components.filter(c=>!known(c.type)).map(c=>c.type))];
   if(odd.length) return {ok:false, fallback:true, reason:"มีบล็อกที่ตัวจำลองในเบราว์เซอร์ยังไม่รองรับ: "+odd.join(", ")};
   /* a bus port is its bits, MSB first — swt(3:0) → swt[3] … swt[0], the same names the pin map

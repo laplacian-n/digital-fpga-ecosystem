@@ -212,3 +212,13 @@
 .probe-bus-pick .pbp-bits button.on small{color:#e8ffe8}
 .probe-bus-pick .pbp-row{display:flex;gap:4px}
 .probe-bus-pick .pbp-row button{border:1px solid var(--line,#ccd);border-radius:6px;background:var(--bg-0);padding:3px 8px;cursor:pointer;font:inherit;font-size:11.5px;color:var(--ink)}
+/* ===== 14. a part's truth table ===== */
+.part-tt{max-height:60vh;overflow:auto;border:1px solid var(--line,#ccd);border-radius:8px}
+.part-tt table{border-collapse:collapse;font:12.5px/1.2 ui-monospace,monospace;width:100%}
+.part-tt th{position:sticky;top:0;background:var(--bg-2,#eef);padding:5px 6px;font-weight:700;z-index:1}
+.part-tt th.out{color:#2f81f7}
+.part-tt td{text-align:center;padding:3px 6px;color:var(--ink-dim)}
+.part-tt td.one{color:var(--ink);font-weight:700}
+.part-tt td.o.one{color:var(--ok,#2da44e)}
+.part-tt td.sep,.part-tt th.sep{width:6px;padding:0;border-left:2px solid var(--line,#ccd)}
+.part-tt tr:nth-child(even) td{background:rgba(127,127,127,.06)}
