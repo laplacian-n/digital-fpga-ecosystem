@@ -41,7 +41,7 @@ function mcpPin(sch, ref, role){
     if(role==="any"){ if(ports.length!==1) mcpFail(`${mcpName(c)} has several pins — name one`, "pins: "+ports.map(x=>mcpName(c)+"."+x.id).join(", ")); pid=ports[0].id; }
     else if(role==="source"){ const o=ports.filter(p=>p.dir==="out"); if(!o.length) mcpFail(`${mcpName(c)} has no output pin`); pid=o[0].id; }
     else { const ins=ports.filter(p=>p.dir==="in"); if(!ins.length) mcpFail(`${mcpName(c)} has no input pin`);
-      const used=new Set(sch.wires.filter(w=>w.to.cid===c.id).map(w=>w.to.pid));
+      const used=new Set(sch.wires.filter(w=>w.to.cid===c.id && mcpDriver(sch,w)).map(w=>w.to.pid));   // a leftover wire with no driver leaves the pin free
       const free=ins.find(p=>!used.has(p.id)); if(!free) mcpFail(`every input of ${mcpName(c)} is already connected`, "name the pin: "+ins.map(p=>mcpName(c)+"."+p.id).join(", ")); pid=free.id; }
   }
   const p=ports.find(x=>x.id===pid);
@@ -65,6 +65,32 @@ function mcpCompInfo(sch, c, detail){
   }
   return o;
 }
+/* the pin that drives a wire's net — null when there is none. netDriverPort answers a bare
+   junction ("c35425.j") for a net whose driver was deleted: that dot is not a driver, and
+   showing it as one made a leftover tree look like a live connection nobody could remove. */
+function mcpDriver(sch, w){
+  let d=null; try{ d=netDriverPort(sch, w); }catch(_){}
+  if(!d) return null;
+  const c=comp(d.cid, sch); return (!c || c.type==="JUNCTION") ? null : d;
+}
+/* every wire of the nets that have no driver, among the nets touching `wires` (or all nets) */
+function mcpUndrivenWires(sch, wires){
+  const out=new Set(), seen=new Set();
+  (wires||sch.wires).forEach(w=>{ if(seen.has(w.id) || !sch.wires.includes(w)) return;
+    const ids=[...netWires(sch, w)]; ids.forEach(i=>seen.add(i));
+    if(!mcpDriver(sch, w)) ids.forEach(i=>out.add(i)); });
+  return out;
+}
+/* drop wires, then the dots that carried only them; returns the real pins left without a driver */
+function mcpDropWires(sch, ids){
+  const pins=[];
+  sch.wires.forEach(w=>{ if(!ids.has(w.id)) return; const c=comp(w.to.cid, sch);
+    if(c && c.type!=="JUNCTION") pins.push(mcpName(c)+"."+w.to.pid); });
+  sch.wires=sch.wires.filter(w=>!ids.has(w.id));
+  const used=new Set(); sch.wires.forEach(w=>{ used.add(w.from.cid); used.add(w.to.cid); });
+  sch.components=sch.components.filter(c=>c.type!=="JUNCTION" || used.has(c.id));
+  return pins;
+}
 /* nets through junctions: one driver pin, its sinks, the net name if any */
 function mcpNets(sch){
   const seen=new Set(), nets=[];
@@ -73,7 +99,7 @@ function mcpNets(sch){
     if(seen.has(w.id)) return;
     const ids=[...netWires(sch, w)]; ids.forEach(id=>seen.add(id));   // netWires returns a Set
     const ws=ids.map(id=>sch.wires.find(x=>x.id===id)).filter(Boolean);
-    let drv=null; try{ drv=netDriverPort(sch, w); }catch(_){}
+    const drv=mcpDriver(sch, w);
     const sinks=new Set(), drivers=new Set();
     ws.forEach(x=>[x.from,x.to].forEach(ep=>{ const c=comp(ep.cid,sch); if(!c||c.type==="JUNCTION"||c.type==="BUSTAP") return;
       const p=getPorts(c).find(q=>q.id===ep.pid); if(!p) return;
@@ -210,7 +236,12 @@ MCP_OPS.connect = a=>{
     const A=mcpPin(sch, f, "source"), B=mcpPin(sch, t, "sink");
     if(A.p.dir!=="out" && A.c.type!=="JUNCTION") mcpFail(`'${f}' is an input — a wire must start at an output`, "swap from/to?");
     if(B.p.dir!=="in") mcpFail(`'${t}' is an output — a wire must end at an input`);
-    if(sch.wires.some(w=>w.to.cid===B.c.id&&w.to.pid===B.p.id)) mcpFail(`${mcpName(B.c)}.${B.p.id} is already driven`, "disconnect it first, or pick another pin");
+    const on=sch.wires.filter(w=>w.to.cid===B.c.id&&w.to.pid===B.p.id);
+    if(on.length){
+      const d=mcpDriver(sch, on[0]);
+      if(d){ const dc=comp(d.cid, sch); mcpFail(`${mcpName(B.c)}.${B.p.id} is already driven by ${dc?mcpName(dc):d.cid}.${d.pid}`, `disconnect {pin:"${mcpName(B.c)}.${B.p.id}"} first, or pick another pin`); }
+      mcpDropWires(sch, new Set(on.map(w=>w.id)));      // left over from a deleted driver: nothing drives it
+    }
     const w={id:uid("w"), from:{cid:A.c.id,pid:A.p.id}, to:{cid:B.c.id,pid:B.p.id}, name:a.net_name||""};
     sch.wires.push(w); made.push(`${mcpName(A.c)}.${A.p.id} → ${mcpName(B.c)}.${B.p.id}`);
   });
@@ -241,14 +272,24 @@ MCP_OPS.disconnect = a=>{
   return {removed_wires:gone.length};
 };
 MCP_OPS.delete = a=>{
-  const sch=mcpUse(a.sheet); const refs=a.refs||[a.ref];
+  const sch=mcpUse(a.sheet); let refs=a.refs||a.ref||a.components||a.ids||a.targets||a.target||a.names;
+  if(refs==null) mcpFail("give refs: [\"id or name\", …]", "delete {refs:[\"U1\",\"g3\"]}");
+  if(!Array.isArray(refs)) refs=[refs];
   const cs=refs.map(r=>mcpComp(sch,r)); mcpBeforeChange("ลบ");
   const ids=new Set(cs.map(c=>c.id));
+  // the nets these parts drove: once the driver is gone, the rest of the tree (dots and all)
+  // would stay behind driving nothing, yet still "driving" the pins it reaches — so it goes too
+  const touched=sch.wires.filter(w=>ids.has(w.from.cid)||ids.has(w.to.cid));
+  const near=new Set(); touched.forEach(w=>netWires(sch,w).forEach(i=>near.add(i)));
   sch.components=sch.components.filter(c=>!ids.has(c.id));
   sch.wires=sch.wires.filter(w=>!ids.has(w.from.cid)&&!ids.has(w.to.cid));
+  const orphan=mcpUndrivenWires(sch, sch.wires.filter(w=>near.has(w.id)));
+  const loose=orphan.size ? mcpDropWires(sch, orphan) : [];
   try{ healJunctions(sch); }catch(_){}
   mcpActivity("ลบ "+cs.map(mcpName).join(", ")); mcpCommit(sch);
-  return {deleted:cs.map(mcpName)};
+  const out={deleted:cs.map(mcpName)};
+  if(loose.length) out.now_unconnected=loose;              // inputs the deleted parts used to drive
+  return out;
 };
 MCP_OPS.update_component = a=>{
   const sch=mcpUse(a.sheet), c=mcpComp(sch, a.ref); mcpBeforeChange("แก้ "+mcpName(c));
@@ -293,13 +334,15 @@ MCP_OPS.build_circuit = a=>{
     return {sheet:dr.sch.name, into:"new", equations:r.exprs, layout:mcpLayoutMetrics(dr.sch)};
   }
   if(a.generator){ const g=a.generator, n=+g.n||0;
-    if(g.kind==="mod_counter"){ if(n<2||n>64) mcpFail("mod_counter n must be 2..64"); intent=fsmCounterIntent(Array.from({length:n},(_,i)=>i)); intent.module=a.name||("mod"+n); title="mod-"+n; }
+    if(g.kind==="mod_counter"){ if(n<2||n>64) mcpFail("mod_counter n must be 2..64", "to divide a clock by a larger N use generator {kind:\"clock_divider\", n}"); intent=fsmCounterIntent(Array.from({length:n},(_,i)=>i)); intent.module=a.name||("mod"+n); title="mod-"+n; }
     else if(g.kind==="sequence_counter"){ const seq=(g.sequence||[]).map(Number); if(seq.length<2) mcpFail("sequence_counter needs sequence: [≥2 numbers 0..63]"); intent=fsmCounterIntent(seq); if(!intent||intent.error) mcpFail((intent&&intent.error)||"sequence too large"); intent.module=a.name||"seqcount"; title="sequence "+seq.join("→"); }
     else if(g.kind==="ripple_counter"||g.kind==="shift_register"||g.kind==="register"){ const b=seqBuildIntent(({ripple_counter:"counter ",shift_register:"shift register ",register:"register "})[g.kind]+(n||4)+" bit"); intent=b.intent; if(a.name) intent.module=a.name; title=b.title; }
-    else if(g.kind==="jk_counter"){ if(n<2||n>64) mcpFail("jk_counter n must be 2..64"); const r=jkCounterIntent(Array.from({length:n},(_,i)=>i), g.output==="q"?{outputs:"q"}:{out:sanId(g.output||"clk_out"), clk:sanId(g.clk||"clk_in")});
+    else if(g.kind==="jk_counter"){ if(n<2||n>64) mcpFail("jk_counter n must be 2..64", "to divide a clock by a larger N use generator {kind:\"clock_divider\", n}"); const r=jkCounterIntent(Array.from({length:n},(_,i)=>i), g.output==="q"?{outputs:"q"}:{out:sanId(g.output||"clk_out"), clk:sanId(g.clk||"clk_in")});
       if(r.error) mcpFail(r.error); intent=r; intent.module=a.name||("jkmod"+n); title="JK-FF mod-"+n; }
+    else if(g.kind==="clock_divider"){ const r=dividerIntent(n, {out:sanId(g.output||"clk_out"), clk:sanId(g.clk||"clk_in")});
+      if(r.error) mcpFail(r.error+" (n = divisor)"); intent=r; if(a.name) intent.module=a.name; title="÷"+n; }
     else if(g.kind==="bcd_7seg"){ const P=seg7Preset(!!g.active_low); intent=ttToIntent(P.inputs,P.outputs,P.rows,a.name||P.module).intent; title="BCD→7seg"; }
-    else mcpFail(`unknown generator '${g.kind}'`, "mod_counter, jk_counter, sequence_counter, ripple_counter, shift_register, register, bcd_7seg");
+    else mcpFail(`unknown generator '${g.kind}'`, "mod_counter, jk_counter, clock_divider, sequence_counter, ripple_counter, shift_register, register, bcd_7seg");
   }
   if(a.intent){ intent=a.intent; title="intent"; }
   if(!intent) mcpFail("give one of: truth_table, generator, intent");
@@ -307,7 +350,10 @@ MCP_OPS.build_circuit = a=>{
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
   if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
   mcpActivity("สร้าง "+title);
-  return {sheet:dr.sch.name, into:"new", parts:dr.sch.components.filter(c=>c.type!=="JUNCTION").length, layout:mcpLayoutMetrics(dr.sch)};
+  const res={sheet:dr.sch.name, into:"new", parts:dr.sch.components.filter(c=>c.type!=="JUNCTION").length, layout:mcpLayoutMetrics(dr.sch)};
+  if(intent.note) res.note=intent.note;
+  if(dr.warns && dr.warns.length) res.warnings=dr.warns;
+  return res;
 };
 
 MCP_OPS.auto_layout = a=>{
@@ -328,6 +374,7 @@ MCP_OPS.check = a=>{
 };
 MCP_OPS.explain_simulation = a=>{ const sch=mcpSheet(a.sheet);
   return {sheet:sch.name, findings:explainSim(sch).map(f=>({level:f.lvl, title:f.title, why:f.why, fix:f.fix, component:f.cid&&comp(f.cid,sch)?mcpName(comp(f.cid,sch)):undefined}))}; };
+const MCP_TT_MAX_BITS = 10;
 MCP_OPS.simulate = a=>{
   const sch=mcpSheet(a.sheet);
   const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
@@ -340,6 +387,16 @@ MCP_OPS.simulate = a=>{
       columns:{inputs:sq.inputs, state:sq.dffs, outputs:sq.outputs},
       rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""), outputs:r[3].join("")}))};
   }
+  if(a.vectors){
+    if(!Array.isArray(a.vectors) || !a.vectors.length) mcpFail("vectors must be a list of input sets, e.g. [{\"a\":1,\"b\":0}, …]");
+    if(a.vectors.length>256) mcpFail("at most 256 vectors per call");
+    const fs=flattenSchematic(sch).sch, st=probeStruct(fs);
+    return {sheet:sch.name, kind:"combinational", mode:"vectors", unset_inputs:"0",
+      rows:a.vectors.map(v=>({inputs:v, outputs:mcpEvalOuts(sch, fs, st, v)}))};
+  }
+  const bits=sch.components.filter(c=>c.type==="IN").reduce((n,c)=>n+Math.max(1,+(c.params.width||1)),0);
+  if(bits>MCP_TT_MAX_BITS) mcpFail(`${bits} input bits = ${2**bits} rows — too many for a full truth table (max ${MCP_TT_MAX_BITS} bits)`,
+    "give vectors: [{input:value,…}, …] (the rows you care about, ≤256; inputs left out are 0), or use probe for one input set");
   const j=clientCombSim(sch);
   if(!j.ok) mcpFail(j.reason||"cannot simulate");
   const tt=j.truth_table;
@@ -371,6 +428,18 @@ function mcpProbeVal(c, v){
   else if(/^\d+$/.test(t)) n=parseInt(t,10);
   else mcpFail(`value '${v}' for bus INPUT '${c.params.name}' (${w} bits) — use a number (5), binary as wide as the bus ("${"0".repeat(w-1)}1"), "0b…" or "0x…"`);
   return (n>>>0)&m;
+}
+/* outputs for one set of inputs (combinational evaluation, same model as probe) */
+function mcpEvalOuts(sch, fs, st, inputs){
+  const saved=Object.assign({},PROBE_VALS);
+  try{
+    Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]);
+    Object.entries(inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`, "inputs: "+sch.components.filter(x=>x.type==="IN").map(x=>x.params.name).join(", ")); PROBE_VALS[c.id]=mcpProbeVal(c, v); });
+    const m=probeModel(fs, st), outs={};
+    sch.components.filter(c=>c.type==="OUT").forEach(c=>{ const v=m.inVal(c.id,"i"), w=probeWidth(c,"i");
+      outs[c.params.name]=v==null?"undriven":(w>1?v.toString(2).padStart(w,"0"):v); });
+    return outs;
+  } finally { Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved); }
 }
 MCP_OPS.probe = a=>{
   const sch=mcpSheet(a.sheet), fs=flattenSchematic(sch).sch, saved=Object.assign({},PROBE_VALS);

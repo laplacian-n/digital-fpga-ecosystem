@@ -103,3 +103,63 @@ function jkLayout(sch, n){
   try{ wtTidySheet(sch); }catch(e){ console.warn("jk layout", e); }
   sch.locked=true;                                            // keep the drawing as placed
 }
+/* ===== Divide a clock by ANY N (50 MHz → 20 Hz = ÷2 500 000), one sheet ==========================
+   The K-map counters above stop at 64 states, so a real divider had to be chained by hand
+   (÷50·50·40·25). This is the textbook synchronous binary counter with a synchronous clear:
+     D_i = (Q_i ⊕ Q_0·…·Q_{i−1}) · ¬TC        TC = AND of the Q bits that are 1 in M−1
+   (the counter first reaches those bits all 1 AT M−1, so TC is exactly "count = M−1").
+   N even: count mod N/2 and toggle clk_out on TC → a 50 % square wave at f/N.
+   N odd:  count mod N, clk_out = the counter's MSB (period N clocks, not 50 %). */
+function dividerIntent(N, opts){
+  opts=opts||{}; N=Math.floor(+N);
+  if(!(N>=2) || N>2**31) return {error:"หารได้ 2 … 2³¹"};
+  const even=N%2===0, M=even?N/2:N;
+  const clk=opts.clk||"clk_in", out=opts.out||"clk_out";
+  const comps=[{id:"clk",type:"IN",name:clk}], nets=[]; let g=0;
+  const gate=(type, ins)=>{ const id=type.toLowerCase()+(g++); comps.push({id,type}); ins.forEach(s=>nets.push({from:s,to:id})); return id; };
+  // an AND of any number of signals, as a tree of ≤8-input gates
+  const andAll=L=>{ while(L.length>1){ const nx=[]; for(let i=0;i<L.length;i+=8){ const part=L.slice(i,i+8); nx.push(part.length===1?part[0]:gate("AND",part)); } L=nx; } return L[0]; };
+  let n=0, tc=null;
+  if(M>1){
+    n=(M-1).toString(2).length;
+    for(let i=0;i<n;i++){ comps.push({id:"ff"+i,type:"DFF"}); nets.push({from:"clk",to:"ff"+i+".clk"}); }
+    const ones=[]; for(let i=0;i<n;i++) if(((M-1)>>>i)&1) ones.push("ff"+i+".q");
+    tc=andAll(ones);
+    const ntc=gate("NOT",[tc]);
+    let carry=null;
+    for(let i=0;i<n;i++){
+      const q="ff"+i+".q";
+      const x = i===0 ? "ff0.qn" : gate("XOR",[q, carry]);
+      nets.push({from:gate("AND",[x, ntc]), to:"ff"+i+".d"});
+      carry = i===0 ? q : gate("AND",[carry, q]);
+    }
+  }
+  if(even){
+    comps.push({id:"tq",type:"DFF"}); nets.push({from:"clk",to:"tq.clk"});
+    nets.push({from: tc ? gate("XOR",["tq.q", tc]) : "tq.qn", to:"tq.d"});
+    comps.push({id:"out",type:"OUT",name:out}); nets.push({from:"tq.q",to:"out"});
+  } else {
+    comps.push({id:"out",type:"OUT",name:out}); nets.push({from:"ff"+(n-1)+".q",to:"out"});
+  }
+  return {module:"div"+N, components:comps, nets, bits:n, modulus:M,
+    note: even ? `นับ 0…${M-1} แล้วสลับ ${out} → ${out} = ${clk}/${N} (duty 50%)`
+               : `นับ 0…${M-1}, ${out} = บิตสูงสุด → ${clk}/${N} (N คี่: duty ไม่ใช่ 50%)`};
+}
+GENERATORS.splice(GENERATORS.findIndex(g=>g.id==="jkmod")+1, 0,
+  {id:"clkdiv", icon:"⏱", name:"หารความถี่ (N ใดก็ได้)", desc:"clk_in → clk_out = clk_in / N · เช่น 50 MHz → 20 Hz ใส่ 2500000", run:async()=>{
+    const v=await uxAsk("หารความถี่ด้วย N",[
+      {label:"หารด้วย (N)",type:"number",value:2500000,min:2,hint:"50 MHz → 1 Hz = 50000000 · → 20 Hz = 2500000"},
+      {label:"ขาออก",value:"clk_out"}]);
+    if(!v) return;
+    const r=dividerIntent(v[0], {out:sanId(String(v[1]||"clk_out").trim()||"clk_out")});
+    if(r.error){ toast("สร้างไม่ได้: "+r.error,"err"); return; }
+    const dr=uxDrawGenerated(r, "หารความถี่ ÷"+r.module.slice(3));
+    if(dr){ try{ zoomFit(); }catch(_){} toast(r.note,"info",8000); } }});
+{
+  const b=document.querySelector('#menu [data-gen="jkmod"]');
+  if(b && !document.querySelector('#menu [data-gen="clkdiv"]')){
+    const g=GENERATORS.find(x=>x.id==="clkdiv");
+    b.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="clkdiv" title="${escA(g.desc)}"><span class="gi">${g.icon}</span>${g.name}…</button>`);
+    document.querySelector('#menu [data-gen="clkdiv"]').addEventListener("click",()=>runGenerator("clkdiv"));
+  }
+}

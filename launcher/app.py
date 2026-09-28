@@ -479,28 +479,40 @@ RUNTIME_FILE = CONFIG_DIR / "runtime.json"
 
 
 class McpRelay:
+    """One editor page runs one operation at a time, in its only (JS) thread: a heavy one (a
+    full auto_layout of a big sheet) freezes it until it is done. So the relay remembers what
+    the page is running: a busy page still counts as open (it cannot poll while it works — it
+    used to look closed, and the next call tried to open another window and hung), and a call
+    queued behind a long job waits a little, then answers "busy with <op>" instead of hanging."""
+    BUSY_WAIT = 15.0
+
     def __init__(self):
         self.cv = threading.Condition()
         self.jobs = {}          # client -> [job]
         self.seen = {}          # client -> last poll time
+        self.running = {}       # client -> (job id, op, started)
+        self.waiting = set()    # job ids a caller is still waiting for
         self.replies = {}       # job id -> reply
         self.n = 0
         self.opened_at = 0.0
 
     def live_client(self, within=35.0):
         now = time.time()
-        live = [(t, c) for c, t in self.seen.items() if now - t < within]
+        live = [(t, c) for c, t in self.seen.items() if now - t < within or c in self.running]
         return max(live)[1] if live else None
 
     def poll(self, client, wait=20.0):
         end = time.time() + wait
         with self.cv:
             self.seen[client] = time.time()
+            self.running.pop(client, None)      # polling again = the previous job is over
             self.cv.notify_all()
             while True:
                 q = self.jobs.get(client)
                 if q:
-                    return q.pop(0)
+                    job = q.pop(0)
+                    self.running[client] = (job["id"], job["op"], time.time())
+                    return job
                 left = end - time.time()
                 if left <= 0:
                     return None
@@ -509,8 +521,17 @@ class McpRelay:
 
     def result(self, reply):
         with self.cv:
-            self.replies[str(reply.get("id"))] = reply
+            jid = str(reply.get("id"))
+            for c, r in list(self.running.items()):
+                if r[0] == jid:
+                    del self.running[c]
+            if jid in self.waiting:             # nobody waits for a late answer any more: drop it
+                self.replies[jid] = reply
             self.cv.notify_all()
+
+    def busy(self, client):
+        r = self.running.get(client)
+        return (r[1], time.time() - r[2]) if r else None
 
     def call(self, op, args, timeout=60.0):
         with self.cv:
@@ -535,17 +556,34 @@ class McpRelay:
             self.n += 1
             jid = f"j{self.n}"
             self.jobs.setdefault(client, []).append({"id": jid, "op": op, "args": args or {}})
+            self.waiting.add(jid)
             self.cv.notify_all()
-            end = time.time() + timeout
-            while jid not in self.replies:
-                left = end - time.time()
-                if left <= 0:
-                    # drop it if the page never picked it up
-                    self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
-                    return {"ok": False, "error": f"the editor did not answer '{op}' within {int(timeout)} s",
-                            "hint": "is the Schematic Studio window frozen or showing a dialog?"}
-                self.cv.wait(min(left, 5.0))
-            return self.replies.pop(jid)
+            start = time.time()
+            end = start + timeout
+            try:
+                while jid not in self.replies:
+                    now = time.time()
+                    b = self.busy(client)
+                    queued = any(j["id"] == jid for j in self.jobs.get(client, []))
+                    # still queued behind another op that has run a while: say so instead of hanging
+                    if queued and b and b[1] > self.BUSY_WAIT and now - start > self.BUSY_WAIT:
+                        self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
+                        return {"ok": False, "error": f"the editor is still busy with '{b[0]}' ({int(b[1])} s so far) — "
+                                                      f"'{op}' was not run",
+                                "hint": "wait a little and call again; a very large sheet takes a while to lay out"}
+                    left = end - now
+                    if left <= 0:
+                        if queued:      # drop it if the page never picked it up
+                            self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
+                            return {"ok": False, "error": f"the editor did not pick up '{op}' within {int(timeout)} s",
+                                    "hint": "is the Schematic Studio window frozen or showing a dialog?"}
+                        return {"ok": False, "error": f"'{op}' is still running in the editor after {int(timeout)} s",
+                                "hint": "it finishes on its own — call status in a moment to see the result"}
+                    self.cv.wait(min(left, 1.0))
+                return self.replies.pop(jid)
+            finally:
+                self.waiting.discard(jid)
+                self.replies.pop(jid, None)
 
 
 RELAY = McpRelay()

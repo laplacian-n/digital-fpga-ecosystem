@@ -133,7 +133,8 @@ TOOLS = [
        "net_name": {"type": "string"}}),
     T("disconnect", "Remove wiring: `pin` drops every wire on that pin; `from`+`to` removes one connection.",
       {"sheet": SHEET, "pin": PIN, "from": PIN, "to": PIN}),
-    T("delete", "Delete components (and their wires).", {"sheet": SHEET, "refs": {"type": "array", "items": {"type": "string"}}}, ["refs"]),
+    T("delete", "Delete components (and their wires). A net a deleted part drove is removed with it (no leftover "
+      "wiring still 'driving' its sinks); the inputs it fed come back as now_unconnected.", {"sheet": SHEET, "refs": {"type": "array", "items": {"type": "string"}}}, ["refs"]),
     T("update_component", "Rename, change params, change a basic gate's type, move (x/y) or rotate a component.",
       {"sheet": SHEET, "ref": REF, "name": {"type": "string"}, "params": {"type": "object"},
        "type": {"type": "string"}, "x": {"type": "number"}, "y": {"type": "number"},
@@ -145,8 +146,10 @@ TOOLS = [
       "• truth_table: {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; "
       "into:\"current\" fills a sheet that has exactly those ports, e.g. a lab template)\n"
       "• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — "
-      "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename)\n"
-      "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}",
+      "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename); "
+      "clock_divider = divide clk_in by ANY n (2..2^31, e.g. 50 MHz → 20 Hz: n=2500000), one sheet, 50 % duty for even n\n"
+      "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]} — a sub-circuit is "
+      "type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]}}, timeout=90),
     # --- layout
@@ -158,9 +161,12 @@ TOOLS = [
     # --- verification
     T("check", "Design-rule check (what Vivado would reject + common mistakes): errors and warnings with the "
       "component and a suggested fix.", {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
-    T("simulate", "Simulate a sheet. Combinational: full truth table (rows 'inputs → outputs', and per-output columns). "
+    T("simulate", "Simulate a sheet. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) "
+      "up to 10 input bits; for more, or to check chosen rows, give `vectors` [{input: value, …}, …] (≤256, inputs "
+      "left out are 0, bus values as in probe). "
       "Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0).",
-      {"sheet": SHEET, "cycles": {"type": "integer", "minimum": 1, "maximum": 256}, "inputs": INPUTS}),
+      {"sheet": SHEET, "cycles": {"type": "integer", "minimum": 1, "maximum": 256}, "inputs": INPUTS,
+       "vectors": {"type": "array", "items": {"type": "object"}, "maxItems": 256}}),
     T("verify_truth_table", "Compare a combinational sheet against expected output columns ({out:\"0110…\"}, x = don't care). "
       "Returns pass and the mismatching rows.", {"sheet": SHEET, "expected": {"type": "object"}}, ["expected"]),
     T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong. "
@@ -224,6 +230,74 @@ TOOLS = [
       {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
 ]
 TOOL_MAP = {t["name"]: t for t in TOOLS}
+APPLY_OPS = ["add_component", "connect", "disconnect", "delete", "update_component", "set_pins"]
+
+
+def fields_of(name):
+    """'refs* (array), sheet' — a tool's fields, required ones starred."""
+    sch = TOOL_MAP[name]["inputSchema"]
+    req = set(sch.get("required", []))
+    return ", ".join(f"{k}{'*' if k in req else ''} ({v.get('type', 'any')})" for k, v in sch["properties"].items())
+
+
+# the apply step fields, spelled out (they used to be guessed: delete takes `refs`, not target/components)
+_apply = TOOL_MAP["apply"]
+_apply["description"] += " Step fields (* = required): " + "; ".join(
+    f"{op}: {fields_of(op).replace('sheet (string), ', '').replace(', sheet (string)', '')}" for op in APPLY_OPS) + \
+    ". Steps run in order and each sees the ones before it (delete then connect to the freed pin works)."
+
+# names people (and models) reach for first → the field the tool actually has
+ALIASES = {
+    "*": {"sheet": ["sheet_name", "sheetName", "schematic"]},
+    "delete": {"refs": ["ref", "components", "component", "ids", "id", "targets", "target", "names", "name", "parts"]},
+    "update_component": {"ref": ["target", "component", "id"]},
+    "focus": {"ref": ["target", "component", "id", "name"]},
+    "connect": {"from": ["source", "src", "driver"], "to": ["dest", "sink", "target"]},
+    "disconnect": {"pin": ["target", "ref"]},
+    "add_component": {"name": ["label"]},
+    "set_pins": {"map": ["pins", "pinmap", "mapping"]},
+    "simulate": {"inputs": ["hold"]},
+}
+
+
+def normalize_args(name, args):
+    """Rename known aliases, then refuse fields the tool does not have — naming the ones it does.
+    Returns (args, error)."""
+    tool = TOOL_MAP[name]
+    props = tool["inputSchema"]["properties"]
+    args = dict(args or {})
+    alias = dict(ALIASES["*"], **ALIASES.get(name, {}))
+    for field, names in alias.items():
+        if field not in props or field in args:
+            continue
+        for a in names:
+            if a in args and a not in props:
+                v = args.pop(a)
+                if props[field].get("type") == "array" and not isinstance(v, list):
+                    v = [v]
+                args[field] = v
+                break
+    unknown = [k for k in args if k not in props]
+    if unknown:
+        return args, (f"{name}: unknown field{'s' if len(unknown) > 1 else ''} {', '.join(repr(k) for k in unknown)}"
+                      f" — {name} takes: {fields_of(name) or '(no fields)'}")
+    missing = [k for k in tool["inputSchema"].get("required", []) if k not in args]
+    if missing:
+        return args, f"{name}: missing {', '.join(repr(k) for k in missing)} — {name} takes: {fields_of(name)}"
+    if name == "apply":
+        steps = args.get("steps")
+        if not isinstance(steps, list):
+            return args, "apply: steps must be a list of {op, …}"
+        fixed = []
+        for i, st in enumerate(steps, 1):
+            if not isinstance(st, dict) or st.get("op") not in APPLY_OPS:
+                return args, f"apply step {i}: op must be one of {', '.join(APPLY_OPS)}"
+            body, e = normalize_args(st["op"], {k: v for k, v in st.items() if k != "op"})
+            if e:
+                return args, f"apply step {i}: {e}"
+            fixed.append(dict(body, op=st["op"]))
+        args["steps"] = fixed
+    return args, None
 LOCAL_TOOLS = {"list_projects", "about", "check_update", "open_home"}   # answered by the app itself, no editor needed
 
 RESOURCES = [
@@ -386,7 +460,10 @@ def call_tool(name, args):
             return {"content": [text({"folder": res.get("dir"), "projects": [
                 {"name": p["name"], "path": p.get("main"), "files": [f["name"] for f in p.get("files", [])]}
                 for p in res.get("projects", [])]})]}
-        reply = APP.call(name, args or {}, tool["_timeout"])
+        args, bad = normalize_args(name, args)
+        if bad:
+            return {"content": [text(bad)], "isError": True}
+        reply = APP.call(name, args, tool["_timeout"])
     except Exception as e:
         return {"content": [text(f"FPGA Ecosystem is not reachable: {e}")], "isError": True}
     if not reply.get("ok"):
