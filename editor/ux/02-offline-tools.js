@@ -110,14 +110,21 @@ function ttToIntent(inputs, outputs, rows, module){
     if(res.const0){ C.push({id:"gnd_"+oi,type:"GND"}); N.push({from:"gnd_"+oi,to:oid}); exprs[on]="0"; return; }
     if(res.const1){ C.push({id:"vcc_"+oi,type:"VCC"}); N.push({from:"vcc_"+oi,to:oid}); exprs[on]="1"; return; }
     exprs[on]=res.terms.map(t=>t.slice().sort((x,y)=>y.v-x.v).map(litTxt).join("·")).join(" + ");   // in input order
+    // a gate takes at most 8 inputs: a wider AND / OR becomes a tree (a 4-bit comparator's eq has 16
+    // product terms — one 16-input OR used to be drawn wrong, and its eq never came out 1)
+    const tree=(type, ins)=>{ while(ins.length>8){ const nx=[]; for(let i=0;i<ins.length;i+=8){ const part=ins.slice(i,i+8);
+        if(part.length===1){ nx.push(part[0]); continue; } const t=type.toLowerCase()+"_"+(g++); C.push({id:t,type}); part.forEach(s=>N.push({from:s,to:t})); nx.push(t); }
+      ins=nx; } return ins; };
     const srcs=res.terms.map(t=>{
       if(t.length===1) return lit(t[0]);
       const key=t.map(l=>l.v+(l.neg?"n":"p")).sort().join(",");
       if(andCache.has(key)) return andCache.get(key);               // shared product term (7-seg!)
-      const a="and_"+(g++); C.push({id:a,type:"AND"}); t.forEach(l=>N.push({from:lit(l),to:a})); andCache.set(key,a); return a;
+      const ins=tree("AND", t.map(lit));
+      const a="and_"+(g++); C.push({id:a,type:"AND"}); ins.forEach(s=>N.push({from:s,to:a})); andCache.set(key,a); return a;
     });
-    if(srcs.length===1) N.push({from:srcs[0], to:oid});
-    else { const o="or_"+oi; C.push({id:o,type:"OR"}); srcs.forEach(s=>N.push({from:s,to:o})); N.push({from:o,to:oid}); }
+    const top=srcs.length>1 ? tree("OR", srcs) : srcs;
+    if(top.length===1) N.push({from:top[0], to:oid});
+    else { const o="or_"+oi; C.push({id:o,type:"OR"}); top.forEach(s=>N.push({from:s,to:o})); N.push({from:o,to:oid}); }
   });
   used.forEach(i=>{ C.push({id:notId(i),type:"NOT"}); N.push({from:inId(i),to:notId(i)}); });
   // self-check: the minimised SOP must match every cared-for row

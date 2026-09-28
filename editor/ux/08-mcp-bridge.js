@@ -814,22 +814,29 @@ async function mcpLoop(){
     }catch(_){ fails++; mcpSetChip(false); await new Promise(res=>setTimeout(res, Math.min(10000, 1000*fails))); continue; }
     mcpSetChip(true);
     if(!job||!job.id) continue;
-    let reply;
-    MCPB.busy=true; MCPB.calls++;
-    mcpRevealFlush();
-    const pre=mcpSheetState();
-    try{
-      const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);
-      const result=await fn(job.args||{});
-      reply={id:job.id, ok:true, result};
-      try{ mcpShowChange(pre); }catch(e){ console.warn("mcp view", e); }
-      try{ uxRefreshPages(); }catch(_){}               // a pin / board page on screen shows the new state
-    }catch(e){
-      reply={id:job.id, ok:false, error:String(e&&e.message||e), hint:e&&e.hint||undefined};
-      if(!(e instanceof McpError)) console.warn("mcp op failed", job.op, e);
-    }finally{ MCPB.busy=false; }
-    try{ await fetch("/api/mcp/result", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(reply)}); }catch(_){}
+    // an op that only WAITS (for the user's click, a Vivado build, the chat) runs beside the others:
+    // it used to hold the queue for up to 40 s, and a simulate sent meanwhile timed out
+    if(MCP_WAITING_OPS.has(job.op)){ mcpRun(job, false); continue; }
+    await mcpRun(job, true);
   }
+}
+const MCP_WAITING_OPS = new Set(["ai_chat_status", "approval_status", "board_status"]);
+async function mcpRun(job, edits){
+  let reply;
+  if(edits){ MCPB.busy=true; mcpRevealFlush(); }
+  MCPB.calls++;
+  const pre=edits?mcpSheetState():null;
+  try{
+    const fn=MCP_OPS[job.op]; if(!fn) throw new McpError(`unknown operation '${job.op}'`);
+    const result=await fn(job.args||{});
+    reply={id:job.id, ok:true, result};
+    if(edits){ try{ mcpShowChange(pre); }catch(e){ console.warn("mcp view", e); }
+      try{ uxRefreshPages(); }catch(_){} }             // a pin / board page on screen shows the new state
+  }catch(e){
+    reply={id:job.id, ok:false, error:String(e&&e.message||e), hint:e&&e.hint||undefined};
+    if(!(e instanceof McpError)) console.warn("mcp op failed", job.op, e);
+  }finally{ if(edits) MCPB.busy=false; }
+  try{ await fetch("/api/mcp/result", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(reply)}); }catch(_){}
 }
 function mcpSetChip(up){ const el=$("#mcpChip"); if(!el) return; el.hidden=false; el.classList.toggle("up", !!up);
   el.title = up ? "เชื่อมกับ Claude แล้ว — Claude อ่าน/แก้แผ่นนี้ได้ (ทุกการแก้กด Ctrl+Z ย้อนได้)" : "รอการเชื่อมต่อจาก Claude…"; }

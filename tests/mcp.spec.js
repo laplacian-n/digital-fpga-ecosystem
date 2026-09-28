@@ -417,14 +417,17 @@ test("bus ports: a generator's q0..q3 become q[3:0] (simulates, makes VHDL, wire
 });
 
 test("module library over MCP: save a sheet with its sub-blocks, use it in another project, open, delete", async () => {
-  const sv = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", description: "mod-10 counter on 4 LEDs" });
+  const gate = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds" });
+  expect(gate.error).toBe(true);                                     // not verified: kept out of the library
+  expect(gate.text).toContain("not verified");
+  const sv = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", description: "mod-10 counter on 4 LEDs", force: true });
   expect(sv.error, sv.text).toBe(false);
   expect(sv.data.blocks).toEqual(["cnt10b"]);                       // the block inside goes with it
   expect(sv.data.ports).toEqual([{ name: "clk", dir: "in", width: 1 }, { name: "leds", dir: "out", width: 4 }]);
-  const dup = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds" });
+  const dup = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", force: true });
   expect(dup.error).toBe(true);
   expect(dup.text).toContain("replace:true");
-  expect((await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", replace: true })).data.replaced).toBe(true);
+  expect((await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", replace: true, force: true })).data.replaced).toBe(true);
   const ls = await mcp.tool("list_modules", { query: "leds" });
   expect(ls.data.modules.map(m => m.name)).toEqual(["counter_leds"]);
   // the Modules tab shows it too
@@ -483,4 +486,32 @@ test("build_circuit into a named sheet (new or empty); connect to one bit of a b
   expect(again.error).toBe(true);
   expect(again.text).toContain("bit 2");
   expect((await mcp.tool("check", { sheet: "bits" })).data.errors).toBe(0);
+});
+
+test("build_part through MCP: a checked full adder on a named sheet, saved to the library without force", async () => {
+  const ls = await mcp.tool("list_parts", { query: "adder" });
+  expect(ls.data.parts.map(p => p.kind)).toEqual(expect.arrayContaining(["half_adder", "full_adder", "adder"]));
+  const b = await mcp.tool("build_part", { kind: "full_adder", sheet: "fa3" });
+  expect(b.error, b.text).toBe(false);
+  expect(b.data).toMatchObject({ sheet: "fa3", verified: { pass: true } });
+  const w = await mcp.tool("build_part", { part: "adder", bits: 4, bus: true, sheet: "add4" });    // aliases
+  expect(w.data.ports.map(p => p.name + ":" + p.width)).toEqual(["a:4", "b:4", "cin:1", "s:4", "cout:1"]);
+  const sv = await mcp.tool("save_module", { sheet: "fa3", name: "FA_checked" });
+  expect(sv.error, sv.text).toBe(false);
+  expect(sv.data.verified).toContain("full_adder");
+  const f = await mcp.tool("build_circuit", { formula: "y = a&b | ~c", sheet: "eq1" });
+  expect(f.data.truth_table.columns.y).toBe("10101011");
+  await mcp.tool("delete_module", { module: "FA_checked" });
+});
+
+test("a call that only waits (approval_status) does not hold up the others", async () => {
+  await mcp.tool("request_approval", { summary: "test" });
+  const t0 = Date.now();
+  const waiting = mcp.tool("approval_status", { wait: 12 });          // waits for the user's click
+  await new Promise(r => setTimeout(r, 500));
+  const st = await mcp.tool("status");                                 // sent meanwhile
+  expect(st.error, st.text).toBe(false);
+  expect(Date.now() - t0).toBeLessThan(6000);                          // answered while the other still waits
+  expect((await waiting).data.status).toBe("waiting");
+  await page.evaluate(() => { const c = document.getElementById("mcpApproval"); if (c) c.remove(); MCPB.approval = { state: "none" }; });
 });

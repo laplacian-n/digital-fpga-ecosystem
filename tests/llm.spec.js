@@ -131,7 +131,7 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(st.data.state).toBe("ready");
     expect(st.data.catalog[0].id).toBe("qwen3.5-9b");
     expect(fs.readFileSync(bin + ".args", "utf-8")).toBe(`-m ${path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-9B-Q4_K_M.gguf")} --host 127.0.0.1 --port ${LPORT} -c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0 -np 1 --cache-ram 1024`);
-    const go = await tool("ai_chat", { message: "สร้าง half adder ให้หน่อย", mode: "agent" });
+    const go = await tool("ai_chat", { message: "ทำวงจร sum กับ carry ของ a และ b ให้หน่อย", mode: "agent" });
     expect(go.error, go.text).toBe(false);
     let s = await tool("ai_chat_status", { wait: 30 });
     expect(s.data.state).toBe("done");
@@ -144,7 +144,7 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(a.steps.some(x => x.kind === "nudge")).toBe(true);      // "done" without verifying → asked to check first
     expect(a.steps.some(x => x.kind === "think" && /half adder/.test(x.text))).toBe(true);
     expect(a.final).toContain("sum=0110");
-    expect(s.data.chat[0]).toEqual({ role: "user", text: "สร้าง half adder ให้หน่อย" });
+    expect(s.data.chat[0]).toEqual({ role: "user", text: "ทำวงจร sum กับ carry ของ a และ b ให้หน่อย" });
     expect(s.data.chat.pop().text).toContain("จำลองได้");
     // the user watched it happen: the sheet is there, and each step is a line in the chat
     expect(await ed.evaluate(() => activeSch().name)).toBe("ha_agent");
@@ -159,12 +159,19 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     // the model server dies mid-run: it is started again and the run carries on
     fs.writeFileSync(bin + ".crash", "1");
     await ed.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "ha_agent"); delete state.project.schematics[s.id]; state.openTabs = state.openTabs.filter(i => i !== s.id); renderAll(); });
-    await tool("ai_chat", { message: "สร้าง half adder อีกที", mode: "agent" });
+    await tool("ai_chat", { message: "ทำวงจร sum กับ carry ของ a และ b อีกที", mode: "agent" });
     s = await tool("ai_chat_status", { wait: 40 });
     if (s.data.state !== "done") s = await tool("ai_chat_status", { wait: 40 });
     expect(s.data.agent.steps.some(x => x.kind === "restart"), JSON.stringify(s.data.agent)).toBe(true);
     expect(s.data.agent.state).toBe("done");
     expect(s.data.agent.final).toContain("sum=0110");
+    // a part it can name: built and checked with no model call at all
+    await tool("ai_chat", { message: "สร้าง full adder ลงชีต fa3", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 30 });
+    expect(s.data.agent.model_calls).toBe(0);
+    expect(s.data.agent.steps.find(x => x.tool === "build_part")).toMatchObject({ ok: true });
+    expect(s.data.agent.final).toContain("fa3");
+    expect(s.data.agent.final).toContain("ตรวจแล้วถูกต้อง");
     expect(ed.errors).toEqual([]);
   } finally { srv.kill(); }
 });
@@ -178,9 +185,17 @@ test("semantic search over the course notes: the embedding model runs on the CPU
   expect(r.semantic).toContain("no embedding model");
   fs.mkdirSync(path.join(data, "models", "embed"), { recursive: true });
   fs.writeFileSync(path.join(data, "models", "embed", "Qwen3-Embedding-0.6B-Q8_0.gguf"), "GGUF");
+  // the first search answers at once (keyword) while the notes are embedded in the background
+  const t0 = Date.now();
   r = await (await request.get(BASE + "/api/rag/search?k=3&q=" + encodeURIComponent("วงจรบวกเลข"))).json();
-  expect(r.mode, JSON.stringify(r)).toBe("hybrid");
+  expect(Date.now() - t0).toBeLessThan(3000);
+  expect(r.mode).toBe("bm25");
+  expect(r.semantic).toContain("being built in the background");
+  await expect.poll(async () => (await (await request.get(BASE + "/api/rag/search?k=3&q=" + encodeURIComponent("วงจรบวกเลข"))).json()).mode,
+    { timeout: 30000 }).toBe("hybrid");
+  r = await (await request.get(BASE + "/api/rag/search?k=3&q=" + encodeURIComponent("วงจรบวกเลข"))).json();
   expect(fs.readFileSync(bin + ".embed.args", "utf-8")).toContain("--embedding --pooling last -ngl 0");
+  expect(fs.readFileSync(bin + ".embed.args", "utf-8")).toContain("-t 4 -tb 4");
   expect(r.hits.some(h => /adder|บวก/i.test(h.title + h.text))).toBe(true);
   // the documents were embedded once; the next query only embeds the query
   const n1 = fs.readFileSync(bin + ".embed.count", "utf-8").length;

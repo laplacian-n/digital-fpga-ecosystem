@@ -22,10 +22,14 @@ function aiagSystemPrompt(){
 "",
 "How to work:",
 "1. Look first: get_sheet (detail:'brief') before changing a sheet you have not seen.",
-"2. Build whole circuits with build_circuit (truth_table / generator / intent). Edit with add_component, connect,",
-"   disconnect, delete, update_component, or apply for several steps at once. Fix the user's own sheets in place.",
-"3. After ANY change: call check AND simulate (or verify_truth_table / probe) ON THE SHEET YOU CHANGED — pass its name",
-"   as `sheet`. For a combinational circuit compare the truth table with what it must do. Never say it works without that.",
+"2. A standard circuit (adder, subtractor, comparator, mux, decoder, encoder, 7-seg, parity, counters, divider,",
+"   registers, toggle, edge detector, debounce): build_part — it is generated AND checked for you (list_parts shows them).",
+"   Anything else: build_circuit with formula (equations like \"y = a&b | ~c\", \"{cout,sum} = a+b+cin\") — never type",
+"   0/1 columns yourself unless the user gave the table. Bigger designs: build the pieces, then place them as blocks",
+"   (block:<sheet>) and connect. Edit with add_component, connect, disconnect, delete, update_component, or apply.",
+"3. After ANY change: call check AND simulate ON THE SHEET YOU CHANGED — pass its name as `sheet`. For logic you",
+"   derived, verify_truth_table with a formula written from the REQUIREMENT (not the table you built from — that",
+"   proves nothing). Look at `recognized` in the answer. Never say it works without that.",
 "4. If a tool returns an error, read its hint and correct the call. Do not repeat the same failing call.",
 "5. Finish with a short answer IN THAI: what you did and what the check / simulation showed.",
 "",
@@ -100,16 +104,21 @@ async function aiAgentRun(msg){
   const live=t=>{ const e=status&&status.querySelector(".ag-live"); if(e) e.textContent=t; };
   try{
     await aiagTools();
-    // the course notes most related to the request go in up front (RAG); more via search_course
+    // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
+    // alone that answers the request with no model round; otherwise the model gets told it exists
     let notes="";
-    try{ const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg))).json();
+    if(typeof aiagFastPath==="function"){ live("สร้างจากคลังชิ้นส่วน…");
+      try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final) run.final=fp.final; else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
+    // the course notes most related to the request go in up front (RAG); more via search_course
+    if(!run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
+      const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
       if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
         run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set();
     let nudges=0, think=true, planned=false;
-    for(let i=0; i<AIAG_MAX_STEPS; i++){
+    for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
