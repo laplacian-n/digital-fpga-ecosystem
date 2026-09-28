@@ -224,5 +224,6 @@ MCP_OPS.ai_model = async a=>{
   const s=await (await fetch("/api/llm/status")).json();
   return {state:s.state, model:s.model, llama_server:s.server||null, mode:s.mode, running_for_s:s.since,
     catalog:(s.catalog||[]).map(m=>({id:m.id, name:m.name, size_gb:m.size_gb, installed:m.installed, agent:!!m.agent})),
+    embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
 };

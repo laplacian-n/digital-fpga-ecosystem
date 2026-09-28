@@ -110,5 +110,5 @@ MCP_OPS.search_course = async a=>{
   const u="/api/rag/search?q="+encodeURIComponent(a.query||"")+"&k="+(+a.k||5)+(a.group?"&group="+encodeURIComponent(a.group):"");
   const j=await (await fetch(u)).json();
   if(!j.ok) mcpFail(j.error||"search failed");
-  return {query:j.query, hits:j.hits};
+  return {query:j.query, mode:j.mode, semantic_off:j.semantic, hits:j.hits};
 };

@@ -341,17 +341,86 @@ def rag_retriever():
         return _RAG["r"]
 
 
-def rag_search(query: str, k: int = 5, group: str = "") -> dict:
+# semantic side (hybrid): document vectors from the embedding model, computed once per index and
+# cached in the data folder; a query is embedded with the instruction Qwen3-Embedding expects
+RAG_Q_INSTRUCT = "Instruct: Given a question about a digital logic course, retrieve the course notes that answer it\nQuery: "
+_EMB = {"vecs": None, "key": "", "err": ""}
+
+
+def rag_vectors(r):
+    """(doc vectors | None, why not). Starts the embedding server when the model is installed."""
+    if not llm.embed_path().is_file():
+        return None, "no embedding model (Settings ▸ โมเดล AI ▸ ค้นแบบความหมาย)"
+    server, _ = detect_llama()
+    if not llm.embed_running():
+        st = llm.start_embed(server)
+        if not st.get("ok"):
+            return None, st.get("error")
+    ep = llm.embed_endpoint()
+    base = ep.rsplit("/v1/", 1)[0]
+    for _ in range(240):                       # the model loads in a few seconds on CPU
+        try:
+            with urllib.request.urlopen(base + "/health", timeout=1) as h:
+                if h.status == 200:
+                    break
+        except Exception:
+            pass
+        if not llm.embed_running():
+            return None, "the embedding server stopped (see llama-embed.log)"
+        time.sleep(0.5)
+    import hashlib
+    key = hashlib.sha1(("\n".join(d["id"] for d in r.docs) + llm.EMBED["file"]).encode()).hexdigest()[:16]
+    if _EMB["key"] == key and _EMB["vecs"] is not None:
+        return _EMB["vecs"], ""
+    cache = DATA_DIR / f"rag-emb-{key}.json"
+    try:
+        vecs = json.loads(cache.read_text("utf-8"))
+        if len(vecs) != len(r.docs):
+            raise ValueError("stale")
+    except Exception:
+        vecs = []
+        texts = [((d.get("title") or "") + "\n" + (d.get("text") or ""))[:2000] for d in r.docs]
+        for i in range(0, len(texts), 16):
+            vecs += llm.embed(texts[i:i + 16])
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(vecs), "utf-8")
+    _EMB.update(vecs=vecs, key=key)
+    return vecs, ""
+
+
+def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True) -> dict:
     r = rag_retriever()
     if r is None:
         return {"ok": False, "error": "course notes (RAG) unavailable: " + _RAG["err"]}
-    hits = r.search(query or "", k=max(1, min(12, int(k or 5))), group=group or None, hybrid=False)
+    k = max(1, min(12, int(k or 5)))
+    bm = r.search(query or "", k=50, group=group or None, hybrid=False)
+    ranks = {}                                  # doc row -> [bm25 rank, cosine rank]
+    for i, h in enumerate(bm):
+        ranks[r.id2row[h["id"]]] = [i, None]
+    mode, why = "bm25", ""
+    if semantic:
+        try:
+            vecs, why = rag_vectors(r)
+            if vecs:
+                qv = llm.embed([RAG_Q_INSTRUCT + (query or "")])[0]
+                sims = sorted(((sum(a * b for a, b in zip(qv, v)), i) for i, v in enumerate(vecs)
+                               if not group or r.docs[i]["group"] == group), reverse=True)[:50]
+                for j, (_, i) in enumerate(sims):
+                    ranks.setdefault(i, [None, None])[1] = j
+                mode = "hybrid"
+        except Exception as e:
+            why = f"semantic search failed: {e}"
+    # reciprocal rank fusion (as ai/rag/retriever.py does with fastembed)
+    fused = sorted(((sum(1.0 / (60 + x) for x in rk if x is not None), i) for i, rk in ranks.items()), reverse=True)[:k]
     out = []
-    for h in hits:
-        rec = r.docs[r.id2row[h["id"]]]
-        out.append({"title": h["title"], "group": h["group"], "source": h["source"],
-                    "topic": h.get("topic") or "", "text": (rec.get("text") or "")[:1500]})
-    return {"ok": True, "query": query, "records": r.N, "hits": out}
+    for _, i in fused:
+        rec = r.docs[i]
+        out.append({"title": rec.get("title", ""), "group": rec["group"], "source": rec.get("source", ""),
+                    "topic": rec.get("topic") or "", "text": (rec.get("text") or "")[:1500]})
+    res = {"ok": True, "query": query, "records": r.N, "mode": mode, "hits": out}
+    if why and mode == "bm25":
+        res["semantic"] = why
+    return res
 
 
 def agent_log(rec: dict) -> dict:
@@ -1137,6 +1206,7 @@ def _bind(port: int, wait: float = 0.0):
 def shutdown():
     try:
         llm.stop()
+        llm.stop_embed()
     except Exception:
         pass
     if HTTPD is not None:

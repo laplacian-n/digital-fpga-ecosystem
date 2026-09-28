@@ -64,6 +64,16 @@ CATALOG = [
 DEFAULT_ARGS = "-c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0"
 OLD_DEFAULT_ARGS = ("-c 8192 --jinja -ngl 999",)
 
+# semantic search over the course notes (RAG): a small embedding model on its own llama-server,
+# CPU-only (-ngl 0) so the GPU stays with the chat model. Kept in models/embed/ so it is never
+# mistaken for a chat model.
+EMBED = {"id": "qwen3-embedding-0.6b", "name": "Qwen3-Embedding 0.6B", "size_gb": 0.64,
+         "note": "ค้นเนื้อหาวิชาแบบความหมาย (RAG) · ไทย/อังกฤษ · ใช้ CPU ไม่แย่งการ์ดจอ",
+         "file": "Qwen3-Embedding-0.6B-Q8_0.gguf",
+         "url": HF + "/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf"}
+EMBED_PORT = 8091
+EMBED_ARGS = "--embedding --pooling last -ngl 0 -c 4096 -b 4096 -ub 4096"
+
 CTX = {"data": Path("."), "log": Path("llama-server.log")}
 
 
@@ -229,14 +239,18 @@ def download_llama(variant: str = "gpu") -> dict:
     return _run("llama", job)
 
 
+def embed_path() -> Path:
+    return models_dir() / "embed" / EMBED["file"]
+
+
 def download_model(model_id: str) -> dict:
-    m = next((x for x in CATALOG if x["id"] == model_id), None)
+    m = next((x for x in CATALOG + [EMBED] if x["id"] == model_id), None)
     if not m:
         return {"ok": False, "error": "ไม่รู้จักโมเดลนี้"}
 
     def job():
-        models_dir().mkdir(parents=True, exist_ok=True)
-        dst = models_dir() / m["file"]
+        dst = embed_path() if m is EMBED else models_dir() / m["file"]
+        dst.parent.mkdir(parents=True, exist_ok=True)
         if not dst.exists():
             _fetch(m["url"], dst)
         DL.s["path"] = str(dst)
@@ -253,6 +267,64 @@ def cancel_download() -> dict:
 # --------------------------------------------------------------------------
 PROC = None
 STARTED = {"model": "", "port": 0, "t": 0.0}
+
+
+EPROC = None
+
+
+def embed_running() -> bool:
+    return EPROC is not None and EPROC.poll() is None
+
+
+def embed_endpoint() -> str:
+    return f"http://127.0.0.1:{EMBED_PORT}/v1/embeddings"
+
+
+def start_embed(server: str) -> dict:
+    """The embedding server (idempotent). Returns once it is started, not once it is ready."""
+    global EPROC
+    if embed_running():
+        return {"ok": True}
+    if not (server and Path(server).is_file()):
+        return {"ok": False, "error": "no llama.cpp"}
+    if not embed_path().is_file():
+        return {"ok": False, "error": "no embedding model"}
+    log = open(CTX["log"].with_name("llama-embed.log"), "wb")
+    EPROC = subprocess.Popen([server, "-m", str(embed_path()), "--host", "127.0.0.1", "--port", str(EMBED_PORT)]
+                             + EMBED_ARGS.split(), stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                             cwd=str(Path(server).parent), creationflags=_NO_WINDOW)
+    return {"ok": True}
+
+
+def stop_embed() -> dict:
+    global EPROC
+    if EPROC is not None:
+        try:
+            EPROC.terminate()
+            EPROC.wait(timeout=5)
+        except Exception:
+            try:
+                EPROC.kill()
+            except Exception:
+                pass
+    EPROC = None
+    return {"ok": True}
+
+
+def embed(texts: list, timeout: float = 120) -> list:
+    """Unit vectors for texts, from the embedding server."""
+    body = json.dumps({"input": texts, "model": "embed"}).encode("utf-8")
+    req = urllib.request.Request(embed_endpoint(), data=body, method="POST", headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read().decode("utf-8"))["data"]
+    out = []
+    for d in sorted(data, key=lambda x: x.get("index", 0)):
+        v = d["embedding"]
+        if v and isinstance(v[0], list):          # some builds return one vector per token
+            v = v[-1]
+        n = sum(x * x for x in v) ** 0.5 or 1.0
+        out.append([x / n for x in v])
+    return out
 
 
 def running() -> bool:
@@ -337,4 +409,5 @@ def status(endpoint: str, server: str, model: str) -> dict:
             "catalog": [dict(m, installed=str(models_dir() / m["file"]) in inst,
                              path=str(models_dir() / m["file"])) for m in CATALOG],
             "download": DL.snapshot(), "log": log_tail(), "data_dir": str(data_dir()),
+            "embed": dict(EMBED, installed=embed_path().is_file(), path=str(embed_path()), running=embed_running()),
             "since": round(time.time() - STARTED["t"]) if running() else 0}
