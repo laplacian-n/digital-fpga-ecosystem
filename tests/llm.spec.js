@@ -125,7 +125,7 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(st.data, st.text).not.toBe(null);
     expect(st.data.state).toBe("ready");
     expect(st.data.catalog[0].id).toBe("qwen3.5-9b");
-    expect(fs.readFileSync(bin + ".args", "utf-8")).toBe(`-m ${path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-9B-Q4_K_M.gguf")} --host 127.0.0.1 --port ${LPORT} -c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0`);
+    expect(fs.readFileSync(bin + ".args", "utf-8")).toBe(`-m ${path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-9B-Q4_K_M.gguf")} --host 127.0.0.1 --port ${LPORT} -c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0 -np 1 --cache-ram 1024`);
     const go = await tool("ai_chat", { message: "สร้าง half adder ให้หน่อย", mode: "agent" });
     expect(go.error, go.text).toBe(false);
     let s = await tool("ai_chat_status", { wait: 30 });
