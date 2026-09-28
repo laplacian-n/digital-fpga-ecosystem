@@ -316,7 +316,14 @@ def llm_chat(req: dict) -> dict:
         except Exception as e:
             # our own llama-server died mid-run (WinError 10054 — out of memory, a driver reset):
             # start it again and repeat THIS request once, so the agent's run carries on
-            if attempt == 0 and CFG["features"].get("llm") == "local" and not llm.running():
+            # (the process may still be exiting when its connection drops: give it a moment to show)
+            dead = lambda: not llm.running() or llm.health(ep) == "down"
+            if attempt == 0 and CFG["features"].get("llm") == "local":
+                for _ in range(30):
+                    if dead():
+                        break
+                    time.sleep(0.1)
+            if attempt == 0 and CFG["features"].get("llm") == "local" and dead():
                 if llm_restart():
                     restarted = True
                     continue
