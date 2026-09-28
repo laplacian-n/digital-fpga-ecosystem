@@ -75,7 +75,8 @@ EMBED = {"id": "qwen3-embedding-0.6b", "name": "Qwen3-Embedding 0.6B", "size_gb"
          "file": "Qwen3-Embedding-0.6B-Q8_0.gguf",
          "url": HF + "/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf"}
 EMBED_PORT = {"port": 0}          # a free port picked at start (a fixed one could be taken by anything)
-EMBED_ARGS = "--embedding --pooling last -ngl 0 -c 4096 -b 4096 -ub 4096 -np 1 --cache-ram 0"
+# -t / -tb 4: indexing the notes (once) must not take every core from the editor and the chat model
+EMBED_ARGS = "--embedding --pooling last -ngl 0 -c 4096 -b 4096 -ub 4096 -np 1 --cache-ram 0 -t 4 -tb 4"
 
 CTX = {"data": Path("."), "log": Path("llama-server.log")}
 

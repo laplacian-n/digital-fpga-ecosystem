@@ -378,30 +378,14 @@ def rag_retriever():
 # semantic side (hybrid): document vectors from the embedding model, computed once per index and
 # cached in the data folder; a query is embedded with the instruction Qwen3-Embedding expects
 RAG_Q_INSTRUCT = "Instruct: Given a question about a digital logic course, retrieve the course notes that answer it\nQuery: "
-_EMB = {"vecs": None, "key": "", "err": ""}
+_EMB = {"vecs": None, "key": "", "err": "", "busy": False, "done": 0, "total": 0}
+_EMB_LOCK = threading.Lock()
 
 
 def rag_vectors(r):
     """(doc vectors | None, why not). Starts the embedding server when the model is installed."""
     if not llm.embed_path().is_file():
         return None, "no embedding model (Settings ▸ โมเดล AI ▸ ค้นแบบความหมาย)"
-    server, _ = detect_llama()
-    if not llm.embed_running():
-        st = llm.start_embed(server)
-        if not st.get("ok"):
-            return None, st.get("error")
-    ep = llm.embed_endpoint()
-    base = ep.rsplit("/v1/", 1)[0]
-    for _ in range(240):                       # the model loads in a few seconds on CPU
-        try:
-            with urllib.request.urlopen(base + "/health", timeout=1) as h:
-                if h.status == 200:
-                    break
-        except Exception:
-            pass
-        if not llm.embed_running():
-            return None, "the embedding server stopped (see llama-embed.log)"
-        time.sleep(0.5)
     import hashlib
     key = hashlib.sha1(("\n".join(d["id"] for d in r.docs) + llm.EMBED["file"]).encode()).hexdigest()[:16]
     if _EMB["key"] == key and _EMB["vecs"] is not None:
@@ -411,15 +395,57 @@ def rag_vectors(r):
         vecs = json.loads(cache.read_text("utf-8"))
         if len(vecs) != len(r.docs):
             raise ValueError("stale")
+        _EMB.update(vecs=vecs, key=key)
+        return vecs, ""
     except Exception:
+        pass
+    # not indexed yet: embedding every document is a minute or more of CPU. It used to happen INSIDE
+    # the first search — the agent's first turn waited on it and the whole machine crawled. Now it
+    # runs in the background and keyword search answers meanwhile.
+    with _EMB_LOCK:
+        if not _EMB["busy"]:
+            _EMB.update(busy=True, done=0, total=len(r.docs), err="")
+            threading.Thread(target=_rag_index, args=(r, key, cache), daemon=True).start()
+    return None, (f"semantic index being built in the background ({_EMB['done']}/{_EMB['total']})"
+                  + (f" — last error: {_EMB['err']}" if _EMB["err"] else "") + "; keyword search meanwhile")
+
+
+def _embed_ready(wait: float) -> bool:
+    """Start the embedding server if needed and wait (≤ wait s) until it answers."""
+    server, _ = detect_llama()
+    if not llm.embed_running() and not llm.start_embed(server).get("ok"):
+        return False
+    base = llm.embed_endpoint().rsplit("/v1/", 1)[0]
+    end = time.time() + wait
+    while time.time() < end:
+        try:
+            with urllib.request.urlopen(base + "/health", timeout=1) as h:
+                if h.status == 200:
+                    return True
+        except Exception:
+            pass
+        if not llm.embed_running():
+            return False
+        time.sleep(0.3)
+    return False
+
+
+def _rag_index(r, key, cache):
+    try:
+        if not _embed_ready(300):
+            raise RuntimeError("the embedding server did not start (see llama-embed.log)")
         vecs = []
         texts = [((d.get("title") or "") + "\n" + (d.get("text") or ""))[:2000] for d in r.docs]
         for i in range(0, len(texts), 16):
-            vecs += llm.embed(texts[i:i + 16])
+            vecs += llm.embed(texts[i:i + 16], timeout=600)
+            _EMB["done"] = len(vecs)
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         cache.write_text(json.dumps(vecs), "utf-8")
-    _EMB.update(vecs=vecs, key=key)
-    return vecs, ""
+        _EMB.update(vecs=vecs, key=key)
+    except Exception as e:
+        _EMB["err"] = f"{type(e).__name__}: {e}"
+    finally:
+        _EMB["busy"] = False
 
 
 def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True) -> dict:
@@ -435,6 +461,8 @@ def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True) -
     if semantic:
         try:
             vecs, why = rag_vectors(r)
+            if vecs and not _embed_ready(20):          # (after an app restart the cached vectors are there, the server not yet)
+                vecs, why = None, "embedding model still loading — keyword search this time"
             if vecs:
                 qv = llm.embed([RAG_Q_INSTRUCT + (query or "")])[0]
                 sims = sorted(((sum(a * b for a, b in zip(qv, v)), i) for i, v in enumerate(vecs)
