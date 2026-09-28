@@ -42,7 +42,6 @@ function brdEnsurePage(){
   let pg=$("#boardPage"); if(pg) return pg;
   pg=document.createElement("div"); pg.id="boardPage"; pg.className="sim-page brd-page";
   pg.innerHTML=`<div class="sim-top">
-      <button class="btn2" data-brd="close">← กลับไปวาดวงจร</button>
       <b>ลงบอร์ด</b><label class="muted" title="แผ่นที่จะลงบอร์ด — วงจรย่อยลงทดสอบเดี่ยวๆ ได้">แผ่น <select id="brdSheetSel"></select></label>
       <span class="muted" id="brdSheet"></span><span class="grow"></span>
       <span class="muted" id="brdTools"></span>
@@ -180,3 +179,12 @@ function brdPoll(once){
     if(v==="topdown") openTopdownWithSheet();
     else if(v==="board") setStage("upload"); }, 900);
 })();
+/* the top bar is the way back: any other step (วาด / เลือกขา / จำลอง) closes this page */
+{
+  const _stage=setStage;
+  setStage=function(st){
+    const pg=$("#boardPage");
+    if(st!=="upload" && pg && pg.classList.contains("show")){ pg.classList.remove("show"); clearInterval(BRD.timer); BRD.timer=null; }
+    return _stage.apply(this, arguments);
+  };
+}

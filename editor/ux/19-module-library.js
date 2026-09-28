@@ -103,3 +103,12 @@ MCP_OPS.delete_module = a=>{
   mcpActivity("ลบโมดูล "+m.name);
   return {deleted:m.name, note:"sheets already brought into projects stay as they are"};
 };
+
+/* ---------- the course notes (RAG, launcher /api/rag/search) ---------- */
+MCP_OPS.search_course = async a=>{
+  if(!/^https?:/.test(location.protocol)) mcpFail("the course notes need the FPGA Ecosystem app");
+  const u="/api/rag/search?q="+encodeURIComponent(a.query||"")+"&k="+(+a.k||5)+(a.group?"&group="+encodeURIComponent(a.group):"");
+  const j=await (await fetch(u)).json();
+  if(!j.ok) mcpFail(j.error||"search failed");
+  return {query:j.query, hits:j.hits};
+};

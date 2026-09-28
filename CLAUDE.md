@@ -51,7 +51,9 @@ so the editor's own internal calls go through the wrapper. Rules:
    projects (Documents) and settings (%APPDATA%) are untouched.
 
 ## Not in the repo
-Vivado/ISE, `*.lic`, LLM models (`ai/models`, `ai/llama`), GHDL, RAG index, course material — see README.
+Vivado/ISE, `*.lic`, LLM models (`ai/models`, `ai/llama`), GHDL, course PDFs — see README. The RAG index
+(`ai/rag/index.jsonl`) is not in git either: `build_windows.ps1` builds it into every installer, and the launcher builds it
+on first use when missing (`rag_search` → `/api/rag/search`, MCP `search_course`, the agent's up-front course notes).
 
 ## Conventions (owner's wishes)
 - Commit as the repo owner (`git config user.name laplacian-n`, `user.email dinucleotide10292910@gmail.com`).

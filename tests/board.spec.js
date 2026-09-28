@@ -54,18 +54,18 @@ test("build the .bit and load it onto the board without leaving the editor", asy
   await expect(page.locator("#brdStatus")).toContainText("สำเร็จ", { timeout: 15000 });
   await expect(page.locator("#brdLog")).toContainText("-m");
   await page.screenshot({ path: test.info().outputPath("board-page.png") });
-  await page.click('[data-brd="close"]');
+  await page.click('.step[data-stage="draw"]');   // the top bar is the way back
   await expect(page.locator("#boardPage")).toBeHidden();
   // coming back later: the .bit is still there and still matches → load it without building again
   await page.click('.step[data-stage="upload"]');
   await expect(page.locator("#brdBit")).toContainText("ไม่ต้องสร้างใหม่");
   await expect(page.locator('[data-brd="sram"]')).toBeEnabled();
-  await page.click('[data-brd="close"]');
+  await page.click('.step[data-stage="draw"]');   // the top bar is the way back
   // change the circuit: the old .bit is flagged as out of date
   await page.evaluate(() => { const o = activeSch().components.find(c => c.type === "OUT"); o.params.name = "total"; renderAll(); });
   await page.click('.step[data-stage="upload"]');
   await expect(page.locator("#brdBit")).toContainText("เปลี่ยนไปแล้ว");
-  await page.click('[data-brd="close"]');
+  await page.click('.step[data-stage="draw"]');   // the top bar is the way back
   expect(errors).toEqual([]);
 });
 
@@ -144,5 +144,5 @@ test("on a sub-circuit's sheet, ลงบอร์ด builds THAT sheet as the t
   const topId = d.topId;
   await page.selectOption("#brdSheetSel", topId);
   await expect(page.locator("#brdSheet")).not.toContainText("entity inv");
-  await page.click('[data-brd="close"]');
+  await page.click('.step[data-stage="draw"]');   // the top bar is the way back
 });

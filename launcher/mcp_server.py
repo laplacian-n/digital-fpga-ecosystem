@@ -236,6 +236,14 @@ TOOLS = [
     T("make_topdown", "Draw the APPROVED circuit in the Top-Down view: the top sheet and every sheet it uses as a block, "
       "as layers (1st Layer (top), 2nd Layer (…), …). Refuses unless the user approved exactly the circuit on screen.",
       {"sheet": {"type": "string", "description": "Top sheet to start from. Default: the project's top sheet."}}),
+    # --- the course (RAG)
+    T("search_course", "Search the course material that ships with the app: textbook chapters, the lab sheets "
+      "(with worked solutions), the EDGE board's pins and peripherals, and checked VHDL examples. Use it to "
+      "follow how the course does something (a lab's requirements, a design method, a board connection).",
+      {"query": {"type": "string"}, "k": {"type": "integer", "minimum": 1, "maximum": 12},
+       "group": {"type": "string", "enum": ["content", "lab", "board", "vhdl_ref"],
+                 "description": "content = chapters, lab = lab sheets, board = pins/peripherals, vhdl_ref = VHDL"}},
+      ["query"]),
     # --- the module library (the Modules tab, shared by every project)
     T("list_modules", "Modules in the user's library (the Modules tab, shared across projects): name, description, "
       "ports, part count, the sub-blocks each carries. `query` filters by name / description / port names.",
@@ -294,7 +302,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
                "build_circuit", "make_bus_ports", "check", "simulate", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module"]
+               "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 
 def openai_tools(names=None):
@@ -321,6 +329,7 @@ ALIASES = {
     "open_module": {"module": ["name", "id", "ref"]},
     "delete_module": {"module": ["name", "id", "ref"]},
     "simulate": {"inputs": ["hold"]},
+    "search_course": {"query": ["q", "text", "question"]},
 }
 
 

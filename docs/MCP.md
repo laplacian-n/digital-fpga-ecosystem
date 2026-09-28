@@ -68,6 +68,11 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
 | Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |
 
+### Course notes (RAG)
+`search_course` searches the course material that ships with the app: the textbook chapters, the lab sheets
+with their solutions, the board's pins and peripherals, and checked VHDL examples. The local agent gets the
+closest notes automatically, and can call `search_course` for more.
+
 ### Module library (the Modules tab)
 - `list_modules` shows the library. It is shared by every project in the editor.
 - `save_module` stores a sheet in the library, together with every sheet it uses as a block.

@@ -688,7 +688,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 </div>
 <div id="simPage" class="sim-page">
   <div class="sim-top">
-    <button class="btn2" data-act="sim-close">← กลับไปวาดวงจร</button>
     <b id="simTopTitle">จำลองบอร์ด</b>
     <span class="muted" id="simSheet"></span>
     <span class="grow"></span>
@@ -15665,7 +15664,6 @@ function brdEnsurePage(){
   let pg=$("#boardPage"); if(pg) return pg;
   pg=document.createElement("div"); pg.id="boardPage"; pg.className="sim-page brd-page";
   pg.innerHTML=`<div class="sim-top">
-      <button class="btn2" data-brd="close">← กลับไปวาดวงจร</button>
       <b>ลงบอร์ด</b><label class="muted" title="แผ่นที่จะลงบอร์ด — วงจรย่อยลงทดสอบเดี่ยวๆ ได้">แผ่น <select id="brdSheetSel"></select></label>
       <span class="muted" id="brdSheet"></span><span class="grow"></span>
       <span class="muted" id="brdTools"></span>
@@ -15803,6 +15801,15 @@ function brdPoll(once){
     if(v==="topdown") openTopdownWithSheet();
     else if(v==="board") setStage("upload"); }, 900);
 })();
+/* the top bar is the way back: any other step (วาด / เลือกขา / จำลอง) closes this page */
+{
+  const _stage=setStage;
+  setStage=function(st){
+    const pg=$("#boardPage");
+    if(st!=="upload" && pg && pg.classList.contains("show")){ pg.classList.remove("show"); clearInterval(BRD.timer); BRD.timer=null; }
+    return _stage.apply(this, arguments);
+  };
+}
 
 /* ===== 10. AI chat: questions about the drawing =========================================
    "นี่วงจรอะไร" used to fall through to the build pipeline and come back REJECTED. A question
@@ -17136,6 +17143,7 @@ function aiagSystemPrompt(){
 "Counters: build_circuit generator {kind:'mod_counter'|'jk_counter', n}; divide a clock by any N: {kind:'clock_divider', n}.",
 "Add bus:true to build_circuit to get q[3:0] instead of q0..q3.",
 "If the request is only a question (no change needed), answer it directly in Thai.",
+"For how the course / a lab sheet does something, or the board's pins, call search_course.",
 "",
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
@@ -17196,7 +17204,12 @@ async function aiAgentRun(msg){
   const live=t=>{ const e=status&&status.querySelector(".ag-live"); if(e) e.textContent=t; };
   try{
     await aiagTools();
-    const messages=[{role:"system", content:aiagSystemPrompt()}, ...hist, {role:"user", content:msg}];
+    // the course notes most related to the request go in up front (RAG); more via search_course
+    let notes="";
+    try{ const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg))).json();
+      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
+        run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
+    const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     let edited=false, verified=true, nudged=false;
     for(let i=0; i<AIAG_MAX_STEPS; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
@@ -17428,6 +17441,15 @@ MCP_OPS.delete_module = a=>{
   delete state.modules[m.id]; saveModules(); try{ renderModulesPane(); }catch(_){}
   mcpActivity("ลบโมดูล "+m.name);
   return {deleted:m.name, note:"sheets already brought into projects stay as they are"};
+};
+
+/* ---------- the course notes (RAG, launcher /api/rag/search) ---------- */
+MCP_OPS.search_course = async a=>{
+  if(!/^https?:/.test(location.protocol)) mcpFail("the course notes need the FPGA Ecosystem app");
+  const u="/api/rag/search?q="+encodeURIComponent(a.query||"")+"&k="+(+a.k||5)+(a.group?"&group="+encodeURIComponent(a.group):"");
+  const j=await (await fetch(u)).json();
+  if(!j.ok) mcpFail(j.error||"search failed");
+  return {query:j.query, hits:j.hits};
 };
 
 /* ===== 20. A project folder holds ONE project =================================================

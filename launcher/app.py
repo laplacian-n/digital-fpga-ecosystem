@@ -317,6 +317,43 @@ def llm_chat(req: dict) -> dict:
     return out
 
 
+# RAG over the course material in ai/rag (chapters, lab sheets with solutions, board pinout,
+# checked VHDL): the index is not in git (it used to be missing from every installer too), so it
+# is built on first use from the sources that ship with the app, and searched with BM25.
+_RAG = {"r": None, "err": ""}
+_RAG_LOCK = threading.Lock()
+
+
+def rag_retriever():
+    with _RAG_LOCK:
+        if _RAG["r"] is None and not _RAG["err"]:
+            try:
+                rag = ROOT / "ai" / "rag"
+                if str(rag) not in sys.path:
+                    sys.path.insert(0, str(rag))
+                import retriever as _rtv
+                if not _rtv.INDEX.exists():
+                    import build_index as _bi
+                    _bi.main()
+                _RAG["r"] = _rtv.Retriever()
+            except Exception as e:
+                _RAG["err"] = f"{type(e).__name__}: {e}"
+        return _RAG["r"]
+
+
+def rag_search(query: str, k: int = 5, group: str = "") -> dict:
+    r = rag_retriever()
+    if r is None:
+        return {"ok": False, "error": "course notes (RAG) unavailable: " + _RAG["err"]}
+    hits = r.search(query or "", k=max(1, min(12, int(k or 5))), group=group or None, hybrid=False)
+    out = []
+    for h in hits:
+        rec = r.docs[r.id2row[h["id"]]]
+        out.append({"title": h["title"], "group": h["group"], "source": h["source"],
+                    "topic": h.get("topic") or "", "text": (rec.get("text") or "")[:1500]})
+    return {"ok": True, "query": query, "records": r.N, "hits": out}
+
+
 def agent_log(rec: dict) -> dict:
     """Every agent run, one JSON line per run: material for examples (RAG) and for finding what goes wrong."""
     d = CONFIG_DIR / "agent-runs"
@@ -908,6 +945,9 @@ def make_handler():
                 return self._out(200, update_check(force=(q.get("force") or ["0"])[0] == "1"))
             if path == "/api/update/progress":
                 return self._out(200, dict(INSTALLER.snapshot(), log=updater.setup_log_path()))
+            if path == "/api/rag/search":
+                return self._out(200, rag_search((q.get("q") or [""])[0], int((q.get("k") or ["5"])[0] or 5),
+                                                 (q.get("group") or [""])[0]))
             if path == "/api/llm/status":
                 server, model = detect_llama()
                 return self._out(200, dict(llm.status(CFG["features"]["llm_endpoint"], server, model),

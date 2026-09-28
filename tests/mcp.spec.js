@@ -447,3 +447,11 @@ test("module library over MCP: save a sheet with its sub-blocks, use it in anoth
   expect((await mcp.tool("delete_module", { module: "counter_leds" })).data.deleted).toBe("counter_leds");
   expect((await mcp.tool("list_modules")).data.count).toBe(0);
 });
+
+test("search_course: the course notes (RAG) answer through MCP", async () => {
+  const r = await mcp.tool("search_course", { query: "JK flip-flop excitation table", k: 3 });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.hits.length).toBe(3);
+  const b = await mcp.tool("search_course", { q: "seven segment digit select", group: "board" });   // alias q → query
+  expect(b.data.hits.every(h => h.group === "board")).toBe(true);
+});
