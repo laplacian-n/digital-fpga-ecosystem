@@ -58,7 +58,7 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
 | Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
 | Edit | `add_component`, `connect`, `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
-| Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist |
+| Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, JK-FF counter, `clock_divider` for any N such as 50 MHz → 20 Hz, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist (sub-circuits as `block:<sheet>`). With `bus: true`, numbered ports come out as one bus port (q0..q3 → `q[3:0]`). `make_bus_ports` does the same for an existing sheet. |
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
 | Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation` |
 | Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc` |
@@ -67,6 +67,17 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | History | `undo`, `redo`, `checkpoint`, `list_checkpoints`, `restore_checkpoint` |
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
 | Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |
+
+### Testing the app's own AI
+Claude can use the app's AI feature the same way the user does, and see what goes wrong:
+- `ai_model` shows the local model's state, its installed models and the llama-server log. It can also
+  start, stop or download a model.
+- `ai_chat` types a message into the editor's AI chat and sends it. You see it happen. Mode `agent` means the
+  local model works step by step with the editor's tools.
+- `ai_chat_status` returns the transcript: the model's thinking, each tool call with its arguments and
+  result or error, the final answer, and the time and tokens used.
+
+Every agent run is also saved to `agent-runs/*.jsonl` in the app's config folder.
 
 ### Lab work: schematic → simulate → you approve → Top-Down
 Claude is told to work in this order, and the tools enforce it:
@@ -99,7 +110,19 @@ There are also **resources** (`fpga://guide`, `fpga://board/edge-spartan7`, `fpg
   `hint: pins: i0(in), i1(in), o(out)`.
 - **Names are never changed silently.** A duplicate name is an error, never an automatic `sum_1`.
 - **`apply` is a transaction.** If any step fails, nothing is changed. Parts added without coordinates are
-  placed by the editor's own placer at the end.
+  placed by the editor's own placer at the end. Steps run in order, and each step sees the ones before it,
+  so "delete, then connect to the freed pin" works in one call.
+- **Wrong field names are caught before they run.** Common aliases are accepted (`delete {target}` means
+  `refs`). Any other unknown field is an error that lists the fields the tool takes. The `apply` description
+  spells out every step's fields.
+- **Deleting a part takes the nets it drove with it.** No leftover wiring keeps "driving" a pin. The inputs
+  it fed come back as `now_unconnected`.
+- **The loop check looks inside blocks.** A feedback path through a flip-flop inside a sub-circuit is legal,
+  just as it is in Vivado. Only a path with no register anywhere is reported as a combinational loop.
+- **One slow call does not hang the others.** A very large `auto_layout` keeps the editor busy. Calls queued
+  behind it answer "busy with auto_layout" after about 15 s, instead of waiting until they time out.
+- **`simulate` with many inputs:** above 10 input bits it asks for `vectors` (the rows you want), instead of
+  producing 65,536 rows.
 - **Edits report layout quality.** Editing tools return layout metrics, so Claude can tell when the drawing
   needs `auto_layout`.
 

@@ -3,7 +3,7 @@ llm.py - the local AI model, managed from Settings (no scripts, no terminal).
 
   * download llama.cpp (llama-server) from its GitHub releases: GPU build (Vulkan: NVIDIA, AMD
     and Intel, no CUDA install) or CPU-only; the zip is unpacked into the app's data folder;
-  * download a model (.gguf) from a short catalog of Qwen2.5-Coder sizes, resumable;
+  * download a model (.gguf) from a short catalog (Qwen3.5 9B/4B, Typhoon 2.5, Qwen2.5-Coder), resumable;
   * start / stop llama-server and report its state: stopped · loading · ready · crashed,
     with the tail of its log.
 Files live in the per-machine data folder (%LOCALAPPDATA%\\FPGA Ecosystem on Windows) - models
@@ -34,19 +34,35 @@ LLAMA_PINNED = "b11016"     # used when the GitHub API can't be reached (rate li
 
 HF = "https://huggingface.co"
 CATALOG = [
-    {"id": "qwen2.5-coder-1.5b", "name": "Qwen2.5-Coder 1.5B", "size_gb": 1.1,
-     "note": "เล็ก เร็ว ใช้ CPU ได้ · เครื่องทั่วไป RAM 8 GB",
-     "file": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
-     "url": HF + "/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"},
-    {"id": "qwen2.5-coder-3b", "name": "Qwen2.5-Coder 3B", "size_gb": 2.1,
-     "note": "แนะนำ · สมดุลความเร็ว/ความเก่ง · การ์ดจอ 4 GB+ หรือ RAM 16 GB",
-     "file": "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
-     "url": HF + "/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf"},
-    {"id": "qwen2.5-coder-7b", "name": "Qwen2.5-Coder 7B", "size_gb": 4.7,
-     "note": "เก่งสุดในชุดนี้ (VHDL/K-map) · การ์ดจอ 6 GB+ แนะนำ",
+    # Qwen3.5: 3 of every 4 layers are Gated DeltaNet (fixed-size state), so a long context costs
+    # a quarter of the usual KV cache; thinks before answering and calls tools (the agent mode)
+    {"id": "qwen3.5-9b", "name": "Qwen3.5 9B", "size_gb": 5.7, "agent": True,
+     "note": "แนะนำ · เอเจนต์ทำงานผ่านเครื่องมือ (MCP) ได้ดีสุด · การ์ดจอ 6 GB+ (ล้นไป RAM ได้)",
+     "file": "Qwen3.5-9B-Q4_K_M.gguf",
+     "url": HF + "/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf"},
+    {"id": "qwen3.5-4b", "name": "Qwen3.5 4B", "size_gb": 3.5, "agent": True,
+     "note": "เร็วกว่า · อยู่บนการ์ดจอ 4–6 GB ได้ทั้งตัว · เก่งน้อยกว่า 9B",
+     "file": "Qwen3.5-4B-Q6_K.gguf",
+     "url": HF + "/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q6_K.gguf"},
+    {"id": "typhoon2.5-4b", "name": "Typhoon 2.5 (Qwen3 4B)", "size_gb": 2.5, "agent": True,
+     "note": "ภาษาไทยดีสุด (SCB 10X) · เรียกเครื่องมือได้ · context 256K",
+     "file": "typhoon2.5-qwen3-4b-q4_k_m.gguf",
+     "url": HF + "/typhoon-ai/typhoon2.5-qwen3-4b-gguf/resolve/main/typhoon2.5-qwen3-4b-q4_k_m.gguf"},
+    {"id": "qwen2.5-coder-7b", "name": "Qwen2.5-Coder 7B (เดิม)", "size_gb": 4.7,
+     "note": "รุ่นเดิม · วาดวงจรแบบรอบเดียว (โหมดวาดวงจร) · ไม่ถนัดทำงานหลายขั้น",
      "file": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
      "url": HF + "/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf"},
+    {"id": "qwen2.5-coder-3b", "name": "Qwen2.5-Coder 3B (เดิม)", "size_gb": 2.1,
+     "note": "รุ่นเดิม · เล็ก · เครื่องไม่มีการ์ดจอ",
+     "file": "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+     "url": HF + "/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf"},
 ]
+
+# llama-server's own --fit (on by default) places as many layers on the GPU as fit and the rest
+# in system RAM — so -ngl is left UNSET (a fixed -ngl 999 turned that off and ran out of VRAM).
+# --jinja = the model's chat template, which carries tool calls; the KV cache is kept at 8 bit.
+DEFAULT_ARGS = "-c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0"
+OLD_DEFAULT_ARGS = ("-c 8192 --jinja -ngl 999",)
 
 CTX = {"data": Path("."), "log": Path("llama-server.log")}
 

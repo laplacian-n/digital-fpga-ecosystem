@@ -16,12 +16,13 @@ test.beforeAll(async () => {
   // what "ดาวน์โหลด" leaves behind: llama.cpp unpacked under llama/, a model under models/
   const bin = path.join(data, "llama", "llama-test-bin"); fs.mkdirSync(bin, { recursive: true });
   fs.mkdirSync(path.join(data, "models"), { recursive: true });
-  fs.writeFileSync(path.join(data, "models", "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"), "GGUF");
+  fs.writeFileSync(path.join(data, "models", "Qwen3.5-9B-Q4_K_M.gguf"), "GGUF");
   fs.writeFileSync(path.join(bin, "llama-server"), `#!/usr/bin/env python3
 import json, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 port = int(sys.argv[sys.argv.index("--port") + 1]); model = sys.argv[sys.argv.index("-m") + 1]
 print("fake llama-server loading", model, flush=True)
+with open(sys.argv[0] + ".args", "w") as f: f.write(" ".join(sys.argv[1:]))
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def _j(self, o):
@@ -29,8 +30,31 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def do_GET(self): self._j({"status": "ok"})
     def do_POST(self):
-        self.rfile.read(int(self.headers.get("Content-Length") or 0))
-        self._j({"choices": [{"message": {"content": "latch ไวต่อระดับสัญญาณ ส่วน flip-flop ไวต่อขอบ clock"}}]})
+        req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        msgs = req.get("messages") or []
+        if not req.get("tools"):
+            return self._j({"choices": [{"message": {"content": "latch ไวต่อระดับสัญญาณ ส่วน flip-flop ไวต่อขอบ clock"}}]})
+        # a scripted agent: the tool results so far decide the next step (like a model reading them)
+        done = [m for m in msgs if m.get("role") == "tool"]
+        last = done[-1]["content"] if done else ""
+        def call(name, args, think):
+            return self._j({"choices": [{"message": {"content": "", "reasoning_content": think, "tool_calls": [
+                {"id": "c%d" % len(done), "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}]}}],
+                "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
+        tt = {"inputs": ["a", "b"], "outputs": ["sum", "carry"], "columns": {"sum": "0110", "carry": "0001"}}
+        if len(done) == 0:
+            return call("build_circuit", {"name": "ha_agent", "truth_table": tt, "colour": "red"}, "half adder = truth table")
+        if len(done) == 1:        # the wrong field came back as an error: fix the call
+            assert "unknown field 'colour'" in last, last
+            return call("build_circuit", {"name": "ha_agent", "truth_table": tt}, "drop the bad field")
+        nudged = any("did not verify" in str(m.get("content")) for m in msgs)
+        if len(done) == 2 and not nudged:     # stopping here gets a nudge: verify first
+            return self._j({"choices": [{"message": {"content": "เสร็จแล้ว"}}]})
+        if not any('"errors"' in m["content"] for m in done):
+            return call("check", {"sheet": "ha_agent"}, "verify")
+        if not any('"columns"' in m["content"] for m in done):
+            return call("simulate", {"sheet": "ha_agent"}, "simulate")
+        return self._j({"choices": [{"message": {"content": "สร้าง half adder แล้ว ตรวจไม่มี error และจำลองได้ sum=0110 carry=0001"}}]})
 HTTPServer(("127.0.0.1", port), H).serve_forever()
 `, { mode: 0o755 });
   const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), XDG_DATA_HOME: path.join(home, ".local", "share"),
@@ -63,4 +87,59 @@ test("start the model from Settings, then the chat answers with it", async ({ pa
   expect(txt).toContain("ไวต่อขอบ clock");
   await page.click("#llmStop");
   await expect(page.locator("#llmState")).toContainText("ยังไม่ได้เริ่ม", { timeout: 10000 });
+});
+
+test("agent mode: the local model works through the tools; Claude drives the chat over MCP and reads every step", async ({ page, context }) => {
+  test.setTimeout(90000);
+  await page.goto(BASE + "/");
+  await page.click('nav button[data-tab="settings"]');
+  await page.click("#llmStart");
+  await expect(page.locator("#llmState")).toContainText("พร้อมใช้", { timeout: 10000 });
+  // started without -ngl (llama.cpp fits the layers itself), with tool calls and a 64K context
+  const bin = path.join(home, ".local", "share", "fpga-ecosystem", "llama", "llama-test-bin", "llama-server");
+  const ed = await context.newPage();
+  ed.errors = []; ed.on("pageerror", e => ed.errors.push(e.message));
+  await ed.goto(BASE + "/studio.html");
+  await ed.waitForFunction(() => typeof MCPB === "object" && MCPB.on);
+  await ed.evaluate(() => document.querySelectorAll(".modal-bg").forEach(m => m.remove()));
+  // Claude's side: the real MCP server
+  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), XDG_DATA_HOME: path.join(home, ".local", "share"),
+                APPDATA: path.join(home, "AppData"), NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost" };
+  const srv = spawn("python3", [path.join(__dirname, "..", "launcher", "mcp_server.py")], { env });
+  let buf = "", n = 0; const waiting = {};
+  srv.stdout.on("data", d => { buf += d; let i; while ((i = buf.indexOf("\n")) >= 0) { const l = buf.slice(0, i); buf = buf.slice(i + 1);
+    if (l.trim()) { const m = JSON.parse(l); if (waiting[m.id]) { waiting[m.id](m); delete waiting[m.id]; } } } });
+  const rpc = (method, params) => new Promise(res => { const id = ++n; waiting[id] = res; srv.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"); });
+  const tool = async (name, args) => { const r = await rpc("tools/call", { name, arguments: args || {} }); const t = r.result.content[0].text;
+    let data = null; try { data = JSON.parse(t); } catch (_) {} return { error: !!r.result.isError, text: t, data }; };
+  try {
+    await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "t", version: "1" } });
+    const st = await tool("ai_model", { action: "status" });
+    expect(st.data, st.text).not.toBe(null);
+    expect(st.data.state).toBe("ready");
+    expect(st.data.catalog[0].id).toBe("qwen3.5-9b");
+    expect(fs.readFileSync(bin + ".args", "utf-8")).toBe(`-m ${path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-9B-Q4_K_M.gguf")} --host 127.0.0.1 --port ${LPORT} -c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0`);
+    const go = await tool("ai_chat", { message: "สร้าง half adder ให้หน่อย", mode: "agent" });
+    expect(go.error, go.text).toBe(false);
+    let s = await tool("ai_chat_status", { wait: 30 });
+    expect(s.data.state).toBe("done");
+    const a = s.data.agent;
+    expect(a.state, JSON.stringify(a)).toBe("done");
+    const tools = a.steps.filter(x => x.tool);
+    expect(tools.map(x => x.tool)).toEqual(["build_circuit", "build_circuit", "check", "simulate"]);
+    expect(tools[0].ok).toBe(false);                               // the bad field was refused, with the fields it takes
+    expect(tools[0].error).toContain("build_circuit takes:");
+    expect(a.steps.some(x => x.kind === "nudge")).toBe(true);      // "done" without verifying → asked to check first
+    expect(a.steps.some(x => x.kind === "think" && /half adder/.test(x.text))).toBe(true);
+    expect(a.final).toContain("sum=0110");
+    expect(s.data.chat[0]).toEqual({ role: "user", text: "สร้าง half adder ให้หน่อย" });
+    expect(s.data.chat.pop().text).toContain("จำลองได้");
+    // the user watched it happen: the sheet is there, and each step is a line in the chat
+    expect(await ed.evaluate(() => activeSch().name)).toBe("ha_agent");
+    expect(await ed.locator("#acLog .ag-step").count()).toBe(4);
+    // and the run is logged for later (examples / debugging)
+    const logs = fs.readdirSync(path.join(home, ".config", "fpga-ecosystem", "agent-runs"));
+    expect(logs.length).toBe(1);
+    expect(ed.errors).toEqual([]);
+  } finally { srv.kill(); }
 });

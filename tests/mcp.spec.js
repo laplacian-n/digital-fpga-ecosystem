@@ -300,3 +300,118 @@ test("the pin page on screen follows set_pins from Claude (and Undo)", async () 
   await expect(sel).toHaveValue("sw:0");
   await page.evaluate(() => hideSimPage());
 });
+
+// ---- from a Claude session's review of lab 6 work through this server ----
+test("blocks in an intent; a loop through a flip-flop inside a block is not an error; a real one is", async () => {
+  await mcp.tool("new_sheet", { name: "rcnt" });
+  let r = await mcp.tool("apply", { steps: [
+    { op: "add_component", type: "IN", name: "en" }, { op: "add_component", type: "IN", name: "clk" },
+    { op: "add_component", type: "DFF", name: "ff" }, { op: "add_component", type: "AND", name: "g" },
+    { op: "add_component", type: "OUT", name: "q" },
+    { op: "connect", connections: [["en", "g"], ["ff.q", "g"], ["g", "ff.d"], ["clk", "ff.clk"], ["ff.q", "q"]] }] });
+  expect(r.error, r.text).toBe(false);
+  await mcp.tool("new_sheet", { name: "rel" });
+  r = await mcp.tool("apply", { steps: [{ op: "add_component", type: "IN", name: "q" }, { op: "add_component", type: "NOT", name: "n" },
+    { op: "add_component", type: "OUT", name: "en" }, { op: "connect", connections: [["q", "n"], ["n", "en"]] }] });
+  expect(r.error, r.text).toBe(false);
+  // the intent instantiates both sheets as blocks; pins are spelled with the sheets' port names
+  r = await mcp.tool("build_circuit", { intent: { module: "rtop", components: [
+    { id: "clk", type: "IN", name: "clk" }, { id: "cnt", type: "block:rcnt" }, { id: "el", type: "block:rel" },
+    { id: "led", type: "OUT", name: "err_led" }, { id: "led2", type: "OUT", name: "en_led" }],
+    nets: [{ from: "clk", to: "cnt.clk" }, { from: "cnt.q", to: "el.q" }, { from: "el", to: "cnt.en" },
+           { from: "el.en", to: "led" }, { from: "el.en", to: "led2" }] } });
+  expect(r.error, r.text).toBe(false);
+  const badPin = await mcp.tool("build_circuit", { intent: { module: "x", components: [{ id: "c", type: "block:rcnt" }, { id: "o", type: "OUT" }],
+    nets: [{ from: "c", to: "o" }, { from: "o", to: "c" }] } });
+  expect(badPin.error).toBe(true);
+  // cnt → el → cnt goes through ff inside rcnt: legal (Vivado builds it), so no loop error
+  const chk = await mcp.tool("check", { sheet: "rtop" });
+  expect(chk.data.issues.filter(i => /combinational loop/.test(i.message))).toEqual([]);
+  // a block that is combinational all the way through does close a real loop
+  await mcp.tool("new_sheet", { name: "rpass" });
+  await mcp.tool("apply", { steps: [{ op: "add_component", type: "IN", name: "a" }, { op: "add_component", type: "NOT", name: "n" },
+    { op: "add_component", type: "OUT", name: "y" }, { op: "connect", connections: [["a", "n"], ["n", "y"]] }] });
+  await mcp.tool("build_circuit", { intent: { module: "rloop", components: [
+    { id: "p", type: "block:rpass" }, { id: "el", type: "block:rel" }, { id: "o", type: "OUT", name: "y" }],
+    nets: [{ from: "p.y", to: "el.q" }, { from: "el.en", to: "p.a" }, { from: "el.en", to: "o" }] } });
+  const loop = await mcp.tool("check", { sheet: "rloop" });
+  expect(loop.data.issues.some(i => i.level === "error" && /combinational loop/.test(i.message))).toBe(true);
+});
+
+test("delete takes its nets along: connect to the freed pin in the same apply, no ghost driver", async () => {
+  await mcp.tool("open_sheet", { sheet: "rtop" });
+  const r = await mcp.tool("apply", { steps: [{ op: "delete", target: "el" }, { op: "connect", from: "cnt.q", to: "err_led" }] });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.steps[0].result.now_unconnected.sort()).toEqual(["cnt.en", "en_led.i", "err_led.i"]);
+  const net = await mcp.tool("get_netlist", { sheet: "rtop" });
+  expect(net.data.nets.filter(n => n.driver && /\.j$/.test(n.driver))).toEqual([]);   // no dot posing as a driver
+  expect(net.data.nets.find(n => n.driver === "cnt.q").sinks).toEqual(["err_led.i"]);
+  const dots = await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "rtop");
+    return s.components.filter(c => c.type === "JUNCTION" && !s.wires.some(w => w.from.cid === c.id || w.to.cid === c.id)).length; });
+  expect(dots).toBe(0);
+  const bad = await mcp.tool("delete", { whatever: "x" });
+  expect(bad.error).toBe(true);
+  expect(bad.text).toContain("delete takes: sheet (string), refs* (array)");
+  const drv = await mcp.tool("connect", { from: "clk", to: "err_led.i" });
+  expect(drv.text).toContain("already driven by cnt.q");
+});
+
+test("simulate: chosen input vectors, and a clear answer instead of 65536 rows", async () => {
+  await mcp.tool("build_circuit", { name: "ha2", truth_table: { inputs: ["a", "b"], outputs: ["sum", "carry"], columns: { sum: "0110", carry: "0001" } } });
+  const v = await mcp.tool("simulate", { sheet: "ha2", vectors: [{ a: 1, b: 1 }, { a: 1 }] });
+  expect(v.error, v.text).toBe(false);
+  expect(v.data.rows.map(r => r.outputs)).toEqual([{ sum: 0, carry: 1 }, { sum: 1, carry: 0 }]);
+  await mcp.tool("new_sheet", { name: "wide" });
+  await mcp.tool("apply", { steps: [{ op: "add_component", type: "IN", name: "a", width: 16 }, { op: "add_component", type: "OUT", name: "y", width: 16 },
+    { op: "connect", from: "a", to: "y" }] });
+  const big = await mcp.tool("simulate", { sheet: "wide" });
+  expect(big.error).toBe(true);
+  expect(big.text).toContain("vectors");
+  const w = await mcp.tool("simulate", { sheet: "wide", vectors: [{ a: "0x1234" }] });
+  expect(w.data.rows[0].outputs.y).toBe((0x1234).toString(2).padStart(16, "0"));
+});
+
+test("clock_divider: any N on one sheet (÷6 simulated, ÷2 500 000 builds)", async () => {
+  let r = await mcp.tool("build_circuit", { name: "div6", generator: { kind: "clock_divider", n: 6 } });
+  expect(r.error, r.text).toBe(false);
+  const sim = await mcp.tool("simulate", { sheet: "div6", cycles: 24 });
+  const out = sim.data.rows.map(x => x.outputs).join("");
+  expect(out.slice(6, 18)).toBe(out.slice(12, 24));                       // period 6
+  expect(out.slice(6, 12).split("").filter(x => x === "1").length).toBe(3); // 50 % duty
+  r = await mcp.tool("build_circuit", { name: "div20hz", generator: { kind: "clock_divider", n: 2500000 } });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.note).toContain("clk_in/2500000");
+  const chk = await mcp.tool("check", { sheet: "div20hz" });
+  expect(chk.data.errors).toBe(0);
+});
+
+test("bus ports: a generator's q0..q3 become q[3:0] (simulates, makes VHDL, wires as one pin on a parent)", async () => {
+  const b = await mcp.tool("build_circuit", { name: "cnt10b", generator: { kind: "jk_counter", n: 10, output: "q" }, bus: true });
+  expect(b.error, b.text).toBe(false);
+  expect(b.data.bus_ports).toEqual(["out q[3:0] ← q0,q1,q2,q3"]);
+  const sh = await mcp.tool("get_sheet", { sheet: "cnt10b", detail: "brief" });
+  expect(sh.data.ports).toEqual([{ name: "clk_in", dir: "in", width: 1 }, { name: "q", dir: "out", width: 4 }]);
+  const chk = await mcp.tool("check", { sheet: "cnt10b" });
+  expect(chk.data.errors, JSON.stringify(chk.data.issues)).toBe(0);
+  const sim = await mcp.tool("simulate", { sheet: "cnt10b", cycles: 12 });
+  expect(sim.data.rows.map(r => parseInt(r.outputs.q, 2))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1]);
+  const v = await mcp.tool("get_vhdl", { entity: "cnt10b" });
+  expect(v.error, v.text).toBe(false);
+  expect(v.data.vhdl.code).toMatch(/q\s*:\s*out\s+std_logic_vector\s*\(\s*3\s+downto\s+0\s*\)/i);
+  // a truth table's inputs a0..a2 / b0..b2 → a, b (3 bits each), still the same function
+  const tt = { inputs: ["a2", "a1", "a0", "b2", "b1", "b0"], outputs: ["eq"], columns: { eq: Array.from({ length: 64 }, (_, r) => (r >> 3) === (r & 7) ? "1" : "0").join("") } };
+  const t = await mcp.tool("build_circuit", { name: "eq3", truth_table: tt, bus: ["a", "b"] });
+  expect(t.error, t.text).toBe(false);
+  const vec = await mcp.tool("simulate", { sheet: "eq3", vectors: [{ a: 5, b: 5 }, { a: 5, b: 4 }, { a: "111", b: "111" }] });
+  expect(vec.data.rows.map(r => r.outputs.eq)).toEqual([1, 0, 1]);
+  // the parent wires the counter's whole bus in one connection
+  const top = await mcp.tool("build_circuit", { intent: { module: "bustop", components: [
+    { id: "clk", type: "IN", name: "clk" }, { id: "c", type: "block:cnt10b" }, { id: "o", type: "OUT", name: "leds", params: { width: 4 } }],
+    nets: [{ from: "clk", to: "c.clk_in" }, { from: "c.q", to: "o" }] } });
+  expect(top.error, top.text).toBe(false);
+  const ts = await mcp.tool("simulate", { sheet: "bustop", cycles: 4 });
+  expect(ts.data.rows.map(r => r.outputs.leds)).toEqual(["0000", "0001", "0010", "0011"]);
+  // an existing sheet that is used as a block is refused (its parent's wires would come loose)
+  const used = await mcp.tool("make_bus_ports", { sheet: "cnt10b" });
+  expect(used.error).toBe(true);
+});

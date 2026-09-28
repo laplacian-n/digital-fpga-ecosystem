@@ -1315,6 +1315,7 @@ class FPGABuilder(tk.Tk):
         cable = self.var_cable.get().strip()
         if mode == "sram":
             # -m = โหลดเข้า SRAM (volatile)
+            pre = []
             cmd = f'"{ofl}" -c {cable} -m "{bit}"'
             done = "โหลดลง FPGA สำเร็จ (Normal Rom: SRAM - หายเมื่อปิดไฟ)"
             self.log(f"โหลด SRAM: {bit}  (cable={cable})")
@@ -1329,14 +1330,18 @@ class FPGABuilder(tk.Tk):
                     f"{self.var_part.get()}{self.var_pkg.get()}.bit\n"
                     "วางไว้ข้าง openFPGALoader.exe (โฟลเดอร์ tools\\openFPGALoader)")
                 return
-            cmd = f'"{ofl}" -c {cable} -f -B "{bridge}" "{bit}"'
+            # openFPGALoader (MSYS2) ส่ง path ผ่าน cygpath — ช่องว่างใน path (เช่น "FPGA Ecosystem")
+            # ทำให้ "Error: fail to open" ทั้งที่ไฟล์มีอยู่: ทำงานจากโฟลเดอร์ของ bridge แล้วส่งแค่ชื่อไฟล์
+            bdir = os.path.dirname(os.path.abspath(bridge))
+            pre = [f'pushd "{bdir}"']
+            cmd = f'"{ofl}" -c {cable} -f -B "{os.path.basename(bridge)}" "{os.path.abspath(bit)}"'
             done = "เขียนลง PROM Flash สำเร็จ (ถาวร - อยู่แม้ถอดปลั๊ก)"
             self.log(f"เขียน PROM Flash: {bit}  (cable={cable})")
         # openFPGALoader (build จาก MSYS2) เรียก cygpath ตอนเขียน flash -
         # เติมโฟลเดอร์ openFPGALoader (ที่ bundle cygpath ไว้) เข้า PATH กัน error
         ofldir = os.path.dirname(os.path.abspath(ofl))
         setpath = f'set "PATH={ofldir};%PATH%"'
-        self._run_flow(PROJECT_DIR, [setpath, cmd], done_msg=done, use_ise=False)
+        self._run_flow(PROJECT_DIR, [setpath] + pre + [cmd], done_msg=done, use_ise=False)
 
     def _action_buttons(self):
         return [b for b in (getattr(self, n, None) for n in

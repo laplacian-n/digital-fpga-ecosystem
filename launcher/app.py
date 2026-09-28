@@ -31,6 +31,7 @@ import sys
 import threading
 import time
 import traceback
+import urllib.error
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,7 +40,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 APP_NAME = "FPGA Ecosystem"
 APP_ID = "fpga-ecosystem"
-VERSION = "1.0.4"
+VERSION = "1.1.0"
 
 FROZEN = getattr(sys, "frozen", False)
 # ROOT = where the bundled content lives (repo root in dev, _MEIPASS when frozen)
@@ -110,7 +111,7 @@ DEFAULTS = {
         "llm_endpoint": "http://127.0.0.1:8080/v1/chat/completions",
         "llama_server": "",       # path to llama-server(.exe) for llm=local
         "llama_model": "",        # path to a .gguf for llm=local
-        "llama_args": "-c 8192 --jinja -ngl 999",
+        "llama_args": "",         # blank = llm.DEFAULT_ARGS (context 64K, tool calls, layers fitted to the GPU)
         "cosim": False,           # GHDL co-simulation check
         "ghdl": "",               # path to ghdl(.exe); blank = auto-detect
         "fpga": True,             # FPGA Builder (VHDL -> .bit -> board)
@@ -263,7 +264,10 @@ def start_llama(force: bool = False) -> dict:
     server, model = detect_llama()
     if not (server and model):
         return {"ok": False, "error": "ยังไม่มี llama.cpp หรือไฟล์โมเดล"}
-    return llm.start(server, model, f.get("llm_endpoint"), f.get("llama_args") or "")
+    args = (f.get("llama_args") or "").strip()
+    if not args or args in llm.OLD_DEFAULT_ARGS:      # the old fixed -ngl 999 / 8K context
+        args = llm.DEFAULT_ARGS
+    return llm.start(server, model, f.get("llm_endpoint"), args)
 
 
 def set_llm_endpoint(ep: str) -> None:
@@ -288,6 +292,39 @@ def set_llm_endpoint(ep: str) -> None:
 
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def llm_chat(req: dict) -> dict:
+    """The editor's agent → the local model (OpenAI chat/completions, tools included). Proxied so the
+    page needs no CORS from llama-server, and so the endpoint in Settings is the one used."""
+    ep = os.environ.get("AI_ENDPOINT") or CFG["features"]["llm_endpoint"]
+    body = {k: v for k, v in req.items() if k in ("messages", "tools", "tool_choice", "temperature", "top_p",
+                                                    "top_k", "max_tokens", "stop", "chat_template_kwargs")}
+    body.setdefault("temperature", 0.6)
+    t0 = time.time()
+    try:
+        r = urllib.request.Request(ep, data=json.dumps(body).encode("utf-8"), method="POST",
+                                   headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(r, timeout=600) as resp:
+            out = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        return {"ok": False, "error": f"model server: HTTP {e.code} {e.read()[:300].decode('utf-8', 'replace')}"}
+    except Exception as e:
+        return {"ok": False, "error": f"the model is not reachable at {ep}: {e}",
+                "hint": "start it in Settings ▸ โมเดล AI"}
+    out["ok"] = True
+    out["elapsed_s"] = round(time.time() - t0, 2)
+    return out
+
+
+def agent_log(rec: dict) -> dict:
+    """Every agent run, one JSON line per run: material for examples (RAG) and for finding what goes wrong."""
+    d = CONFIG_DIR / "agent-runs"
+    d.mkdir(parents=True, exist_ok=True)
+    f = d / time.strftime("%Y-%m.jsonl")
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(dict(rec, t=time.time()), ensure_ascii=False) + "\n")
+    return {"ok": True, "file": str(f)}
 
 
 def llm_up() -> bool:
@@ -479,38 +516,60 @@ RUNTIME_FILE = CONFIG_DIR / "runtime.json"
 
 
 class McpRelay:
+    """One editor page runs one operation at a time, in its only (JS) thread: a heavy one (a
+    full auto_layout of a big sheet) freezes it until it is done. So the relay remembers what
+    the page is running: a busy page still counts as open (it cannot poll while it works — it
+    used to look closed, and the next call tried to open another window and hung), and a call
+    queued behind a long job waits a little, then answers "busy with <op>" instead of hanging."""
+    BUSY_WAIT = 15.0
+
     def __init__(self):
         self.cv = threading.Condition()
         self.jobs = {}          # client -> [job]
         self.seen = {}          # client -> last poll time
+        self.running = {}       # client -> (job id, op, started)
+        self.waiting = set()    # job ids a caller is still waiting for
         self.replies = {}       # job id -> reply
         self.n = 0
         self.opened_at = 0.0
 
     def live_client(self, within=35.0):
         now = time.time()
-        live = [(t, c) for c, t in self.seen.items() if now - t < within]
+        live = [(t, c) for c, t in self.seen.items() if now - t < within or c in self.running]
         return max(live)[1] if live else None
 
     def poll(self, client, wait=20.0):
         end = time.time() + wait
         with self.cv:
             self.seen[client] = time.time()
+            self.running.pop(client, None)      # polling again = the previous job is over
             self.cv.notify_all()
             while True:
                 q = self.jobs.get(client)
                 if q:
-                    return q.pop(0)
+                    job = q.pop(0)
+                    self.running[client] = (job["id"], job["op"], time.time())
+                    return job
                 left = end - time.time()
                 if left <= 0:
                     return None
+                # no "seen" refresh while waiting: a page that was closed or reloaded mid-poll must
+                # not look alive (and newest) — its jobs went nowhere while the new page sat idle
                 self.cv.wait(min(left, 5.0))
-                self.seen[client] = time.time()
 
     def result(self, reply):
         with self.cv:
-            self.replies[str(reply.get("id"))] = reply
+            jid = str(reply.get("id"))
+            for c, r in list(self.running.items()):
+                if r[0] == jid:
+                    del self.running[c]
+            if jid in self.waiting:             # nobody waits for a late answer any more: drop it
+                self.replies[jid] = reply
             self.cv.notify_all()
+
+    def busy(self, client):
+        r = self.running.get(client)
+        return (r[1], time.time() - r[2]) if r else None
 
     def call(self, op, args, timeout=60.0):
         with self.cv:
@@ -535,17 +594,34 @@ class McpRelay:
             self.n += 1
             jid = f"j{self.n}"
             self.jobs.setdefault(client, []).append({"id": jid, "op": op, "args": args or {}})
+            self.waiting.add(jid)
             self.cv.notify_all()
-            end = time.time() + timeout
-            while jid not in self.replies:
-                left = end - time.time()
-                if left <= 0:
-                    # drop it if the page never picked it up
-                    self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
-                    return {"ok": False, "error": f"the editor did not answer '{op}' within {int(timeout)} s",
-                            "hint": "is the Schematic Studio window frozen or showing a dialog?"}
-                self.cv.wait(min(left, 5.0))
-            return self.replies.pop(jid)
+            start = time.time()
+            end = start + timeout
+            try:
+                while jid not in self.replies:
+                    now = time.time()
+                    b = self.busy(client)
+                    queued = any(j["id"] == jid for j in self.jobs.get(client, []))
+                    # still queued behind another op that has run a while: say so instead of hanging
+                    if queued and b and b[1] > self.BUSY_WAIT and now - start > self.BUSY_WAIT:
+                        self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
+                        return {"ok": False, "error": f"the editor is still busy with '{b[0]}' ({int(b[1])} s so far) — "
+                                                      f"'{op}' was not run",
+                                "hint": "wait a little and call again; a very large sheet takes a while to lay out"}
+                    left = end - now
+                    if left <= 0:
+                        if queued:      # drop it if the page never picked it up
+                            self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
+                            return {"ok": False, "error": f"the editor did not pick up '{op}' within {int(timeout)} s",
+                                    "hint": "is the Schematic Studio window frozen or showing a dialog?"}
+                        return {"ok": False, "error": f"'{op}' is still running in the editor after {int(timeout)} s",
+                                "hint": "it finishes on its own — call status in a moment to see the result"}
+                    self.cv.wait(min(left, 1.0))
+                return self.replies.pop(jid)
+            finally:
+                self.waiting.discard(jid)
+                self.replies.pop(jid, None)
 
 
 RELAY = McpRelay()
@@ -907,6 +983,21 @@ def make_handler():
                     save_config(CFG)
                     set_llm_endpoint(f["llm_endpoint"])
                     return self._out(200, start_llama(force=True))
+                if path == "/api/llm/chat":
+                    return self._out(200, llm_chat(data))
+                return self._out(404, {"ok": False, "error": "unknown api"})
+            if path.startswith("/api/agent/"):
+                import mcp_server as MS         # tool schemas + argument checks, shared with the MCP server
+                if path == "/api/agent/tools":
+                    return self._out(200, {"ok": True, "tools": MS.openai_tools(data.get("names") or None)})
+                if path == "/api/agent/normalize":
+                    name = str(data.get("name") or "")
+                    if name not in MS.TOOL_MAP:
+                        return self._out(200, {"ok": False, "error": f"unknown tool '{name}'"})
+                    args, err = MS.normalize_args(name, data.get("args") or {})
+                    return self._out(200, {"ok": not err, "args": args, "error": err})
+                if path == "/api/agent/log":
+                    return self._out(200, agent_log(data))
                 return self._out(404, {"ok": False, "error": "unknown api"})
             if path.startswith("/api/board/"):
                 if not CFG["features"].get("fpga"):
