@@ -236,6 +236,23 @@ TOOLS = [
     T("make_topdown", "Draw the APPROVED circuit in the Top-Down view: the top sheet and every sheet it uses as a block, "
       "as layers (1st Layer (top), 2nd Layer (…), …). Refuses unless the user approved exactly the circuit on screen.",
       {"sheet": {"type": "string", "description": "Top sheet to start from. Default: the project's top sheet."}}),
+    # --- the module library (the Modules tab, shared by every project)
+    T("list_modules", "Modules in the user's library (the Modules tab, shared across projects): name, description, "
+      "ports, part count, the sub-blocks each carries. `query` filters by name / description / port names.",
+      {"query": {"type": "string"}}),
+    T("save_module", "Save a sheet (with every sheet it uses as a block) into the module library, so it can be reused "
+      "in any project. Default: the active sheet, named after it.",
+      {"sheet": SHEET, "name": {"type": "string"}, "description": {"type": "string"},
+       "replace": {"type": "boolean", "description": "overwrite a module with the same name"}}),
+    T("use_module", "Place a library module on a sheet as a block (its sheet is brought into the project once, then "
+      "reused). Returns the block with its pins — connect them like any part.",
+      {"module": {"type": "string", "description": "module name or id"}, "sheet": SHEET,
+       "name": {"type": "string", "description": "label for the block"}, "x": {"type": "number"}, "y": {"type": "number"}},
+      ["module"]),
+    T("open_module", "Open a library module as a new sheet (a copy) to look at or change it.",
+      {"module": {"type": "string"}}, ["module"]),
+    T("delete_module", "Remove a module from the library (sheets already brought into projects stay). Only when the user asks.",
+      {"module": {"type": "string"}}, ["module"]),
     # --- the app's own AI (the chat panel + the local model): drive it to test / debug it
     T("ai_model", "The local AI model the app runs (llama.cpp): status (state, model, installed catalog, llama-server "
       "log), start {model: catalog id like 'qwen3.5-9b' or a .gguf path}, stop, or download {model: id | 'llama.cpp'}.",
@@ -277,7 +294,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
                "build_circuit", "make_bus_ports", "check", "simulate", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "undo"]
+               "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module"]
 
 
 def openai_tools(names=None):
@@ -300,6 +317,9 @@ ALIASES = {
     "disconnect": {"pin": ["target", "ref"]},
     "add_component": {"name": ["label"]},
     "set_pins": {"map": ["pins", "pinmap", "mapping"]},
+    "use_module": {"module": ["name", "id", "ref"]},
+    "open_module": {"module": ["name", "id", "ref"]},
+    "delete_module": {"module": ["name", "id", "ref"]},
     "simulate": {"inputs": ["hold"]},
 }
 
