@@ -71,7 +71,7 @@ EMBED = {"id": "qwen3-embedding-0.6b", "name": "Qwen3-Embedding 0.6B", "size_gb"
          "note": "ค้นเนื้อหาวิชาแบบความหมาย (RAG) · ไทย/อังกฤษ · ใช้ CPU ไม่แย่งการ์ดจอ",
          "file": "Qwen3-Embedding-0.6B-Q8_0.gguf",
          "url": HF + "/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf"}
-EMBED_PORT = 8091
+EMBED_PORT = {"port": 0}          # a free port picked at start (a fixed one could be taken by anything)
 EMBED_ARGS = "--embedding --pooling last -ngl 0 -c 4096 -b 4096 -ub 4096"
 
 CTX = {"data": Path("."), "log": Path("llama-server.log")}
@@ -277,7 +277,7 @@ def embed_running() -> bool:
 
 
 def embed_endpoint() -> str:
-    return f"http://127.0.0.1:{EMBED_PORT}/v1/embeddings"
+    return f"http://127.0.0.1:{EMBED_PORT['port']}/v1/embeddings"
 
 
 def start_embed(server: str) -> dict:
@@ -289,8 +289,12 @@ def start_embed(server: str) -> dict:
         return {"ok": False, "error": "no llama.cpp"}
     if not embed_path().is_file():
         return {"ok": False, "error": "no embedding model"}
+    import socket
+    with socket.socket() as so:
+        so.bind(("127.0.0.1", 0))
+        EMBED_PORT["port"] = so.getsockname()[1]
     log = open(CTX["log"].with_name("llama-embed.log"), "wb")
-    EPROC = subprocess.Popen([server, "-m", str(embed_path()), "--host", "127.0.0.1", "--port", str(EMBED_PORT)]
+    EPROC = subprocess.Popen([server, "-m", str(embed_path()), "--host", "127.0.0.1", "--port", str(EMBED_PORT["port"])]
                              + EMBED_ARGS.split(), stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                              cwd=str(Path(server).parent), creationflags=_NO_WINDOW)
     return {"ok": True}
@@ -356,7 +360,9 @@ def start(server: str, model: str, endpoint: str, args: str) -> dict:
 
 
 def stop() -> dict:
+    """Stop the chat model, and the embedding server with it (หยุด = the AI stops using memory)."""
     global PROC
+    stop_embed()
     if PROC is not None:
         try:
             PROC.terminate()

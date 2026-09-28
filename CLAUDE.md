@@ -54,7 +54,7 @@ so the editor's own internal calls go through the wrapper. Rules:
 Vivado/ISE, `*.lic`, LLM models (`ai/models`, `ai/llama`), GHDL, course PDFs — see README. The RAG index
 (`ai/rag/index.jsonl`) is not in git either: `build_windows.ps1` builds it into every installer, and the launcher builds it
 on first use when missing (`rag_search` → `/api/rag/search`, MCP `search_course`, the agent's up-front course notes). Semantic side: with the optional Qwen3-Embedding 0.6B
-(`llm.EMBED`, in `models/embed/`) a second llama-server runs CPU-only (`--embedding`, port 8091); document vectors are cached
+(`llm.EMBED`, in `models/embed/`) a second llama-server runs CPU-only (`--embedding`, on a free port); document vectors are cached
 in the data folder and fused with BM25 by reciprocal rank (`rag_search` → `mode: hybrid`).
 
 ## Conventions (owner's wishes)
