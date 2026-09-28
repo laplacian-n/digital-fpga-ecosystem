@@ -384,3 +384,34 @@ test("clock_divider: any N on one sheet (÷6 simulated, ÷2 500 000 builds)", as
   const chk = await mcp.tool("check", { sheet: "div20hz" });
   expect(chk.data.errors).toBe(0);
 });
+
+test("bus ports: a generator's q0..q3 become q[3:0] (simulates, makes VHDL, wires as one pin on a parent)", async () => {
+  const b = await mcp.tool("build_circuit", { name: "cnt10b", generator: { kind: "jk_counter", n: 10, output: "q" }, bus: true });
+  expect(b.error, b.text).toBe(false);
+  expect(b.data.bus_ports).toEqual(["out q[3:0] ← q0,q1,q2,q3"]);
+  const sh = await mcp.tool("get_sheet", { sheet: "cnt10b", detail: "brief" });
+  expect(sh.data.ports).toEqual([{ name: "clk_in", dir: "in", width: 1 }, { name: "q", dir: "out", width: 4 }]);
+  const chk = await mcp.tool("check", { sheet: "cnt10b" });
+  expect(chk.data.errors, JSON.stringify(chk.data.issues)).toBe(0);
+  const sim = await mcp.tool("simulate", { sheet: "cnt10b", cycles: 12 });
+  expect(sim.data.rows.map(r => parseInt(r.outputs.q, 2))).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1]);
+  const v = await mcp.tool("get_vhdl", { entity: "cnt10b" });
+  expect(v.error, v.text).toBe(false);
+  expect(v.data.vhdl.code).toMatch(/q\s*:\s*out\s+std_logic_vector\s*\(\s*3\s+downto\s+0\s*\)/i);
+  // a truth table's inputs a0..a2 / b0..b2 → a, b (3 bits each), still the same function
+  const tt = { inputs: ["a2", "a1", "a0", "b2", "b1", "b0"], outputs: ["eq"], columns: { eq: Array.from({ length: 64 }, (_, r) => (r >> 3) === (r & 7) ? "1" : "0").join("") } };
+  const t = await mcp.tool("build_circuit", { name: "eq3", truth_table: tt, bus: ["a", "b"] });
+  expect(t.error, t.text).toBe(false);
+  const vec = await mcp.tool("simulate", { sheet: "eq3", vectors: [{ a: 5, b: 5 }, { a: 5, b: 4 }, { a: "111", b: "111" }] });
+  expect(vec.data.rows.map(r => r.outputs.eq)).toEqual([1, 0, 1]);
+  // the parent wires the counter's whole bus in one connection
+  const top = await mcp.tool("build_circuit", { intent: { module: "bustop", components: [
+    { id: "clk", type: "IN", name: "clk" }, { id: "c", type: "block:cnt10b" }, { id: "o", type: "OUT", name: "leds", params: { width: 4 } }],
+    nets: [{ from: "clk", to: "c.clk_in" }, { from: "c.q", to: "o" }] } });
+  expect(top.error, top.text).toBe(false);
+  const ts = await mcp.tool("simulate", { sheet: "bustop", cycles: 4 });
+  expect(ts.data.rows.map(r => r.outputs.leds)).toEqual(["0000", "0001", "0010", "0011"]);
+  // an existing sheet that is used as a block is refused (its parent's wires would come loose)
+  const used = await mcp.tool("make_bus_ports", { sheet: "cnt10b" });
+  expect(used.error).toBe(true);
+});

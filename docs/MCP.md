@@ -58,7 +58,7 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
 | Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
 | Edit | `add_component`, `connect`, `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
-| Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, JK-FF counter, `clock_divider` for any N such as 50 MHz → 20 Hz, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist (sub-circuits as `block:<sheet>`) |
+| Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, JK-FF counter, `clock_divider` for any N such as 50 MHz → 20 Hz, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist (sub-circuits as `block:<sheet>`). With `bus: true`, numbered ports come out as one bus port (q0..q3 → `q[3:0]`). `make_bus_ports` does the same for an existing sheet. |
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
 | Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation` |
 | Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc` |

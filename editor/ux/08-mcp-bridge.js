@@ -331,7 +331,10 @@ MCP_OPS.build_circuit = a=>{
     const r=ttToIntent(t.inputs, t.outputs, rows, a.name||"logic"); if(r.error) mcpFail(r.error); intent=r.intent; title="truth table";
     if(a.into==="current" && uxCanFillSheet({inputs:t.inputs, outputs:t.outputs})){ uxFillSheet(activeSch(), intent); return {sheet:activeSch().name, into:"current", equations:r.exprs, layout:mcpLayoutMetrics(activeSch())}; }
     const dr=aiDrawIntent(intent); if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"));
-    return {sheet:dr.sch.name, into:"new", equations:r.exprs, layout:mcpLayoutMetrics(dr.sch)};
+    const res={sheet:dr.sch.name, into:"new", equations:r.exprs};
+    if(a.bus){ res.bus_ports=busifyPorts(dr.sch, a.bus).map(b=>`${b.dir} ${b.port}[${b.width-1}:0] ← ${b.bits.join(",")}`); snapshot(); renderAll(); }
+    res.layout=mcpLayoutMetrics(dr.sch);
+    return res;
   }
   if(a.generator){ const g=a.generator, n=+g.n||0;
     if(g.kind==="mod_counter"){ if(n<2||n>64) mcpFail("mod_counter n must be 2..64", "to divide a clock by a larger N use generator {kind:\"clock_divider\", n}"); intent=fsmCounterIntent(Array.from({length:n},(_,i)=>i)); intent.module=a.name||("mod"+n); title="mod-"+n; }
@@ -349,13 +352,23 @@ MCP_OPS.build_circuit = a=>{
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
   if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
+  let buses=null;
+  if(a.bus){ const was=dr.sch.locked; dr.sch.locked=false; buses=busifyPorts(dr.sch, a.bus); dr.sch.locked=was; snapshot(); renderAll(); }
   mcpActivity("สร้าง "+title);
   const res={sheet:dr.sch.name, into:"new", parts:dr.sch.components.filter(c=>c.type!=="JUNCTION").length, layout:mcpLayoutMetrics(dr.sch)};
   if(intent.note) res.note=intent.note;
+  if(buses) res.bus_ports=buses.map(b=>`${b.dir} ${b.port}[${b.width-1}:0] ← ${b.bits.join(",")}`);
   if(dr.warns && dr.warns.length) res.warnings=dr.warns;
   return res;
 };
 
+MCP_OPS.make_bus_ports = a=>{
+  const sch=mcpUse(a.sheet); mcpBeforeChange("รวมขาเป็นบัส");
+  const r=busPortsOnSheet(sch, a.ports && a.ports.length ? a.ports : true);
+  if(r.error) mcpFail(r.error, "numbered ports (q0..q3) of a sheet that no other sheet uses as a block yet — or give bus:true to build_circuit");
+  mcpActivity("รวมขาเป็นบัส"); mcpCommit(sch);
+  return {sheet:sch.name, bus_ports:r.made.map(b=>`${b.dir} ${b.port}[${b.width-1}:0] ← ${b.bits.join(",")}`), ports:schPortList(sch).map(p=>({name:p.id, dir:p.dir, width:p.width}))};
+};
 MCP_OPS.auto_layout = a=>{
   const sch=mcpUse(a.sheet); mcpBeforeChange("จัดวาง");
   if(a.mode==="wires_only"){ healLayout(sch, null, true); } else { autoRouteSheet(sch); }
@@ -379,13 +392,16 @@ MCP_OPS.simulate = a=>{
   const sch=mcpSheet(a.sheet);
   const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
   if(hasFF){
-    const hold={}; Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); hold[c.id]=+v?1:0; });
+    const hold={}; Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); hold[c.id]=mcpProbeVal(c, v); });
     const j=clientSeqSim(sch, Math.max(1,Math.min(256,+a.cycles||16)), {hold});
     if(!j.ok) mcpFail(j.reason||"cannot simulate");
     const sq=j.sequence;
+    const outW=sch.components.filter(c=>c.type==="OUT").map(c=>Math.max(1,+(c.params.width||1))), busOut=outW.some(w=>w>1);
     return {sheet:sch.name, kind:"sequential", note:j.note||undefined, clocks_pulsed:"every INPUT that drives a flip-flop clock", held_inputs:a.inputs||{},
       columns:{inputs:sq.inputs, state:sq.dffs, outputs:sq.outputs},
-      rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""), outputs:r[3].join("")}))};
+      // a bus OUTPUT reads as its value in binary: outputs become {name: value}
+      rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""),
+        outputs: busOut ? Object.fromEntries(sq.outputs.map((n,k)=>{ const w=outW[k]; return [n, w>1 ? (r[4]?r[4][k]:0).toString(2).padStart(w,"0") : r[3][k]]; })) : r[3].join("")}))};
   }
   if(a.vectors){
     if(!Array.isArray(a.vectors) || !a.vectors.length) mcpFail("vectors must be a list of input sets, e.g. [{\"a\":1,\"b\":0}, …]");

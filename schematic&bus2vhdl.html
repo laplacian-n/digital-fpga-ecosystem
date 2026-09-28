@@ -11916,7 +11916,7 @@ function clientSeqSim(sch, cycles, opts){
   const clr=o=>Object.keys(o).forEach(k=>delete o[k]);
   const put=(o,s)=>{ clr(o); Object.assign(o,s); };
   clr(PROBE_VALS); clr(PROBE_FF); clr(PROBE_PREV);
-  if(opts.hold) Object.keys(opts.hold).forEach(id=>{ if(!clocks.includes(id)) PROBE_VALS[id]=opts.hold[id]?1:0; });
+  if(opts.hold) Object.keys(opts.hold).forEach(id=>{ if(!clocks.includes(id)){ const v=opts.hold[id]; PROBE_VALS[id]=typeof v==="number"?v:(v?1:0); } });   // a bus INPUT holds its whole value
   const rows=[], st=probeStruct(fs);   // fs is a private flattened copy → its structure is fixed for the run
   try{
     probeSettle(fs, st);
@@ -11925,7 +11925,8 @@ function clientSeqSim(sch, cycles, opts){
         Object.keys(h).forEach(id=>{ if(clocks.includes(id)) return; const v=h[id]?1:0; if(PROBE_VALS[id]!==v){ PROBE_VALS[id]=v; ch=true; } });
         if(ch) probeSettle(fs, st); }
       const m=probeModel(fs, st);
-      rows.push([i, ins.map(c=>probeBit(c)), ffs.map(c=>PROBE_FF[c.id]?1:0), outs.map(c=>m.inVal(c.id,"i")?1:0)]);
+      // [4] = the outputs' whole values (a bus OUTPUT is a number there; [3] only says 0 / not 0)
+      rows.push([i, ins.map(c=>probeBit(c)), ffs.map(c=>PROBE_FF[c.id]?1:0), outs.map(c=>m.inVal(c.id,"i")?1:0), outs.map(c=>m.inVal(c.id,"i")||0)]);
       clocks.forEach(id=>{ PROBE_VALS[id]=1; }); probeSettle(fs, st);
       clocks.forEach(id=>{ PROBE_VALS[id]=0; }); probeSettle(fs, st);
     }
@@ -15105,7 +15106,10 @@ MCP_OPS.build_circuit = a=>{
     const r=ttToIntent(t.inputs, t.outputs, rows, a.name||"logic"); if(r.error) mcpFail(r.error); intent=r.intent; title="truth table";
     if(a.into==="current" && uxCanFillSheet({inputs:t.inputs, outputs:t.outputs})){ uxFillSheet(activeSch(), intent); return {sheet:activeSch().name, into:"current", equations:r.exprs, layout:mcpLayoutMetrics(activeSch())}; }
     const dr=aiDrawIntent(intent); if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"));
-    return {sheet:dr.sch.name, into:"new", equations:r.exprs, layout:mcpLayoutMetrics(dr.sch)};
+    const res={sheet:dr.sch.name, into:"new", equations:r.exprs};
+    if(a.bus){ res.bus_ports=busifyPorts(dr.sch, a.bus).map(b=>`${b.dir} ${b.port}[${b.width-1}:0] ← ${b.bits.join(",")}`); snapshot(); renderAll(); }
+    res.layout=mcpLayoutMetrics(dr.sch);
+    return res;
   }
   if(a.generator){ const g=a.generator, n=+g.n||0;
     if(g.kind==="mod_counter"){ if(n<2||n>64) mcpFail("mod_counter n must be 2..64", "to divide a clock by a larger N use generator {kind:\"clock_divider\", n}"); intent=fsmCounterIntent(Array.from({length:n},(_,i)=>i)); intent.module=a.name||("mod"+n); title="mod-"+n; }
@@ -15123,13 +15127,23 @@ MCP_OPS.build_circuit = a=>{
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
   if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
+  let buses=null;
+  if(a.bus){ const was=dr.sch.locked; dr.sch.locked=false; buses=busifyPorts(dr.sch, a.bus); dr.sch.locked=was; snapshot(); renderAll(); }
   mcpActivity("สร้าง "+title);
   const res={sheet:dr.sch.name, into:"new", parts:dr.sch.components.filter(c=>c.type!=="JUNCTION").length, layout:mcpLayoutMetrics(dr.sch)};
   if(intent.note) res.note=intent.note;
+  if(buses) res.bus_ports=buses.map(b=>`${b.dir} ${b.port}[${b.width-1}:0] ← ${b.bits.join(",")}`);
   if(dr.warns && dr.warns.length) res.warnings=dr.warns;
   return res;
 };
 
+MCP_OPS.make_bus_ports = a=>{
+  const sch=mcpUse(a.sheet); mcpBeforeChange("รวมขาเป็นบัส");
+  const r=busPortsOnSheet(sch, a.ports && a.ports.length ? a.ports : true);
+  if(r.error) mcpFail(r.error, "numbered ports (q0..q3) of a sheet that no other sheet uses as a block yet — or give bus:true to build_circuit");
+  mcpActivity("รวมขาเป็นบัส"); mcpCommit(sch);
+  return {sheet:sch.name, bus_ports:r.made.map(b=>`${b.dir} ${b.port}[${b.width-1}:0] ← ${b.bits.join(",")}`), ports:schPortList(sch).map(p=>({name:p.id, dir:p.dir, width:p.width}))};
+};
 MCP_OPS.auto_layout = a=>{
   const sch=mcpUse(a.sheet); mcpBeforeChange("จัดวาง");
   if(a.mode==="wires_only"){ healLayout(sch, null, true); } else { autoRouteSheet(sch); }
@@ -15153,13 +15167,16 @@ MCP_OPS.simulate = a=>{
   const sch=mcpSheet(a.sheet);
   const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
   if(hasFF){
-    const hold={}; Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); hold[c.id]=+v?1:0; });
+    const hold={}; Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); hold[c.id]=mcpProbeVal(c, v); });
     const j=clientSeqSim(sch, Math.max(1,Math.min(256,+a.cycles||16)), {hold});
     if(!j.ok) mcpFail(j.reason||"cannot simulate");
     const sq=j.sequence;
+    const outW=sch.components.filter(c=>c.type==="OUT").map(c=>Math.max(1,+(c.params.width||1))), busOut=outW.some(w=>w>1);
     return {sheet:sch.name, kind:"sequential", note:j.note||undefined, clocks_pulsed:"every INPUT that drives a flip-flop clock", held_inputs:a.inputs||{},
       columns:{inputs:sq.inputs, state:sq.dffs, outputs:sq.outputs},
-      rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""), outputs:r[3].join("")}))};
+      // a bus OUTPUT reads as its value in binary: outputs become {name: value}
+      rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""),
+        outputs: busOut ? Object.fromEntries(sq.outputs.map((n,k)=>{ const w=outW[k]; return [n, w>1 ? (r[4]?r[4][k]:0).toString(2).padStart(w,"0") : r[3][k]]; })) : r[3].join("")}))};
   }
   if(a.vectors){
     if(!Array.isArray(a.vectors) || !a.vectors.length) mcpFail("vectors must be a list of input sets, e.g. [{\"a\":1,\"b\":0}, …]");
@@ -16975,6 +16992,110 @@ function rtInput(kind, idx, v){
     if(rtInput("pb", PB_OF_DOM[k], 1)){ p.style.background="#ffd"; const up=()=>{ rtInput("pb", PB_OF_DOM[k], 0); p.style.background="#fff"; document.removeEventListener("mouseup", up, true); }; document.addEventListener("mouseup", up, true); } }, true);
   const _hide = typeof hideSimPage==="function" ? hideSimPage : null;
   if(_hide) hideSimPage = function(){ rtStop(); return _hide.apply(this, arguments); };
+}
+
+/* ===== 17. Bus ports for generated circuits: yu0..yu3 → yu[3:0] ===============================
+   A generator / truth table / intent gives one INPUT or OUTPUT per bit (q0, q1, q2, q3), so
+   a parent sheet had to wire yu0..yu3, t0..t3 one by one. busifyPorts turns every numbered
+   group into ONE bus port, as the lab draws it:
+     IN  yu (4 bits) ─┬─▷ bit 0 ─ (what yu0 fed)        (split taps)
+                      ├─▷ bit 1 ─ …
+     (what q0 was fed) ─◁ bit 0 ─┬─ OUT q (4 bits)      (merge taps)
+   Each tap goes exactly where the old port's pin was, so the circuit's placement stays as the
+   generator drew it; only the new bus nets are routed (12-wire-tidy). Bit i = the number in the
+   name. Groups need ≥2 members numbered 0..n−1 with no gap, one direction, and a free name. */
+function busGroups(sch, which){
+  const want = which===true || which==null ? null : new Set([].concat(which).map(x=>String(x).toLowerCase()));
+  const groups = new Map();
+  sch.components.filter(c=>c.type==="IN"||c.type==="OUT").forEach(c=>{
+    const m = /^(.*?[A-Za-z])_?(\d+)$/.exec(String(c.params.name||"")); if(!m || (c.params.width||1)>1) return;
+    const key = c.type+":"+m[1];
+    if(!groups.has(key)) groups.set(key, {dir:c.type, name:m[1], bits:[]});
+    groups.get(key).bits.push({c, i:+m[2]});
+  });
+  return [...groups.values()].filter(g=>{
+    if(want && !want.has(g.name.toLowerCase())) return false;
+    if(g.bits.length<2) return false;
+    g.bits.sort((a,b)=>a.i-b.i);
+    if(!g.bits.every((b,k)=>b.i===k)) return false;                     // q0..q(n−1), no gap, no repeat
+    return !sch.components.some(c=>(c.type==="IN"||c.type==="OUT") && String(c.params.name).toLowerCase()===g.name.toLowerCase());
+  });
+}
+function busifyPorts(sch, which){
+  const made = [];
+  busGroups(sch, which).forEach(g=>{
+    const n = g.bits.length, isIn = g.dir==="IN", taps = [];
+    g.bits.forEach(({c, i})=>{
+      const pin = portPos(c, isIn ? "o" : "i");
+      const t = {id:uid("c"), type:"BUSTAP", label:"", x:0, y:0,
+        params:{bit:i, nbit:1, mode:isIn?"split":"merge", dir:isIn?"right":"left"}};
+      // the tap's bit pin lands where the old port's pin was: nothing else has to move
+      const yp = TYPES.BUSTAP.ports(t.params).find(p=>p.id==="y");
+      t.x = snap(pin.x - yp.dx); t.y = snap(pin.y - yp.dy);
+      sch.components.push(t); taps.push(t);
+      sch.wires.forEach(w=>{
+        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; }
+        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; }
+      });
+    });
+    const gone = new Set(g.bits.map(b=>b.c.id));
+    sch.components = sch.components.filter(c=>!gone.has(c.id));
+    // the bus port beside the column of taps, level with its middle
+    const port = {id:uid("c"), type:g.dir, label:"", x:0, y:0, params:{name:_uniquePortName(sch, g.dir, sanId(g.name)), width:n}};
+    const sz = getSize(port), ys = taps.map(t=>t.y), mid = (Math.min(...ys)+Math.max(...ys))/2;
+    port.x = snap(isIn ? Math.min(...taps.map(t=>t.x)) - GRID*8 - sz.w : Math.max(...taps.map(t=>t.x)) + GRID*11);
+    port.y = snap(mid + 11 - sz.h/2);
+    sch.components.push(port);
+    if(isIn) taps.forEach(t=>sch.wires.push({id:uid("w"), from:{cid:port.id, pid:"o"}, to:{cid:t.id, pid:"d"}, name:""}));
+    else {                                           // taps write INTO the bus: a dot drives nothing, the taps do
+      const J = {id:uid("c"), type:"JUNCTION", label:"", x:snap(port.x - GRID*4) - 6, y:snap(portPos(port,"i").y) - 6, params:{}};
+      sch.components.push(J);
+      sch.wires.push({id:uid("w"), from:{cid:J.id, pid:"j"}, to:{cid:port.id, pid:"i"}, name:""});
+      taps.forEach(t=>sch.wires.push({id:uid("w"), from:{cid:J.id, pid:"j"}, to:{cid:t.id, pid:"d"}, name:""}));
+    }
+    if(sch.portOrder){ const k = isIn ? "in" : "out", L = sch.portOrder[k];
+      if(L){ const low = new Set(g.bits.map(b=>String(b.c.params.name).toLowerCase())), at = L.findIndex(x=>low.has(String(x).toLowerCase()));
+        sch.portOrder[k] = L.filter(x=>!low.has(String(x).toLowerCase())); sch.portOrder[k].splice(Math.max(0,at), 0, port.params.name); } }
+    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name)});
+  });
+  if(made.length){
+    try{ normalizePortFanout(sch); }catch(_){}
+    try{ wtTidySheet(sch); }catch(e){ console.warn("bus ports: tidy", e); }
+    // a merge bus has no driver pin, so the router may start a wire AT the OUTPUT's input or a
+    // tap's bus pin; turn those round (a wire always leaves from a dot or an output)
+    sch.wires.forEach(w=>{ const c = comp(w.from.cid, sch); if(!c || c.type==="JUNCTION") return;
+      const p = getPort(c, w.from.pid); if(!p || p.dir!=="in") return;
+      const f = w.from; w.from = w.to; w.to = f; if(w.pts) w.pts.reverse(); });
+  }
+  return made;
+}
+/* the sheets that place `sch` as a block: its pins would change under their wires */
+function busParents(sch){
+  return Object.values(state.project.schematics).filter(s=>s!==sch && s.components.some(c=>c.type==="SCH:"+sch.id)).map(s=>s.name);
+}
+/* Tools ▸ "รวมขาเป็นบัส" on the sheet on screen */
+function busPortsOnSheet(sch, which){
+  sch = sch || activeSch(); if(!sch) return {error:"ไม่มีแผ่นที่เปิดอยู่"};
+  const par = busParents(sch);
+  if(par.length) return {error:`แผ่นนี้ถูกใช้เป็นบล็อกใน ${par.join(", ")} — ขาเปลี่ยนแล้วสายในแผ่นนั้นจะหลุด`};
+  if(!busGroups(sch, which).length) return {error:"ไม่มีกลุ่มขาที่ชื่อเรียงเลข 0,1,2… (เช่น q0 q1 q2 q3)"};
+  const was = sch.locked; sch.locked = false;
+  const made = busifyPorts(sch, which);
+  sch.locked = was;
+  return {made};
+}
+GENERATORS.push({id:"busports", icon:"⫼", name:"รวมขาเป็นบัส (q0…q3 → q)", desc:"ขา INPUT/OUTPUT ที่ชื่อเรียงเลข รวมเป็นขาบัสขาเดียวพร้อม bus tap — แผ่นย่อยจะมีขาเดียวแทน 4 ขา", run:()=>{
+  const r = busPortsOnSheet(activeSch(), true);
+  if(r.error){ toast(r.error, "warn", 5000); return; }
+  snapshot(); renderAll();
+  toast("รวมเป็นบัสแล้ว: "+r.made.map(m=>`${m.port}[${m.width-1}:0]`).join(", "), "ok", 4000); }});
+{
+  const last = [...document.querySelectorAll('#menu [data-gen]')].pop();
+  if(last && !document.querySelector('#menu [data-gen="busports"]')){
+    const g = GENERATORS.find(x=>x.id==="busports");
+    last.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="busports" title="${escA(g.desc)}"><span class="gi">${g.icon}</span>${g.name}</button>`);
+    document.querySelector('#menu [data-gen="busports"]').addEventListener("click", ()=>runGenerator("busports"));
+  }
 }
 
 </script>

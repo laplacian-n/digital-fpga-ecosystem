@@ -151,7 +151,14 @@ TOOLS = [
       "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]} — a sub-circuit is "
       "type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
-       "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]}}, timeout=90),
+       "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]},
+       "bus": {"type": ["boolean", "array"], "items": {"type": "string"},
+               "description": "Numbered ports become one bus port: true = every group (q0..q3 → q[3:0], yu0..yu3 → yu[3:0]), "
+                              "or a list of group names ['q']. Bit i = the number in the name; bus taps are drawn for you."}},
+      timeout=90),
+    T("make_bus_ports", "Turn numbered INPUT/OUTPUT ports of a sheet (q0..q3) into one bus port each (q, 4 bits) with bus taps, "
+      "keeping the drawing. Only for a sheet no other sheet uses as a block yet (their wiring would come loose).",
+      {"sheet": SHEET, "ports": {"type": "array", "items": {"type": "string"}, "description": "group names, e.g. ['q','yu']; default: all"}}),
     # --- layout
     T("auto_layout", "Re-place and route the whole sheet (mode 'full'), or only re-route wires keeping parts ('wires_only').",
       {"sheet": SHEET, "mode": {"type": "string", "enum": ["full", "wires_only"]}, "lock": {"type": "boolean"}}, timeout=120),
