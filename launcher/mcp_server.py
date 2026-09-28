@@ -130,7 +130,8 @@ TOOLS = [
        "x": {"type": "number"}, "y": {"type": "number"}, "rot": {"type": "integer", "enum": [0, 90, 180, 270]}},
       ["type"]),
     T("connect", "Wire an output pin to an input pin (fan-out is fine; an input takes one driver). "
-      "Give from/to, or `connections` [[from,to],…] for several. The new wires are routed.",
+      "Give from/to, or `connections` [[from,to],…] for several. The new wires are routed. One bit of a bus pin "
+      "takes an index — 'a', 'y.i[2]' or 's.o[3]', 'z' — and the bus tap is placed for you.",
       {"sheet": SHEET, "from": PIN, "to": PIN,
        "connections": {"type": "array", "items": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 2}},
        "net_name": {"type": "string"}}),
@@ -155,6 +156,8 @@ TOOLS = [
       "type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]},
+       "sheet": {"type": "string", "description": "Sheet to build on: a new name creates that sheet, an existing EMPTY "
+                                                  "sheet is filled (one with parts is refused). Default: a new sheet named after `name`."},
        "bus": {"type": ["boolean", "array"], "items": {"type": "string"},
                "description": "Numbered ports become one bus port: true = every group (q0..q3 → q[3:0], yu0..yu3 → yu[3:0]), "
                               "or a list of group names ['q']. Bit i = the number in the name; bus taps are drawn for you."}},
@@ -301,7 +304,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_circuit", "make_bus_ports", "check", "simulate", "probe", "explain_simulation",
+               "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
                "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 

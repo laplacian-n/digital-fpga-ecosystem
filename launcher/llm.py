@@ -61,8 +61,11 @@ CATALOG = [
 # llama-server's own --fit (on by default) places as many layers on the GPU as fit and the rest
 # in system RAM — so -ngl is left UNSET (a fixed -ngl 999 turned that off and ran out of VRAM).
 # --jinja = the model's chat template, which carries tool calls; the KV cache is kept at 8 bit.
-DEFAULT_ARGS = "-c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0"
-OLD_DEFAULT_ARGS = ("-c 8192 --jinja -ngl 999",)
+# -np 1: one chat at a time (the default is 4 slots, each with its own buffers);
+# --cache-ram 1024: llama-server keeps old prompts in system RAM to reuse them, 8 GB by default —
+# with the agent's long, growing prompts that filled a 24 GB laptop to 100 % (1.1.0 / 1.1.1).
+DEFAULT_ARGS = "-c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0 -np 1 --cache-ram 1024"
+OLD_DEFAULT_ARGS = ("-c 8192 --jinja -ngl 999", "-c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0")
 
 # semantic search over the course notes (RAG): a small embedding model on its own llama-server,
 # CPU-only (-ngl 0) so the GPU stays with the chat model. Kept in models/embed/ so it is never
@@ -72,7 +75,7 @@ EMBED = {"id": "qwen3-embedding-0.6b", "name": "Qwen3-Embedding 0.6B", "size_gb"
          "file": "Qwen3-Embedding-0.6B-Q8_0.gguf",
          "url": HF + "/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf"}
 EMBED_PORT = {"port": 0}          # a free port picked at start (a fixed one could be taken by anything)
-EMBED_ARGS = "--embedding --pooling last -ngl 0 -c 4096 -b 4096 -ub 4096"
+EMBED_ARGS = "--embedding --pooling last -ngl 0 -c 4096 -b 4096 -ub 4096 -np 1 --cache-ram 0"
 
 CTX = {"data": Path("."), "log": Path("llama-server.log")}
 

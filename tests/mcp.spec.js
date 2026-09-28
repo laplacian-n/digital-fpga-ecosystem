@@ -455,3 +455,32 @@ test("search_course: the course notes (RAG) answer through MCP", async () => {
   const b = await mcp.tool("search_course", { q: "seven segment digit select", group: "board" });   // alias q → query
   expect(b.data.hits.every(h => h.group === "board")).toBe(true);
 });
+
+test("build_circuit into a named sheet (new or empty); connect to one bit of a bus pin", async () => {
+  await mcp.tool("new_sheet", { name: "fa_empty" });
+  const tt = { inputs: ["a", "b", "cin"], outputs: ["sum", "cout"], columns: { sum: "01101001", cout: "00010111" } };
+  let r = await mcp.tool("build_circuit", { truth_table: tt, sheet: "fa_empty" });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.sheet).toBe("fa_empty");                                   // filled, not a new "logic" sheet beside it
+  expect((await mcp.tool("verify_truth_table", { sheet: "fa_empty", expected: tt.columns })).data.pass).toBe(true);
+  expect((await mcp.tool("status")).data.sheets.filter(s => /^logic/.test(s.name))).toEqual([]);
+  r = await mcp.tool("build_circuit", { truth_table: tt, sheet: "fa_empty" });
+  expect(r.error).toBe(true);                                              // has parts now: refused, not overwritten
+  expect(r.text).toContain("already has parts");
+  r = await mcp.tool("build_circuit", { generator: { kind: "mod_counter", n: 5 }, sheet: "cnt5_here" });
+  expect(r.data.sheet).toBe("cnt5_here");
+  // bits of a bus
+  await mcp.tool("new_sheet", { name: "bits" });
+  await mcp.tool("apply", { steps: [{ op: "add_component", type: "IN", name: "a" }, { op: "add_component", type: "IN", name: "b" },
+    { op: "add_component", type: "OUT", name: "y", width: 4 }, { op: "add_component", type: "IN", name: "s", width: 4 },
+    { op: "add_component", type: "OUT", name: "z" }] });
+  r = await mcp.tool("connect", { connections: [["a", "y.i[0]"], ["b", "y.i[2]"], ["s.o[3]", "z"]] });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.bus_bits.length).toBe(3);
+  const v = await mcp.tool("simulate", { sheet: "bits", vectors: [{ a: 1, b: 1, s: 8 }, { a: 0, b: 1, s: 7 }] });
+  expect(v.data.rows.map(x => x.outputs)).toEqual([{ y: "0101", z: 1 }, { y: "0100", z: 0 }]);
+  const again = await mcp.tool("connect", { from: "b", to: "y.i[2]" });
+  expect(again.error).toBe(true);
+  expect(again.text).toContain("bit 2");
+  expect((await mcp.tool("check", { sheet: "bits" })).data.errors).toBe(0);
+});
