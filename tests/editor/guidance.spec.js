@@ -27,7 +27,7 @@ test("stepper badges follow the work", async ({ page }) => {
   await expect(badge("draw")).toHaveText("✓");
   await expect(badge("sim")).toHaveText("•");
   await page.click(".step[data-stage=sim]");
-  await page.click("[data-act=sim-close]");
+  await page.click(".step[data-stage=draw]");
   await expect(badge("sim")).toHaveText("✓");
 });
 

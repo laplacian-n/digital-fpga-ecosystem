@@ -33,6 +33,7 @@ function aiagSystemPrompt(){
 "Counters: build_circuit generator {kind:'mod_counter'|'jk_counter', n}; divide a clock by any N: {kind:'clock_divider', n}.",
 "Add bus:true to build_circuit to get q[3:0] instead of q0..q3.",
 "If the request is only a question (no change needed), answer it directly in Thai.",
+"For how the course / a lab sheet does something, or the board's pins, call search_course.",
 "",
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
@@ -93,7 +94,12 @@ async function aiAgentRun(msg){
   const live=t=>{ const e=status&&status.querySelector(".ag-live"); if(e) e.textContent=t; };
   try{
     await aiagTools();
-    const messages=[{role:"system", content:aiagSystemPrompt()}, ...hist, {role:"user", content:msg}];
+    // the course notes most related to the request go in up front (RAG); more via search_course
+    let notes="";
+    try{ const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg))).json();
+      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
+        run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
+    const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     let edited=false, verified=true, nudged=false;
     for(let i=0; i<AIAG_MAX_STEPS; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
@@ -218,5 +224,6 @@ MCP_OPS.ai_model = async a=>{
   const s=await (await fetch("/api/llm/status")).json();
   return {state:s.state, model:s.model, llama_server:s.server||null, mode:s.mode, running_for_s:s.since,
     catalog:(s.catalog||[]).map(m=>({id:m.id, name:m.name, size_gb:m.size_gb, installed:m.installed, agent:!!m.agent})),
+    embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
 };

@@ -22,7 +22,8 @@ import json, sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 port = int(sys.argv[sys.argv.index("--port") + 1]); model = sys.argv[sys.argv.index("-m") + 1]
 print("fake llama-server loading", model, flush=True)
-with open(sys.argv[0] + ".args", "w") as f: f.write(" ".join(sys.argv[1:]))
+EMB = "--embedding" in sys.argv
+with open(sys.argv[0] + (".embed" if EMB else "") + ".args", "w") as f: f.write(" ".join(sys.argv[1:]))
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def _j(self, o):
@@ -31,6 +32,12 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self): self._j({"status": "ok"})
     def do_POST(self):
         req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        if self.path.startswith("/v1/embeddings"):     # a toy embedding: which topic words the text has
+            with open(sys.argv[0] + ".embed.count", "a") as f: f.write("x")
+            inp = req["input"] if isinstance(req["input"], list) else [req["input"]]
+            topics = [("adder", "บวก", "sum"), ("counter", "นับ"), ("segment", "7-seg", "ตัวถอดรหัส")]
+            vec = lambda t: [float(sum(t.lower().count(w) for w in ws)) for ws in topics] + [0.01]
+            return self._j({"data": [{"index": i, "embedding": vec(t)} for i, t in enumerate(inp)]})
         msgs = req.get("messages") or []
         if not req.get("tools"):
             return self._j({"choices": [{"message": {"content": "latch ไวต่อระดับสัญญาณ ส่วน flip-flop ไวต่อขอบ clock"}}]})
@@ -142,4 +149,25 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(logs.length).toBe(1);
     expect(ed.errors).toEqual([]);
   } finally { srv.kill(); }
+});
+
+test("semantic search over the course notes: the embedding model runs on the CPU beside the chat model", async ({ request }) => {
+  test.setTimeout(120000);
+  const data = path.join(home, ".local", "share", "fpga-ecosystem");
+  const bin = path.join(data, "llama", "llama-test-bin", "llama-server");
+  let r = await (await request.get(BASE + "/api/rag/search?k=3&q=" + encodeURIComponent("วงจรบวกเลข"))).json();
+  expect(r.mode).toBe("bm25");                                   // no embedding model yet: keyword search still works
+  expect(r.semantic).toContain("no embedding model");
+  fs.mkdirSync(path.join(data, "models", "embed"), { recursive: true });
+  fs.writeFileSync(path.join(data, "models", "embed", "Qwen3-Embedding-0.6B-Q8_0.gguf"), "GGUF");
+  r = await (await request.get(BASE + "/api/rag/search?k=3&q=" + encodeURIComponent("วงจรบวกเลข"))).json();
+  expect(r.mode, JSON.stringify(r)).toBe("hybrid");
+  expect(fs.readFileSync(bin + ".embed.args", "utf-8")).toContain("--embedding --pooling last -ngl 0");
+  expect(r.hits.some(h => /adder|บวก/i.test(h.title + h.text))).toBe(true);
+  // the documents were embedded once; the next query only embeds the query
+  const n1 = fs.readFileSync(bin + ".embed.count", "utf-8").length;
+  await request.get(BASE + "/api/rag/search?q=counter");
+  expect(fs.readFileSync(bin + ".embed.count", "utf-8").length).toBe(n1 + 1);
+  const st = await (await request.get(BASE + "/api/llm/status")).json();
+  expect(st.embed).toMatchObject({ id: "qwen3-embedding-0.6b", installed: true, running: true });
 });

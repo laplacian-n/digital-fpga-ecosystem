@@ -67,6 +67,11 @@
     var data = b ? Promise.resolve(b) : fetch(href).then(function(r){ return r.blob(); });
     var proj = projectName();
     data.then(function(blob){
+      // a project file saved into a project folder holds that project only (not the whole workspace)
+      if (/\.schproj\.json$/i.test(name) && typeof window.uxProjectOnlyJson === "function")
+        return blob.text().then(function(t){ return new Blob([window.uxProjectOnlyJson(t)], {type: "application/json"}); });
+      return blob;
+    }).then(function(blob){
       return fetch("/api/files/save?project=" + encodeURIComponent(proj) +
                    "&name=" + encodeURIComponent(name), {method:"POST", body: blob});
     }).then(function(r){ return r.json(); }).then(function(j){
@@ -103,6 +108,8 @@
           .then(function(r){ if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
           .then(function(txt){
             if (typeof window.deserialize !== "function") throw new Error("editor not ready");
+            // a file from before 1.1.1 may hold several projects: load the one this folder is for
+            if (typeof window.uxProjectFromFile === "function") txt = window.uxProjectFromFile(txt, open.split(/[\\/]/)[0]);
             window.deserialize(txt);
             note("เปิดโปรเจกต์ " + open, "ok");
           })

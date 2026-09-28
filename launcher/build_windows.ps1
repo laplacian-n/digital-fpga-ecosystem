@@ -41,9 +41,13 @@ Get-ChildItem ai\*.py | ForEach-Object { Stage $_.FullName ("ai\" + $_.Name) }
 foreach ($d in "grammar", "prompts", "board") { Stage "ai\$d" "ai\$d" }
 Get-ChildItem ai\rag\*.py | ForEach-Object { Stage $_.FullName ("ai\rag\" + $_.Name) }
 Stage "ai\rag\labs" "ai\rag\labs"
-foreach ($opt in "ai\rag\index.jsonl", "ai\rag\emb.npz") {       # RAG index if built locally
-  if (Test-Path $opt) { Stage $opt $opt }
-}
+Stage "ai\rag\content" "ai\rag\content"
+# the RAG index is not in git: build it here (chapters + lab sheets + board + checked VHDL), so every
+# installer ships it — before 1.1.1 none did, and the app had no course notes at all
+python ai\rag\build_index.py
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path "ai\rag\index.jsonl")) { throw "RAG index build failed" }
+Stage "ai\rag\index.jsonl" "ai\rag\index.jsonl"
+if (Test-Path "ai\rag\emb.npz") { Stage "ai\rag\emb.npz" "ai\rag\emb.npz" }
 
 # ---- PyInstaller (one-folder: fast start, no temp unpacking, AV-friendly) ----
 python -m pip install --quiet --upgrade pyinstaller

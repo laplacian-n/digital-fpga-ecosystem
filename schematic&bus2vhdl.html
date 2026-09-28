@@ -493,9 +493,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
     <input class="proj-name" id="projectName" value="my_project" spellcheck="false">
     <button class="save-chip clean" id="saveChip" data-act="save-project" title="สถานะการบันทึก"><span class="dot"></span>…</button>
     <button class="btn btn-ghost" data-act="history-open" title="ประวัติย้อนเวลา — กลับไปจุดที่เก็บไว้อัตโนมัติ">🕘<span class="lbl-wide"> ประวัติ</span></button>
-    <button class="btn btn-ghost" data-act="sync-bridge" title="โหลดดีไซน์จาก MCP bridge (127.0.0.1:8766)">Sync</button>
-    <button class="btn btn-ghost" data-act="open-manual" title="เปิดคู่มือการใช้งาน">คู่มือ</button>
-    <button class="btn btn-ghost" data-act="synth" title="Run synthesis check (F7)">Check</button>
     <button class="btn btn-primary" data-act="save-project" title="บันทึกโปรเจกต์ (Ctrl+S)">Save</button>
   </header>
 
@@ -691,7 +688,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 </div>
 <div id="simPage" class="sim-page">
   <div class="sim-top">
-    <button class="btn2" data-act="sim-close">← กลับไปวาดวงจร</button>
     <b id="simTopTitle">จำลองบอร์ด</b>
     <span class="muted" id="simSheet"></span>
     <span class="grow"></span>
@@ -794,7 +790,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
         <table>
           <thead><tr><th>ส่วน</th><th>ตำแหน่ง</th><th>ใช้ทำอะไร</th></tr></thead>
           <tbody>
-            <tr><td class="k">แถบเมนู</td><td>บนสุด</td><td>File / Edit / Tools / View, ชื่อโปรเจกต์, ปุ่ม <b>Check</b> (ตรวจวงจร) และ <b>Generate VHDL</b></td></tr>
+            <tr><td class="k">แถบเมนู</td><td>บนสุด</td><td>File / Edit / Tools / View, ชื่อโปรเจกต์ และปุ่มบันทึก · ตรวจวงจรกด <b>F7</b> (หรือ Tools)</td></tr>
             <tr><td class="k">แผงซ้าย</td><td>ซ้าย</td><td>แท็บ <b>Project</b> = รายชื่อ schematic, นำเข้า .vhd, ใช้แผ่นอื่นเป็นบล็อกย่อย · แท็บ <b>Components</b> = คลังชิ้นส่วน</td></tr>
             <tr><td class="k">Canvas</td><td>กลาง</td><td>พื้นที่วาดวงจร มีแถบเครื่องมือแนวตั้งอยู่ซ้ายบน และตัวควบคุมซูมอยู่ขวาบน</td></tr>
             <tr><td class="k">แผงขวา</td><td>ขวา</td><td><b>Inspector</b> ปรับค่าของสิ่งที่เลือก · <b>Issues</b> ผลการตรวจ · <b>VHDL</b> โค้ดที่สร้างได้</td></tr>
@@ -15668,7 +15664,6 @@ function brdEnsurePage(){
   let pg=$("#boardPage"); if(pg) return pg;
   pg=document.createElement("div"); pg.id="boardPage"; pg.className="sim-page brd-page";
   pg.innerHTML=`<div class="sim-top">
-      <button class="btn2" data-brd="close">← กลับไปวาดวงจร</button>
       <b>ลงบอร์ด</b><label class="muted" title="แผ่นที่จะลงบอร์ด — วงจรย่อยลงทดสอบเดี่ยวๆ ได้">แผ่น <select id="brdSheetSel"></select></label>
       <span class="muted" id="brdSheet"></span><span class="grow"></span>
       <span class="muted" id="brdTools"></span>
@@ -15806,6 +15801,15 @@ function brdPoll(once){
     if(v==="topdown") openTopdownWithSheet();
     else if(v==="board") setStage("upload"); }, 900);
 })();
+/* the top bar is the way back: any other step (วาด / เลือกขา / จำลอง) closes this page */
+{
+  const _stage=setStage;
+  setStage=function(st){
+    const pg=$("#boardPage");
+    if(st!=="upload" && pg && pg.classList.contains("show")){ pg.classList.remove("show"); clearInterval(BRD.timer); BRD.timer=null; }
+    return _stage.apply(this, arguments);
+  };
+}
 
 /* ===== 10. AI chat: questions about the drawing =========================================
    "นี่วงจรอะไร" used to fall through to the build pipeline and come back REJECTED. A question
@@ -17139,6 +17143,7 @@ function aiagSystemPrompt(){
 "Counters: build_circuit generator {kind:'mod_counter'|'jk_counter', n}; divide a clock by any N: {kind:'clock_divider', n}.",
 "Add bus:true to build_circuit to get q[3:0] instead of q0..q3.",
 "If the request is only a question (no change needed), answer it directly in Thai.",
+"For how the course / a lab sheet does something, or the board's pins, call search_course.",
 "",
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
@@ -17199,7 +17204,12 @@ async function aiAgentRun(msg){
   const live=t=>{ const e=status&&status.querySelector(".ag-live"); if(e) e.textContent=t; };
   try{
     await aiagTools();
-    const messages=[{role:"system", content:aiagSystemPrompt()}, ...hist, {role:"user", content:msg}];
+    // the course notes most related to the request go in up front (RAG); more via search_course
+    let notes="";
+    try{ const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg))).json();
+      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
+        run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
+    const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     let edited=false, verified=true, nudged=false;
     for(let i=0; i<AIAG_MAX_STEPS; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
@@ -17324,7 +17334,158 @@ MCP_OPS.ai_model = async a=>{
   const s=await (await fetch("/api/llm/status")).json();
   return {state:s.state, model:s.model, llama_server:s.server||null, mode:s.mode, running_for_s:s.since,
     catalog:(s.catalog||[]).map(m=>({id:m.id, name:m.name, size_gb:m.size_gb, installed:m.installed, agent:!!m.agent})),
+    embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
+};
+
+/* ===== 19. The module library (Modules tab) over MCP — and modules that keep their sub-blocks ===
+   "เพิ่มโมดูลผ่าน mcp ได้ไหม": Claude (and the local agent) can list, save, place, open and delete
+   modules in the cross-project library the Modules tab shows (state.modules, localStorage).
+   A module used to be ONE sheet: a counter built from a mod10 block lost that block on the way
+   into the library (its SCH: type pointed at a sheet that was not stored). A module now carries
+   `deps`, every sheet it uses as a block (recursively), and they come back together. */
+function moduleDeps(sch){
+  const P=state.project.schematics, seen=new Set([sch.id]), out=[];
+  const walk=s=>(s.components||[]).forEach(c=>{
+    if(typeof c.type!=="string" || c.type.indexOf("SCH:")!==0) return;
+    const sub=P[c.type.slice(4)]; if(!sub || seen.has(sub.id)) return;
+    seen.add(sub.id); out.push(JSON.parse(JSON.stringify(sub))); walk(sub); });
+  walk(sch);
+  return out;
+}
+function moduleSave(sch, name, desc, replaceId){
+  loadModules();
+  const id=replaceId || ("mod_"+Date.now().toString(36)+Math.random().toString(36).slice(2,5));
+  state.modules[id]={ id, name:String(name).trim(), desc:String(desc||"").trim(), ts:Date.now(),
+    schematic:JSON.parse(JSON.stringify(sch)), deps:moduleDeps(sch) };
+  saveModules(); try{ renderModulesPane(); }catch(_){}
+  return state.modules[id];
+}
+function moduleFind(ref){
+  loadModules(); const all=Object.values(state.modules||{}), low=String(ref||"").trim().toLowerCase();
+  return (state.modules||{})[ref] || all.find(m=>m.name.toLowerCase()===low) || null;
+}
+/* the module's sheet (+ its blocks) brought into the project; returns the added top sheet */
+function moduleAdopt(m, keepLink){
+  const copy=JSON.parse(JSON.stringify(m.schematic)); if(keepLink) copy.moduleId=m.id;
+  const added=adoptSchematics([copy, ...JSON.parse(JSON.stringify(m.deps||[]))]);
+  if(!added.length) return null;
+  if(keepLink) added[0].moduleId=m.id;
+  return added[0];
+}
+// the Modules tab itself: save with the blocks, bring them back with it
+moduleImportCurrent=function(){
+  const sch=activeSch(); if(!sch||!((sch.components||[]).length)){ toast("แผ่นปัจจุบันยังไม่มีวงจร","warn"); return; }
+  const name=prompt("ชื่อโมดูล:", sch.name||"module"); if(name===null||!name.trim()) return;
+  const desc=prompt("คำอธิบายสั้นๆ (ไม่ใส่ก็ได้):","")||"";
+  const m=moduleSave(sch, name, desc);
+  toast("เก็บโมดูล “"+m.name+"” เข้าคลังแล้ว"+(m.deps.length?` (รวมบล็อกย่อย ${m.deps.length} แผ่น)`:""),"ok");
+};
+moduleAdoptInto=function(id){
+  loadModules(); const m=(state.modules||{})[id]; if(!m) return null;
+  const existing=Object.values(state.project.schematics).find(s=>s.moduleId===id);
+  if(existing) return existing.id;
+  const s=moduleAdopt(m, true); return s ? s.id : null;
+};
+moduleOpen=function(id){
+  loadModules(); const m=(state.modules||{})[id]; if(!m) return;
+  const s=moduleAdopt(m, false); if(!s) return;
+  openSchTab(s.id); snapshot(); renderAll();
+  toast("เปิดโมดูล “"+m.name+"” เป็นแผ่นใหม่เพื่อแก้ไข","ok");
+};
+
+/* ---------- MCP ---------- */
+function mcpModuleInfo(m){
+  let ports=[]; try{ ports=schPortList(m.schematic).map(p=>({name:p.id, dir:p.dir, width:p.width})); }catch(_){}
+  return {id:m.id, name:m.name, description:m.desc||"", ports, parts:(m.schematic.components||[]).filter(c=>c.type!=="JUNCTION").length,
+    blocks:(m.deps||[]).map(d=>d.name), saved:new Date(m.ts||0).toISOString()};
+}
+function mcpModule(ref){
+  const m=moduleFind(ref); if(m) return m;
+  mcpFail(`module '${ref}' is not in the library`, "modules: "+(Object.values(state.modules||{}).map(x=>x.name).join(", ")||"(empty — save_module first)"));
+}
+MCP_OPS.list_modules = a=>{
+  loadModules();
+  const q=String(a.query||"").trim();
+  const mods=Object.values(state.modules||{}).sort((x,y)=>(y.ts||0)-(x.ts||0)).filter(m=>!q || moduleMatch(m,q));
+  return {count:mods.length, modules:mods.map(mcpModuleInfo),
+    note:"the library is shared by every project in this editor (browser storage of the app)"};
+};
+MCP_OPS.save_module = a=>{
+  const sch=mcpSheet(a.sheet);
+  if(!sch.components.filter(c=>c.type!=="JUNCTION").length) mcpFail(`sheet '${sch.name}' is empty`);
+  const name=String(a.name||sch.name).trim(); if(!name) mcpFail("name is required");
+  const same=moduleFind(name);
+  if(same && !a.replace) mcpFail(`a module named '${same.name}' is already in the library`, "replace:true overwrites it, or choose another name");
+  const m=moduleSave(sch, name, a.description||"", same?same.id:null);
+  mcpActivity("เก็บโมดูล "+m.name);
+  try{ toast("Claude เก็บโมดูล “"+m.name+"” เข้าคลัง","ok",3000); }catch(_){}
+  return Object.assign({saved:true, replaced:!!same}, mcpModuleInfo(m));
+};
+MCP_OPS.use_module = a=>{
+  const m=mcpModule(a.module), target=mcpUse(a.sheet);
+  const sid=moduleAdoptInto(m.id); if(!sid) mcpFail("could not bring the module into the project");
+  const sub=state.project.schematics[sid];
+  const why=subBlockBlockedWhy(sid, target.id); if(why) mcpFail(why);
+  mcpUse(target.id);
+  const r=MCP_OPS.add_component({sheet:target.name, type:"block:"+sub.name, name:a.name, x:a.x, y:a.y});
+  return Object.assign({module:m.name, sheet_in_project:sub.name}, r);
+};
+MCP_OPS.open_module = a=>{
+  const m=mcpModule(a.module); mcpBeforeChange("เปิดโมดูล");
+  const s=moduleAdopt(m, false); if(!s) mcpFail("could not open the module");
+  openSchTab(s.id); mcpCommit(s); try{ zoomFit(); }catch(_){}
+  return {module:m.name, opened_as:s.name, blocks_added:(m.deps||[]).length};
+};
+MCP_OPS.delete_module = a=>{
+  const m=mcpModule(a.module);
+  delete state.modules[m.id]; saveModules(); try{ renderModulesPane(); }catch(_){}
+  mcpActivity("ลบโมดูล "+m.name);
+  return {deleted:m.name, note:"sheets already brought into projects stay as they are"};
+};
+
+/* ---------- the course notes (RAG, launcher /api/rag/search) ---------- */
+MCP_OPS.search_course = async a=>{
+  if(!/^https?:/.test(location.protocol)) mcpFail("the course notes need the FPGA Ecosystem app");
+  const u="/api/rag/search?q="+encodeURIComponent(a.query||"")+"&k="+(+a.k||5)+(a.group?"&group="+encodeURIComponent(a.group):"");
+  const j=await (await fetch(u)).json();
+  if(!j.ok) mcpFail(j.error||"search failed");
+  return {query:j.query, mode:j.mode, semantic_off:j.semantic, hits:j.hits};
+};
+
+/* ===== 20. A project folder holds ONE project =================================================
+   The editor keeps several projects open at once (the Projects tree), and serialize() writes that
+   whole workspace. Saved into a project's folder in the app, lab6_counter.schproj.json carried
+   lab5_2 and lab5_3 too — and opening lab6 from Home brought them all back. In the app:
+     - a .schproj.json saved into a project folder holds only the project it is saved as;
+     - opening a project from Home (?open=) loads only that project — from an older file that
+       still holds several, the one named like its folder (else the one that was active).
+   Opened from disk the editor is unchanged (File ▸ Save keeps the whole workspace). */
+function uxProjectOnlyJson(text){
+  let o; try{ o=JSON.parse(text); }catch(_){ return text; }
+  if(!o || !o.workspace || !o.project) return text;
+  const pid=o.workspace.activeId, p=(o.workspace.projects||{})[pid] || o.project;
+  return JSON.stringify({version:2, workspace:{projects:{[pid||p.id||"p1"]:p}, activeId:pid||p.id||"p1"},
+    project:o.project, activeId:o.activeId, openTabs:o.openTabs}, null, 2);
+}
+function uxProjectFromFile(text, folder){
+  let o; try{ o=JSON.parse(text); }catch(_){ return text; }
+  const W=o && o.workspace && o.workspace.projects;
+  if(!W || Object.keys(W).length<2) return text;
+  const want=String(folder||"").toLowerCase(), all=Object.values(W);
+  const p=all.find(x=>x && String(x.name||"").toLowerCase()===want)
+       || all.find(x=>x && sanId(String(x.name||"")).toLowerCase()===sanId(want).toLowerCase())
+       || W[o.workspace.activeId] || o.project;
+  return JSON.stringify({version:1, project:p, activeId:p.activeId, openTabs:p.openTabs});
+}
+MCP_OPS.save_project = async a=>{
+  state.project.name=sanId($("#projectName").value||state.project.name||"project");
+  const p=await mcpSaveFile(state.project.name, state.project.name+".schproj.json", uxProjectOnlyJson(serialize()));
+  uxMarkSaved(); return {saved:p};
+};
+MCP_OPS.open_project = async a=>{
+  const r=await fetch("/api/files/read?path="+encodeURIComponent(a.path)); if(!r.ok) mcpFail(`cannot read '${a.path}' (HTTP ${r.status})`, "list_projects shows the paths");
+  UX.expectFileLoad=true; deserialize(uxProjectFromFile(await r.text(), String(a.path).split(/[\\/]/)[0])); return MCP_OPS.status();
 };
 
 </script>

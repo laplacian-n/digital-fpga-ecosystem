@@ -69,3 +69,26 @@ test("Home: สร้าง opens the editor on the new project, saved into its 
   await page.waitForFunction(() => state.project && state.project.name === "lab9");
   expect(await page.evaluate(() => Object.values(state.projects).filter(p => /^lab9/.test(p.name)).length)).toBe(1);
 });
+
+test("a project folder holds one project: open from Home loads only it, saving writes only it", async ({ page, request }) => {
+  const dir = (await (await request.get(BASE + "/api/projects")).json()).dir;
+  await page.goto(BASE + "/studio.html");
+  await page.waitForFunction(() => typeof UX === "object");
+  await page.evaluate(() => document.querySelectorAll(".modal-bg").forEach(m => m.remove()));
+  // an older file: the whole workspace (lab6 + lab5_2, lab5_2 active) saved into lab6's folder
+  const multi = await page.evaluate(() => { state.project.name = "lab6"; $("#projectName").value = "lab6";
+    addProject("lab5_2"); return serialize(); });
+  expect(Object.keys(JSON.parse(multi).workspace.projects).length).toBe(2);
+  fs.mkdirSync(path.join(dir, "lab6"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "lab6", "lab6.schproj.json"), multi);
+  await page.goto(BASE + "/studio.html?open=" + encodeURIComponent("lab6/lab6.schproj.json"));
+  await page.waitForFunction(() => typeof UX === "object" && state.project && state.project.name === "lab6");
+  expect(await page.evaluate(() => Object.values(state.projects).map(p => p.name))).toEqual(["lab6"]);
+  // and saving it back writes lab6 alone
+  await page.evaluate(() => { addProject("scratch"); switchProject(Object.values(state.projects).find(p => p.name === "lab6").id); });
+  await page.evaluate(() => saveProjectToFile());
+  await expect.poll(() => { try { return Object.keys(JSON.parse(fs.readFileSync(path.join(dir, "lab6", "lab6.schproj.json"), "utf-8")).workspace.projects).length; } catch (_) { return -1; } }).toBe(1);
+  const saved = JSON.parse(fs.readFileSync(path.join(dir, "lab6", "lab6.schproj.json"), "utf-8"));
+  expect(Object.values(saved.workspace.projects)[0].name).toBe("lab6");
+  expect(saved.project.name).toBe("lab6");
+});

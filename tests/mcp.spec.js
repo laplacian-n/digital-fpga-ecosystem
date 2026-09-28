@@ -415,3 +415,43 @@ test("bus ports: a generator's q0..q3 become q[3:0] (simulates, makes VHDL, wire
   const used = await mcp.tool("make_bus_ports", { sheet: "cnt10b" });
   expect(used.error).toBe(true);
 });
+
+test("module library over MCP: save a sheet with its sub-blocks, use it in another project, open, delete", async () => {
+  const sv = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", description: "mod-10 counter on 4 LEDs" });
+  expect(sv.error, sv.text).toBe(false);
+  expect(sv.data.blocks).toEqual(["cnt10b"]);                       // the block inside goes with it
+  expect(sv.data.ports).toEqual([{ name: "clk", dir: "in", width: 1 }, { name: "leds", dir: "out", width: 4 }]);
+  const dup = await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds" });
+  expect(dup.error).toBe(true);
+  expect(dup.text).toContain("replace:true");
+  expect((await mcp.tool("save_module", { sheet: "bustop", name: "counter_leds", replace: true })).data.replaced).toBe(true);
+  const ls = await mcp.tool("list_modules", { query: "leds" });
+  expect(ls.data.modules.map(m => m.name)).toEqual(["counter_leds"]);
+  // the Modules tab shows it too
+  await page.evaluate(() => renderModulesPane());
+  await expect(page.locator("#modulesPane")).toContainText("counter_leds");
+  // another project: place it as a block, wire it, simulate — the counter inside counts
+  await mcp.tool("new_project", { name: "modtest" });
+  const u = await mcp.tool("use_module", { module: "counter_leds", name: "U1" });
+  expect(u.error, u.text).toBe(false);
+  expect(u.data.pins.map(p => p.id)).toEqual(["clk", "leds"]);
+  await mcp.tool("apply", { steps: [{ op: "add_component", type: "IN", name: "clk" }, { op: "add_component", type: "OUT", name: "y", width: 4 },
+    { op: "connect", connections: [["clk", "U1.clk"], ["U1.leds", "y"]] }] });
+  const sim = await mcp.tool("simulate", { cycles: 3 });
+  expect(sim.data.rows.map(r => r.outputs.y)).toEqual(["0000", "0001", "0010"]);
+  // a second use reuses the sheet already brought in
+  const u2 = await mcp.tool("use_module", { module: "counter_leds" });
+  expect(u2.data.sheet_in_project).toBe(u.data.sheet_in_project);
+  const op = await mcp.tool("open_module", { module: "counter_leds" });
+  expect(op.data.blocks_added).toBe(1);
+  expect((await mcp.tool("delete_module", { module: "counter_leds" })).data.deleted).toBe("counter_leds");
+  expect((await mcp.tool("list_modules")).data.count).toBe(0);
+});
+
+test("search_course: the course notes (RAG) answer through MCP", async () => {
+  const r = await mcp.tool("search_course", { query: "JK flip-flop excitation table", k: 3 });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.hits.length).toBe(3);
+  const b = await mcp.tool("search_course", { q: "seven segment digit select", group: "board" });   // alias q → query
+  expect(b.data.hits.every(h => h.group === "board")).toBe(true);
+});

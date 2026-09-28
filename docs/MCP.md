@@ -68,6 +68,19 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
 | Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |
 
+### Course notes (RAG)
+`search_course` searches the course material that ships with the app: the textbook chapters, the lab sheets
+with their solutions, the board's pins and peripherals, and checked VHDL examples. The local agent gets the
+closest notes automatically, and can call `search_course` for more. Search is by keyword (BM25). With the optional embedding model
+(Settings ▸ โมเดล AI ▸ Qwen3-Embedding 0.6B, 640 MB), it also searches by meaning, in Thai or English. That
+model runs on the CPU, so the graphics card stays free for the chat model.
+
+### Module library (the Modules tab)
+- `list_modules` shows the library. It is shared by every project in the editor.
+- `save_module` stores a sheet in the library, together with every sheet it uses as a block.
+- `use_module` places a module as a block, and `open_module` opens it as a sheet you can edit.
+- `delete_module` removes a module from the library.
+
 ### Testing the app's own AI
 Claude can use the app's AI feature the same way the user does, and see what goes wrong:
 - `ai_model` shows the local model's state, its installed models and the llama-server log. It can also

@@ -44,6 +44,19 @@ class Relay(unittest.TestCase):
         self.assertEqual(R.replies, {})
 
 
+class Rag(unittest.TestCase):
+    def test_course_notes_are_searchable(self):
+        """The index is built from what ships with the app when it is missing (it is not in git)."""
+        r = app.rag_search("7-segment decoder BCD", k=3, group="lab")
+        self.assertTrue(r["ok"], r)
+        self.assertGreater(r["records"], 200)
+        self.assertEqual(len(r["hits"]), 3)
+        self.assertTrue(all(h["group"] == "lab" and h["text"] for h in r["hits"]))
+        b = app.rag_search("clock 50 MHz pin", k=2, group="board")
+        self.assertIn("H11", " ".join(h["text"] for h in b["hits"]))
+        self.assertIn("search_course", M.AGENT_TOOLS)
+
+
 class Args(unittest.TestCase):
     def test_aliases_and_unknown_fields(self):
         a, e = M.normalize_args("delete", {"target": "el"})
