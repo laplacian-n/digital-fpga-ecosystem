@@ -68,6 +68,17 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
 | Lab / Top-Down | `request_approval`, `approval_status`, `make_topdown` (see below) |
 
+### Testing the app's own AI
+Claude can use the app's AI feature the same way the user does, and see what goes wrong:
+- `ai_model` shows the local model's state, its installed models and the llama-server log. It can also
+  start, stop or download a model.
+- `ai_chat` types a message into the editor's AI chat and sends it. You see it happen. Mode `agent` means the
+  local model works step by step with the editor's tools.
+- `ai_chat_status` returns the transcript: the model's thinking, each tool call with its arguments and
+  result or error, the final answer, and the time and tokens used.
+
+Every agent run is also saved to `agent-runs/*.jsonl` in the app's config folder.
+
 ### Lab work: schematic → simulate → you approve → Top-Down
 Claude is told to work in this order, and the tools enforce it:
 1. **Schematic:** Claude builds the circuit in Schematic Studio. Each sub-circuit is its own sheet, placed on its parent as a block.

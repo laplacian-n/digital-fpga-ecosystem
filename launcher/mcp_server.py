@@ -73,6 +73,9 @@ LAB / TOP-DOWN WORK — always in this order, never skip or reorder a step:
      approval_status until it is no longer "waiting". If the user asks for changes, make them, go back to B,
      and ask again. Do not continue without "approved".
   D. Top-Down: make_topdown — it draws the approved circuit's layers in the Top-Down view.
+TESTING THE APP'S OWN AI: `ai_model` (start/stop the local model, see its log), `ai_chat` (send a chat message,
+mode 'agent' for the local model working with tools) and `ai_chat_status` (the transcript: thinking, tool calls,
+errors). Use these when the user asks you to test or improve the AI feature; report what the local model got wrong.
 Never write Top-Down JSON by hand or use another server's save_design / Sync: the Top-Down must come from the
 approved, simulated circuit (make_topdown refuses anything else)."""
 
@@ -233,6 +236,22 @@ TOOLS = [
     T("make_topdown", "Draw the APPROVED circuit in the Top-Down view: the top sheet and every sheet it uses as a block, "
       "as layers (1st Layer (top), 2nd Layer (…), …). Refuses unless the user approved exactly the circuit on screen.",
       {"sheet": {"type": "string", "description": "Top sheet to start from. Default: the project's top sheet."}}),
+    # --- the app's own AI (the chat panel + the local model): drive it to test / debug it
+    T("ai_model", "The local AI model the app runs (llama.cpp): status (state, model, installed catalog, llama-server "
+      "log), start {model: catalog id like 'qwen3.5-9b' or a .gguf path}, stop, or download {model: id | 'llama.cpp'}.",
+      {"action": {"type": "string", "enum": ["status", "start", "stop", "download"]},
+       "model": {"type": "string"}, "wait": {"type": "integer", "minimum": 5, "maximum": 40}}, timeout=55),
+    T("ai_chat", "Type a message into the editor's AI chat panel and send it, exactly as the user would (the user "
+      "sees it). mode: 'agent' = the local model works step by step with the editor's tools (a core set of these "
+      "same tools); 'build' = the older one-shot circuit pipeline; 'qa' = questions. Returns at once — then "
+      "ai_chat_status. Use it to test the app's AI feature and find what goes wrong.",
+      {"message": {"type": "string"}, "mode": {"type": "string", "enum": ["agent", "build", "qa"]}}, ["message"]),
+    T("ai_chat_status", "Wait (≤`wait` s) for the chat to finish the message sent with ai_chat, then return what "
+      "appeared in the chat and, for agent mode, the run: every step (the model's thinking, each tool call with its "
+      "arguments and result or error, nudges), the final answer, model calls, tokens and time. detail:'full' "
+      "includes the complete tool results and thinking.",
+      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}, "detail": {"type": "string", "enum": ["steps", "full"]}},
+      timeout=55),
     T("notify_user", "Show a short message to the user inside the editor.",
       {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
 ]
@@ -252,6 +271,24 @@ _apply = TOOL_MAP["apply"]
 _apply["description"] += " Step fields (* = required): " + "; ".join(
     f"{op}: {fields_of(op).replace('sheet (string), ', '').replace(', sheet (string)', '')}" for op in APPLY_OPS) + \
     ". Steps run in order and each sees the ones before it (delete then connect to the freed pin works)."
+
+# the tools the LOCAL model gets in the editor's agent mode (18-ai-agent.js): the editing,
+# checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
+AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
+               "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
+               "build_circuit", "make_bus_ports", "check", "simulate", "probe", "explain_simulation",
+               "get_pins", "set_pins", "auto_pins", "undo"]
+
+
+def openai_tools(names=None):
+    """The tools as OpenAI-style function definitions (what llama-server --jinja expects)."""
+    out = []
+    for n in names or AGENT_TOOLS:
+        t = TOOL_MAP[n]
+        out.append({"type": "function", "function": {"name": n, "description": t["description"],
+                                                     "parameters": t["inputSchema"]}})
+    return out
+
 
 # names people (and models) reach for first → the field the tool actually has
 ALIASES = {
