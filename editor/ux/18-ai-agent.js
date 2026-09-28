@@ -10,7 +10,7 @@
 const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null };
 const AIAG_MAX_STEPS = 24;
 const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
-const AIAG_VERIFY_OPS = new Set(["check","simulate","probe"]);
+const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table"]);
 
 function aiagSystemPrompt(){
   const P=state.project, s=activeSch();
@@ -24,9 +24,15 @@ function aiagSystemPrompt(){
 "1. Look first: get_sheet (detail:'brief') before changing a sheet you have not seen.",
 "2. Build whole circuits with build_circuit (truth_table / generator / intent). Edit with add_component, connect,",
 "   disconnect, delete, update_component, or apply for several steps at once. Fix the user's own sheets in place.",
-"3. After ANY change: call check, then simulate (or probe for chosen inputs). Never say it works without that.",
+"3. After ANY change: call check AND simulate (or verify_truth_table / probe) ON THE SHEET YOU CHANGED — pass its name",
+"   as `sheet`. For a combinational circuit compare the truth table with what it must do. Never say it works without that.",
 "4. If a tool returns an error, read its hint and correct the call. Do not repeat the same failing call.",
 "5. Finish with a short answer IN THAI: what you did and what the check / simulation showed.",
+"",
+"Be quick: call SEVERAL tools in one turn when they do not depend on each other (e.g. every add_component at once),",
+"or one apply with all the steps. Do not write your plan out again each turn — just make the next calls.",
+"A new circuit on a sheet the user names: build_circuit with sheet:'<that name>' (it creates or fills that sheet) —",
+"do not make an empty sheet first. Stay in the current project. A pin of a bus takes a bit index: 'y.i[2]', 's.o[0]'.",
 "",
 "References: a component is its id, an INPUT/OUTPUT name or a label; a pin is 'component.pin' (U1.i0, ff0.q).",
 "Truth tables list rows with the FIRST input as the MSB. Sub-circuits are sheets placed as 'block:<sheet name>'.",
@@ -100,18 +106,27 @@ async function aiAgentRun(msg){
       if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
         run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
-    let edited=false, verified=true, nudged=false;
+    // sheets changed and not yet checked / simulated on — the nudge names them
+    const needCheck=new Set(), needSim=new Set();
+    let nudges=0, think=true, planned=false;
     for(let i=0; i<AIAG_MAX_STEPS; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
-      const j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20});
+      // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
+      // routine next call (the plan from the first turn stays in the system prompt instead)
+      const j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
+        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}});
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
+      if(j.restarted){ run.steps.push({kind:"restart", text:"the model server had stopped — restarted it and repeated the call"});
+        aiagLine('<div class="ag-step bad"><span class="ag-tool">↻ โมเดลหยุดทำงาน</span><div class="ag-res">เริ่มใหม่ให้แล้ว ทำต่อจากเดิม</div></div>', "step"); }
       run.model_calls++; run.model_seconds+=j.elapsed_s||0;
       if(j.usage){ run.tokens.prompt=j.usage.prompt_tokens||run.tokens.prompt; run.tokens.completion+=j.usage.completion_tokens||0; }
       const m=((j.choices||[])[0]||{}).message||{};
-      const think=String(m.reasoning_content||"");
+      const thought=String(m.reasoning_content||"");
       const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
-      if(think) run.steps.push({kind:"think", text:aiagClip(think, 4000)});
+      if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
+      if(!planned && thought){ planned=true; messages[0].content+="\n\nYour plan (from your first reasoning — follow it, do not repeat it):\n"+aiagClip(thought, 1500); }
+      think=false;
       if(calls.length){
         for(const tc of calls){
           const tool=tc.function.name; let args={}, bad=null;
@@ -126,14 +141,22 @@ async function aiAgentRun(msg){
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
           aiagLine(aiagStepHtml(st), "step");
-          if(r.ok && AIAG_EDIT_OPS.has(tool)){ edited=true; verified=false; }
-          if(r.ok && AIAG_VERIFY_OPS.has(tool)) verified=true;
+          // which sheet this call worked on: the tool's own answer, else its argument, else the one on screen
+          const on=(r.ok && r.result && r.result.sheet) || args.sheet || (activeSch()||{}).name;
+          if(r.ok && AIAG_EDIT_OPS.has(tool) && on){ needCheck.add(on); needSim.add(on); }
+          if(r.ok && tool==="check") needCheck.delete(on);
+          if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool)) needSim.delete(on);
+          if(!r.ok) think=true;                // an error: let it reason about the fix
         }
         continue;
       }
-      if(edited && !verified && !nudged){      // it changed the circuit but did not look at the result
-        nudged=true; run.steps.push({kind:"nudge", text:"asked to check + simulate before answering"});
-        messages.push({role:"user", content:"(system) You changed the circuit but did not verify it. Call check, then simulate or probe, then answer."});
+      // it changed a circuit but did not check / simulate THAT sheet (it once verified an empty sheet
+      // while the real one had a wrong carry): name the sheets and what is missing
+      if((needCheck.size || needSim.size) && nudges<2){
+        nudges++; think=true;
+        const miss=[...new Set([...needCheck, ...needSim])].map(n=>`'${n}' (${[needCheck.has(n)&&"check", needSim.has(n)&&"simulate or verify_truth_table"].filter(Boolean).join(" + ")})`).join(", ");
+        run.steps.push({kind:"nudge", text:"not verified yet: "+miss});
+        messages.push({role:"user", content:`(system) You changed ${miss} but did not verify ${needCheck.size+needSim.size>2?"them":"it"}. Call those tools with sheet set to that name, compare the result with what the circuit must do, fix it if it is wrong, then answer.`});
         continue;
       }
       run.final=String(m.content||"").trim() || "(ไม่มีคำตอบ)";

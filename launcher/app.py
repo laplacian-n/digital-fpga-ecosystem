@@ -299,22 +299,49 @@ def llm_chat(req: dict) -> dict:
     page needs no CORS from llama-server, and so the endpoint in Settings is the one used."""
     ep = os.environ.get("AI_ENDPOINT") or CFG["features"]["llm_endpoint"]
     body = {k: v for k, v in req.items() if k in ("messages", "tools", "tool_choice", "temperature", "top_p",
-                                                    "top_k", "max_tokens", "stop", "chat_template_kwargs")}
+                                                    "top_k", "max_tokens", "stop", "chat_template_kwargs",
+                                                    "parallel_tool_calls")}
     body.setdefault("temperature", 0.6)
     t0 = time.time()
-    try:
-        r = urllib.request.Request(ep, data=json.dumps(body).encode("utf-8"), method="POST",
-                                   headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(r, timeout=600) as resp:
-            out = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        return {"ok": False, "error": f"model server: HTTP {e.code} {e.read()[:300].decode('utf-8', 'replace')}"}
-    except Exception as e:
-        return {"ok": False, "error": f"the model is not reachable at {ep}: {e}",
-                "hint": "start it in Settings ▸ โมเดล AI"}
+    restarted = False
+    for attempt in (0, 1):
+        try:
+            r = urllib.request.Request(ep, data=json.dumps(body).encode("utf-8"), method="POST",
+                                       headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(r, timeout=600) as resp:
+                out = json.loads(resp.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as e:
+            return {"ok": False, "error": f"model server: HTTP {e.code} {e.read()[:300].decode('utf-8', 'replace')}"}
+        except Exception as e:
+            # our own llama-server died mid-run (WinError 10054 — out of memory, a driver reset):
+            # start it again and repeat THIS request once, so the agent's run carries on
+            if attempt == 0 and CFG["features"].get("llm") == "local" and not llm.running():
+                if llm_restart():
+                    restarted = True
+                    continue
+            return {"ok": False, "error": f"the model is not reachable at {ep}: {e}",
+                    "hint": "start it in Settings ▸ โมเดล AI", "log_tail": llm.log_tail(12)}
     out["ok"] = True
     out["elapsed_s"] = round(time.time() - t0, 2)
+    if restarted:
+        out["restarted"] = True
     return out
+
+
+def llm_restart(wait: float = 180) -> bool:
+    """Start the local model again and wait until it answers."""
+    if not start_llama().get("ok"):
+        return False
+    end = time.time() + wait
+    while time.time() < end:
+        st = llm.state(CFG["features"]["llm_endpoint"])
+        if st == "ready":
+            return True
+        if st == "crashed":
+            return False
+        time.sleep(1)
+    return False
 
 
 # RAG over the course material in ai/rag (chapters, lab sheets with solutions, board pinout,

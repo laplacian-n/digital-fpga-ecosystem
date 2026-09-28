@@ -39,6 +39,11 @@ class H(BaseHTTPRequestHandler):
             vec = lambda t: [float(sum(t.lower().count(w) for w in ws)) for ws in topics] + [0.01]
             return self._j({"data": [{"index": i, "embedding": vec(t)} for i, t in enumerate(inp)]})
         msgs = req.get("messages") or []
+        import os
+        if req.get("tools"):
+            with open(sys.argv[0] + ".kw", "a") as f: f.write(json.dumps(req.get("chat_template_kwargs")) + "\\n")
+            if os.path.exists(sys.argv[0] + ".crash"):      # die mid-request, like WinError 10054
+                os.remove(sys.argv[0] + ".crash"); os._exit(1)
         if not req.get("tools"):
             return self._j({"choices": [{"message": {"content": "latch ไวต่อระดับสัญญาณ ส่วน flip-flop ไวต่อขอบ clock"}}]})
         # a scripted agent: the tool results so far decide the next step (like a model reading them)
@@ -147,6 +152,19 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     // and the run is logged for later (examples / debugging)
     const logs = fs.readdirSync(path.join(home, ".config", "fpga-ecosystem", "agent-runs"));
     expect(logs.length).toBe(1);
+    // it thinks to plan and when nudged, not on every routine call
+    const kw = fs.readFileSync(bin + ".kw", "utf-8").trim().split("\n").map(l => JSON.parse(l).enable_thinking);
+    expect(kw[0]).toBe(true);
+    expect(kw.filter(x => x === false).length).toBeGreaterThan(0);
+    // the model server dies mid-run: it is started again and the run carries on
+    fs.writeFileSync(bin + ".crash", "1");
+    await ed.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "ha_agent"); delete state.project.schematics[s.id]; state.openTabs = state.openTabs.filter(i => i !== s.id); renderAll(); });
+    await tool("ai_chat", { message: "สร้าง half adder อีกที", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    if (s.data.state !== "done") s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "restart"), JSON.stringify(s.data.agent)).toBe(true);
+    expect(s.data.agent.state).toBe("done");
+    expect(s.data.agent.final).toContain("sum=0110");
     expect(ed.errors).toEqual([]);
   } finally { srv.kill(); }
 });
