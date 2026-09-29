@@ -228,3 +228,23 @@
 .ag-step code{font-size:11px;opacity:.8;word-break:break-all}
 .ag-step .ag-res{font-size:11.5px;color:var(--ink-dim,#667);margin-top:2px;word-break:break-word}
 .ag-step.bad .ag-res{color:var(--err,#c33)}
+/* 24. the part library in the Modules tab */
+.pt-sec{margin-bottom:6px}
+.pt-h{font-weight:700;font-size:12px;color:var(--ink);margin:4px 2px 6px;display:flex;align-items:center;gap:6px}
+.pt-h.pt-mine{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.pt-ok{font-weight:600;font-size:10.5px;color:var(--ok,#16a34a)}
+.pt-grp{margin-bottom:4px}
+.pt-gh{width:100%;text-align:left;background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--ink);cursor:pointer}
+.pt-gh:hover{border-color:var(--accent)}
+.pt-list{display:none;padding:4px 0 2px 6px}
+.pt-grp.open .pt-list{display:block}
+.pt-item{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;cursor:pointer;color:var(--ink)}
+.pt-item:hover{background:var(--bg-2);border-color:var(--line)}
+.pt-item b{font-size:12px;font-weight:600;display:block}
+.pt-item small{display:block;font-size:10.5px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-badge{font-size:9.5px;font-weight:600;padding:0 5px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:1px}
+.pt-badge.ok{color:var(--ok,#16a34a);border-color:var(--ok,#16a34a)}
+.pt-form{display:flex;flex-wrap:wrap;gap:8px 16px}
+.pt-f{font-size:12.5px;display:flex;align-items:center;gap:6px}
+.pt-ports{margin-top:10px;padding:8px;border:1px solid var(--line);border-radius:6px;font-size:12px;line-height:1.6;background:var(--bg-2)}
+.pt-ports.bad{color:var(--err,#c33)}
