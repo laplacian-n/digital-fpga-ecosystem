@@ -257,3 +257,11 @@
 .spec-s.ok{color:var(--ok,#16a34a)} .spec-s.bad{color:var(--err,#dc2626)}
 .spec-d{font-size:11.5px;line-height:1.5;word-break:break-word}
 .spec-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+/* 26. FSM designer */
+.fsm-wrap{display:flex;gap:14px;align-items:flex-start}
+.fsm-l{flex:0 0 360px;display:flex;flex-direction:column;gap:6px}
+.fsm-l textarea{width:100%;font-family:ui-monospace,monospace;font-size:12.5px;background:var(--bg-1);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+.fsm-r{flex:1;min-width:0}
+.fsm-t{border-collapse:collapse;font-size:12px;margin-top:8px}
+.fsm-t th,.fsm-t td{border:1px solid var(--line);padding:3px 8px;text-align:center}
+#fsmMsg.bad{color:var(--err,#dc2626)}

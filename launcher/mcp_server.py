@@ -146,6 +146,13 @@ TOOLS = [
     T("apply", "Run several edit steps as one transaction — if a step fails nothing changes (unless keep_going). "
       "Each step is {\"op\": \"add_component\"|\"connect\"|\"disconnect\"|\"delete\"|\"update_component\"|\"set_pins\", …that tool's args}.",
       {"sheet": SHEET, "steps": {"type": "array", "items": {"type": "object"}}, "keep_going": {"type": "boolean"}}, ["steps"]),
+    T("build_fsm", "Build a state machine from its state diagram: binary encoding (reset state = 0), minimised next-state "
+      "and output logic, D flip-flops — then run clock by clock against the diagram before it is handed over (verified). "
+      "fsm as text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\nstate S1: z=1\\nS0 -> S1 when x\\nS0 -> S0 else\\nS1 -> S0 when ~x\\nreset S0' "
+      "(Mealy: 'S0 -> S1 when x / z=1'; conditions & | ^ ~ ( ) else) or an object {inputs, outputs, states:[{name,out}], "
+      "transitions:[{from,to,when,out?}], reset}. Ports: clk, the inputs, the outputs, state bits (state_out:false drops them).",
+      {"fsm": {"type": ["string", "object"]}, "sheet": SHEET, "name": {"type": "string"}, "state_out": {"type": "boolean"}},
+      ["fsm"], timeout=90),
     T("set_spec", "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): "
       "formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, "
       "inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks "
@@ -333,7 +340,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts", "set_spec", "check_spec",
+               "build_part", "list_parts", "build_fsm", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
                "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
