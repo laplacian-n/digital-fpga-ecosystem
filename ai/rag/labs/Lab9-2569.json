@@ -1,0 +1,62 @@
+{
+ "source": "Lab9-2569.pdf",
+ "group": "labs",
+ "lab": "9",
+ "title": "พื้นฐานวงจร ALU ขนาด 8 บิต พร้อมแสดงผลเลขฐานสิบหกบนจอ 7-Segment ด้วยวิธี Schematic บนบอร์ด FPGA",
+ "objectives": [
+  "ฝึกการออกแบบวงจรดิจิตอลให้คล่องและเป็นระบบมากขึ้น",
+  "เข้าใจโครงสร้างและวิธีการออกแบบวงจร ALU",
+  "ออกแบบวงจรเลือกเส้นทางข้อมูลด้วย MUX และ DeMUX",
+  "ออกแบบวงจรเลื่อนบิตทางซ้าย (Logical Shift Left)",
+  "ออกแบบวงจรแบบลำดับชั้น เรียกใช้บล็อกจากการทดลองก่อนหน้า",
+  "ทดสอบวงจรอย่างเป็นระบบ"
+ ],
+ "items": [
+  {
+   "id": "lab9-1",
+   "question": "ประกอบวงจร ALU 8 บิต: A[7:0] จาก SW(22,21,19,17,15,13,12,11) และ B[7:0] จาก SW(10,9,8,7,6,5,4,2) เรียง MSB→LSB; ปุ่มกด 1 ตัวเลือกโหมดวน ADD → SUB → XOR → SHL (กด 1 ครั้งเปลี่ยน 1 โหมด); SHL = เลื่อน A ซ้าย 1 ตำแหน่ง; แสดงผลเป็นเลขฐานสิบหกบน 7-segment รวมตัวทดเมื่อมี",
+   "subtasks": [
+    "ALU 4 การทำงาน (ADD SUB XOR SHL) เลือกด้วย MODE[1:0]",
+    "วงจรนับโหมด 0–3 เปลี่ยนเมื่อกดปุ่ม (กันเด้ง)",
+    "แสดงผลลัพธ์ 2 หลักฐานสิบหก + ตัวทด บน 7-segment (สแกนหลัก)",
+    "กำหนดขาสวิตช์/ปุ่ม/7-segment ให้ตรงบอร์ด"
+   ],
+   "topic": "datapath",
+   "solution": {
+    "steps": "แบ่งเป็นบล็อก (ชิ้นส่วนสำเร็จรูปในแท็บ Modules):\n1) ALU: ชิ้นส่วน alu (n=8, ops='4') → op[1:0] = 00 ADD, 01 SUB, 10 XOR, 11 SHL; ออก y[7:0], carry (ทด/ยืม), overflow, zero ข้างในคือ addsub (ตัวบวก/ลบ two's complement จาก full adder 8 ตัว) + ALU 1 บิต 8 ตัว (MUX 4:1 ต่อบิต เลือก s, a⊕b, a[i-1])\n2) โหมด: หารความถี่ 50 MHz → ~100 Hz (clock_divider N=500000) เป็น clock ของ one_pulse (btn = ปุ่มกด) → pulse ต่อเข้า en ของ counter_digit (m=4) ที่ใช้ clock 100 Hz เดียวกัน → q[1:0] = MODE\n3) แสดงผล: seg7_mux4 (hex:true) ones = y[3:0], tens = y[7:4], hundreds = carry (บิต 0, บิตอื่น GND); clock สแกน ~1 kHz (clock_divider N=50000); ออก a..g และ an[3:0] active-low\nปุ่มของบอร์ดเป็น active-high (กด = 1)",
+    "truth_table": " 1. 0F ADD 01 = 10  carry/borrow = 0\n 2. 5A ADD 25 = 7F  carry/borrow = 0\n 3. FF ADD 01 = 00  carry/borrow = 1\n 4. 0A SUB 05 = 05  carry/borrow = 0\n 5. 05 SUB 0A = FB  carry/borrow = 1\n 6. 00 SUB 01 = FF  carry/borrow = 1\n 7. F0 XOR 0F = FF  carry/borrow = 0\n 8. 5A XOR FF = A5  carry/borrow = 0\n 9. AA XOR AA = 00  carry/borrow = 0\n10. 01 SHL -- = 02  carry/borrow = 0\n11. 5A SHL -- = B4  carry/borrow = 0\n12. FF SHL -- = FE  carry/borrow = 0",
+    "kmap": null,
+    "final_expression": "y = MODE 00: A+B, 01: A−B, 10: A⊕B, 11: A<<1 · carry = ทดของ ADD / ยืมของ SUB (A<B), SHL ไม่นับบิตที่หลุดเป็นตัวทด",
+    "intent_json": null,
+    "notes": "ผลที่คาดไว้ของตารางทดสอบข้อ 2 อยู่ใน truth_table (คำนวณจากนิยามในใบงาน)"
+   },
+   "verify": "ชิ้นส่วน alu ตรวจเทียบโมเดลอ้างอิง 302 ชุดอินพุตทุกครั้งที่สร้าง; ตารางทดสอบ 12 แถวคำนวณจากนิยาม ADD/SUB/XOR/SHL",
+   "related_content": [
+    "lab4-3",
+    "lab4-4"
+   ]
+  },
+  {
+   "id": "lab9-2",
+   "question": "ทดสอบการคิดเลขฐานสองด้วยค่าทดสอบ 12 แถว (A, B ฐาน 16 และโหมด) แล้วบันทึกผล",
+   "subtasks": [
+    "ตั้งสวิตช์ A/B และเลือกโหมด",
+    "อ่านผลฐานสิบหก + ตัวทดจากจอ",
+    "เทียบกับค่าที่คำนวณไว้"
+   ],
+   "topic": "testing",
+   "solution": {
+    "steps": "ค่าที่ควรได้ (ฐาน 16):\n 1. 0F ADD 01 = 10  carry/borrow = 0\n 2. 5A ADD 25 = 7F  carry/borrow = 0\n 3. FF ADD 01 = 00  carry/borrow = 1\n 4. 0A SUB 05 = 05  carry/borrow = 0\n 5. 05 SUB 0A = FB  carry/borrow = 1\n 6. 00 SUB 01 = FF  carry/borrow = 1\n 7. F0 XOR 0F = FF  carry/borrow = 0\n 8. 5A XOR FF = A5  carry/borrow = 0\n 9. AA XOR AA = 00  carry/borrow = 0\n10. 01 SHL -- = 02  carry/borrow = 0\n11. 5A SHL -- = B4  carry/borrow = 0\n12. FF SHL -- = FE  carry/borrow = 0",
+    "truth_table": " 1. 0F ADD 01 = 10  carry/borrow = 0\n 2. 5A ADD 25 = 7F  carry/borrow = 0\n 3. FF ADD 01 = 00  carry/borrow = 1\n 4. 0A SUB 05 = 05  carry/borrow = 0\n 5. 05 SUB 0A = FB  carry/borrow = 1\n 6. 00 SUB 01 = FF  carry/borrow = 1\n 7. F0 XOR 0F = FF  carry/borrow = 0\n 8. 5A XOR FF = A5  carry/borrow = 0\n 9. AA XOR AA = 00  carry/borrow = 0\n10. 01 SHL -- = 02  carry/borrow = 0\n11. 5A SHL -- = B4  carry/borrow = 0\n12. FF SHL -- = FE  carry/borrow = 0",
+    "kmap": null,
+    "final_expression": null,
+    "intent_json": null,
+    "notes": "ในเอดิเตอร์ใช้ simulate {vectors:[{a:0x0F,b:0x01,op:0}, …]} กับแผ่น ALU ตรวจได้ก่อนลงบอร์ด"
+   },
+   "verify": "คำนวณจากนิยามการทำงานในใบงาน",
+   "related_content": [
+    "lab9-1"
+   ]
+  }
+ ]
+}
