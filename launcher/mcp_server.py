@@ -161,6 +161,13 @@ TOOLS = [
       "on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit "
       "enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one "
       "the ลงบอร์ด page builds.", {"sheet": SHEET}),
+    T("suggest_wires", "Wiring hints for the unconnected pins of a sheet: blocks of one kind in a row chain carry-like pins "
+      "(cout→cin, x_out→x_in), a block input named like a sheet INPUT takes it (clk, rst, en; a2 or bit 2 of bus a for "
+      "the block labelled …2), a sheet OUTPUT named like a block output takes it. Each hint has a reason; apply:true "
+      "wires them all (one undo step).", {"sheet": SHEET, "apply": {"type": "boolean"}}),
+    T("board_troubleshoot", "The real board does not do what the simulation did: give the symptom (load, darkx, map, "
+      "segpol, segan, segmap, fast, stuck, bounce, btninv; none = list them) and get the causes checked on this design "
+      "(pins, polarity, clock source, reset, stale .bit) plus what to try.", {"sheet": SHEET, "symptom": {"type": "string"}}),
     T("set_spec", "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): "
       "formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, "
       "inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks "
@@ -350,7 +357,7 @@ AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "op
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
                "build_part", "list_parts", "build_fsm", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "board_check", "undo", "list_modules", "use_module", "save_module", "search_course"]
+               "get_pins", "set_pins", "auto_pins", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 
 def openai_tools(names=None):

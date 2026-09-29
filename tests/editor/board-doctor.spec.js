@@ -54,3 +54,33 @@ test("the doctor's board preview: flip the mapped switches, the digit shows what
   await page.screenshot({ path: test.info().outputPath("board-doctor.png") });
   expect(page.errors).toEqual([]);
 });
+
+test("บอร์ดไม่ทำงานเหมือนที่จำลอง: two answers lead to the cause, checked on this design", async ({ page }) => {
+  await openEditor(page);
+  const r = await page.evaluate(() => {
+    MCP_OPS.build_part({ kind: "bcd_7seg", active_low: false, sheet: "hi" });
+    activeSch().pinmap = Object.assign({ b3: "sw:3", b2: "sw:2", b1: "sw:1", b0: "sw:0" }, ...[..."abcdefg"].map(s => ({ [s]: "seg:" + s })));
+    const seg = MCP_OPS.board_troubleshoot({ sheet: "hi", symptom: "segpol" });
+    MCP_OPS.build_part({ kind: "mod_counter", n: 10, sheet: "cnt" });
+    const s = activeSch(); s.pinmap = {}; let l = 0;
+    uxPortBits(s).forEach(b => { s.pinmap[b.key] = b.dir === "out" ? "led:" + (l++) : /clk/.test(b.key) ? "clk" : "sw:15"; });
+    const fast = MCP_OPS.board_troubleshoot({ sheet: "cnt", symptom: "fast" });
+    let err = null; try { MCP_OPS.board_troubleshoot({ symptom: "nope" }); } catch (e) { err = e.message; }
+    BRD.sheetId = activeSch().id;
+    return { seg, fast, err, list: MCP_OPS.board_troubleshoot({}).symptoms.length };
+  });
+  expect(r.seg.checked.join(" ")).toContain("active-high");
+  expect(r.fast.checked.join(" ")).toMatch(/50 MHz ตรงๆ/);
+  expect(r.err).toContain("unknown symptom");
+  expect(r.list).toBe(10);
+  // the same through the dialog: counter → dim LEDs → the verdict
+  await page.evaluate(() => openBoardHelp());
+  await page.getByRole("button", { name: "ตัวนับไม่นับ / ค้าง / ติดสลัวๆ" }).click();
+  await page.getByRole("button", { name: "ใช่ สลัวค้าง" }).click();
+  await expect(page.locator(".bh-diag h3")).toContainText("เร็วเกินตาเห็น");
+  await expect(page.locator(".bh-bad").first()).toContainText("50 MHz");
+  await page.screenshot({ path: test.info().outputPath("board-help.png") });
+  await page.locator('[data-bh="back"]').click();
+  await expect(page.locator(".bh-q")).toContainText("สลัว");
+  expect(page.errors).toEqual([]);
+});

@@ -57,11 +57,11 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | The app | `about` (app + version, update available and what's new, workspace, editor open?, Vivado / openFPGALoader / USB driver / AI model ready?), `check_update`, `open_home` (Home / setup checklist / settings — the user clicks อัปเดตเลย there) |
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
 | Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
-| Edit | `add_component`, `connect`, `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
+| Edit | `add_component`, `connect`, `suggest_wires` (hints for unconnected pins: cout→cin chains, a2 → the block labelled …2; `apply:true` wires them), `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
 | Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, JK-FF counter, `clock_divider` for any N such as 50 MHz → 20 Hz, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist (sub-circuits as `block:<sheet>`). With `bus: true`, numbered ports come out as one bus port (q0..q3 → `q[3:0]`). `make_bus_ports` does the same for an existing sheet. |
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
 | Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation`, `set_spec` / `check_spec` (the sheet's acceptance test) |
-| Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc`, `board_check` (what will go wrong on the real board, before a build) |
+| Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc`, `board_check` (what will go wrong on the real board, before a build), `board_troubleshoot` (the board misbehaves: symptom → causes checked on the design) |
 | Output | `make_report` (the lab report into the project folder), `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `new_project`, `list_projects`, `open_project` |
 | Real board | `board_build` (Vivado → .bit), `board_program` (load into the FPGA, or `detect`), `board_status` (follow the job: log tail, Thai explanation of an error, does the .bit match the circuit). Writing the Flash stays the user's click. |
 | History | `undo`, `redo`, `checkpoint`, `list_checkpoints`, `restore_checkpoint` |

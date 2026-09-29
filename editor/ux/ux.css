@@ -290,3 +290,14 @@
 .bd-led.on i{background:#34c759;box-shadow:0 0 8px #34c759}
 .bd-segs{display:inline-flex;gap:4px;background:#111;padding:6px 8px;border-radius:6px;margin-top:3px}
 .bd-line{padding:4px 8px;border-radius:6px;margin:6px 0;font-size:13px}.bd-line.bad{background:rgba(255,59,48,.12)}.bd-line.warn{background:rgba(255,159,10,.13)}
+/* 30 wiring hints */
+.wh-box{margin:10px 12px;padding:8px 10px;border:1px solid rgba(255,204,0,.55);background:rgba(255,204,0,.08);border-radius:8px}
+.wh-h{font-weight:600;margin-bottom:6px}.wh-list{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;max-height:260px;overflow:auto}
+.wh-i{display:flex;gap:6px;align-items:center;justify-content:space-between;font-size:12px}.wh-i code{font-size:11px}
+.wh-ghost .wh-line{fill:none;stroke:#f5a623;stroke-width:1.6;stroke-dasharray:5 4;opacity:.9;pointer-events:none}
+/* 31 board troubleshooting */
+.bh-q{font-size:16px;font-weight:600;margin:6px 0 12px}.bh-opts{display:flex;flex-direction:column;gap:6px}
+.bh-o{text-align:left;justify-content:flex-start}.bh-back{margin-bottom:6px}
+.bh-diag h3{margin:4px 0 8px}.bh-checks,.bh-tips{margin:4px 0 12px;padding-left:22px;line-height:1.6}
+.bh-checks{list-style:none;padding-left:4px}.bh-ok{color:#1f8a3b}.bh-bad{color:#c4271d}
+.bh-map{margin:4px 0 8px;font-size:13px}.bh-acts{display:flex;flex-wrap:wrap;gap:6px}.bd-help{margin:10px 0 0}
