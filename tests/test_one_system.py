@@ -12,12 +12,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ai"))
 import intent_client  # noqa: E402
 
 
+SEEN = []
+
+
 class Strict(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
     def do_POST(self):
-        msgs = json.loads(self.rfile.read(int(self.headers["Content-Length"])))["messages"]
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        SEEN.append(body)
+        msgs = body["messages"]
         roles = [m["role"] for m in msgs]
         if roles.count("system") > 1 or (roles.count("system") and roles[0] != "system"):
             b = b'{"error":{"message":"System message must be at the beginning."}}'
@@ -53,6 +58,13 @@ class OneSystemMessage(unittest.TestCase):
             intent_client.retrieve_context = old
         self.assertTrue(r.get("ok"), r)
         self.assertIn("xor", r["vhdl"])
+
+    def test_thinking_is_off_unless_asked(self):
+        # Qwen3.5 thinks by default and spent build mode's whole max_tokens on it: no VHDL came back
+        SEEN.clear()
+        intent_client.generate_vhdl_from_spec("half adder", endpoint=self.ep, use_rag=False)
+        self.assertEqual(SEEN[-1].get("chat_template_kwargs"), {"enable_thinking": False})
+        self.assertEqual(intent_client._extract_vhdl("<think>entity x is</think>```vhdl\nentity ha is end;\n```"), "entity ha is end;")
 
     def test_merge_keeps_no_think_last(self):
         m = intent_client.one_system_message([{"role": "system", "content": "A\n/no_think"},

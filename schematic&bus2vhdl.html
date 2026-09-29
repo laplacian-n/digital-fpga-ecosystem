@@ -14881,7 +14881,7 @@ function mcpSheet(ref){
   if(ref==null || ref==="") return activeSch() || mcpFail("no sheet is open");
   const P=state.project.schematics, low=String(ref).toLowerCase();
   const s = P[ref] || Object.values(P).find(x=>String(x.name).toLowerCase()===low);
-  return s || mcpFail(`sheet '${ref}' not found`, "sheets: "+Object.values(P).map(x=>x.name).join(", "));
+  return s || mcpFail(`sheet '${ref}' not found`, "sheets: "+Object.values(P).map(x=>x.name).join(", ")+` — to make it: build_circuit / build_part / build_fsm {sheet:'${ref}', …}, or set_spec {sheet:'${ref}', …} first`);
 }
 /* run against a sheet: it becomes the active tab so the user watches the change */
 function mcpUse(ref){ const s=mcpSheet(ref); if(state.activeId!==s.id){ openSchTab(s.id); } return s; }
@@ -17256,12 +17256,16 @@ function aiagSystemPrompt(){
 "2. A standard circuit (adder, subtractor, comparator, mux, decoder, encoder, 7-seg, parity, counters, divider,",
 "   registers, toggle, edge detector, debounce): build_part — it is generated AND checked for you (list_parts shows them).",
 "   Anything else: build_circuit with formula (equations like \"y = a&b | ~c\", \"{cout,sum} = a+b+cin\") — never type",
-"   0/1 columns yourself unless the user gave the table. Bigger designs: build the pieces, then place them as blocks",
+"   0/1 columns yourself unless the user gave the table. Output 1 for certain input values (primes, a range, a list)?",
+"   give the ROWS: truth_table:{inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}} (set_spec table takes ones too).",
+"   Bigger designs: build the pieces, then place them as blocks",
 "   (block:<sheet>) and connect. Edit with add_component, connect, disconnect, delete, update_component, or apply.",
 "3. After ANY change: call check AND simulate ON THE SHEET YOU CHANGED — pass its name as `sheet`. For logic you",
 "   derived, verify_truth_table with a formula written from the REQUIREMENT (not the table you built from — that",
 "   proves nothing). Look at `recognized` in the answer. Never say it works without that.",
 "4. If a tool returns an error, read its hint and correct the call. Do not repeat the same failing call.",
+"   A wrong circuit: rebuild it ON THE SAME SHEET (same sheet name, replace:true) — never a new sheet per try.",
+"   verify / check_spec answering pass:null or independent:false checked nothing: check against the request instead.",
 "5. Finish with a short answer IN THAI: what you did and what the check / simulation showed.",
 "",
 "Be quick: call SEVERAL tools in one turn when they do not depend on each other (e.g. every add_component at once),",
@@ -17299,6 +17303,8 @@ function aiagSummary(tool, r){
   if(!r || typeof r!=="object") return String(r);
   if(tool==="check") return `errors ${r.errors} · warnings ${r.warnings}`+(r.issues&&r.issues.length?" — "+r.issues.slice(0,2).map(i=>i.message).join(" | "):"");
   if(tool==="simulate") return r.kind==="sequential" ? `${r.rows.length} cycles` : r.rows ? `${r.rows.length} rows` : "";
+  if(tool==="verify_truth_table" || tool==="check_spec") return r.pass===null || r.independent===false
+    ? "NOT A CHECK — compared with the table it was built from" : `pass ${r.pass}`+(r.total_mismatches||(r.mismatches||[]).length?` · ${r.total_mismatches||r.mismatches.length} rows differ`:"");
   if(tool==="build_circuit") return `sheet ${r.sheet} · ${r.parts||""} parts`+(r.note?" · "+r.note:"");
   if(tool==="get_sheet") return `${r.sheet}: ${(r.components||[]).length} parts, ${(r.nets||[]).length} nets`;
   if(r.connected) return r.connected.join(", ");
@@ -17342,12 +17348,12 @@ async function aiAgentRun(msg){
       try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final) run.final=fp.final; else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
     // the course notes most related to the request go in up front (RAG); more via search_course
     if(!run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
-      const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
-      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
+      const rj=await (await fetch("/api/rag/search?k=2&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
+      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,350)}`).join("\n");
         run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
-    const needCheck=new Set(), needSim=new Set();
+    const needCheck=new Set(), needSim=new Set(), made=new Set();
     let nudges=0, think=true, planned=false;
     for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
@@ -17365,7 +17371,9 @@ async function aiAgentRun(msg){
       const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
-      if(!planned && thought){ planned=true; messages[0].content+="\n\nYour plan (from your first reasoning — follow it, do not repeat it):\n"+aiagClip(thought, 1500); }
+      // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server
+      // reuse its cache, where editing messages[0] made it re-read ~9k prompt tokens on every call
+      if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
         for(const tc of calls){
@@ -17373,8 +17381,14 @@ async function aiAgentRun(msg){
           try{ args=typeof tc.function.arguments==="string" ? JSON.parse(tc.function.arguments||"{}") : (tc.function.arguments||{}); }
           catch(_){ bad="the arguments are not valid JSON: "+aiagClip(tc.function.arguments, 200); }
           live(`กำลังใช้ ${tool}…`);
+          // a rebuild of a sheet this run made replaces it (it used to leave prime3, prime3_2 … prime3_5)
+          if(!bad && /^build_(circuit|part|fsm)$/.test(tool)){ const nm=String(args.sheet||args.name||"").trim().toLowerCase();
+            const s=nm && Object.values(state.project.schematics).find(x=>String(x.name).toLowerCase()===nm);
+            if(s && made.has(s.id) && s.components.some(c=>c.type!=="JUNCTION")) args=Object.assign({}, args, {sheet:s.name, replace:true}); }
+          const before=new Set(Object.keys(state.project.schematics));
           const t0=performance.now();
           const r=bad ? {ok:false, error:bad} : await aiagCall(tool, args);
+          Object.keys(state.project.schematics).forEach(id=>{ if(!before.has(id)) made.add(id); });
           const content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
@@ -17385,7 +17399,8 @@ async function aiAgentRun(msg){
           const on=(r.ok && r.result && r.result.sheet) || args.sheet || (activeSch()||{}).name;
           if(r.ok && AIAG_EDIT_OPS.has(tool) && on){ needCheck.add(on); needSim.add(on); }
           if(r.ok && tool==="check") needCheck.delete(on);
-          if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool)) needSim.delete(on);
+          const circular=r.ok && r.result && (r.result.independent===false || (r.result.result&&r.result.result.independent===false));
+          if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
         continue;
@@ -19669,6 +19684,136 @@ Object.assign(PARTS, {
 });
 /* the kinds this file adds (tests/editor/parts-labs.spec.js builds every one of them) */
 const PARTS_LABS=Object.keys(PARTS).filter(k=>!PARTS_LABS_BEFORE.has(k));
+
+/* ===== 33. What testing the in-app AI (Qwen3.5 4B through ai_chat) turned up =====================
+   - A prime detector came out WRONG and was reported "ตรวจแล้วถูกต้อง": the model listed the primes
+     right in its reasoning, then typed the 0/1 column wrong (one bit off), built from it and verified
+     against the same column. Small models reason about VALUES well and type bit strings badly, so a
+     table can now be given as the rows that are 1 (ones:{p:[2,3,5,7]}), and a check that only
+     compares a circuit with what it was built from says pass:null — it is not a check.
+   - It called set_spec / check_spec on a sheet it had not made yet ("sheet not found", then gave
+     up on the spec): set_spec now makes the empty sheet, the builders fill it and report the spec.
+   - Each retry drew a NEW sheet (prime3, prime3_2 … prime3_5): builders take replace:true, and the
+     agent passes it itself for a sheet it made in the same run.
+   - It put a truth-table object into build_circuit.formula: taken as the table it is.
+   - Build mode (not the agent) sent "full adder" to the model and failed after 55 s: a part it can
+     name is built from the part library first, in both modes. */
+
+/* {p:[2,3,5,7]} over n inputs (first input = MSB of the row number) → {p:"00110101"} */
+function ttOnesToCols(n, ones, dc){
+  const out={};
+  if(!n || n>10) mcpFail(`ones needs the inputs (1..10 of them), got ${n||0}`, "give inputs:[…] with ones");
+  Object.entries(ones||{}).forEach(([o,L])=>{
+    if(!Array.isArray(L)) mcpFail(`ones.${o} must be a list of row numbers`, "e.g. ones:{p:[2,3,5,7]} — the rows (input values) where p is 1");
+    const s=new Array(1<<n).fill("0");
+    L.forEach(v=>{ v=+v; if(!(Number.isInteger(v) && v>=0 && v<(1<<n))) mcpFail(`ones.${o}: ${v} is not a row of ${n} inputs (0..${(1<<n)-1})`); s[v]="1"; });
+    ((dc||{})[o]||[]).forEach(v=>{ v=+v; if(v>=0 && v<(1<<n) && s[v]!=="1") s[v]="x"; });
+    out[o]=s.join(""); });
+  return out;
+}
+function aifSheetByName(n){ if(!n) return null; const low=String(n).trim().toLowerCase(); return Object.values(state.project.schematics).find(s=>String(s.name).toLowerCase()===low)||null; }
+/* replace:true — empty the named sheet so a builder fills it again (one undo step brings it back) */
+function aifClearForRebuild(a){
+  const name=a.sheet||a.name, s=aifSheetByName(name);
+  if(!a.replace || !s || !s.components.some(c=>c.type!=="JUNCTION")) return a;
+  mcpBeforeChange("สร้างแผ่น "+s.name+" ใหม่");
+  s.components=[]; s.wires=[]; delete s.verified; delete s.builtFrom; delete s.fsm;
+  return Object.assign({}, a, {sheet:s.name, replace:undefined});
+}
+/* a sheet with a spec reports it as soon as something is built into it */
+function aifSpecOf(r){
+  try{ const s=r && aifSheetByName(r.sheet); if(!s || !s.spec) return;
+    const x=specRun(s); if(x) r.spec_check={pass:x.pass, checked:x.checked, reason:x.reason, independent:x.independent!==false,
+      mismatches:(x.mismatches||[]).slice(0,4), total_mismatches:x.total_mismatches};
+    try{ renderProjectTree(); }catch(_){}
+  }catch(_){}
+}
+function aifInputsOf(sch){ try{ const j=clientCombSim(sch); return j.ok ? j.truth_table.inputs.length : 0; }catch(_){ return 0; } }
+
+/* ---- build_circuit: ones, a table in `formula`, replace ---- */
+{
+  const _b=MCP_OPS.build_circuit;
+  MCP_OPS.build_circuit=async a=>{
+    a=Object.assign({}, a);
+    if(a.formula && typeof a.formula==="object" && !Array.isArray(a.formula) && !a.formula.equations){
+      const f=a.formula;
+      if(f.columns || f.ones){ a.truth_table=f; delete a.formula; }
+      else if(Object.keys(f).length && Object.values(f).every(v=>typeof v==="string" && /^[01x]+$/i.test(v))){
+        if(!Array.isArray(a.inputs)) mcpFail("formula got a table of 0/1 columns but no inputs", "use truth_table:{inputs:[…], outputs:[…], columns:{…}} — or ones:{out:[rows that are 1]}");
+        a.truth_table={inputs:a.inputs, outputs:Object.keys(f), columns:f}; delete a.formula; delete a.inputs; }
+      else mcpFail("formula must be equations text, e.g. \"y = a&b | ~c\"", "a table goes in truth_table:{inputs, outputs, columns} or truth_table:{inputs, ones:{y:[rows that are 1]}}");
+    }
+    const t=a.truth_table;
+    if(t && t.ones){
+      if(!Array.isArray(t.inputs) || !t.inputs.length) mcpFail("truth_table.ones needs truth_table.inputs", 'e.g. truth_table:{inputs:["x2","x1","x0"], ones:{p:[2,3,5,7]}}');
+      const cols=ttOnesToCols(t.inputs.length, t.ones, t.dont_care||t.dc);
+      a.truth_table={inputs:t.inputs, outputs:t.outputs||Object.keys(Object.assign({}, t.columns||{}, cols)), columns:Object.assign({}, t.columns||{}, cols)};
+    }
+    a=aifClearForRebuild(a);
+    const r=await _b(a); aifSpecOf(r); return r;
+  };
+  // build_part / build_fsm answer synchronously (the parts dialog and tests rely on it): stay that way
+  ["build_part","build_fsm"].forEach(op=>{ const _o=MCP_OPS[op];
+    MCP_OPS[op]=a=>{ const r=_o(aifClearForRebuild(Object.assign({}, a)));
+      if(r && typeof r.then==="function") return r.then(x=>{ aifSpecOf(x); return x; });
+      aifSpecOf(r); return r; }; });
+}
+/* ---- set_spec: makes the sheet it names; a table may be given as ones ---- */
+{
+  const _ss=MCP_OPS.set_spec;
+  MCP_OPS.set_spec=a=>{
+    a=Object.assign({}, a); let made=null;
+    if(a.sheet && !aifSheetByName(a.sheet)){ made=MCP_OPS.new_sheet({name:String(a.sheet).trim()}).sheet; a.sheet=made; }
+    if(a.table && a.table.ones){ const s=mcpSheet(a.sheet);
+      const n=Array.isArray(a.table.inputs) ? a.table.inputs.length : aifInputsOf(s);
+      if(!n) mcpFail("table.ones needs table.inputs on a sheet with no inputs yet", 'e.g. table:{inputs:["x2","x1","x0"], ones:{p:[2,3,5,7]}}');
+      a.table=ttOnesToCols(n, a.table.ones, a.table.dont_care||a.table.dc); }
+    const r=_ss(a);
+    if(made) r.note=`sheet '${made}' did not exist — it was made empty and holds this spec. Build into it with build_circuit / build_part / build_fsm {sheet:'${made}', …}: the answer then includes spec_check.`;
+    return r;
+  };
+}
+/* ---- a check against what the sheet was built from is not a check ---- */
+{
+  const _v=MCP_OPS.verify_truth_table;
+  MCP_OPS.verify_truth_table=a=>{
+    a=Object.assign({}, a);
+    if(a.expected && a.expected.ones){ const s=mcpSheet(a.sheet); a.expected=ttOnesToCols(aifInputsOf(s), a.expected.ones, a.expected.dont_care||a.expected.dc); }
+    const r=_v(a);
+    if(r && r.independent===false){ r.pass=null; r.result="NOT A CHECK — it only compared the circuit with the table it was built from"; }
+    return r;
+  };
+  const _sr=specRun;
+  specRun=function(sch){
+    const r=_sr.apply(this, arguments);
+    const sp=sch&&sch.spec, B=sch&&sch.builtFrom; if(!r || !sp || !B) return r;
+    const same=(sp.kind==="table" && Object.keys(sp.cols||{}).length && Object.entries(sp.cols).every(([k,v])=>B.cols&&B.cols[k]!=null && String(v).toLowerCase()===String(B.cols[k]).toLowerCase()))
+      || (sp.kind==="formula" && B.via==="formula" && String(B.text)===String(sp.text).replace(/\s+/g,""));
+    if(same){ r.independent=false;
+      r.warning="the spec is the very table / formula the sheet was built from, so passing it proves nothing — write what the circuit must do another way (its equations, the rows that are 1, a known property)";
+      if(sch.verified && /^spec /.test(sch.verified.how||"")) delete sch.verified;
+      if(sch.specResult) sch.specResult.summary="⚠ ข้อกำหนดเหมือนตารางที่ใช้สร้างวงจร — ยังไม่ได้ตรวจจริง"; }
+    return r;
+  };
+}
+
+/* ---- build mode: a part it can name comes from the library, not the model ---- */
+{
+  const _send=aiSend;
+  aiSend=async function(){
+    const t=$("#acInput"), msg=t?String(t.value||"").trim():"";
+    if(AICHAT.busy || !msg || msg[0]==="/" || AICHAT.mode==="agent" || AICHAT.mode==="qa" || typeof partFromMessage!=="function"
+       || (typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg))) return _send.apply(this, arguments);
+    const fp=partFromMessage(msg);
+    if(!fp || !fp.simple) return _send.apply(this, arguments);
+    aiAppend("user", msg); t.value="";
+    try{
+      const r=await MCP_OPS.build_part(Object.assign({kind:fp.kind}, fp.args));
+      const io=d=>r.ports.filter(p=>p.dir===d).map(p=>p.name+(p.width>1?"["+(p.width-1)+":0]":"")).join(", ");
+      aiAppend("ai", `<span class="ac-badge v">คลังชิ้นส่วน</span> สร้าง ${esc(PARTS[fp.kind].label)} ลงแผ่น <b>${esc(r.sheet)}</b> แล้ว<br>ขาเข้า ${esc(io("in"))} · ขาออก ${esc(io("out"))}<br>✓ ตรวจเทียบโมเดลอ้างอิงแล้ว: ${esc(r.verified.method)}`, {html:true});
+    }catch(e){ aiAppend("ai", "สร้างจากคลังชิ้นส่วนไม่ได้: "+e.message+" — ลองอธิบายเพิ่มหรือใช้โหมดเอเจนต์", {err:true}); }
+  };
+}
 
 </script>
 <!-- UX-LAYER:END -->

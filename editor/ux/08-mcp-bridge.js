@@ -19,7 +19,7 @@ function mcpSheet(ref){
   if(ref==null || ref==="") return activeSch() || mcpFail("no sheet is open");
   const P=state.project.schematics, low=String(ref).toLowerCase();
   const s = P[ref] || Object.values(P).find(x=>String(x.name).toLowerCase()===low);
-  return s || mcpFail(`sheet '${ref}' not found`, "sheets: "+Object.values(P).map(x=>x.name).join(", "));
+  return s || mcpFail(`sheet '${ref}' not found`, "sheets: "+Object.values(P).map(x=>x.name).join(", ")+` — to make it: build_circuit / build_part / build_fsm {sheet:'${ref}', …}, or set_spec {sheet:'${ref}', …} first`);
 }
 /* run against a sheet: it becomes the active tab so the user watches the change */
 function mcpUse(ref){ const s=mcpSheet(ref); if(state.activeId!==s.id){ openSchTab(s.id); } return s; }

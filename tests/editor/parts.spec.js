@@ -53,7 +53,7 @@ test("equations become the truth table; a check against what it was built from d
   expect(r.F).toEqual({ sum: "01101001", cout: "00010111" });
   expect(r.G).toEqual({ cout: "00010111", sum: "01101001" });
   expect(r.H).toEqual({ y: "0110" });
-  expect(r.t1).toEqual([true, false, false]);        // passes, but proves nothing — and says so
+  expect(r.t1).toEqual([null, false, false]);        // proves nothing — says so, and is not a pass
   expect(r.t2).toEqual([false, 6]);                  // against the requirement: the 6 wrong rows from the test log
   expect(r.saveErr).toContain("not verified");       // the wrong FA1 never reaches the library
   expect(r.rec).toContain("Full Adder");

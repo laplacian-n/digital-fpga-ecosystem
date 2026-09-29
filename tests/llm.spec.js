@@ -53,6 +53,22 @@ class H(BaseHTTPRequestHandler):
             return self._j({"choices": [{"message": {"content": "", "reasoning_content": think, "tool_calls": [
                 {"id": "c%d" % len(done), "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}]}}],
                 "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
+        with open(sys.argv[0] + ".sys", "a") as f: f.write(str(hash(msgs[0].get("content", ""))) + "\\n")
+        ask = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+        if "prime" in ask:       # the in-app test: wrong column, a circular "check", then a retry
+            px = ["x2", "x1", "x0"]
+            if len(done) == 0:
+                return call("build_circuit", {"name": "prime3", "truth_table": {"inputs": px, "outputs": ["p"], "columns": {"p": "00110111"}}}, "primes 2 3 5 7")
+            if len(done) == 1:
+                return call("verify_truth_table", {"sheet": "prime3", "expected": {"p": "00110111"}}, "")
+            if len(done) == 2:
+                assert "NOT A CHECK" in last, last
+                return call("build_circuit", {"name": "prime3", "truth_table": {"inputs": px, "ones": {"p": [2, 3, 5, 7]}}}, "list the rows instead")
+            if len(done) == 3:
+                return call("check", {"sheet": "prime3"}, "")
+            if len(done) == 4:
+                return call("simulate", {"sheet": "prime3"}, "")
+            return self._j({"choices": [{"message": {"content": "สร้างตัวตรวจจำนวนเฉพาะ 3 บิตแล้ว p = 00110101"}}]})
         tt = {"inputs": ["a", "b"], "outputs": ["sum", "carry"], "columns": {"sum": "0110", "carry": "0001"}}
         if len(done) == 0:
             return call("build_circuit", {"name": "ha_agent", "truth_table": tt, "colour": "red"}, "half adder = truth table")
@@ -156,6 +172,8 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     const kw = fs.readFileSync(bin + ".kw", "utf-8").trim().split("\n").map(l => JSON.parse(l).enable_thinking);
     expect(kw[0]).toBe(true);
     expect(kw.filter(x => x === false).length).toBeGreaterThan(0);
+    // the system prompt stays the same through the run, so llama-server reuses its prompt cache
+    expect(new Set(fs.readFileSync(bin + ".sys", "utf-8").trim().split("\n")).size).toBe(1);
     // the model server dies mid-run: it is started again and the run carries on
     fs.writeFileSync(bin + ".crash", "1");
     await ed.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "ha_agent"); delete state.project.schematics[s.id]; state.openTabs = state.openTabs.filter(i => i !== s.id); renderAll(); });
@@ -172,6 +190,17 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.find(x => x.tool === "build_part")).toMatchObject({ ok: true });
     expect(s.data.agent.final).toContain("fa3");
     expect(s.data.agent.final).toContain("ตรวจแล้วถูกต้อง");
+    // the prime detector from the in-app test: a circular check says so, the retry replaces the sheet
+    await tool("ai_chat", { message: "ทำ prime detector 3 บิต x2 x1 x0 ลงแผ่น prime3", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    const pt = s.data.agent.steps.filter(x => x.tool);
+    expect(pt.map(x => x.tool)).toEqual(["build_circuit", "verify_truth_table", "build_circuit", "check", "simulate"]);
+    expect(pt[1].summary).toContain("NOT A CHECK");
+    expect(pt[2].args.replace).toBe(true);
+    const sheets = await ed.evaluate(() => Object.values(state.project.schematics).map(x => x.name));
+    expect(sheets.filter(n => /^prime3/.test(n))).toEqual(["prime3"]);
+    expect(await ed.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "prime3");
+      const j = clientCombSim(s); return j.truth_table.rows.map(r => r[1][0]).join(""); })).toBe("00110101");
     expect(ed.errors).toEqual([]);
   } finally { srv.kill(); }
 });

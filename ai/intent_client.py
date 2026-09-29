@@ -164,6 +164,9 @@ def one_system_message(messages: list) -> list:
 def _post(endpoint: str, payload: dict, timeout: float) -> dict:
     if isinstance(payload.get("messages"), list):
         payload = dict(payload, messages=one_system_message(payload["messages"]))
+    # Qwen3.5 thinks by default: a call that did not ask for it spent its whole max_tokens reasoning and
+    # came back with no answer (build mode "สร้าง VHDL ไม่ได้" on a plain full adder). Off unless asked.
+    payload.setdefault("chat_template_kwargs", {"enable_thinking": False})
     req = urllib.request.Request(
         endpoint, data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"}, method="POST")
@@ -217,7 +220,7 @@ _VHDL_SYS = (
 
 def _extract_vhdl(raw: str) -> str:
     """Pull the VHDL body out of a model reply (strip fences/prose)."""
-    t = raw or ""
+    t = re.sub(r"<think>.*?(</think>|$)", "", raw or "", flags=re.S)      # a reasoning block left in the reply
     if "```" in t:                              # take the first fenced block
         import re as _re
         m = _re.search(r"```(?:vhdl|VHDL)?\s*(.*?)```", t, _re.S)
@@ -282,7 +285,7 @@ def generate_vhdl_from_spec(spec: str, *, endpoint: str = DEFAULT_ENDPOINT,
     for fb in (feedback or []):
         messages.append({"role": "user", "content": fb})
     payload = {"model": model, "messages": messages, "temperature": temperature,
-               "max_tokens": 1400, "stream": False}
+               "max_tokens": 2000, "stream": False}
     try:
         data = _post(endpoint, payload, timeout)
     except Exception as e:
