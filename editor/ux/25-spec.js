@@ -14,8 +14,9 @@ function specCheck(sch){
       const sim=clientCombSim(sch);
       if(!sim.ok) return {pass:false, reason:sim.reason||"จำลองไม่ได้"};
       const tt=sim.truth_table;
-      const cols = sp.kind==="formula" ? formulaTable(sp.text, tt.inputs).cols : sp.cols;
-      const bad=[];
+      if(sp.kind==="formula"){ const bad=specFormulaMismatches(sp.text, tt);
+        return {pass:!bad.length, checked:`${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs}; }
+      const cols=sp.cols, bad=[];
       Object.entries(cols).forEach(([o,col])=>{ const k=tt.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
         if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้"}); return; }
         String(col).toLowerCase().split("").forEach((ch,r)=>{ if(ch==="x"||!tt.rows[r]) return; const got=tt.rows[r][1][k];
@@ -39,6 +40,46 @@ function specCheck(sch){
     }
     return {pass:false, reason:"ข้อกำหนดไม่รู้จักชนิด "+sp.kind};
   }catch(e){ return {pass:false, reason:String(e&&e.message||e)}; }
+}
+/* A formula spec against the sheet's truth table, port by port: a bus port is one number (a = 5), so
+   "{cout,sum} = a + b + cin" or "sum = a + b + cin" on a 4-bit adder means the addition; one bit is
+   a[2]; a slice a[3:0] is the port. An equation is arithmetic when its left side is {…}, its output
+   is a bus, or it reads a bus; otherwise boolean (+ = OR). Outputs of earlier equations may be used. */
+function specFormulaMismatches(text, tt){
+  const group=names=>{ const P={}; names.forEach((n,i)=>{ const m=/^(.*)\[(\d+)\]$/.exec(n), base=(m?m[1]:n), k=base.toLowerCase();
+      (P[k]=P[k]||{name:base, bits:[]}).bits.push({i, bit:m?+m[2]:0, col:n}); });
+    Object.values(P).forEach(p=>p.width=Math.max(...p.bits.map(b=>b.bit))+1); return P; };
+  const IN=group(tt.inputs), OUT=group(tt.outputs);
+  const src=String(text).replace(/(\w+)\[\d+:\d+\]/g,"$1").replace(/(\w+)\[(\d+)\]/g,"$1__b$2");
+  const eqs=src.split(/[;\n]+/).map(x=>x.trim()).filter(Boolean);
+  if(!eqs.length) throw new Error("formula is empty");
+  const low=e=>{ if(!e) return e; if(e.id!=null) return {id:e.id.toLowerCase()}; return Object.assign({}, e, {not:low(e.not), neg:low(e.neg), l:low(e.l), r:low(e.r)}); };
+  const ids=(e,a=[])=>{ if(!e) return a; if(e.id!=null) a.push(e.id); ids(e.not,a); ids(e.neg,a); ids(e.l,a); ids(e.r,a); return a; };
+  const parsed=eqs.map(q=>{ const i=q.indexOf("="); if(i<1) throw new Error(`"${q}" is not an equation`);
+    const lhs=q.slice(0,i).trim(), cat=/^\{(.*)\}$/.exec(lhs);
+    const outs=(cat?cat[1]:lhs).split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+    let rhsT; try{ rhsT=fxTokens(q.slice(i+1)); fxParse(rhsT,true); }catch(e){ throw new Error(`"${q.replace(/__b(\d+)/g,"[$1]")}": ${e.message.replace(/__b(\d+)/g,"[$1]")}`); }
+    const busIn=ids(low(fxParse(rhsT,true))).some(id=>IN[id]&&IN[id].width>1);
+    const arith=!!cat || outs.some(o=>OUT[o]&&OUT[o].width>1) || busIn;
+    return {q:q.replace(/__b(\d+)/g,"[$1]"), outs, arith, ast:low(fxParse(rhsT, arith))}; });
+  parsed.forEach(p=>p.outs.forEach(o=>{ const m=/^(.*)__b(\d+)$/.exec(o); if(OUT[o]||!m||!OUT[m[1]]) return;   // s[0] = …
+    const b=OUT[m[1]].bits.find(x=>x.bit===+m[2]); if(b) OUT[o]={name:b.col, width:1, bits:[{i:b.i, bit:0, col:b.col}]}; }));
+  const known=[...Object.values(IN).map(p=>p.name)];
+  const bad=[];
+  parsed.forEach(p=>p.outs.forEach(o=>{ if(!OUT[o]) bad.push({output:o, reason:"ไม่มีขาออกนี้ (มี: "+Object.values(OUT).map(x=>x.name).join(", ")+")"}); }));
+  if(bad.length) return bad;
+  tt.rows.forEach(([iv,ov],r)=>{
+    const env={};
+    Object.entries(IN).forEach(([k,p])=>{ let v=0; p.bits.forEach(b=>{ if(iv[b.i]) v|=1<<b.bit; env[k+"__b"+b.bit]=iv[b.i]; }); env[k]=v; });
+    parsed.forEach(p=>{
+      let v; try{ v=fxEval(p.ast, env, p.arith); }catch(e){ throw new Error(`"${p.q}": ${e.message.replace(/__b(\d+)/g,"[$1]")} (ขาเข้า: ${known.join(", ")})`); }
+      let shift=0; const L=p.outs.map(o=>OUT[o].width);
+      for(let k=p.outs.length-1;k>=0;k--){ const o=OUT[p.outs[k]], w=L[k];
+        const M=2**w, val=p.arith ? ((Math.floor(v/2**shift)%M)+M)%M : (v?1:0); shift+=w; env[p.outs[k]]=val;
+        o.bits.forEach(b=>{ const want=(val>>b.bit)&1, got=ov[b.i];
+          if(String(got)!==String(want)) bad.push({output:b.col, row:r, inputs:iv.join(""), want, got}); }); }
+    }); });
+  return bad;
 }
 /* run it, remember the result, stamp the sheet when it passes */
 function specRun(sch){

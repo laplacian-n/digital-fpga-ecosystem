@@ -200,6 +200,23 @@ MCP_OPS.new_sheet = a=>{
 MCP_OPS.set_top_sheet = a=>{ const s=mcpSheet(a.sheet); state.project.topId=s.id; mcpCommit(null); return {top_sheet:s.name}; };
 MCP_OPS.rename_sheet = a=>{ const s=mcpSheet(a.sheet); s.name=uniqueSchName(a.name, s.id); mcpCommit(null); return {sheet:s.name}; };
 
+/* delete a sheet (undoable). One another sheet uses as a block is refused unless force (then its
+   instances go too, as the project tree's 🗑 does); the last sheet stays. */
+MCP_OPS.delete_sheet = a=>{
+  const s=mcpSheet(a.sheet), P=state.project.schematics;
+  if(Object.keys(P).length===1) mcpFail("the project must keep at least one sheet");
+  const users=Object.values(P).filter(x=>x.id!==s.id && x.components.some(c=>c.type==="SCH:"+s.id));
+  if(users.length && !a.force) mcpFail(`'${s.name}' is used as a block on ${users.map(x=>x.name).join(", ")}`, "force:true deletes those block instances too");
+  mcpBeforeChange("ลบแผ่น "+s.name);
+  delete P[s.id];
+  const removed=users.length ? removeInstancesOf("SCH:"+s.id) : 0;
+  state.openTabs=(state.openTabs||[]).filter(t=>t!==s.id);
+  if(state.activeId===s.id){ state.activeId=state.openTabs[0]||Object.keys(P)[0]; state.selection.clear(); state.pendingWire=null; }
+  if(!state.openTabs.includes(state.activeId)) state.openTabs.push(state.activeId);
+  if(state.project.topId===s.id) state.project.topId=Object.keys(P)[0];
+  mcpCommit(null);
+  return {deleted:s.name, block_instances_removed:removed, top_sheet:P[state.project.topId].name, sheets:Object.values(P).map(x=>x.name)};
+};
 MCP_OPS.add_component = a=>{
   const sch=mcpUse(a.sheet);
   let type=String(a.type||"").trim();
@@ -392,12 +409,17 @@ MCP_OPS.simulate = a=>{
   const sch=mcpSheet(a.sheet);
   const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
   if(hasFF){
-    const hold={}; Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); hold[c.id]=mcpProbeVal(c, v); });
-    const j=clientSeqSim(sch, Math.max(1,Math.min(256,+a.cycles||16)), {hold});
+    const put=(o,src)=>{ Object.entries(src||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); o[c.id]=mcpProbeVal(c, v); }); return o; };
+    const hold=put({}, a.inputs);
+    // vectors in sequential mode: the inputs held during each clock (the last one stays)
+    const V=Array.isArray(a.vectors)&&a.vectors.length ? a.vectors.map(v=>put(Object.assign({},hold), v)) : null;
+    if(V && V.length>256) mcpFail("at most 256 vectors per call");
+    const cycles=Math.max(1,Math.min(256,+a.cycles||(V?V.length:16)));
+    const j=clientSeqSim(sch, cycles, V ? {hold:V[0], holdAt:i=>V[Math.min(i,V.length-1)]} : {hold});
     if(!j.ok) mcpFail(j.reason||"cannot simulate");
     const sq=j.sequence;
     const outW=sch.components.filter(c=>c.type==="OUT").map(c=>Math.max(1,+(c.params.width||1))), busOut=outW.some(w=>w>1);
-    return {sheet:sch.name, kind:"sequential", note:j.note||undefined, clocks_pulsed:"every INPUT that drives a flip-flop clock", held_inputs:a.inputs||{},
+    return {sheet:sch.name, kind:"sequential", note:j.note||undefined, clocks_pulsed:"every INPUT that drives a flip-flop clock", held_inputs:V?"per clock from vectors":(a.inputs||{}),
       columns:{inputs:sq.inputs, state:sq.dffs, outputs:sq.outputs},
       // a bus OUTPUT reads as its value in binary: outputs become {name: value}
       rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""),
@@ -468,6 +490,9 @@ MCP_OPS.probe = a=>{
     const nets=mcpNets(sch).map(n=>{ if(!n.driver) return Object.assign({value:"undriven"},n);
       const [cn,pid]=[n.driver.slice(0,n.driver.lastIndexOf(".")), n.driver.slice(n.driver.lastIndexOf(".")+1)];
       const c=findCompRef(sch,cn); let v=null; try{ v=c?m.outVal(c.id,pid,new Set()):null; }catch(_){}
+      // a block's output: flattened, it is the block's inner OUTPUT (now a BUF named <block>__<out>)
+      const sub=v==null&&c?subSchOf(c):null, pp=sub&&schPortList(sub).find(q=>q.id===pid&&q.dir==="out");
+      if(pp){ try{ v=m.outVal(c.id+"__"+pp.cid,"o",new Set()); }catch(_){} }
       return Object.assign({value:v==null?"unknown":v}, n); });
     return {sheet:sch.name, inputs:a.inputs||{}, outputs:outs, nets};
   } finally { Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved); }

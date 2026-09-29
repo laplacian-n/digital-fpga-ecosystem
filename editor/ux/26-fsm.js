@@ -220,7 +220,7 @@ MCP_OPS.build_fsm = a=>{
   if(!a.fsm) mcpFail("fsm is required", "text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\n…\\nS0 -> S1 when x\\nreset S0', or {inputs, outputs, states:[{name, out}], transitions:[{from,to,when,out?}], reset}");
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
-  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name");
+  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name, or delete_sheet it first to rebuild it");
   mcpBeforeChange("สร้าง FSM");
   let r; try{ r=fsmBuild(a.fsm, {sheet:want||a.name, name:a.name, state_out:a.state_out}); }catch(e){ mcpFail(e.message); }
   let sch=r.sch;

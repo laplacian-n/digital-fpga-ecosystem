@@ -323,7 +323,7 @@ MCP_OPS.build_part = a=>{
   const kind=String(a.kind||"").trim(); if(!kind) mcpFail("kind is required", "list_parts shows the kinds");
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
-  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet");
+  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet — or delete_sheet it first to rebuild it");
   mcpBeforeChange("สร้าง "+kind);
   const r=partBuild(kind, a);
   let sch=r.sch;
