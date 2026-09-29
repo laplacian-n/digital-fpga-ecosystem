@@ -153,6 +153,10 @@ TOOLS = [
       "transitions:[{from,to,when,out?}], reset}. Ports: clk, the inputs, the outputs, state bits (state_out:false drops them).",
       {"fsm": {"type": ["string", "object"]}, "sheet": SHEET, "name": {"type": "string"}, "state_out": {"type": "boolean"}},
       ["fsm"], timeout=90),
+    T("make_report", "Write the lab report into the project folder (<project>_report.html): every sheet (top first, then its "
+      "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks, state diagram, acceptance "
+      "test, board pin table, VHDL. The user prints it to PDF.",
+      {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}}, timeout=90),
     T("set_spec", "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): "
       "formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, "
       "inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks "

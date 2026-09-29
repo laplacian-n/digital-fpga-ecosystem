@@ -92,3 +92,31 @@ test("a project folder holds one project: open from Home loads only it, saving w
   expect(Object.values(saved.workspace.projects)[0].name).toBe("lab6");
   expect(saved.project.name).toBe("lab6");
 });
+
+test("Tools ▸ ผู้ช่วยทำแลป: the lab sheet as a checklist; an item's equations become the sheet's acceptance test", async ({ page, request }) => {
+  const labs = (await (await request.get(BASE + "/api/rag/labs")).json()).labs;
+  expect(labs.length).toBeGreaterThan(5);
+  await page.goto(BASE + "/studio.html");
+  await page.waitForFunction(() => typeof UX === "object");
+  await page.evaluate(() => document.querySelectorAll(".modal-bg").forEach(m => m.remove()));
+  // the full adder the lab asks for, drawn from the parts library
+  await page.evaluate(() => MCP_OPS.build_part({ kind: "full_adder", sheet: "FA" }));
+  await page.evaluate(() => runGenerator("labhelper"));
+  const lab4 = labs.find(l => l.items.some(i => i.id === "lab4-2")).lab;
+  await page.selectOption("#lhLab", lab4);
+  const card = page.locator('.lh-card[data-item="lab4-2"]');
+  await expect(card.locator('[data-lh="spec"]')).toHaveAttribute("data-f", /Cout = A\*B \+ \(A\^B\)\*Cin/);
+  const before = await page.locator("#lhProg").textContent();
+  await card.locator("[data-sub]").first().check();
+  await expect(page.locator("#lhProg")).not.toHaveText(before);
+  expect(await page.evaluate(() => state.project.labProgress["lab4-2"][0])).toBe(true);
+  // the parts library names its ports a/b/cin, the lab A/B/Cin: the spec says what it cannot find
+  await card.locator('[data-lh="spec"]').click();
+  await expect(page.locator(".toast").last()).toContainText(/lab4-2|ตั้งไม่ได้/);
+  await page.screenshot({ path: test.info().outputPath("lab-helper.png") });
+  // the agent button closes the helper and prefills the chat
+  await page.evaluate(() => runGenerator("labhelper"));
+  await page.selectOption("#lhLab", lab4);
+  await page.locator('.lh-card[data-item="lab4-2"] [data-lh="agent"]').click();
+  await expect(page.locator("#acInput")).toHaveValue(/ทำข้อ lab4-2/);
+});
