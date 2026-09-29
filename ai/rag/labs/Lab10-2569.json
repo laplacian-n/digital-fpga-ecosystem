@@ -1,0 +1,76 @@
+{
+ "source": "Lab10-2569.pdf",
+ "group": "labs",
+ "lab": "10",
+ "title": "วงจรจำลองการทำงานของ CPU อย่างง่าย (ALU + ACC + FLAG) ด้วยวิธี Schematic บนบอร์ด FPGA EDGE Spartan-7",
+ "objectives": [
+  "เข้าใจกลไกการประมวลผลของ CPU",
+  "ฝึกการใช้งาน FPGA",
+  "เชื่อมโยงวงจรที่ออกแบบเองกับการทำงานจริงของ CPU: สร้าง ALU ACC FLAG เป็นวงจรจริง และทำหน้าที่ IR PC CU ด้วยตนเอง",
+  "เขียนผัง schematic จากบล็อกย่อยและกำหนดขาให้ตรงอุปกรณ์จริง"
+ ],
+ "items": [
+  {
+   "id": "lab10-1",
+   "question": "ออกแบบ datapath ของ CPU: ALU 8 บิต (OP[2:0]: 000 ไม่ทำอะไร, 001 +, 010 −, 011 ^, 100 <<, 101 AND, 110 OR, 111 MOV) โดย ACC เป็นตัวตั้งเสมอและเก็บผลที่ ACC เมื่อกด PB3 (STEP); RESET (PB5) ทำให้ ACC = 0 และ FLAG = 0; OP จาก SW13–SW11, ค่าคงที่ 8 บิตจาก SW10–SW2; 7-seg หลัก 1–0 แสดง ACC, หลัก 3–2 แสดงค่าคงที่; LED D4 D3 D2 = Carry, Overflow, Zero",
+   "subtasks": [
+    "ALU 8 การทำงาน + flag carry/overflow/zero",
+    "ACC 8 บิต (register มี enable + clear)",
+    "FLAG 3 บิต",
+    "STEP กันเด้งเป็น 1 พัลส์ต่อการกด",
+    "แสดง ACC และค่าคงที่เป็นเลขฐานสิบหก 4 หลัก",
+    "กำหนดขาตามตารางที่ 2"
+   ],
+   "topic": "datapath",
+   "solution": {
+    "steps": "บล็อก (ชิ้นส่วนสำเร็จรูป):\n1) alu (n=8, ops='8'): a = ACC.q, b = CONST, op = OP → y, carry, overflow, zero\n2) ACC = register_en (n=8, async:true): d = alu.y, en = step_pulse, clr = RESET, q → alu.a และจอหลัก 1–0\n3) FLAG = register_en (n=3, async:true): d = {carry, overflow, zero}, en = step_pulse, clr = RESET → LED D4 D3 D2\n4) STEP: clock_divider 50 MHz → ~100 Hz เป็น clock ของ one_pulse (btn = PB3) และของ ACC/FLAG; pulse → en (ปุ่มเด้งทำให้กดครั้งเดียว ACC เปลี่ยนหลายครั้ง — คำถามท้ายการทดลองข้อ 4)\n5) จอ: seg7_mux4 (hex:true) ones = ACC[3:0], tens = ACC[7:4], hundreds = CONST[3:0], thousands = CONST[7:4]; clock สแกน ~1 kHz\nCarry = ทดออกจากบิต 7 (ตีความแบบไม่มีเครื่องหมาย), Overflow = ผลผิดเมื่อตีความแบบมีเครื่องหมาย — คนละอย่างกัน",
+    "truth_table": "โปรแกรมที่ 1 (ตารางที่ 3): ACC หลังแต่ละคำสั่ง 00, 00, 00, FF, 2B, 02, 82, 05; Zero = 1, 1, 1, 0, 0, 0, 0, 0; Overflow = 0; Carry = 0",
+    "kmap": null,
+    "final_expression": "ACC ← ACC (OP) CONST เมื่อกด STEP · ACC, FLAG ← 0 เมื่อ RESET",
+    "intent_json": null,
+    "notes": "ชิ้นส่วน alu เลื่อนซ้าย 1 ตำแหน่งแบบแลป 9 (ในตารางตัวอย่าง << ใช้กับ ACC = 00 จึงบอกไม่ได้ว่าเลื่อนกี่ตำแหน่ง — ถามผู้คุมแลปถ้าไม่แน่ใจ); SHL, AND, OR, XOR, MOV ไม่ตั้ง carry"
+   },
+   "verify": "alu และ register_en ตรวจเทียบโมเดลอ้างอิงทุกครั้งที่สร้าง; ค่า ACC ของโปรแกรมที่ 1 ตรงกับตารางที่ 3 ในใบงาน",
+   "related_content": [
+    "lab9-1"
+   ]
+  },
+  {
+   "id": "lab10-2",
+   "question": "รันโปรแกรมที่ 1 (ตารางที่ 3, 8 คำสั่ง) ทีละคำสั่ง บันทึกค่า 7-segment และ LED แล้วเทียบกับค่าที่คำนวณไว้",
+   "subtasks": [
+    "ตั้งสวิตช์ OP + ค่าคงที่ตามแถว",
+    "กด PB3 หนึ่งครั้ง",
+    "บันทึกจอ/LED และเทียบกับตาราง"
+   ],
+   "topic": "testing",
+   "solution": {
+    "steps": "ที่อยู่ 0: 100 0110 1001 → ACC = 00 (00<<1), Z=1\n1: 101 1000 0000 → 00 AND 80 = 00, Z=1\n2: 000 → 00, Z=1\n3: 111 1111 1111 → MOV FF\n4: 011 1101 0100 → FF ^ D4 = 2B\n5: 101 1100 0110 → 2B AND C6 = 02\n6: 011 1000 0000 → 02 ^ 80 = 82\n7: 111 0000 0101 → MOV 05",
+    "truth_table": null,
+    "kmap": null,
+    "final_expression": null,
+    "intent_json": null,
+    "notes": "ในเอดิเตอร์: simulate แผ่น datapath แบบ sequential ด้วย vectors ต่อ clock ({op, const} ต่อคำสั่ง) ตรวจได้ก่อนลงบอร์ด"
+   },
+   "verify": "ค่าจากตารางที่ 3 ของใบงาน",
+   "related_content": [
+    "lab10-1"
+   ]
+  },
+  {
+   "id": "lab10-3",
+   "question": "เขียนโปรแกรมของตนเอง (ตารางที่ 5) ให้ค่าสุดท้ายของ ACC เท่ากับเลขสองหลักสุดท้ายของรหัสนักศึกษา ใช้ครบทุก Operation มีคำสั่งที่ทำให้ Zero ติดและ Carry ติดอย่างน้อยอย่างละหนึ่ง แล้วรันบนบอร์ดยืนยัน",
+   "subtasks": [
+    "ออกแบบลำดับคำสั่ง",
+    "คำนวณ ACC/flag ที่คาดไว้",
+    "รันบนบอร์ดและเทียบ"
+   ],
+   "topic": "testing",
+   "solution": null,
+   "verify": null,
+   "related_content": [
+    "lab10-1"
+   ]
+  }
+ ]
+}

@@ -71,6 +71,10 @@ function partDialog(kind){
   m.addEventListener("input", preview); preview();
   const go=async place=>{ if(!preview()) return;
     const back=activeSch(), a=read();
+    // a big part (ALU, a 4-digit counter) takes seconds to draw and check: say so, and let it paint first
+    m.querySelectorAll(".modal-foot button").forEach(b=>b.disabled=true);
+    const el=m.querySelector("#ptPorts"); if(el) el.insertAdjacentHTML("afterend", '<div class="muted pt-busy">⏳ กำลังสร้างและตรวจเทียบโมเดลอ้างอิง… ชิ้นใหญ่ใช้เวลาหลายวินาที</div>');
+    await new Promise(r=>setTimeout(r, 60));
     try{
       const r=MCP_OPS.build_part(a);
       m.close();
@@ -83,7 +87,8 @@ function partDialog(kind){
         try{ const b=activeSch().components.filter(c=>c.type==="SCH:"+sub.id).pop(); if(b) focusComp(back.id, b.id); }catch(_){}
         toast(`วาง ${P.label} (${r.sheet}) เป็นบล็อกแล้ว — ตรวจแล้วถูกต้อง: ${r.verified.method}`,"ok",4500);
       } else toast(`สร้าง ${P.label} ในแผ่น ${r.sheet} แล้ว — ตรวจแล้วถูกต้อง: ${r.verified.method}`,"ok",4500);
-    }catch(e){ toast("สร้างไม่ได้: "+e.message+(e.hint?" — "+e.hint:""),"err",6000); }
+    }catch(e){ toast("สร้างไม่ได้: "+e.message+(e.hint?" — "+e.hint:""),"err",6000);
+      m.querySelectorAll(".modal-foot button").forEach(b=>b.disabled=false); m.querySelectorAll(".pt-busy").forEach(x=>x.remove()); }
   };
   m.querySelector("#ptPlace").onclick=()=>go(true);
   m.querySelector("#ptOpen").onclick=()=>go(false);

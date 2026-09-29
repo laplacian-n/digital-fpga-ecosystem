@@ -412,7 +412,9 @@ MCP_OPS.simulate = a=>{
     const put=(o,src)=>{ Object.entries(src||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); o[c.id]=mcpProbeVal(c, v); }); return o; };
     const hold=put({}, a.inputs);
     // vectors in sequential mode: the inputs held during each clock (the last one stays)
-    const V=Array.isArray(a.vectors)&&a.vectors.length ? a.vectors.map(v=>put(Object.assign({},hold), v)) : null;
+    // (an input a vector leaves out is 0 — or its `inputs` value — not whatever the previous clock had)
+    const zero={}; sch.components.filter(x=>x.type==="IN").forEach(x=>zero[x.id]=0);
+    const V=Array.isArray(a.vectors)&&a.vectors.length ? a.vectors.map(v=>put(Object.assign({},zero,hold), v)) : null;
     if(V && V.length>256) mcpFail("at most 256 vectors per call");
     const cycles=Math.max(1,Math.min(256,+a.cycles||(V?V.length:16)));
     const j=clientSeqSim(sch, cycles, V ? {hold:V[0], holdAt:i=>V[Math.min(i,V.length-1)]} : {hold});

@@ -15,6 +15,8 @@ test("Modules tab: a checked part placed as a block on the sheet on screen", asy
   await page.screenshot({ path: test.info().outputPath("parts-dialog.png") });
   const before = await page.evaluate(() => activeSch().name);
   await dlg.locator("#ptPlace").click();
+  await expect(page.locator(".modal .pt-busy")).toHaveCount(0);           // "กำลังสร้าง…" while it builds, then closes
+  await expect.poll(() => page.evaluate(() => activeSch().components.some(c => String(c.type).startsWith("SCH:")))).toBe(true);
   const r = await page.evaluate(() => { const s = activeSch(); const blk = s.components.find(c => String(c.type).startsWith("SCH:"));
     const sub = blk && state.project.schematics[blk.type.slice(4)];
     return { name: s.name, block: !!blk, pins: blk ? getPorts(blk).map(p => p.id + ":" + (p.width || 1)) : [], verified: sub && sheetVerified(sub) }; });
