@@ -146,6 +146,14 @@ TOOLS = [
     T("apply", "Run several edit steps as one transaction — if a step fails nothing changes (unless keep_going). "
       "Each step is {\"op\": \"add_component\"|\"connect\"|\"disconnect\"|\"delete\"|\"update_component\"|\"set_pins\", …that tool's args}.",
       {"sheet": SHEET, "steps": {"type": "array", "items": {"type": "object"}}, "keep_going": {"type": "boolean"}}, ["steps"]),
+    T("set_spec", "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): "
+      "formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, "
+      "inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks "
+      "the sheet verified. Set it FIRST, then build until check_spec passes.",
+      {"sheet": SHEET, "formula": {"type": ["string", "array"], "items": {"type": "string"}}, "table": {"type": "object"},
+       "sequence": {"type": "object"}}),
+    T("check_spec", "Run a sheet's acceptance test (or every sheet's with all_sheets) and get pass / the mismatches.",
+      {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
     T("list_parts", "The part library: standard circuits (adders, subtractors, comparator, mux/demux, decoder, encoder, "
       "BCD→7-seg, parity, majority, counters, clock divider, shift register, register, toggle, edge detector, debounce) "
       "with their parameters and ports. `query` filters.", {"query": {"type": "string"}}),
@@ -325,7 +333,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts",
+               "build_part", "list_parts", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
                "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module", "search_course"]
 

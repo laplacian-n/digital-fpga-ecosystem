@@ -248,3 +248,12 @@
 .pt-f{font-size:12.5px;display:flex;align-items:center;gap:6px}
 .pt-ports{margin-top:10px;padding:8px;border:1px solid var(--line);border-radius:6px;font-size:12px;line-height:1.6;background:var(--bg-2)}
 .pt-ports.bad{color:var(--err,#c33)}
+/* 25. acceptance tests */
+.spec-b{margin-left:6px;font-size:11px;font-weight:700}
+.spec-b.ok{color:var(--ok,#16a34a)} .spec-b.bad{color:var(--err,#dc2626)}
+.spec-box{margin-top:14px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2)}
+.spec-h{font-weight:700;font-size:12.5px;margin-bottom:4px}
+.spec-s{font-weight:700;font-size:12.5px;margin:4px 0}
+.spec-s.ok{color:var(--ok,#16a34a)} .spec-s.bad{color:var(--err,#dc2626)}
+.spec-d{font-size:11.5px;line-height:1.5;word-break:break-word}
+.spec-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}

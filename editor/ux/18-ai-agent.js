@@ -10,7 +10,7 @@
 const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null };
 const AIAG_MAX_STEPS = 24;
 const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
-const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table"]);
+const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table","check_spec","set_spec"]);
 
 function aiagSystemPrompt(){
   const P=state.project, s=activeSch();
@@ -21,6 +21,8 @@ function aiagSystemPrompt(){
 "You work ONLY through the tools. Every change you make is drawn live on the user's screen and can be undone.",
 "",
 "How to work:",
+"0. For a new circuit, first write down what it must do with set_spec (a formula / table / clock sequence taken from",
+"   the REQUEST), then build until check_spec passes. The spec is the yardstick — never derive it from your circuit.",
 "1. Look first: get_sheet (detail:'brief') before changing a sheet you have not seen.",
 "2. A standard circuit (adder, subtractor, comparator, mux, decoder, encoder, 7-seg, parity, counters, divider,",
 "   registers, toggle, edge detector, debounce): build_part — it is generated AND checked for you (list_parts shows them).",
