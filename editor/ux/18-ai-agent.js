@@ -27,12 +27,16 @@ function aiagSystemPrompt(){
 "2. A standard circuit (adder, subtractor, comparator, mux, decoder, encoder, 7-seg, parity, counters, divider,",
 "   registers, toggle, edge detector, debounce): build_part — it is generated AND checked for you (list_parts shows them).",
 "   Anything else: build_circuit with formula (equations like \"y = a&b | ~c\", \"{cout,sum} = a+b+cin\") — never type",
-"   0/1 columns yourself unless the user gave the table. Bigger designs: build the pieces, then place them as blocks",
+"   0/1 columns yourself unless the user gave the table. Output 1 for certain input values (primes, a range, a list)?",
+"   give the ROWS: truth_table:{inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}} (set_spec table takes ones too).",
+"   Bigger designs: build the pieces, then place them as blocks",
 "   (block:<sheet>) and connect. Edit with add_component, connect, disconnect, delete, update_component, or apply.",
 "3. After ANY change: call check AND simulate ON THE SHEET YOU CHANGED — pass its name as `sheet`. For logic you",
 "   derived, verify_truth_table with a formula written from the REQUIREMENT (not the table you built from — that",
 "   proves nothing). Look at `recognized` in the answer. Never say it works without that.",
 "4. If a tool returns an error, read its hint and correct the call. Do not repeat the same failing call.",
+"   A wrong circuit: rebuild it ON THE SAME SHEET (same sheet name, replace:true) — never a new sheet per try.",
+"   verify / check_spec answering pass:null or independent:false checked nothing: check against the request instead.",
 "5. Finish with a short answer IN THAI: what you did and what the check / simulation showed.",
 "",
 "Be quick: call SEVERAL tools in one turn when they do not depend on each other (e.g. every add_component at once),",
@@ -70,6 +74,8 @@ function aiagSummary(tool, r){
   if(!r || typeof r!=="object") return String(r);
   if(tool==="check") return `errors ${r.errors} · warnings ${r.warnings}`+(r.issues&&r.issues.length?" — "+r.issues.slice(0,2).map(i=>i.message).join(" | "):"");
   if(tool==="simulate") return r.kind==="sequential" ? `${r.rows.length} cycles` : r.rows ? `${r.rows.length} rows` : "";
+  if(tool==="verify_truth_table" || tool==="check_spec") return r.pass===null || r.independent===false
+    ? "NOT A CHECK — compared with the table it was built from" : `pass ${r.pass}`+(r.total_mismatches||(r.mismatches||[]).length?` · ${r.total_mismatches||r.mismatches.length} rows differ`:"");
   if(tool==="build_circuit") return `sheet ${r.sheet} · ${r.parts||""} parts`+(r.note?" · "+r.note:"");
   if(tool==="get_sheet") return `${r.sheet}: ${(r.components||[]).length} parts, ${(r.nets||[]).length} nets`;
   if(r.connected) return r.connected.join(", ");
@@ -113,12 +119,12 @@ async function aiAgentRun(msg){
       try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final) run.final=fp.final; else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
     // the course notes most related to the request go in up front (RAG); more via search_course
     if(!run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
-      const rj=await (await fetch("/api/rag/search?k=3&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
-      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,500)}`).join("\n");
+      const rj=await (await fetch("/api/rag/search?k=2&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
+      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,350)}`).join("\n");
         run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
-    const needCheck=new Set(), needSim=new Set();
+    const needCheck=new Set(), needSim=new Set(), made=new Set();
     let nudges=0, think=true, planned=false;
     for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
       live(`กำลังคิด… (รอบ ${i+1})`);
@@ -136,7 +142,9 @@ async function aiAgentRun(msg){
       const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
-      if(!planned && thought){ planned=true; messages[0].content+="\n\nYour plan (from your first reasoning — follow it, do not repeat it):\n"+aiagClip(thought, 1500); }
+      // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server
+      // reuse its cache, where editing messages[0] made it re-read ~9k prompt tokens on every call
+      if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
         for(const tc of calls){
@@ -144,8 +152,14 @@ async function aiAgentRun(msg){
           try{ args=typeof tc.function.arguments==="string" ? JSON.parse(tc.function.arguments||"{}") : (tc.function.arguments||{}); }
           catch(_){ bad="the arguments are not valid JSON: "+aiagClip(tc.function.arguments, 200); }
           live(`กำลังใช้ ${tool}…`);
+          // a rebuild of a sheet this run made replaces it (it used to leave prime3, prime3_2 … prime3_5)
+          if(!bad && /^build_(circuit|part|fsm)$/.test(tool)){ const nm=String(args.sheet||args.name||"").trim().toLowerCase();
+            const s=nm && Object.values(state.project.schematics).find(x=>String(x.name).toLowerCase()===nm);
+            if(s && made.has(s.id) && s.components.some(c=>c.type!=="JUNCTION")) args=Object.assign({}, args, {sheet:s.name, replace:true}); }
+          const before=new Set(Object.keys(state.project.schematics));
           const t0=performance.now();
           const r=bad ? {ok:false, error:bad} : await aiagCall(tool, args);
+          Object.keys(state.project.schematics).forEach(id=>{ if(!before.has(id)) made.add(id); });
           const content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
@@ -156,7 +170,8 @@ async function aiAgentRun(msg){
           const on=(r.ok && r.result && r.result.sheet) || args.sheet || (activeSch()||{}).name;
           if(r.ok && AIAG_EDIT_OPS.has(tool) && on){ needCheck.add(on); needSim.add(on); }
           if(r.ok && tool==="check") needCheck.delete(on);
-          if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool)) needSim.delete(on);
+          const circular=r.ok && r.result && (r.result.independent===false || (r.result.result&&r.result.result.independent===false));
+          if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
         continue;

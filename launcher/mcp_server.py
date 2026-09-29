@@ -153,7 +153,8 @@ TOOLS = [
       "fsm as text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\nstate S1: z=1\\nS0 -> S1 when x\\nS0 -> S0 else\\nS1 -> S0 when ~x\\nreset S0' "
       "(Mealy: 'S0 -> S1 when x / z=1'; conditions & | ^ ~ ( ) else) or an object {inputs, outputs, states:[{name,out}], "
       "transitions:[{from,to,when,out?}], reset}. Ports: clk, the inputs, the outputs, state bits (state_out:false drops them).",
-      {"fsm": {"type": ["string", "object"]}, "sheet": SHEET, "name": {"type": "string"}, "state_out": {"type": "boolean"}},
+      {"fsm": {"type": ["string", "object"]}, "sheet": SHEET, "name": {"type": "string"}, "state_out": {"type": "boolean"},
+       "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"}},
       ["fsm"], timeout=90),
     T("make_report", "Write the lab report into the project folder (<project>_report.html): every sheet (top first, then its "
       "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks, state diagram, acceptance "
@@ -199,11 +200,13 @@ TOOLS = [
        "hex": {"type": "boolean", "description": "seg7_mux4: show 0–F"}, "dp": {"type": "boolean", "description": "seg7_mux4: decimal points"},
        "async": {"type": "boolean", "description": "register_en: clear without waiting for the clock"},
        "sheet": {"type": "string", "description": "sheet to build on (created, or an empty one filled)"},
+       "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"},
        "name": {"type": "string", "description": "entity name when no sheet is given"}}, ["kind"], timeout=90),
     T("build_circuit", "Create a whole circuit, minimised and laid out by the editor, on a new sheet. One of:\n"
       "• formula: equations — \"sum = a ^ b ^ cin; cout = a&b | cin&(a^b)\" or \"{cout,sum} = a + b + cin\" (& | ^ ~ ' and/or/xor/not; "
       "{…} on the left = arithmetic, MSB first). The truth table is computed for you — prefer this to typing columns.\n"
-      "• truth_table: {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; "
+      "• truth_table: {inputs:[...], ones:{out:[rows that are 1]}} — e.g. a 3-bit prime detector {inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}}; "
+      "or {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; "
       "into:\"current\" fills a sheet that has exactly those ports, e.g. a lab template)\n"
       "• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — "
       "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename); "
@@ -212,8 +215,9 @@ TOOLS = [
       "type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]},
-       "formula": {"type": ["string", "array"], "items": {"type": "string"}},
+       "formula": {"type": ["string", "array", "object"], "items": {"type": "string"}},
        "inputs": {"type": "array", "items": {"type": "string"}, "description": "formula: input order (first = MSB); default: order of appearance"},
+       "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"},
        "sheet": {"type": "string", "description": "Sheet to build on: a new name creates that sheet, an existing EMPTY "
                                                   "sheet is filled (one with parts is refused). Default: a new sheet named after `name`."},
        "bus": {"type": ["boolean", "array"], "items": {"type": "string"},

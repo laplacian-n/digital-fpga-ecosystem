@@ -465,7 +465,9 @@ test("build_circuit into a named sheet (new or empty); connect to one bit of a b
   let r = await mcp.tool("build_circuit", { truth_table: tt, sheet: "fa_empty" });
   expect(r.error, r.text).toBe(false);
   expect(r.data.sheet).toBe("fa_empty");                                   // filled, not a new "logic" sheet beside it
-  expect((await mcp.tool("verify_truth_table", { sheet: "fa_empty", expected: tt.columns })).data.pass).toBe(true);
+  // checked against its own table it proves nothing (pass:null); against the requirement it passes
+  expect((await mcp.tool("verify_truth_table", { sheet: "fa_empty", expected: tt.columns })).data.pass).toBe(null);
+  expect((await mcp.tool("verify_truth_table", { sheet: "fa_empty", formula: "{cout,sum} = a + b + cin" })).data.pass).toBe(true);
   expect((await mcp.tool("status")).data.sheets.filter(s => /^logic/.test(s.name))).toEqual([]);
   r = await mcp.tool("build_circuit", { truth_table: tt, sheet: "fa_empty" });
   expect(r.error).toBe(true);                                              // has parts now: refused, not overwritten

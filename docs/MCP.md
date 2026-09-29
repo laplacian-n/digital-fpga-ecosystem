@@ -92,6 +92,11 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
   a sequence of clocks. On bus ports a formula is arithmetic: `{cout,sum} = a + b + cin` or `sum = a + b + cin`
   on a 4-bit adder, one bit as `a[2]` / `sum[0] = …`, a slice `a[3:0]` means the whole port. The app re-checks it after every edit (✓/✗ in the project tree). A pass marks the
   sheet verified. Set it first, then build until it passes.
+- **Tables as rows:** a truth table can list the rows that are 1: `truth_table:{inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}}`.
+  This works in `build_circuit`, `set_spec` and `verify_truth_table`, and is safer than typing a 0/1 column.
+- **Rebuilding:** `replace:true` rebuilds a sheet that already has parts, instead of making a new one.
+- **Spec before the sheet:** `set_spec` on a sheet that doesn't exist yet makes it empty. Building into it then answers `spec_check`.
+- **A check that proves nothing:** a check against the very table a sheet was built from returns `pass: null`.
 - **`save_module`:** refuses a sheet that is not verified, unless you pass `force: true`.
 - **Calls that only wait** (`approval_status`, `board_status`, `ai_chat_status`) run beside the others. They
   no longer hold up the queue.
