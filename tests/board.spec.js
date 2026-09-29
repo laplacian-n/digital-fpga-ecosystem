@@ -45,6 +45,11 @@ test("build the .bit and load it onto the board without leaving the editor", asy
   await expect(page.locator("#boardPage")).toBeVisible();
   await expect(page.locator("#brdTools")).toContainText("Vivado");
   await expect(page.locator("#brdPins .brd-pin")).toHaveCount(4);            // a, b, sum, cout
+  // the board doctor sits next to "แก้ขา" and finds nothing wrong with a half adder on switches/LEDs
+  await page.click('.brd-card [data-brd="doctor"]');
+  await expect(page.locator(".bd-sum")).toHaveClass(/ok/);
+  await expect(page.locator(".bd-led")).toHaveCount(2);
+  await page.locator(".modal-bg .close").click();
   await page.click('[data-brd="build"]');
   await expect(page.locator("#brdStatus")).toContainText("สร้าง .bit" + "สำเร็จ", { timeout: 15000 });
   await expect(page.locator("#brdLog")).toContainText("write_bitstream ok");

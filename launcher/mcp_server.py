@@ -157,6 +157,10 @@ TOOLS = [
       "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks, state diagram, acceptance "
       "test, board pin table, VHDL. The user prints it to PDF.",
       {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}}, timeout=90),
+    T("board_check", "Before building the .bit: what will go wrong on the real EDGE board — ports without a pin, two ports "
+      "on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit "
+      "enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one "
+      "the ลงบอร์ด page builds.", {"sheet": SHEET}),
     T("set_spec", "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): "
       "formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, "
       "inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks "
@@ -346,7 +350,7 @@ AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "op
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
                "build_part", "list_parts", "build_fsm", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module", "search_course"]
+               "get_pins", "set_pins", "auto_pins", "board_check", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 
 def openai_tools(names=None):
