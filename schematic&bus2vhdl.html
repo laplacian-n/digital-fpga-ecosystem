@@ -13152,6 +13152,79 @@ init();
 .ag-step code{font-size:11px;opacity:.8;word-break:break-all}
 .ag-step .ag-res{font-size:11.5px;color:var(--ink-dim,#667);margin-top:2px;word-break:break-word}
 .ag-step.bad .ag-res{color:var(--err,#c33)}
+/* 24. the part library in the Modules tab */
+.pt-sec{margin-bottom:6px}
+.pt-h{font-weight:700;font-size:12px;color:var(--ink);margin:4px 2px 6px;display:flex;align-items:center;gap:6px}
+.pt-h.pt-mine{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.pt-ok{font-weight:600;font-size:10.5px;color:var(--ok,#16a34a)}
+.pt-grp{margin-bottom:4px}
+.pt-gh{width:100%;text-align:left;background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--ink);cursor:pointer}
+.pt-gh:hover{border-color:var(--accent)}
+.pt-list{display:none;padding:4px 0 2px 6px}
+.pt-grp.open .pt-list{display:block}
+.pt-item{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;cursor:pointer;color:var(--ink)}
+.pt-item:hover{background:var(--bg-2);border-color:var(--line)}
+.pt-item b{font-size:12px;font-weight:600;display:block}
+.pt-item small{display:block;font-size:10.5px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-badge{font-size:9.5px;font-weight:600;padding:0 5px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:1px}
+.pt-badge.ok{color:var(--ok,#16a34a);border-color:var(--ok,#16a34a)}
+.pt-form{display:flex;flex-wrap:wrap;gap:8px 16px}
+.pt-f{font-size:12.5px;display:flex;align-items:center;gap:6px}
+.pt-ports{margin-top:10px;padding:8px;border:1px solid var(--line);border-radius:6px;font-size:12px;line-height:1.6;background:var(--bg-2)}
+.pt-ports.bad{color:var(--err,#c33)}
+/* 25. acceptance tests */
+.spec-b{margin-left:6px;font-size:11px;font-weight:700}
+.spec-b.ok{color:var(--ok,#16a34a)} .spec-b.bad{color:var(--err,#dc2626)}
+.spec-box{margin-top:14px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg-2)}
+.spec-h{font-weight:700;font-size:12.5px;margin-bottom:4px}
+.spec-s{font-weight:700;font-size:12.5px;margin:4px 0}
+.spec-s.ok{color:var(--ok,#16a34a)} .spec-s.bad{color:var(--err,#dc2626)}
+.spec-d{font-size:11.5px;line-height:1.5;word-break:break-word}
+.spec-a{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+/* 26. FSM designer */
+.fsm-wrap{display:flex;gap:14px;align-items:flex-start}
+.fsm-l{flex:0 0 360px;display:flex;flex-direction:column;gap:6px}
+.fsm-l textarea{width:100%;font-family:ui-monospace,monospace;font-size:12.5px;background:var(--bg-1);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+.fsm-r{flex:1;min-width:0}
+.fsm-t{border-collapse:collapse;font-size:12px;margin-top:8px}
+.fsm-t th,.fsm-t td{border:1px solid var(--line);padding:3px 8px;text-align:center}
+#fsmMsg.bad{color:var(--err,#dc2626)}
+/* 28. lab helper */
+.lh-top{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.lh-top select{max-width:620px}
+.lh-body{max-height:62vh;overflow:auto}
+.lh-card{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--bg-2)}
+.lh-q{font-size:13px;line-height:1.5;margin-bottom:6px}
+.lh-subs label{display:flex;gap:6px;align-items:flex-start;font-size:12.5px;line-height:1.45;margin:3px 0}
+.lh-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.lh-sol{margin-top:6px}.lh-sol summary{cursor:pointer;font-size:12px;color:var(--ink-dim)}
+.lh-sol pre{white-space:pre-wrap;font-size:11.5px;background:var(--bg-1);border:1px solid var(--line);border-radius:6px;padding:8px;max-height:260px;overflow:auto}
+/* 29 board doctor */
+.bd-sum{padding:8px 12px;border-radius:8px;margin-bottom:10px;font-weight:600}
+.bd-sum.ok{background:rgba(52,199,89,.14);color:#1f8a3b}.bd-sum.warn{background:rgba(255,159,10,.15);color:#a15c00}.bd-sum.bad{background:rgba(255,59,48,.13);color:#c4271d}
+.bd-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto}
+.bd-f{border:1px solid var(--line,#ddd);border-left:4px solid #999;border-radius:6px;padding:6px 10px}
+.bd-f.err{border-left-color:#ff3b30}.bd-f.warn{border-left-color:#ff9f0a}.bd-f.info{border-left-color:#0a84ff}
+.bd-t{font-weight:600}.bd-fix{margin-top:3px}.bd-h{margin:14px 0 6px;font-size:14px}
+.bd-row{margin:6px 0}.bd-sws,.bd-leds{display:flex;flex-wrap:wrap;gap:6px;margin-top:3px}
+.bd-sw{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line,#ccc);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px}
+.bd-sw.on{background:rgba(10,132,255,.14);border-color:#0a84ff}.bd-sw span{color:#888}
+.bd-led{display:inline-flex;flex-direction:column;align-items:center;font-size:11px;gap:2px;min-width:28px}
+.bd-led i{width:12px;height:12px;border-radius:50%;background:rgba(128,128,128,.25);display:block}
+.bd-led.on i{background:#34c759;box-shadow:0 0 8px #34c759}
+.bd-segs{display:inline-flex;gap:4px;background:#111;padding:6px 8px;border-radius:6px;margin-top:3px}
+.bd-line{padding:4px 8px;border-radius:6px;margin:6px 0;font-size:13px}.bd-line.bad{background:rgba(255,59,48,.12)}.bd-line.warn{background:rgba(255,159,10,.13)}
+/* 30 wiring hints */
+.wh-box{margin:10px 12px;padding:8px 10px;border:1px solid rgba(255,204,0,.55);background:rgba(255,204,0,.08);border-radius:8px}
+.wh-h{font-weight:600;margin-bottom:6px}.wh-list{display:flex;flex-direction:column;gap:6px;margin-bottom:6px;max-height:260px;overflow:auto}
+.wh-i{display:flex;gap:6px;align-items:center;justify-content:space-between;font-size:12px}.wh-i code{font-size:11px}
+.wh-ghost .wh-line{fill:none;stroke:#f5a623;stroke-width:1.6;stroke-dasharray:5 4;opacity:.9;pointer-events:none}
+/* 31 board troubleshooting */
+.bh-q{font-size:16px;font-weight:600;margin:6px 0 12px}.bh-opts{display:flex;flex-direction:column;gap:6px}
+.bh-o{text-align:left;justify-content:flex-start}.bh-back{margin-bottom:6px}
+.bh-diag h3{margin:4px 0 8px}.bh-checks,.bh-tips{margin:4px 0 12px;padding-left:22px;line-height:1.6}
+.bh-checks{list-style:none;padding-left:4px}.bh-ok{color:#1f8a3b}.bh-bad{color:#c4271d}
+.bh-map{margin:4px 0 8px;font-size:13px}.bh-acts{display:flex;flex-wrap:wrap;gap:6px}.bd-help{margin:10px 0 0}
 </style>
 <script>
 "use strict";
@@ -17134,7 +17207,7 @@ GENERATORS.push({id:"busports", icon:"⫼", name:"รวมขาเป็นบ
 const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null };
 const AIAG_MAX_STEPS = 24;
 const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
-const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table"]);
+const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table","check_spec","set_spec"]);
 
 function aiagSystemPrompt(){
   const P=state.project, s=activeSch();
@@ -17145,6 +17218,8 @@ function aiagSystemPrompt(){
 "You work ONLY through the tools. Every change you make is drawn live on the user's screen and can be undone.",
 "",
 "How to work:",
+"0. For a new circuit, first write down what it must do with set_spec (a formula / table / clock sequence taken from",
+"   the REQUEST), then build until check_spec passes. The spec is the yardstick — never derive it from your circuit.",
 "1. Look first: get_sheet (detail:'brief') before changing a sheet you have not seen.",
 "2. A standard circuit (adder, subtractor, comparator, mux, decoder, encoder, 7-seg, parity, counters, divider,",
 "   registers, toggle, edge detector, debounce): build_part — it is generated AND checked for you (list_parts shows them).",
@@ -18176,6 +18251,1087 @@ async function aiagFastPath(msg, run){
   }
   return {note:"(system) "+desc+(wrongNames.length?` The user named ports ${wrongNames.join(", ")} — rename the part's ports with update_component to match.`:"")+" Do only the rest of the request."};
 }
+
+/* ===== 24. The part library in the Modules tab ===================================================
+   The checked parts (22-parts.js) were reachable only through Claude / the local agent. The
+   Modules tab now opens with them, grouped, above the user's own modules: click one → a small form
+   (size, bus, options, the ports it will have) → "วางเป็นบล็อก" on the sheet on screen, or
+   "เปิดเป็นแผ่นใหม่". The user's modules below carry a badge: ✓ ตรวจแล้ว / ยังไม่ได้ตรวจ. */
+const PARTS_UI = { open:{} };
+function partsMatches(q){
+  const t=String(q||"").trim().toLowerCase();
+  return Object.entries(PARTS).filter(([k,P])=>!t || t.split(/\s+/).every(w=>(k+" "+P.label+" "+P.desc+" "+P.group).toLowerCase().includes(w)));
+}
+function partsSectionHtml(){
+  const q=(state.modSearch||"").trim(), hits=partsMatches(q);
+  if(!hits.length) return "";
+  const groups={}; hits.forEach(([k,P])=>(groups[P.group]=groups[P.group]||[]).push([k,P]));
+  const open=g=>q || PARTS_UI.open[g];
+  return `<div class="pt-sec"><div class="pt-h">ชิ้นส่วนสำเร็จรูป <span class="pt-ok">✓ ตรวจทุกครั้งที่สร้าง</span></div>`+
+    Object.entries(groups).map(([g,L])=>`<div class="pt-grp ${open(g)?"open":""}"><button class="pt-gh" data-ptgrp="${esc(g)}">${open(g)?"▾":"▸"} ${esc(g)} <span class="muted">${L.length}</span></button>
+      <div class="pt-list">${L.map(([k,P])=>`<button class="pt-item" data-part="${k}" title="${esc(P.desc)}"><b>${esc(P.label)}</b><small>${esc(P.desc)}</small></button>`).join("")}</div></div>`).join("")+
+    `</div><div class="pt-h pt-mine">โมดูลของฉัน</div>`;
+}
+{
+  const _cards=moduleCardsHtml;
+  moduleCardsHtml=function(){
+    let h=_cards.apply(this, arguments);
+    // the verified badge on the user's own modules
+    loadModules();
+    Object.values(state.modules||{}).forEach(m=>{
+      const badge=m.verified && !/^not verified/.test(m.verified) ? `<span class="pt-badge ok" title="${esc(m.verified)}">✓ ตรวจแล้ว</span>` : `<span class="pt-badge" title="ยังไม่ได้ตรวจเทียบกับข้อกำหนด">ยังไม่ได้ตรวจ</span>`;
+      h=h.replace(`<div class="mod-name" title="${esc(m.name)}">${esc(m.name)}</div>`, `<div class="mod-name" title="${esc(m.name)}">${esc(m.name)} ${badge}</div>`);
+    });
+    return partsSectionHtml()+h;
+  };
+  const _pane=renderModulesPane;
+  renderModulesPane=function(){ const r=_pane.apply(this, arguments);
+    const si=$("#modSearch"); if(si) si.placeholder="🔍 ค้นหาชิ้นส่วน / โมดูล (ชื่อ / คำอธิบาย / ชื่อขา)";
+    return r; };
+  document.addEventListener("click", ev=>{
+    const g=ev.target.closest && ev.target.closest("[data-ptgrp]");
+    if(g){ const k=g.dataset.ptgrp; PARTS_UI.open[k]=!PARTS_UI.open[k]; renderModCards(); return; }
+    const it=ev.target.closest && ev.target.closest("[data-part]");
+    if(it) partDialog(it.dataset.part);
+  });
+  try{ renderModulesPane(); }catch(_){}
+}
+/* the form: parameters, ports preview, place / open */
+function partDialog(kind){
+  const P=PARTS[kind]; if(!P) return;
+  const params=P.params||{};
+  const field=(k,s)=>{
+    const lab={n:"ขนาด (N)", cin:"มีขา cin", en:"มีขา enable", odd:"parity คี่", active_low:"active-low (บอร์ด EDGE)", output:"ขาออก"}[k]||k;
+    if(s.bool) return `<label class="pt-f"><input type="checkbox" data-pp="${k}" ${s.def?"checked":""}> ${lab}</label>`;
+    if(s.options) return `<label class="pt-f">${lab} <select data-pp="${k}">${s.options.map(o=>`<option ${o===s.def?"selected":""}>${o}</option>`).join("")}</select></label>`;
+    return `<label class="pt-f">${lab} <input type="number" data-pp="${k}" value="${s.def}" min="${s.min}" max="${s.max}" style="width:${s.max>1e6?120:70}px"> <span class="muted">${s.min}–${s.max}</span></label>`;
+  };
+  const m=uxModal(esc(P.label), `
+    <div class="muted" style="margin-bottom:8px">${esc(P.desc)}</div>
+    <div class="pt-form">${Object.entries(params).map(([k,s])=>field(k,s)).join("")}
+      <label class="pt-f"><input type="checkbox" data-pp="bus"> ขาแบบบัส (a3..a0 → a[3:0])</label>
+      <label class="pt-f">ชื่อแผ่น <input type="text" data-pp="sheet" placeholder="ไม่ใส่ = ตั้งให้" spellcheck="false" style="width:140px"></label></div>
+    <div class="pt-ports" id="ptPorts"></div>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">สร้างแล้วระบบจำลองเทียบกับโมเดลอ้างอิงให้ทุกครั้ง — ถ้าไม่ตรงจะไม่วาดออกมา</div>`,
+    {width:480, foot:`<button class="btn" id="ptOpen">เปิดเป็นแผ่นใหม่</button><button class="btn btn-primary" id="ptPlace">วางเป็นบล็อกบนแผ่นนี้</button>`});
+  const read=()=>{ const a={kind};
+    m.querySelectorAll("[data-pp]").forEach(e=>{ const k=e.dataset.pp;
+      if(e.type==="checkbox") a[k]=e.checked; else if(e.type==="number") a[k]=+e.value; else if(e.value.trim()) a[k]=e.value.trim(); });
+    if(!a.sheet) delete a.sheet; return a; };
+  const preview=()=>{ const el=m.querySelector("#ptPorts"); try{ const a=read(); const p=partParams(kind, a); const pp=P.ports(p);
+      const fmt=o=>Object.entries(o).filter(([,w])=>w>0).map(([b,w])=>w>1?(a.bus?`${b}[${w-1}:0]`:`${b}${w-1}..${b}0`):b).join(", ");
+      el.innerHTML=`<b>ขาเข้า</b> ${esc(fmt(pp.in))}<br><b>ขาออก</b> ${esc(fmt(pp.out))}`; el.classList.remove("bad"); return true; }
+    catch(e){ el.textContent=e.message; el.classList.add("bad"); return false; } };
+  m.addEventListener("input", preview); preview();
+  const go=async place=>{ if(!preview()) return;
+    const back=activeSch(), a=read();
+    try{
+      const r=MCP_OPS.build_part(a);
+      m.close();
+      if(place && back && back.id!==(Object.values(state.project.schematics).find(s=>s.name===r.sheet)||{}).id){
+        openSchTab(back.id);
+        const sub=Object.values(state.project.schematics).find(s=>s.name===r.sheet);
+        const why=subBlockBlockedWhy(sub.id, back.id);
+        if(why){ toast(why,"warn",4000); return; }
+        MCP_OPS.add_component({sheet:back.name, type:"block:"+sub.name});     // a free spot beside the drawing, not on top of it
+        try{ const b=activeSch().components.filter(c=>c.type==="SCH:"+sub.id).pop(); if(b) focusComp(back.id, b.id); }catch(_){}
+        toast(`วาง ${P.label} (${r.sheet}) เป็นบล็อกแล้ว — ตรวจแล้วถูกต้อง: ${r.verified.method}`,"ok",4500);
+      } else toast(`สร้าง ${P.label} ในแผ่น ${r.sheet} แล้ว — ตรวจแล้วถูกต้อง: ${r.verified.method}`,"ok",4500);
+    }catch(e){ toast("สร้างไม่ได้: "+e.message+(e.hint?" — "+e.hint:""),"err",6000); }
+  };
+  m.querySelector("#ptPlace").onclick=()=>go(true);
+  m.querySelector("#ptOpen").onclick=()=>go(false);
+}
+
+/* ===== 25. Acceptance tests: what a sheet MUST do, checked on every change =======================
+   "ให้คนพื้นฐานน้อยทำงานเกินตัวได้": the user says what the circuit must do — a formula, a table, or
+   a clock-by-clock sequence — and the sheet shows ✓ / ✗ from then on, re-checked after every edit
+   (the project tree and the Inspector). It is also the independent yardstick an AI needs: a spec
+   written from the requirement, not from the circuit. A passing spec stamps the sheet verified
+   (22-parts: sheetVerifyStamp), so a hand-drawn or sequential sheet can be saved as a module too.
+   sch.spec = {kind:"formula", text} | {kind:"table", cols:{out:"01x…"}}
+            | {kind:"sequence", cycles, inputs:[{name:v}…] (per cycle, optional), expect:{out:[v|"x"…]}}
+   A result is cached on the sheet (sch.specResult) for the badges. */
+function specCheck(sch){
+  const sp=sch && sch.spec; if(!sp) return null;
+  try{
+    if(sp.kind==="formula" || sp.kind==="table"){
+      const sim=clientCombSim(sch);
+      if(!sim.ok) return {pass:false, reason:sim.reason||"จำลองไม่ได้"};
+      const tt=sim.truth_table;
+      const cols = sp.kind==="formula" ? formulaTable(sp.text, tt.inputs).cols : sp.cols;
+      const bad=[];
+      Object.entries(cols).forEach(([o,col])=>{ const k=tt.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
+        if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้"}); return; }
+        String(col).toLowerCase().split("").forEach((ch,r)=>{ if(ch==="x"||!tt.rows[r]) return; const got=tt.rows[r][1][k];
+          if(String(got)!==ch) bad.push({output:o, row:r, inputs:tt.rows[r][0].join(""), want:+ch, got}); }); });
+      return {pass:!bad.length, checked:`${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs};
+    }
+    if(sp.kind==="sequence"){
+      const ins=sch.components.filter(c=>c.type==="IN"), byName=n=>ins.find(c=>String(c.params.name).toLowerCase()===String(n).toLowerCase());
+      const holdAt=i=>{ const v=(sp.inputs||[])[i]||(sp.inputs||[])[(sp.inputs||[]).length-1]||{}, o={};
+        Object.entries(v).forEach(([n,val])=>{ const c=byName(n); if(c) o[c.id]=typeof val==="string"?mcpProbeVal(c,val):+val; }); return o; };
+      const cycles=Math.max(1, Math.min(512, sp.cycles || Math.max(...Object.values(sp.expect||{}).map(a=>a.length), 1)));
+      const j=clientSeqSim(sch, cycles, {holdAt, hold:holdAt(0)});
+      if(!j.ok) return {pass:false, reason:j.reason||"จำลองไม่ได้"};
+      const sq=j.sequence, bad=[];
+      Object.entries(sp.expect||{}).forEach(([o,L])=>{ const k=sq.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
+        if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้"}); return; }
+        L.forEach((w,i)=>{ if(w==="x"||w==null||!sq.rows[i]) return; const row=sq.rows[i], got=row[4]?row[4][k]:row[3][k];
+          const want=typeof w==="string" ? parseInt(w, /^[01]+$/.test(w)&&w.length>1?2:10) : +w;
+          if(got!==want) bad.push({output:o, cycle:i, want, got}); }); });
+      return {pass:!bad.length, checked:`${cycles} clock`, mismatches:bad.slice(0,16), total_mismatches:bad.length};
+    }
+    return {pass:false, reason:"ข้อกำหนดไม่รู้จักชนิด "+sp.kind};
+  }catch(e){ return {pass:false, reason:String(e&&e.message||e)}; }
+}
+/* run it, remember the result, stamp the sheet when it passes */
+function specRun(sch){
+  const r=specCheck(sch); if(!r){ delete sch.specResult; return null; }
+  sch.specResult={pass:r.pass, at:Date.now(), hash:sheetHash(sch), summary:r.pass?`✓ ผ่าน (${r.checked})`:`✗ ${r.reason||("ไม่ตรง "+r.total_mismatches+" จุด")}`};
+  if(r.pass){ const how="spec "+(sch.spec.kind==="formula"?sch.spec.text:sch.spec.kind)+" — "+r.checked;
+    if(!sheetVerified(sch) || !String(sch.verified.how).startsWith("part")) sheetVerifyStamp(sch, how); }
+  return r;
+}
+/* re-check after edits (debounced); only sheets whose connectivity changed since their last check */
+{
+  let t=null;
+  const again=()=>{ clearTimeout(t); t=setTimeout(()=>{ let changed=false;
+    Object.values(state.project.schematics).forEach(s=>{ if(!s.spec) return;
+      if(s.specResult && s.specResult.hash===sheetHash(s)) return;
+      specRun(s); changed=true; });
+    if(changed){ try{ renderProjectTree(); }catch(_){} try{ if(!state.selection.size) renderInspector(); }catch(_){} } }, 700); };
+  const _snap=snapshot; snapshot=function(){ const r=_snap.apply(this, arguments); again(); return r; };
+  const _undo=undo; undo=function(){ const r=_undo.apply(this, arguments); again(); return r; };
+  const _redo=redo; redo=function(){ const r=_redo.apply(this, arguments); again(); return r; };
+  // badges in the project tree
+  const _tree=renderProjectTree;
+  renderProjectTree=function(){ const r=_tree.apply(this, arguments);
+    document.querySelectorAll('#projectPane .tree-item.sch[data-open]').forEach(el=>{
+      const s=state.project.schematics[el.dataset.open]; if(!s || !s.specResult || el.querySelector(".spec-b")) return;
+      const b=document.createElement("span"); b.className="spec-b "+(s.specResult.pass?"ok":"bad"); b.textContent=s.specResult.pass?"✓":"✗";
+      b.title="ข้อกำหนด: "+s.specResult.summary; el.appendChild(b); });
+    return r; };
+  // the Inspector with nothing selected: the sheet's spec
+  const _insp=renderInspector;
+  renderInspector=function(){ const r=_insp.apply(this, arguments);
+    try{ if(state.selection.size) return r; const sch=activeSch(), pane=$("#inspectorPane"); if(!sch||!pane) return r;
+      const box=document.createElement("div"); box.className="spec-box";
+      const sr=sch.spec && sch.specResult;
+      box.innerHTML=`<div class="spec-h">ข้อกำหนดของแผ่นนี้ (acceptance test)</div>
+        ${sch.spec ? `<div class="spec-s ${sr&&sr.pass?"ok":"bad"}">${esc(sr?sr.summary:"ยังไม่ได้ตรวจ")}</div>
+          <div class="muted spec-d">${esc(specDescribe(sch.spec))}</div>`
+          : `<div class="muted spec-d">บอกว่าวงจรนี้ต้องทำอะไร แล้วระบบจะตรวจให้ทุกครั้งที่แก้ — เช่น สมการ, ตารางความจริง หรือค่าที่ต้องได้ทีละ clock</div>`}
+        <div class="spec-a"><button class="btn" id="specEdit">${sch.spec?"แก้ข้อกำหนด":"＋ ตั้งข้อกำหนด"}</button>
+          ${sch.spec?`<button class="btn" id="specRun">ตรวจตอนนี้</button><button class="btn" id="specDel" title="ลบข้อกำหนด">🗑</button>`:""}</div>`;
+      pane.appendChild(box);
+      box.querySelector("#specEdit").onclick=()=>specDialog(sch);
+      const rr=box.querySelector("#specRun"); if(rr) rr.onclick=()=>{ const x=specRun(sch); renderProjectTree(); renderInspector();
+        if(x && !x.pass && x.mismatches&&x.mismatches.length) toast("ไม่ตรง: "+x.mismatches.slice(0,3).map(m=>m.cycle!=null?`${m.output} clock ${m.cycle} ต้องได้ ${m.want} ได้ ${m.got}`:`${m.output} แถว ${m.inputs} ต้องได้ ${m.want} ได้ ${m.got}`).join(" · "),"warn",7000); };
+      const rd=box.querySelector("#specDel"); if(rd) rd.onclick=()=>{ delete sch.spec; delete sch.specResult; snapshot(); renderAll(); };
+    }catch(e){ console.warn("spec box", e); }
+    return r; };
+}
+function specDescribe(sp){
+  if(sp.kind==="formula") return "สมการ: "+sp.text;
+  if(sp.kind==="table") return "ตาราง: "+Object.entries(sp.cols).map(([k,v])=>k+"="+v).join(", ");
+  if(sp.kind==="sequence") return `ลำดับ ${sp.cycles||""} clock: `+Object.entries(sp.expect||{}).map(([k,v])=>k+" = "+v.slice(0,12).join(",")+(v.length>12?"…":"")).join(" · ");
+  return "";
+}
+/* the form: formula / table / "what it does now" */
+function specDialog(sch){
+  const sp=sch.spec||{};
+  const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
+  const m=uxModal("ข้อกำหนดของแผ่น "+esc(sch.name), `
+    <div class="seg-tabs" style="margin-bottom:8px"><button data-sk="formula" class="${sp.kind!=="sequence"&&sp.kind!=="table"?"on":""}">สมการ</button>
+      <button data-sk="table" class="${sp.kind==="table"?"on":""}">ตารางความจริง</button><button data-sk="sequence" class="${sp.kind==="sequence"?"on":""}">ลำดับทีละ clock</button></div>
+    <div data-sp="formula"><textarea id="spF" rows="3" style="width:100%" placeholder="sum = a ^ b ^ cin; cout = a&b | cin&(a^b)   หรือ   {cout,sum} = a + b + cin">${esc(sp.kind==="formula"?sp.text:"")}</textarea>
+      <div class="muted" style="font-size:11.5px">& AND · | OR · ^ XOR · ~ NOT · {…} = ตัวเลขหลายบิต (บิตสูงก่อน) · ชื่อต้องตรงกับขา INPUT/OUTPUT</div></div>
+    <div data-sp="table" hidden><textarea id="spT" rows="3" style="width:100%" placeholder="sum = 01101001&#10;cout = 00010111">${esc(sp.kind==="table"?Object.entries(sp.cols).map(([k,v])=>k+" = "+v).join("\n"):"")}</textarea>
+      <div class="muted" style="font-size:11.5px">หนึ่งบรรทัดต่อขาออก · หนึ่งตัวอักษรต่อแถว (0/1/x) · ขาเข้าตัวแรกเป็นบิตสูงสุด</div></div>
+    <div data-sp="sequence" hidden><textarea id="spS" rows="3" style="width:100%" placeholder="q = 0,1,2,3,4,5,0,1&#10;clk_out = 0,0,0,1,1,1,0">${esc(sp.kind==="sequence"?Object.entries(sp.expect).map(([k,v])=>k+" = "+v.join(",")).join("\n"):"")}</textarea>
+      <div class="muted" style="font-size:11.5px">ค่าที่ต้องได้ก่อน clock แต่ละลูก (เริ่มจาก clock 0) · x = ไม่สนใจ · อินพุตอื่นค้างที่ 0</div></div>
+    <div class="spec-a" style="margin-top:8px"><button class="btn" id="spNow" title="ใช้พฤติกรรมตอนนี้เป็นข้อกำหนด — กันแก้แล้วพังทีหลัง">ใช้สิ่งที่วงจรทำตอนนี้</button></div>
+    <div id="spMsg" class="muted" style="margin-top:6px"></div>`,
+    {width:560, foot:`<button class="btn btn-primary" id="spSave">บันทึกและตรวจ</button>`});
+  let kind=sp.kind||(hasFF?"sequence":"formula");
+  const show=k=>{ kind=k; m.querySelectorAll("[data-sk]").forEach(b=>b.classList.toggle("on", b.dataset.sk===k)); m.querySelectorAll("[data-sp]").forEach(d=>d.hidden=d.dataset.sp!==k); };
+  show(kind);
+  m.querySelectorAll("[data-sk]").forEach(b=>b.onclick=()=>show(b.dataset.sk));
+  const lines=t=>t.split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>{ const i=l.indexOf("="); return i<1?null:[l.slice(0,i).trim(), l.slice(i+1).trim()]; }).filter(Boolean);
+  m.querySelector("#spNow").onclick=()=>{
+    if(hasFF){ const j=clientSeqSim(sch, 16); if(!j.ok){ toast(j.reason,"warn"); return; }
+      const sq=j.sequence; m.querySelector("#spS").value=sq.outputs.map((o,k)=>o+" = "+sq.rows.map(r=>r[4]?r[4][k]:r[3][k]).join(",")).join("\n"); show("sequence"); }
+    else { const j=clientCombSim(sch); if(!j.ok){ toast(j.reason,"warn"); return; }
+      const tt=j.truth_table; m.querySelector("#spT").value=tt.outputs.map((o,k)=>o+" = "+tt.rows.map(r=>r[1][k]).join("")).join("\n"); show("table"); }
+    m.querySelector("#spMsg").textContent="ใส่พฤติกรรมตอนนี้แล้ว — ตรวจว่าตรงกับที่ต้องการก่อนบันทึก";
+  };
+  m.querySelector("#spSave").onclick=()=>{
+    let spec;
+    try{
+      if(kind==="formula"){ const t=m.querySelector("#spF").value.trim(); if(!t) throw new Error("ใส่สมการก่อน"); spec={kind, text:t}; }
+      else if(kind==="table"){ spec={kind, cols:Object.fromEntries(lines(m.querySelector("#spT").value))}; if(!Object.keys(spec.cols).length) throw new Error("ใส่ตารางก่อน"); }
+      else { const ex=Object.fromEntries(lines(m.querySelector("#spS").value).map(([k,v])=>[k, v.split(/[,\s]+/).filter(Boolean).map(x=>x==="x"?"x":(/^[01]{2,}$/.test(x)?x:+x))]));
+        if(!Object.keys(ex).length) throw new Error("ใส่ค่าที่ต้องได้ก่อน"); spec={kind, expect:ex, cycles:Math.max(...Object.values(ex).map(a=>a.length))}; }
+      sch.spec=spec; delete sch.specResult;
+      const r=specRun(sch);
+      if(r && r.reason && !r.pass && !r.mismatches){ throw new Error(r.reason); }
+      m.close(); snapshot(); renderAll();
+      toast(r.pass?"ตั้งข้อกำหนดแล้ว — วงจรผ่าน ✓":"ตั้งข้อกำหนดแล้ว — วงจรยังไม่ผ่าน ✗ ("+r.total_mismatches+" จุด)", r.pass?"ok":"warn", 5000);
+    }catch(e){ m.querySelector("#spMsg").textContent="✗ "+(e.message||e); }
+  };
+}
+
+/* ---------- MCP ---------- */
+MCP_OPS.set_spec = a=>{
+  const sch=mcpUse(a.sheet); let spec;
+  if(a.formula!=null) spec={kind:"formula", text:Array.isArray(a.formula)?a.formula.join("; "):String(a.formula)};
+  else if(a.table) spec={kind:"table", cols:a.table};
+  else if(a.sequence){ const s=a.sequence; if(!s.expect) mcpFail("sequence needs expect: {output: [value per clock, …]}");
+    spec={kind:"sequence", expect:s.expect, inputs:s.inputs, cycles:s.cycles||Math.max(...Object.values(s.expect).map(v=>v.length))}; }
+  else mcpFail("give formula, table or sequence", 'e.g. formula:"sum = a^b^cin; cout = a&b | cin&(a^b)", sequence:{expect:{q:[0,1,2,3,4,5,0]}}');
+  mcpBeforeChange("ตั้งข้อกำหนด");
+  sch.spec=spec; delete sch.specResult;
+  const r=specRun(sch);
+  mcpCommit(sch);
+  return {sheet:sch.name, spec, result:r, note:"checked again after every change; a passing spec marks the sheet verified"};
+};
+MCP_OPS.check_spec = a=>{
+  const list=a.all_sheets ? Object.values(state.project.schematics).filter(s=>s.spec) : [mcpSheet(a.sheet)];
+  const out=list.map(s=>{ if(!s.spec) return {sheet:s.name, spec:null, note:"no spec — set_spec first"};
+    const r=specRun(s); return Object.assign({sheet:s.name, spec:specDescribe(s.spec)}, r); });
+  try{ renderProjectTree(); }catch(_){}
+  return a.all_sheets ? {sheets:out, pass:out.every(x=>x.pass)} : out[0];
+};
+
+/* ===== 26. State machines from a state diagram (Tools ▸ ออกแบบ FSM, MCP build_fsm) ===============
+   The labs that stop beginners are FSMs (traffic light, sequence detector, vending machine): the
+   diagram → state table → encoding → K-maps → flip-flops step. Here the user writes the diagram as
+   a few lines (or sees it drawn as they type), and the app does the rest — binary encoding with the
+   reset state = 0 (the flip-flops' power-up value), next-state and output logic minimised per bit
+   (unused codes go back to reset, so it can never lock up), D flip-flops — then runs the circuit
+   clock by clock against the diagram itself before handing it over. The diagram stays on the sheet
+   (sch.fsm) and becomes its acceptance test.
+
+     inputs: x              outputs: z             (Moore: outputs per state)
+     state S0: z=0          S0 -> S1 when x        S0 -> S0 when ~x
+     state S1: z=0          S1 -> S2 when x        S1 -> S0 else
+     state S2: z=1          S2 -> S2 when x        S2 -> S0 else
+     reset S0
+   Mealy: an output on the arrow — "S1 -> S2 when x / z=1". Conditions: & | ^ ~ ( ), "else" = none of the above. */
+function fsmParse(src){
+  if(src && typeof src==="object") return fsmNormalize(src);
+  const M={inputs:[], outputs:[], states:[], transitions:[], reset:null, clock:"clk"};
+  String(src||"").split(/\n|;/).map(l=>l.replace(/#.*$/,"").trim()).filter(Boolean).forEach((l,ln)=>{
+    let m;
+    if((m=/^inputs?\s*[:=]\s*(.*)$/i.exec(l))) M.inputs=m[1].split(/[\s,]+/).filter(Boolean);
+    else if((m=/^outputs?\s*[:=]\s*(.*)$/i.exec(l))) M.outputs=m[1].split(/[\s,]+/).filter(Boolean);
+    else if((m=/^clock\s*[:=]\s*(\w+)$/i.exec(l))) M.clock=m[1];
+    else if((m=/^reset\s*[:=]?\s*(\w+)$/i.exec(l))) M.reset=m[1];
+    else if((m=/^state\s+(\w+)\s*[:]?\s*(.*)$/i.exec(l))) M.states.push({name:m[1], out:fsmAssigns(m[2])});
+    else if((m=/^(\w+)\s*-+>\s*(\w+)\s*(?:(?:when|if|on|:)\s*([^/]*?)|(else|otherwise))?\s*(?:\/\s*(.*))?$/i.exec(l)))
+      M.transitions.push({from:m[1], to:m[2], when:(m[3]||m[4]||"").trim()||"1", out:m[5]?fsmAssigns(m[5]):null});
+    else throw new Error(`บรรทัด ${ln+1} อ่านไม่ออก: "${l}"`);
+  });
+  return fsmNormalize(M);
+}
+function fsmAssigns(t){ const o={}; String(t||"").split(/[\s,]+/).filter(Boolean).forEach(p=>{ const m=/^(\w+)\s*=\s*([01])$/.exec(p); if(m) o[m[1]]=+m[2]; }); return o; }
+function fsmNormalize(M){
+  M={inputs:(M.inputs||[]).slice(), outputs:(M.outputs||[]).slice(), states:(M.states||[]).map(s=>typeof s==="string"?{name:s,out:{}}:{name:s.name, out:Object.assign({}, s.out||s.outputs||{})}),
+     transitions:(M.transitions||[]).map(t=>({from:t.from, to:t.to, when:String(t.when==null?"1":t.when).trim()||"1", out:t.out?Object.assign({},t.out):null})),
+     reset:M.reset, clock:M.clock||"clk"};
+  // states named only in arrows count too
+  M.transitions.forEach(t=>[t.from,t.to].forEach(n=>{ if(!M.states.some(s=>s.name===n)) M.states.push({name:n, out:{}}); }));
+  if(!M.states.length) throw new Error("ยังไม่มี state");
+  if(!M.reset) M.reset=M.states[0].name;
+  if(!M.states.some(s=>s.name===M.reset)) throw new Error(`reset ${M.reset} ไม่ใช่ state`);
+  // the reset state first → code 0
+  M.states.sort((a,b)=>(a.name===M.reset?-1:b.name===M.reset?1:0));
+  M.mealy=M.transitions.some(t=>t.out && Object.keys(t.out).length);
+  const bad=[...M.inputs, ...M.outputs].find(n=>!/^[A-Za-z_]\w*$/.test(n)); if(bad) throw new Error(`ชื่อขาไม่ถูก: ${bad}`);
+  if(M.inputs.some(n=>M.outputs.includes(n))) throw new Error("ชื่อขาเข้าและขาออกซ้ำกัน");
+  const k=Math.max(1, Math.ceil(Math.log2(M.states.length)));
+  if(k+M.inputs.length>10) throw new Error(`state ${M.states.length} ตัว + ขาเข้า ${M.inputs.length} ขา มากเกินไป (บิต state + ขาเข้า ≤ 10)`);
+  M.bits=k;
+  M.transitions.forEach(t=>{ if(t.when.toLowerCase()!=="else"){ try{ fxParse(fxTokens(t.when), false); }catch(e){ throw new Error(`เงื่อนไข "${t.when}" (${t.from} → ${t.to}): ${e.message}`); } } });
+  return M;
+}
+/* the diagram's own meaning: from state s with inputs v → {to, out} */
+function fsmStep(M, s, v){
+  const env=Object.assign({}, v);
+  const from=M.transitions.filter(t=>t.from===s);
+  let hit=from.find(t=>t.when.toLowerCase()!=="else" && fxEval(fxParse(fxTokens(t.when), false), env, false));
+  if(!hit) hit=from.find(t=>t.when.toLowerCase()==="else");
+  const st=M.states.find(x=>x.name===s);
+  const out={}; M.outputs.forEach(o=>out[o]=(st.out[o]||0));
+  if(M.mealy) M.outputs.forEach(o=>out[o]=(hit&&hit.out&&hit.out[o]!=null)?hit.out[o]:(st.out[o]||0));
+  return {to:hit?hit.to:s, out};                        // no arrow matches: stay
+}
+/* → intent: D flip-flops + minimised next-state / output logic */
+function fsmIntent(M, opts){
+  opts=opts||{};
+  const k=M.bits, ni=M.inputs.length, nv=k+ni, code=n=>M.states.findIndex(s=>s.name===n);
+  // variable v (qm: bit v of the row index): state bits are the high ones, inputs the low ones
+  const rowOf=(sc, iv)=>(sc<<ni)|iv;
+  const C=[{id:"clk", type:"IN", name:M.clock}], N=[];
+  M.inputs.forEach(n=>C.push({id:"in_"+n, type:"IN", name:n}));
+  for(let i=0;i<k;i++){ C.push({id:"ff"+i, type:"DFF"}); N.push({from:"clk", to:"ff"+i+".clk"}); }
+  let g=0; const inv={};
+  const lit=l=>{ if(l.v>=ni){ const b=l.v-ni; return "ff"+b+(l.neg?".qn":".q"); }
+    const nm=M.inputs[ni-1-l.v]; if(!l.neg) return "in_"+nm;
+    if(!inv[nm]){ inv[nm]="n_"+nm; C.push({id:inv[nm], type:"NOT"}); N.push({from:"in_"+nm, to:inv[nm]}); } return inv[nm]; };
+  const tree=(type, ins)=>{ while(ins.length>8){ const nx=[]; for(let i=0;i<ins.length;i+=8){ const p=ins.slice(i,i+8); if(p.length===1){ nx.push(p[0]); continue; }
+      const t=type.toLowerCase()+"_"+(g++); C.push({id:t,type}); p.forEach(s=>N.push({from:s,to:t})); nx.push(t); } ins=nx; } return ins; };
+  const andCache=new Map();
+  const sop=(ones, dcs)=>{ const r=qmMinimize(ones, dcs, nv);
+    if(r.const0){ const id="gnd"+(g++); C.push({id, type:"GND"}); return id; }
+    if(r.const1){ const id="vcc"+(g++); C.push({id, type:"VCC"}); return id; }
+    const terms=r.terms.map(t=>{ if(t.length===1) return lit(t[0]);
+      const key=t.map(l=>l.v+(l.neg?"n":"p")).sort().join(","); if(andCache.has(key)) return andCache.get(key);
+      const ins=tree("AND", t.map(lit)), a="and_"+(g++); C.push({id:a, type:"AND"}); ins.forEach(s=>N.push({from:s, to:a})); andCache.set(key,a); return a; });
+    const top=terms.length>1?tree("OR", terms):terms; if(top.length===1) return top[0];
+    const o="or_"+(g++); C.push({id:o, type:"OR"}); top.forEach(s=>N.push({from:s, to:o})); return o; };
+  const valid=new Set(M.states.map((_,i)=>i));
+  // next state: unused codes → reset (0): never stuck in a state that is not on the diagram
+  for(let b=0;b<k;b++){ const ones=[];
+    for(let sc=0;sc<(1<<k);sc++) for(let iv=0;iv<(1<<ni);iv++){
+      let nx=0; if(valid.has(sc)){ const v={}; M.inputs.forEach((n,j)=>v[n]=(iv>>(ni-1-j))&1); nx=code(fsmStep(M, M.states[sc].name, v).to); }
+      if((nx>>b)&1) ones.push(rowOf(sc,iv)); }
+    N.push({from:sop(ones, []), to:"ff"+b+".d"}); }
+  // outputs: Moore = state only (inputs don't care), Mealy = state + inputs; unused codes don't care
+  M.outputs.forEach(o=>{ const ones=[], dcs=[];
+    for(let sc=0;sc<(1<<k);sc++) for(let iv=0;iv<(1<<ni);iv++){ const r=rowOf(sc,iv);
+      if(!valid.has(sc)){ dcs.push(r); continue; }
+      const v={}; M.inputs.forEach((n,j)=>v[n]=(iv>>(ni-1-j))&1);
+      if(fsmStep(M, M.states[sc].name, v).out[o]) ones.push(r); }
+    const id="out_"+o; C.push({id, type:"OUT", name:o}); N.push({from:sop(ones, dcs), to:id}); });
+  if(opts.state_out!==false) for(let b=k-1;b>=0;b--){ const id="st_"+b; C.push({id, type:"OUT", name:"state"+b}); N.push({from:"ff"+b+".q", to:id}); }
+  return {module:sanId(opts.name||"fsm"), components:C, nets:N};
+}
+/* the diagram run next to the circuit: a pseudo-random input walk, outputs (and the state) compared per clock */
+function fsmVerify(sch, M, cycles){
+  cycles=cycles||Math.min(200, 24*M.states.length*Math.max(1,1<<M.inputs.length));
+  let seed=7; const rnd=()=>{ seed=(Math.imul(seed,1103515245)+12345)>>>0; return seed>>>16; };
+  const ins=sch.components.filter(c=>c.type==="IN"), byName=n=>ins.find(c=>c.params.name===n);
+  const drive=[]; for(let i=0;i<cycles;i++){ const v={}; M.inputs.forEach(n=>v[n]=rnd()&1); drive.push(v); }
+  const j=clientSeqSim(sch, cycles, {holdAt:i=>{ const o={}; Object.entries(drive[i]).forEach(([n,x])=>{ const c=byName(n); if(c) o[c.id]=x; }); return o; }});
+  if(!j.ok) return {pass:false, reason:j.reason};
+  const sq=j.sequence, col=n=>sq.outputs.indexOf(n);
+  let s=M.reset;
+  for(let i=0;i<sq.rows.length;i++){
+    const r=fsmStep(M, s, drive[i]), row=sq.rows[i];
+    for(const o of M.outputs){ const got=row[3][col(o)]; if(got!==r.out[o]) return {pass:false, mismatch:{cycle:i, state:s, inputs:drive[i], output:o, want:r.out[o], got}}; }
+    if(col("state0")>=0){ let code=0; for(let b=0;b<M.bits;b++) code|=(row[3][col("state"+b)]?1:0)<<b;
+      if(code!==M.states.findIndex(x=>x.name===s)) return {pass:false, mismatch:{cycle:i, want_state:s, got_code:code}}; }
+    s=r.to;
+  }
+  return {pass:true, method:`${sq.rows.length} clock อินพุตสุ่ม เทียบกับ state diagram`};
+}
+function fsmBuild(src, a){
+  a=a||{};
+  const M=fsmParse(src);
+  const it=fsmIntent(M, {name:a.name||a.sheet||"fsm", state_out:a.state_out});
+  const dr=aiDrawIntent(it);
+  if(!dr||!dr.ok) throw new Error("วาดไม่ได้: "+((dr&&(dr.error||(dr.errors||[]).map(e=>e.msg||e).join("; ")))||"?"));
+  const sch=dr.sch;
+  sch.portOrder={in:[M.clock, ...M.inputs], out:[...M.outputs, ...Array.from({length:M.bits},(_,b)=>"state"+(M.bits-1-b))]};
+  const v=fsmVerify(sch, M);
+  if(!v.pass){ delete state.project.schematics[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); renderAll();
+    throw new Error("ตรวจวงจรเทียบกับ diagram ไม่ผ่าน (บั๊กของตัวสร้าง): "+JSON.stringify(v.mismatch||v.reason)); }
+  sch.fsm={src:typeof src==="string"?src:JSON.stringify(src), model:M};
+  sheetVerifyStamp(sch, "fsm — "+v.method);
+  const enc=M.states.map((s,i)=>({state:s.name, code:i.toString(2).padStart(M.bits,"0")}));
+  return {sch, M, verify:v, encoding:enc};
+}
+
+/* ---------- a picture of the diagram (circle layout, arrows with conditions) ---------- */
+function fsmSvg(M){
+  const n=M.states.length, R=Math.max(90, 34*n), cx=R+100, cy=R+95, r=26;     // room for self-loops and their labels
+  const pos={}; M.states.forEach((s,i)=>{ const a=-Math.PI/2+2*Math.PI*i/n; pos[s.name]={x:cx+R*Math.cos(a), y:cy+R*Math.sin(a)}; });
+  let g=`<defs><marker id="fsmA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>`;
+  const lab=t=>esc((t.when==="1"?"":t.when)+(t.out&&Object.keys(t.out).length?" / "+Object.entries(t.out).map(([k,v])=>k+"="+v).join(","):""));
+  M.transitions.forEach(t=>{ const A=pos[t.from], B=pos[t.to];
+    if(t.from===t.to){ const dx=A.x-cx, dy=A.y-cy, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, px=A.x+ux*r, py=A.y+uy*r;
+      g+=`<path d="M${px-uy*10},${py+ux*10} C${px+ux*46-uy*30},${py+uy*46+ux*30} ${px+ux*46+uy*30},${py+uy*46-ux*30} ${px+uy*10},${py-ux*10}" fill="none" stroke="currentColor" marker-end="url(#fsmA)"/>
+        <text x="${A.x+ux*(r+52)}" y="${A.y+uy*(r+52)+4}" text-anchor="middle" font-size="11" fill="currentColor">${lab(t)}</text>`; return; }
+    const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy), ux=dx/L, uy=dy/L, nx=-uy*14, ny=ux*14;
+    const x1=A.x+ux*r+nx*0.4, y1=A.y+uy*r+ny*0.4, x2=B.x-ux*r+nx*0.4, y2=B.y-uy*r+ny*0.4, mx=(x1+x2)/2+nx, my=(y1+y2)/2+ny;
+    g+=`<path d="M${x1},${y1} Q${mx+nx},${my+ny} ${x2},${y2}" fill="none" stroke="currentColor" marker-end="url(#fsmA)"/>
+      <text x="${mx+nx*1.3}" y="${my+ny*1.3+4}" text-anchor="middle" font-size="11" fill="currentColor">${lab(t)}</text>`; });
+  M.states.forEach(s=>{ const p=pos[s.name], outs=Object.entries(s.out).map(([k,v])=>k+"="+v).join(",");
+    g+=`<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="var(--bg-1,#fff)" stroke="currentColor" stroke-width="${s.name===M.reset?2.6:1.4}"/>
+      <text x="${p.x}" y="${p.y+(outs?-2:4)}" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${esc(s.name)}</text>
+      ${outs?`<text x="${p.x}" y="${p.y+12}" text-anchor="middle" font-size="9.5" fill="currentColor">${esc(outs)}</text>`:""}`; });
+  return `<svg viewBox="0 0 ${2*cx} ${2*cy}" width="100%" style="max-height:340px;color:var(--ink,#223)">${g}</svg>`;
+}
+function fsmTableHtml(M){
+  const combos=1<<M.inputs.length;
+  const head=`<tr><th>state</th>${Array.from({length:combos},(_,iv)=>`<th>${M.inputs.length?M.inputs.map((n,j)=>n+"="+((iv>>(M.inputs.length-1-j))&1)).join(" "):"next"}</th>`).join("")}${M.mealy?"":M.outputs.map(o=>`<th>${esc(o)}</th>`).join("")}</tr>`;
+  const rows=M.states.map((s,sc)=>`<tr><td><b>${esc(s.name)}</b> <span class="muted">${sc.toString(2).padStart(M.bits,"0")}</span></td>${Array.from({length:combos},(_,iv)=>{ const v={}; M.inputs.forEach((n,j)=>v[n]=(iv>>(M.inputs.length-1-j))&1);
+      const r=fsmStep(M, s.name, v); return `<td>${esc(r.to)}${M.mealy?" / "+M.outputs.map(o=>r.out[o]).join(""):""}</td>`; }).join("")}${M.mealy?"":M.outputs.map(o=>`<td>${s.out[o]||0}</td>`).join("")}</tr>`).join("");
+  return `<table class="fsm-t">${head}${rows}</table>`;
+}
+const FSM_EXAMPLE=`# ตัวตรวจลำดับ 11 (Moore): z = 1 เมื่อ x เป็น 1 สองครั้งติดกัน
+inputs: x
+outputs: z
+state S0: z=0
+state S1: z=0
+state S2: z=1
+S0 -> S1 when x
+S0 -> S0 else
+S1 -> S2 when x
+S1 -> S0 else
+S2 -> S2 when x
+S2 -> S0 else
+reset S0`;
+function openFsmTool(preset){
+  const m=uxModal("ออกแบบ FSM (state machine)", `
+    <div class="fsm-wrap"><div class="fsm-l"><textarea id="fsmSrc" spellcheck="false" rows="16">${esc(preset||FSM_EXAMPLE)}</textarea>
+      <div class="muted" style="font-size:11px;line-height:1.5">inputs / outputs · <b>state</b> ชื่อ: ขาออก=ค่า (Moore) · <b>A -&gt; B when</b> เงื่อนไข (&amp; | ^ ~ , else) · Mealy: <b>A -&gt; B when x / z=1</b> · <b>reset</b> state เริ่มต้น</div>
+      <label class="pt-f" style="margin-top:6px">ชื่อแผ่น <input id="fsmSheet" value="fsm" spellcheck="false" style="width:120px"></label>
+      <label class="pt-f"><input type="checkbox" id="fsmState" checked> มีขาออก state (ดูบน LED ได้)</label></div>
+      <div class="fsm-r"><div id="fsmPic"></div><div id="fsmTab"></div><div id="fsmMsg" class="muted"></div></div></div>`,
+    {width:980, foot:`<button class="btn btn-primary" id="fsmGo">สร้างวงจร + ตรวจเทียบกับ diagram</button>`});
+  const upd=()=>{ try{ const M=fsmParse(m.querySelector("#fsmSrc").value);
+      m.querySelector("#fsmPic").innerHTML=fsmSvg(M); m.querySelector("#fsmTab").innerHTML=fsmTableHtml(M);
+      m.querySelector("#fsmMsg").textContent=`${M.states.length} state → ${M.bits} flip-flop · ${M.mealy?"Mealy":"Moore"}`; m.querySelector("#fsmMsg").classList.remove("bad"); return M; }
+    catch(e){ m.querySelector("#fsmMsg").textContent="✗ "+e.message; m.querySelector("#fsmMsg").classList.add("bad"); return null; } };
+  m.querySelector("#fsmSrc").addEventListener("input", upd); upd();
+  m.querySelector("#fsmGo").onclick=()=>{ if(!upd()) return;
+    try{ const r=fsmBuild(m.querySelector("#fsmSrc").value, {sheet:m.querySelector("#fsmSheet").value.trim()||"fsm", state_out:m.querySelector("#fsmState").checked});
+      const want=sanId(m.querySelector("#fsmSheet").value.trim()||"fsm"); r.sch.name=uniqueSchName(want, r.sch.id);
+      m.close(); openSchTab(r.sch.id); snapshot(); renderAll(); try{ zoomFit(); }catch(_){}
+      toast(`สร้าง FSM ${r.M.states.length} state แล้ว — ตรวจแล้วถูกต้อง: ${r.verify.method}`,"ok",5000); }
+    catch(e){ m.querySelector("#fsmMsg").textContent="✗ "+e.message; } };
+}
+GENERATORS.push({id:"fsm", icon:"◎", name:"ออกแบบ FSM (state diagram)", desc:"เขียน state + ลูกศร → วงจร D-FF ที่ตรวจเทียบกับ diagram แล้ว", run:()=>openFsmTool((activeSch()&&activeSch().fsm&&activeSch().fsm.src)||null)});
+{
+  const last=[...document.querySelectorAll('#menu [data-gen]')].pop();
+  if(last && !document.querySelector('#menu [data-gen="fsm"]')){
+    last.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="fsm" title="เขียน state + ลูกศร → วงจรที่ตรวจแล้ว"><span class="gi">◎</span>ออกแบบ FSM (state diagram)…</button>`);
+    document.querySelector('#menu [data-gen="fsm"]').addEventListener("click", ()=>runGenerator("fsm"));
+  }
+}
+/* the diagram is the sheet's acceptance test too */
+{
+  const _check=specCheck;
+  specCheck=function(sch){ const r=_check.apply(this, arguments);
+    if(r || !sch || !sch.fsm) return r;
+    try{ const v=fsmVerify(sch, sch.fsm.model); return {pass:v.pass, checked:v.method||"", reason:v.reason, mismatches:v.mismatch?[v.mismatch]:[], total_mismatches:v.pass?0:1}; }
+    catch(e){ return {pass:false, reason:String(e.message||e)}; } };
+}
+
+/* ---------- MCP ---------- */
+MCP_OPS.build_fsm = a=>{
+  if(!a.fsm) mcpFail("fsm is required", "text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\n…\\nS0 -> S1 when x\\nreset S0', or {inputs, outputs, states:[{name, out}], transitions:[{from,to,when,out?}], reset}");
+  const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
+  const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
+  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name");
+  mcpBeforeChange("สร้าง FSM");
+  let r; try{ r=fsmBuild(a.fsm, {sheet:want||a.name, name:a.name, state_out:a.state_out}); }catch(e){ mcpFail(e.message); }
+  let sch=r.sch;
+  if(tgt){ ["components","wires","portOrder","fsm","verified"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; }); delete P[sch.id];
+    state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
+  else if(want) sch.name=uniqueSchName(want, sch.id);
+  openSchTab(sch.id); mcpActivity("สร้าง FSM"); mcpCommit(sch); try{ zoomFit(); }catch(_){}
+  return {sheet:sch.name, kind:r.M.mealy?"mealy":"moore", states:r.M.states.length, flip_flops:r.M.bits, encoding:r.encoding,
+    ports:schPortList(sch).map(p=>({name:p.id, dir:p.dir, width:p.width})), verified:{pass:true, method:r.verify.method},
+    note:"the diagram is kept on the sheet (Tools ▸ ออกแบบ FSM re-opens it) and is its acceptance test"};
+};
+
+/* ===== 27. Lab report, made from the work (Tools ▸ ทำรายงานแลป, MCP make_report) =================
+   The part of a lab students spend most time on, from what the app already knows: every sheet of
+   the design (top first, then its blocks) as a vector picture, its ports, its truth table and
+   minimised equations (combinational) or its first clocks (sequential), its acceptance test, the
+   board pin table and the VHDL. One HTML page: print it to PDF, or save the .doc Word opens. */
+function reportSheetSvg(sch){
+  // render the sheet on screen, then copy the drawing with its colours resolved (as screenshot does)
+  const back=state.activeId;
+  openSchTab(sch.id); try{ zoomFit(); }catch(_){} render();
+  const src=$("#canvas"); if(!src) return "";
+  const clone=src.cloneNode(true);
+  const all=[src, ...src.querySelectorAll("*")], cl=[clone, ...clone.querySelectorAll("*")];
+  all.forEach((el,i)=>{ const cs=getComputedStyle(el), d=cl[i]; if(!d||!d.style) return;
+    ["fill","stroke","stroke-width","stroke-dasharray","opacity","font-size","font-weight","font-family"].forEach(k=>{ const v=cs.getPropertyValue(k); if(v) d.style.setProperty(k, v); }); });
+  clone.querySelectorAll(".ux-marks,.mcp-flash,.grid-bg").forEach(n=>n.remove());
+  let vb=null; try{ const g=src.firstChild, bb=g.getBBox(), t=(g.getAttribute("transform")||""), m=/translate\(([-\d.]+)[ ,]+([-\d.]+)\)\s*scale\(([-\d.]+)\)/.exec(t);
+    if(m){ const tx=+m[1], ty=+m[2], k=+m[3]; vb=[tx+bb.x*k-20, ty+bb.y*k-20, bb.width*k+40, bb.height*k+40]; } }catch(_){}
+  const box=src.getBoundingClientRect();
+  clone.setAttribute("xmlns","http://www.w3.org/2000/svg");
+  clone.setAttribute("viewBox", (vb||[0,0,box.width,box.height]).join(" "));
+  clone.setAttribute("width","100%"); clone.removeAttribute("height"); clone.setAttribute("style","max-height:520px;background:#fff");
+  if(back && back!==sch.id) openSchTab(back);
+  return new XMLSerializer().serializeToString(clone);
+}
+function reportSheets(){
+  const P=state.project, top=P.schematics[P.topId], out=[], seen=new Set();
+  const walk=s=>{ if(!s||seen.has(s.id)) return; seen.add(s.id); out.push(s); s.components.forEach(c=>{ const sub=subSchOf(c); if(sub) walk(sub); }); };
+  walk(top);
+  Object.values(P.schematics).forEach(s=>{ if(!seen.has(s.id) && s.components.some(c=>c.type!=="JUNCTION")) out.push(s); });
+  return out;
+}
+function reportHtml(opts){
+  opts=opts||{};
+  const P=state.project, name=($("#projectName")||{}).value||P.name||"project";
+  const sheets=(opts.sheets||reportSheets());
+  const esc2=esc, tbl=(head, rows)=>`<table><tr>${head.map(h=>`<th>${esc2(h)}</th>`).join("")}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${esc2(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+  const sec=sheets.map((s,i)=>{
+    let body="";
+    const ports=schPortList(s);
+    body+=`<h3>ขาเข้า/ขาออก</h3>`+tbl(["ขา","ทิศ","บิต"], ports.map(p=>[p.id, p.dir==="in"?"เข้า":"ออก", String(p.width)]));
+    const hasFF=flattenSchematic(s).sch.components.some(c=>PROBE_SEQ[c.type]);
+    if(!hasFF){ const j=clientCombSim(s);
+      if(j.ok && j.truth_table.inputs.length<=6){ const tt=j.truth_table;
+        body+=`<h3>ตารางความจริง</h3>`+tbl([...tt.inputs, ...tt.outputs], tt.rows.map(([a,b])=>[...a.map(String), ...b.map(String)]));
+        const eq=uxEquations(tt); if(eq.length) body+=`<h3>สมการ (ลดรูปแล้ว)</h3><ul>${eq.map(e=>`<li><code>${esc2(e)}</code></li>`).join("")}</ul>`;
+        const rec=uxRecognize(tt); if(rec) body+=`<p class="muted">วงจรนี้คือ: ${esc2(rec)}</p>`; }
+      else if(j.ok) body+=`<p class="muted">อินพุต ${j.truth_table.inputs.length} บิต — ตารางความจริงยาวเกินกว่าจะใส่ในรายงาน</p>`; }
+    else { const j=clientSeqSim(s, 16);
+      if(j.ok){ const sq=j.sequence;
+        body+=`<h3>การทำงานทีละ clock (16 clock แรก)</h3>`+tbl(["clock", ...sq.inputs, ...sq.outputs], sq.rows.map(r=>[String(r[0]), ...r[1].map(String), ...(r[4]||r[3]).map(String)])); } }
+    if(s.fsm && s.fsm.model){ try{ body+=`<h3>State diagram</h3>${fsmSvg(s.fsm.model)}${fsmTableHtml(s.fsm.model)}`; }catch(_){} }
+    if(s.spec){ const r=specCheck(s); body+=`<h3>ข้อกำหนด (acceptance test)</h3><p>${esc2(specDescribe(s.spec))} — <b>${r&&r.pass?"✓ ผ่าน":"✗ ไม่ผ่าน"}</b></p>`; }
+    if(sheetVerified(s)) body+=`<p class="muted">ตรวจแล้ว: ${esc2(s.verified.how)}</p>`;
+    const pm=s.pinmap&&Object.keys(s.pinmap).length ? s.pinmap : null;
+    if(pm) body+=`<h3>ขาบนบอร์ด EDGE Spartan-7</h3>`+tbl(["สัญญาณ","ขาบอร์ด","package pin"], Object.entries(pm).map(([k,v])=>[k, String(v), (typeof BOARD_PINS==="object"&&BOARD_PINS[v])||""]));
+    let pic=""; try{ pic=reportSheetSvg(s); }catch(e){ pic=`<p class="muted">(วาดรูปไม่ได้: ${esc2(e.message)})</p>`; }
+    return `<section><h2>${i+1}. ${esc2(s.name)}${s.id===P.topId?" (top)":""}</h2><div class="pic">${pic}</div>${body}</section>`;
+  }).join("");
+  let vhdl=""; if(opts.vhdl!==false){ try{ vhdl=`<section><h2>VHDL</h2><pre>${esc(bundleAll(generateAllVhdl()))}</pre></section>`; }catch(_){} }
+  const d=new Date();
+  return `<!doctype html><html><head><meta charset="utf-8"><title>รายงาน ${esc(name)}</title>
+<style>body{font-family:"Sarabun","TH Sarabun New","Leelawadee UI",sans-serif;max-width:900px;margin:24px auto;padding:0 18px;color:#111;line-height:1.5}
+h1{font-size:24px;margin:0 0 4px}h2{font-size:19px;border-bottom:2px solid #333;padding-bottom:3px;margin-top:28px}h3{font-size:15px;margin:14px 0 4px}
+table{border-collapse:collapse;margin:4px 0 8px;font-size:13px}th,td{border:1px solid #999;padding:2px 8px;text-align:center}th{background:#eee}
+pre{font-size:11px;background:#f6f6f6;border:1px solid #ccc;padding:8px;white-space:pre-wrap}.muted{color:#555;font-size:13px}.pic svg{border:1px solid #ccc}
+.meta td{text-align:left;border:none;padding:1px 10px 1px 0}[contenteditable]{background:#fffbe6;min-width:160px;display:inline-block}
+.bar{position:sticky;top:0;background:#fff;padding:6px 0;border-bottom:1px solid #ddd;margin-bottom:10px}@media print{.bar{display:none}[contenteditable]{background:none}section{page-break-inside:avoid}}</style></head>
+<body><div class="bar"><button onclick="print()">พิมพ์ / บันทึกเป็น PDF</button> <span class="muted">คลิกช่องสีเหลืองเพื่อกรอกชื่อ/รหัส ก่อนพิมพ์</span></div>
+<h1>รายงานการทดลอง: ${esc(name)}</h1>
+<table class="meta"><tr><td>ชื่อ-สกุล</td><td contenteditable="true">&nbsp;</td></tr><tr><td>รหัสนักศึกษา</td><td contenteditable="true">&nbsp;</td></tr>
+<tr><td>วันที่</td><td>${d.toLocaleDateString("th-TH",{year:"numeric",month:"long",day:"numeric"})}</td></tr><tr><td>บอร์ด</td><td>EDGE Spartan-7 (XC7S15)</td></tr></table>
+${sec}${vhdl}<p class="muted">สร้างโดย FPGA Ecosystem — Schematic Studio</p></body></html>`;
+}
+async function makeReport(opts){
+  const html=reportHtml(opts), name=sanId(($("#projectName")||{}).value||state.project.name||"project");
+  let saved=null;
+  if(/^https?:/.test(location.protocol)){ try{ saved=await mcpSaveFile(name, name+"_report.html", html); }catch(_){} }
+  return {html, saved};
+}
+GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแลป", desc:"รูปวงจรทุกชั้น, ตารางความจริง, สมการ, ผลทีละ clock, ขาบอร์ด, VHDL — พิมพ์เป็น PDF หรือเปิดใน Word", run:async()=>{
+  const r=await makeReport({});
+  const blob=new Blob([r.html], {type:"text/html"}), url=URL.createObjectURL(blob);
+  const w=window.open(url, "_blank");
+  if(!w){ const a=document.createElement("a"); a.href=url; a.download=sanId(state.project.name||"project")+"_report.html"; a.click(); }
+  // Word opens an HTML file named .doc as a document
+  const doc=new Blob(["﻿"+r.html.replace('<div class="bar">','<div class="bar" style="display:none">')], {type:"application/msword"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(doc); a.download=sanId(state.project.name||"project")+"_report.doc"; a.textContent="report.doc";
+  toast(r.saved?`บันทึกรายงานลงโฟลเดอร์โปรเจกต์แล้ว (${r.saved})`:"เปิดรายงานในแท็บใหม่แล้ว — พิมพ์เป็น PDF ได้จากปุ่มบนหน้า", "ok", 6000);
+  setTimeout(()=>{ try{ a.click(); }catch(_){} }, 300);
+}});
+{
+  const last=[...document.querySelectorAll('#menu [data-gen]')].pop();
+  if(last && !document.querySelector('#menu [data-gen="report"]')){
+    last.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="report" title="รายงานแลปจากงานในโปรเจกต์นี้"><span class="gi">📄</span>ทำรายงานแลป…</button>`);
+    document.querySelector('#menu [data-gen="report"]').addEventListener("click", ()=>runGenerator("report"));
+  }
+}
+MCP_OPS.make_report = async a=>{
+  const sheets=a.sheets&&a.sheets.length ? a.sheets.map(n=>mcpSheet(n)) : null;
+  const r=await makeReport({sheets, vhdl:a.vhdl});
+  return {saved:r.saved||null, sheets:(sheets||reportSheets()).map(s=>s.name), size_kb:Math.round(r.html.length/1024),
+    note:r.saved?"the user opens it from the project folder and prints to PDF":"(not saved: the editor was opened from disk)"};
+};
+
+/* ===== 28. Lab helper: the lab sheet as a checklist, one step at a time (Tools ▸ ผู้ช่วยทำแลป) =====
+   The course's lab sheets ship with the app (ai/rag/labs: every item's question, sub-tasks, and a
+   worked solution). Pick a lab → each item becomes a card: its sub-tasks as a checklist (kept with
+   the project), "ให้เอเจนต์ช่วยข้อนี้" (the question goes to the chat's agent), "ตั้งเป็นข้อกำหนด"
+   (when the solution gives equations: the active sheet's acceptance test), and the worked solution
+   folded away as a hint. A beginner follows it down the page. */
+const LABH = { labs:null };
+async function labhLoad(){
+  if(LABH.labs) return LABH.labs;
+  if(!/^https?:/.test(location.protocol)) throw new Error("ใบแลปมากับโปรแกรม FPGA Ecosystem — เปิด editor ผ่านโปรแกรม");
+  const j=await (await fetch("/api/rag/labs")).json(); if(!j.ok) throw new Error(j.error||"โหลดใบแลปไม่ได้");
+  LABH.labs=j.labs.filter(l=>l.items&&l.items.length); return LABH.labs;
+}
+/* equations a solution states ("invalid = W·X + W·Y", "f = a' + b·d") → a formula, or null. All or
+   nothing: one statement that is not a plain equation (c_{i+1} = …, BCD_invalid(SW[7:4])) and the
+   item gets no button rather than a spec that checks only part of it. */
+function labhFormula(sol){
+  if(!sol) return null;
+  const txt=[sol.final_expression, sol.expression, sol.equations].flat().filter(Boolean).join("\n")
+    .replace(/\s*\(\s*[^\x00-\x7f][^\n]*/g, "");          // "(สมการของเซกเมนต์ …)" notes
+  if(!txt.trim()) return null;
+  const parts=txt.split(/\n|;|,(?=\s*\w+\s*=)/).map(s=>s.trim()).filter(Boolean);
+  if(!parts.length || parts.some(s=>!/^\w+\s*=\s*[\w\s'*+^()~&|·∙•⊕!]+$/.test(s))) return null;
+  const eqs=parts.map(s=>s.replace(/\s+/g," "));                       // fxParse reads x', ·, ⊕, + as OR
+  const outs=eqs.map(e=>e.split("=")[0].trim());
+  try{ const t=formulaTable(eqs.join("; "));
+    if(t.inputs.some(i=>outs.includes(i))) return null;               // a JK excitation (Q on both sides)
+    return eqs.join("; "); }catch(_){ return null; }
+}
+function labhProgress(){ return state.project.labProgress=state.project.labProgress||{}; }
+async function openLabHelper(){
+  let labs; try{ labs=await labhLoad(); }catch(e){ toast(e.message,"warn",5000); return; }
+  const cur=state.project.labProgress&&state.project.labProgress._lab;
+  if(LABH.modal && LABH.modal.isConnected) LABH.modal.close();
+  const m=LABH.modal=uxModal("ผู้ช่วยทำแลป (จากใบงาน)", `
+    <div class="lh-top"><select id="lhLab">${labs.map(l=>`<option value="${esc(l.lab)}" ${l.lab===cur?"selected":""}>${esc(l.lab)} — ${esc(l.title)}</option>`).join("")}</select>
+      <span id="lhProg" class="muted"></span></div>
+    <div id="lhBody" class="lh-body"></div>`, {width:860});
+  const draw=()=>{
+    const lab=labs.find(l=>l.lab===m.querySelector("#lhLab").value)||labs[0], P=labhProgress(); P._lab=lab.lab;
+    let total=0, done=0;
+    m.querySelector("#lhBody").innerHTML=(lab.objectives&&lab.objectives.length?`<div class="muted" style="margin-bottom:8px">จุดประสงค์: ${lab.objectives.map(esc).join(" · ")}</div>`:"")+
+      lab.items.map(it=>{ const st=P[it.id]||[], subs=it.subtasks&&it.subtasks.length?it.subtasks:[it.question];
+        total+=subs.length; done+=subs.filter((_,i)=>st[i]).length;
+        const f=labhFormula(it.solution), sol=it.solution;
+        return `<div class="lh-card" data-item="${esc(it.id)}"><div class="lh-q"><b>${esc(it.id)}</b> ${esc(it.question)}</div>
+          <div class="lh-subs">${subs.map((s,i)=>`<label><input type="checkbox" data-sub="${i}" ${st[i]?"checked":""}> ${esc(s)}</label>`).join("")}</div>
+          <div class="lh-acts"><button class="btn" data-lh="agent">🤖 ให้เอเจนต์ช่วยข้อนี้</button>
+            <button class="btn" data-lh="ask">💬 ถามเรื่องข้อนี้</button>
+            ${f?`<button class="btn" data-lh="spec" data-f="${esc(f)}" title="${esc(f)}">✓ ตั้งเป็นข้อกำหนดของแผ่นนี้</button>`:""}</div>
+          ${sol?`<details class="lh-sol"><summary>ดูแนวคิด / เฉลย (ลองทำเองก่อน)</summary><pre>${esc([sol.steps, sol.truth_table, sol.final_expression].filter(Boolean).join("\n\n"))}</pre></details>`:""}</div>`; }).join("");
+    m.querySelector("#lhProg").textContent=`ทำแล้ว ${done}/${total} ขั้น`;
+  };
+  m.querySelector("#lhLab").onchange=()=>{ draw(); snapshot(); };
+  m.addEventListener("change", e=>{ const cb=e.target.closest("[data-sub]"); if(!cb) return;
+    const id=cb.closest("[data-item]").dataset.item, P=labhProgress(); (P[id]=P[id]||[])[+cb.dataset.sub]=cb.checked; snapshot(); draw(); });
+  m.addEventListener("click", e=>{ const b=e.target.closest("[data-lh]"); if(!b) return;
+    const lab=labs.find(l=>l.lab===m.querySelector("#lhLab").value), it=lab.items.find(x=>x.id===b.closest("[data-item]").dataset.item);
+    if(b.dataset.lh==="spec"){ const sch=activeSch();
+      try{ const r=MCP_OPS.set_spec({sheet:sch.name, formula:b.dataset.f}); renderAll();
+        toast(`ตั้งข้อกำหนดของแผ่น ${sch.name} จากข้อ ${it.id} แล้ว — ${r.result&&r.result.pass?"วงจรผ่าน ✓":"ยังไม่ผ่าน ✗ (ทำต่อจนเป็น ✓)"}`, r.result&&r.result.pass?"ok":"warn", 6000); }
+      catch(err){ toast("ตั้งไม่ได้: "+err.message, "warn", 6000); } return; }
+    // to the chat: the agent does it, or the Q&A mode explains it
+    m.close(); if(!AICHAT.open) toggleAiChat();
+    aiSetMode(b.dataset.lh==="agent"?"agent":"qa");
+    const t=$("#acInput");
+    t.value = b.dataset.lh==="agent"
+      ? `ทำข้อ ${it.id} ของใบแลป: ${it.question}${it.subtasks&&it.subtasks.length?"\nขั้นตอน: "+it.subtasks.join(" / "):""}`
+      : `อธิบายข้อ ${it.id} ของใบแลปให้หน่อย ต้องเริ่มจากอะไร: ${it.question}`;
+    t.focus(); toast("ใส่คำสั่งในแชทให้แล้ว — แก้ได้ก่อนกดส่ง","info",4000);
+  });
+  draw();
+}
+GENERATORS.push({id:"labhelper", icon:"🧭", name:"ผู้ช่วยทำแลป (จากใบงาน)", desc:"ใบแลปเป็นเช็กลิสต์ทีละขั้น + ให้เอเจนต์ช่วย + ตั้งข้อกำหนด + ดูเฉลย", run:()=>openLabHelper()});
+{
+  const last=[...document.querySelectorAll('#menu [data-gen]')].pop();
+  if(last && !document.querySelector('#menu [data-gen="labhelper"]')){
+    last.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="labhelper" title="ใบแลปเป็นเช็กลิสต์ทีละขั้น"><span class="gi">🧭</span>ผู้ช่วยทำแลป (จากใบงาน)…</button>`);
+    document.querySelector('#menu [data-gen="labhelper"]').addEventListener("click", ()=>runGenerator("labhelper"));
+  }
+}
+
+/* ===== 29. Board doctor: what will go wrong on the real board, before a 1-minute Vivado build =====
+   The mistakes that only show on the board, where a beginner cannot see why: a port without a
+   pin, two ports on one pin, an input on an LED, segments written active-high for this common-
+   anode display (every digit shows inverted), no digit enabled, a clock from a bouncing push
+   button, a counter on the raw 50 MHz clock (too fast to see). Plus "เทียบกับบอร์ด": flip the
+   mapped switches and see the LEDs and digits the design will light (combinational sheets).
+   Button on the ลงบอร์ด page and on the pin summary; MCP board_check. */
+const BDOC = {};
+/* one bit's value out of mcpEvalOuts (number for 1-bit, MSB-first string for a bus) */
+function bdocBit(outs, name, bit){
+  const v=outs[name]; if(v==null||v==="undriven") return null;
+  if(bit==null) return typeof v==="string" ? (v.slice(-1)==="1"?1:0) : (+v?1:0);
+  const s=String(v); return s[s.length-1-bit]==="1"?1:0;
+}
+function bdocOutName(sch, port){
+  const c=sch.components.find(x=>x.type==="OUT" && sanId(x.params.name)===port) || sch.components.find(x=>x.type==="OUT" && String(x.params.name).toLowerCase()===String(port).toLowerCase());
+  return c ? c.params.name : port;
+}
+function bdocInName(sch, port){
+  const c=sch.components.find(x=>x.type==="IN" && sanId(x.params.name)===port) || sch.components.find(x=>x.type==="IN" && String(x.params.name).toLowerCase()===String(port).toLowerCase());
+  return c ? c.params.name : port;
+}
+/* the input combinations the checks look at: all of them up to 10 bits, else 256 random ones */
+function bdocVectors(sch){
+  const ins=sch.components.filter(c=>c.type==="IN").map(c=>({name:c.params.name, w:probeWidth(c,"o")||1}));
+  const bits=ins.reduce((s,i)=>s+i.w,0), n=bits<=10 ? 1<<bits : 256, out=[];
+  for(let r=0;r<n;r++){ let k=bits<=10 ? r : Math.floor(Math.random()*2**Math.min(bits,30)); const v={};
+    ins.slice().reverse().forEach(i=>{ const m=2**i.w; v[i.name]=String(k%m); k=Math.floor(k/m); }); out.push(v); }
+  return out;
+}
+function boardDoctor(sch){
+  sch=sch||brdSheet(); const F=[];
+  const add=(lvl,title,why,fix,act)=>F.push({lvl,title,why,fix:fix||"",act:act||null});
+  const bits=uxPortBits(sch).map(b=>Object.assign({t:uxPinTarget(b, sch)}, b));
+  if(!bits.length){ add("err","แผ่นนี้ไม่มี INPUT / OUTPUT","บอร์ดคุยกับวงจรผ่านขาเข้า/ออกเท่านั้น","วาง INPUT (สวิตช์/ปุ่ม) และ OUTPUT (LED/7-seg)"); return F; }
+  // --- pins ---
+  const miss=bits.filter(b=>!b.t);
+  if(miss.length) add("err",`ยังไม่ได้เลือกขา ${miss.length} ขา: ${miss.slice(0,6).map(b=>b.key).join(", ")}${miss.length>6?" …":""}`,
+    "Vivado ต้องรู้ว่าทุกขาของวงจรต่อกับอะไรบนบอร์ด ไม่งั้น build ไม่ผ่าน","ไปหน้าเลือกขา แล้วกด “เดาขาให้” หรือเลือกเอง","pins");
+  const byT={}; bits.filter(b=>b.t).forEach(b=>(byT[b.t]=byT[b.t]||[]).push(b.key));
+  Object.entries(byT).filter(([,ks])=>ks.length>1).forEach(([t,ks])=>
+    add("err",`${ks.join(" กับ ")} ใช้ขาเดียวกัน (${pinTargetLabel(t)})`,"ขาจริงหนึ่งขาต่อได้กับสัญญาณเดียว — Vivado จะ error","เปลี่ยนขาของตัวใดตัวหนึ่ง","pins"));
+  bits.filter(b=>b.t).forEach(b=>{ const k=b.t.split(":")[0];
+    if(b.dir==="in" && ["led","seg","an","buzzer"].includes(k)) add("err",`INPUT ${b.key} ต่อกับ ${pinTargetLabel(b.t)}`,"LED / 7-seg เป็นของที่บอร์ด “แสดง” — รับค่าจากมันไม่ได้","ให้ INPUT ใช้สวิตช์ (SW) หรือปุ่ม","pins");
+    if(b.dir==="out" && ["sw","pb","clk"].includes(k)) add("err",`OUTPUT ${b.key} ต่อกับ ${pinTargetLabel(b.t)}`,"สวิตช์/ปุ่ม/นาฬิกาเป็นของที่ “ส่งค่าเข้า” วงจร — ส่งออกไปไม่ได้","ให้ OUTPUT ใช้ LED หรือ 7-seg","pins"); });
+  // --- the circuit itself (its own errors make the board meaningless too) ---
+  try{ explainSim(sch).filter(x=>x.lvl==="err").slice(0,4).forEach(x=>add("err","วงจร: "+x.title, x.why, x.fix, "sim")); }catch(_){}
+  let flat=null; try{ flat=flattenSchematic(sch).sch; }catch(_){}
+  if(!flat) return F;
+  const st=probeStruct(flat), ffs=flat.components.filter(c=>PROBE_SEQ[c.type]);
+  const segs=bits.filter(b=>b.dir==="out" && /^seg:[a-g]$/.test(b.t||"")), ans=bits.filter(b=>b.dir==="out" && /^an:\d$/.test(b.t||""));
+  const leds=bits.filter(b=>b.dir==="out" && /^led:/.test(b.t||""));
+  // --- 7-segment: polarity and digit select ---
+  if(segs.length && !ans.length) add("warn","ใช้ 7-seg แต่ไม่ได้กำหนดขาเลือกหลัก (an0–an3)",
+    "จอ 4 หลักบนบอร์ดเปิดทีละหลักด้วยขา an (active-low: 0 = ติด) — ถ้าไม่ได้ขับไว้ หลักอาจไม่ติดเลย",
+    "เพิ่ม OUTPUT ชื่อ an0 ต่อกับ GND (เปิดหลักขวาสุด) แล้วเลือกขาเป็น “หลัก 0”");
+  if(!ffs.length && (segs.length || ans.length)){
+    let hi=0, lo=0, anOff=0, n=0;
+    const vecs=bdocVectors(sch);
+    vecs.forEach(v=>{ let outs; try{ outs=mcpEvalOuts(sch, flat, st, v); }catch(_){ return; } n++;
+      if(segs.length>=7){ const pat="abcdefg".split("").map(s=>{ const b=segs.find(x=>x.t==="seg:"+s); return b?bdocBit(outs, bdocOutName(sch,b.port), b.bit):null; });
+        if(!pat.includes(null)){ const on=pat.join(""), off=pat.map(x=>1-x).join("");
+          for(let d=0; d<10; d++){ const want="abcdefg".split("").map(s=>SEG7[s][d]).join("");
+            if(on===want) hi++; if(off===want) lo++; } } }
+      if(ans.length && ans.every(b=>bdocBit(outs, bdocOutName(sch,b.port), b.bit)===1)) anOff++; });
+    if(hi>=2 && hi>lo) add("err","7-seg เขียนแบบ active-high แต่จอบนบอร์ดเป็น common-anode (active-low)",
+      `ในตารางของวงจรนี้ ${hi} แถวออกมาเป็นรูปตัวเลขเมื่อ “1 = ติด” — บนบอร์ด 0 คือติด ตัวเลขจึงจะกลับด้าน (ส่วนที่ควรดับกลับติด)`,
+      "ใช้ชิ้นส่วน BCD → 7-segment แบบ active-low หรือใส่ NOT ที่ขา a–g ทุกขา","seg");
+    if(n && anOff===n) add("err","ขาเลือกหลัก (an) เป็น 1 ตลอด — ทุกหลักดับ",
+      "an เป็น active-low: 1 = ปิดหลักนั้น","ต่อ an ของหลักที่ต้องการให้ติดกับ GND");
+  }
+  // --- clocks ---
+  const clkIns=new Set(); try{ const m=probeModel(flat, st);
+    ffs.forEach(c=>{ const s=m.source(c.id,"clk"); if(s&&s.type==="IN") clkIns.add(s.cid); }); }catch(_){}
+  clkIns.forEach(cid=>{ const c=sch.components.find(x=>x.id===cid); if(!c) return;
+    const b=bits.find(x=>x.port===sanId(c.params.name)&&x.bit==null)||{}, t=b.t||"";
+    if(/^pb:/.test(t)) add("warn",`นาฬิกา ${c.params.name} มาจากปุ่มกด`,
+      "หน้าสัมผัสปุ่มเด้ง (bounce) — กดหนึ่งครั้งอาจได้ขอบขาขึ้นหลายสิบครั้ง ตัวนับจะกระโดดข้ามหลายค่า",
+      "ใช้นาฬิกา 50 MHz + ตัวหารความถี่ แล้วใช้ปุ่มเป็น enable ผ่านชิ้นส่วน Debounce (แท็บ Modules ▸ ชิ้นส่วน)");
+    else if(/^sw:/.test(t)) add("info",`นาฬิกา ${c.params.name} มาจากสวิตช์เลื่อน`,
+      "ใช้ทดสอบทีละ clock ได้ แต่สวิตช์ก็เด้งได้บ้าง ถ้านับข้ามบางครั้งเป็นเพราะเรื่องนี้","");
+    else if(t==="clk" && ffs.length<20 && (leds.length||segs.length)) add("warn",`วงจรใช้นาฬิกา 50 MHz ตรงๆ (มี flip-flop ${ffs.length} ตัว)`,
+      "ค่าเปลี่ยน 50 ล้านครั้งต่อวินาที — ตาเห็น LED ติดสลัวๆ ค้าง ไม่เห็นการนับ",
+      "ถ้าอยากเห็นการนับ ใส่ตัวหารความถี่ (เช่น ÷50000000 = 1 Hz) ระหว่าง clk กับวงจร — แท็บ Modules ▸ ชิ้นส่วน ▸ หารความถี่");
+  });
+  if(BRD.tools){ if(!BRD.tools.vivado) add("info","ยังไม่พบ Vivado","สร้าง .bit ไม่ได้จนกว่าจะติดตั้ง/ตั้งที่อยู่ของ Vivado","หน้า Home ▸ เริ่มต้นใช้งาน");
+    if(!BRD.tools.openfpgaloader) add("info","ยังไม่พบ openFPGALoader","โหลดลงบอร์ดไม่ได้","ติดตั้งโปรแกรมรุ่นเต็ม (มี openFPGALoader มาด้วย)"); }
+  return F;
+}
+
+/* ---------- "เทียบกับบอร์ด": the mapped switches → the LEDs and digits this design lights ---------- */
+function bdocSegSvg(on){   // on = [a..g] true = lit
+  const S={a:"M8 4h24",b:"M34 6v24",c:"M34 34v24",d:"M8 60h24",e:"M6 34v24",f:"M6 6v24",g:"M8 32h24"};
+  return `<svg viewBox="0 0 40 64" width="34" height="54">${"abcdefg".split("").map((s,i)=>`<path d="${S[s]}" stroke="${on[i]?"#ff3b30":"rgba(128,128,128,.18)"}" stroke-width="5" stroke-linecap="round"/>`).join("")}</svg>`;
+}
+function bdocPreviewHtml(sch){
+  const flat=flattenSchematic(sch).sch;
+  if(flat.components.some(c=>PROBE_SEQ[c.type])) return `<p class="muted">วงจรนี้มี flip-flop — ใช้ “⚡ เล่นเวลาจริง (50 MHz)” ในหน้าจำลอง จะเห็นเหมือนบอร์ดจริง รวมถึงความเร็ว</p><button class="btn2" data-bd="sim">ไปหน้าจำลอง</button>`;
+  const bits=uxPortBits(sch).map(b=>Object.assign({t:uxPinTarget(b, sch)}, b));
+  const ins=bits.filter(b=>b.dir==="in" && /^(sw|pb):/.test(b.t||""));
+  if(!ins.length && !bits.some(b=>b.dir==="out"&&b.t)) return `<p class="muted">เลือกขาก่อน แล้วค่อยเทียบ</p>`;
+  BDOC.vals=BDOC.vals||{};
+  const outs=(()=>{ const v={}; sch.components.filter(c=>c.type==="IN").forEach(c=>{ const w=probeWidth(c,"o")||1; let n=0;
+      bits.filter(b=>b.dir==="in"&&b.port===sanId(c.params.name)).forEach(b=>{ if(BDOC.vals[b.key]) n+=2**(b.bit==null?0:b.bit); }); v[c.params.name]=String(n); });
+    try{ return mcpEvalOuts(sch, flat, probeStruct(flat), v); }catch(_){ return {}; } })();
+  const val=b=>bdocBit(outs, bdocOutName(sch,b.port), b.bit);
+  const sw=ins.map(b=>`<label class="bd-sw ${BDOC.vals[b.key]?"on":""}"><input type="checkbox" data-bdin="${esc(b.key)}" ${BDOC.vals[b.key]?"checked":""}><span>${esc(pinTargetLabel(b.t).split(" (")[0])}</span><b>${esc(b.key)}</b></label>`).join("");
+  const leds=bits.filter(b=>b.dir==="out"&&/^led:/.test(b.t||"")).sort((x,y)=>+y.t.slice(4)-+x.t.slice(4));
+  const ledHtml=leds.map(b=>`<span class="bd-led ${val(b)===1?"on":""}" title="${esc(b.key)}"><i></i>${esc(b.key)}</span>`).join("");
+  const segs=bits.filter(b=>b.dir==="out"&&/^seg:[a-g]$/.test(b.t||"")), ans=bits.filter(b=>b.dir==="out"&&/^an:\d$/.test(b.t||""));
+  let segHtml="";
+  if(segs.length){
+    const lit="abcdefg".split("").map(s=>{ const b=segs.find(x=>x.t==="seg:"+s); return b ? val(b)===0 : false; });   // active-low
+    const digitOn=d=>{ if(!ans.length) return d===0; const b=ans.find(x=>x.t==="an:"+d); return b ? val(b)===0 : false; };
+    segHtml=`<div class="bd-segs">${[3,2,1,0].map(d=>`<div class="bd-dig">${bdocSegSvg(digitOn(d)?lit:[])}</div>`).join("")}</div>`
+      +(ans.length?"":`<div class="muted">ไม่ได้ขับขา an — ภาพนี้สมมติว่าหลักขวาสุดติด</div>`);
+  }
+  return `<div class="bd-row"><div class="muted">สวิตช์/ปุ่มที่ใช้ (คลิกเพื่อสลับ)</div><div class="bd-sws">${sw||'<span class="muted">—</span>'}</div></div>
+    ${ledHtml?`<div class="bd-row"><div class="muted">LED</div><div class="bd-leds">${ledHtml}</div></div>`:""}
+    ${segHtml?`<div class="bd-row"><div class="muted">7-segment (0 = ติด ตามบอร์ดจริง)</div>${segHtml}</div>`:""}`;
+}
+function openBoardDoctor(){
+  const sch=brdSheet(), F=boardDoctor(sch);
+  const icon={err:"⛔",warn:"⚠",info:"ℹ"}, errs=F.filter(f=>f.lvl==="err").length;
+  const m=uxModal("🩺 ตรวจก่อนลงบอร์ด — "+esc(sch.name), `
+    <div class="bd-sum ${errs?"bad":F.length?"warn":"ok"}">${errs?`พบ ${errs} เรื่องที่ต้องแก้ก่อน build`:F.length?"ไม่มีเรื่องร้ายแรง — ลองอ่านข้อสังเกตด้านล่าง":"✓ ไม่พบปัญหา — สร้าง .bit ได้เลย"}</div>
+    <div class="bd-list">${F.map(f=>`<div class="bd-f ${f.lvl}"><div class="bd-t">${icon[f.lvl]} ${esc(f.title)}</div><div class="muted">${esc(f.why)}</div>
+      ${f.fix?`<div class="bd-fix">→ ${esc(f.fix)}${f.act==="pins"?' <button class="btn2" data-bd="pins">ไปเลือกขา</button>':f.act==="sim"?' <button class="btn2" data-bd="sim">ไปหน้าจำลอง</button>':""}</div>`:""}</div>`).join("")}</div>
+    <h3 class="bd-h">เทียบกับบอร์ด</h3><div id="bdPrev"></div>`, {width:760});
+  const draw=()=>{ const el=m.querySelector("#bdPrev"); try{ el.innerHTML=bdocPreviewHtml(sch); }catch(e){ el.innerHTML=`<p class="muted">${esc(e.message)}</p>`; } };
+  m.addEventListener("change", e=>{ const cb=e.target.closest("[data-bdin]"); if(!cb) return; BDOC.vals[cb.dataset.bdin]=cb.checked; draw(); });
+  m.addEventListener("click", e=>{ const b=e.target.closest("[data-bd]"); if(!b) return; m.close();
+    if(b.dataset.bd==="pins") brdAct("pins"); else if(b.dataset.bd==="sim"){ brdShow(false); setStage("sim"); } });
+  draw();
+  return F;
+}
+/* on the ลงบอร์ด page: a button in step 1, and a one-line verdict under the pins */
+{
+  const _ref=brdRefresh;
+  brdRefresh=function(){
+    const r=_ref.apply(this, arguments);
+    const h=$("#boardPage .brd-card h3 [data-brd=pins]");
+    if(h && !h.parentNode.querySelector("[data-brd=doctor]")) h.insertAdjacentHTML("afterend", ' <button class="btn2" data-brd="doctor" title="หาเรื่องที่จะพังบนบอร์ดจริง ก่อนเสียเวลา build">🩺 ตรวจก่อนลงบอร์ด</button>');
+    try{ const F=boardDoctor(brdSheet()), e=F.filter(f=>f.lvl==="err").length, w=F.filter(f=>f.lvl==="warn").length, el=$("#brdWarn");
+      if(el && (e||w)) el.insertAdjacentHTML("afterbegin", `<div class="bd-line ${e?"bad":"warn"}">🩺 ${e?`พบ ${e} เรื่องที่จะพังบนบอร์ด`:""}${e&&w?" · ":""}${w?`ข้อควรระวัง ${w} เรื่อง`:""} <button class="btn2" data-brd="doctor">ดู</button></div>`); }catch(_){}
+    return r;
+  };
+  const _act=brdAct;
+  brdAct=function(a){ if(a==="doctor") return openBoardDoctor(); return _act.apply(this, arguments); };
+}
+MCP_OPS.board_check = a=>{
+  const sch=a.sheet ? mcpSheet(a.sheet) : brdSheet();
+  const F=boardDoctor(sch);
+  return {sheet:sch.name, errors:F.filter(f=>f.lvl==="err").length, findings:F.map(f=>({level:f.lvl, title:f.title, why:f.why, fix:f.fix}))};
+};
+
+/* ===== 30. Wiring hints: "cout of FA0 goes to cin of FA1" (Inspector 💡, dashed lines, MCP suggest_wires) =====
+   A beginner who has placed four full adders knows they must be chained but not which pin goes
+   where. The sheet already says most of it: blocks of one kind in a row pass carry-like signals
+   along (x_out → x_in, cout → cin, bout → bin), a block's input named like a sheet INPUT takes
+   it (clk, rst, en — and a2 or bit 2 of bus a for the block labelled …2), a sheet OUTPUT named
+   like a block output (or its bit / index) takes that. Only pins that are still unconnected get
+   a hint, each with a reason in Thai; one click wires it (through MCP connect, so undo works). */
+function whLinked(sch, cid, pid){ return sch.wires.some(w=>(w.to.cid===cid&&w.to.pid===pid)||(w.from.cid===cid&&w.from.pid===pid)); }
+function whIdx(c){ const m=/(\d+)$/.exec(c.label||""); return m ? +m[1] : null; }
+function whStem(pid, kind){ const m=new RegExp("^(.*?)_?"+kind+"$","i").exec(pid); return m && m[1] ? m[1].toLowerCase() : null; }
+function wireHints(sch){
+  sch=sch||activeSch(); if(!sch) return [];
+  const H=[], taken=new Set(), key=(c,p)=>c.id+"|"+p;
+  const push=(src, dst, dstC, dstP, why, kind)=>{ if(taken.has(key(dstC,dstP))) return; taken.add(key(dstC,dstP)); H.push({from:src, to:dst, why, kind, cid:dstC.id, pid:dstP}); };
+  const parts=sch.components.filter(c=>!["JUNCTION","BUSTAP","IN","OUT","VCC","GND","CONST"].includes(c.type));
+  const ins=sch.components.filter(c=>c.type==="IN"), outs=sch.components.filter(c=>c.type==="OUT");
+  const nm=c=>String((c.params&&c.params.name)||"").toLowerCase();
+  const free=(c,p)=>p.dir==="in" && !whLinked(sch, c.id, p.id);
+  const W=p=>p.width||1;
+  // 1. a chain: blocks of one kind in order (label index, else left→right, top→bottom)
+  const groups={}; parts.forEach(c=>(groups[c.type]=groups[c.type]||[]).push(c));
+  Object.values(groups).filter(g=>g.length>1).forEach(g=>{
+    const ord=g.every(c=>whIdx(c)!=null) ? g.slice().sort((a,b)=>whIdx(a)-whIdx(b)) : g.slice().sort((a,b)=>(a.x-b.x)||(a.y-b.y));
+    const P=getPorts(ord[0]), pairs=[];
+    P.filter(o=>o.dir==="out").forEach(o=>{ const s=whStem(o.id,"out")||whStem(o.id,"o");
+      const i=s && P.find(x=>x.dir==="in" && (whStem(x.id,"in")===s || whStem(x.id,"i")===s) && W(x)===W(o)); if(i) pairs.push([o,i]); });
+    for(let k=0;k+1<ord.length;k++) pairs.forEach(([o,i])=>{ const A=ord[k], B=ord[k+1];
+      if(free(B,i) && !sch.wires.some(w=>w.from.cid===A.id&&w.from.pid===o.id))
+        push(`${mcpName(A)}.${o.id}`, `${mcpName(B)}.${i.id}`, B, i.id, `ต่อเป็นทอด: ${o.id} ของ ${mcpName(A)} ส่งต่อไปเข้า ${i.id} ของ ${mcpName(B)} (ตัวถัดไป)`, "chain"); });
+  });
+  // 2. a block input named like a sheet INPUT (or bit k of it / name+k, for the block labelled …k)
+  parts.forEach(c=>getPorts(c).filter(p=>free(c,p) && !taken.has(key(c,p.id))).forEach(p=>{
+    const id=p.id.toLowerCase(), k=whIdx(c), alias=id==="clk"?["clk","clock"]:[id];
+    // one sheet INPUT to several blocks' pin of that name only for signals every block shares
+    const many=parts.filter(x=>x!==c && getPorts(x).some(q=>q.id.toLowerCase()===id && free(x,q) && !taken.has(key(x,q.id)))).length>0;
+    const shared=/^(clk|clock|rst|reset|clr|clear|en|enable|ce|load|ld|sub|mode|sel|s|dir|up)$/.test(id);
+    let s=(!many||shared||k==null) && ins.find(x=>alias.includes(nm(x)) && W(getPorts(x)[0])===W(p));
+    if(s) return push(`${mcpName(s)}`, `${mcpName(c)}.${p.id}`, c, p.id, `ชื่อตรงกัน: INPUT ${mcpName(s)} → ขา ${p.id} ของ ${mcpName(c)}`, "name");
+    if(k==null || W(p)!==1) return;
+    s=ins.find(x=>[id+k, id+"_"+k].includes(nm(x)) && W(getPorts(x)[0])===1);
+    if(s) return push(`${mcpName(s)}`, `${mcpName(c)}.${p.id}`, c, p.id, `บิตที่ ${k}: INPUT ${mcpName(s)} → ขา ${p.id} ของ ${mcpName(c)}`, "bit");
+    s=ins.find(x=>nm(x)===id && W(getPorts(x)[0])>1 && W(getPorts(x)[0])>k);
+    if(s) push(`${mcpName(s)}.o[${k}]`, `${mcpName(c)}.${p.id}`, c, p.id, `บิตที่ ${k} ของบัส ${mcpName(s)} → ขา ${p.id} ของ ${mcpName(c)}`, "bus");
+  }));
+  // 3. a sheet OUTPUT named like a block output (unique), or name+k / bit k of a bus OUTPUT
+  outs.forEach(o=>{ const n=nm(o), w=W(getPorts(o)[0]);
+    if(whLinked(sch, o.id, "i")) return;
+    const hits=parts.flatMap(c=>getPorts(c).filter(p=>p.dir==="out"&&p.id.toLowerCase()===n&&W(p)===w).map(p=>({c,p})))
+      .filter(({c,p})=>!sch.wires.some(x=>x.from.cid===c.id&&x.from.pid===p.id) && !H.some(h=>h.from===`${mcpName(c)}.${p.id}`));   // a carry already passed on is not the answer
+    if(hits.length===1) return push(`${mcpName(hits[0].c)}.${hits[0].p.id}`, `${mcpName(o)}`, o, "i", `ชื่อตรงกัน: ${hits[0].p.id} ของ ${mcpName(hits[0].c)} → OUTPUT ${mcpName(o)}`, "name");
+    const m=/^(.*?)_?(\d+)$/.exec(n);
+    if(m && w===1){ const c=parts.find(x=>whIdx(x)===+m[2] && getPorts(x).some(p=>p.dir==="out"&&p.id.toLowerCase()===m[1]&&W(p)===1));
+      if(c) return push(`${mcpName(c)}.${getPorts(c).find(p=>p.dir==="out"&&p.id.toLowerCase()===m[1]).id}`, `${mcpName(o)}`, o, "i", `บิตที่ ${m[2]}: ${m[1]} ของ ${mcpName(c)} → OUTPUT ${mcpName(o)}`, "bit"); }
+    if(w>1 && !sch.wires.some(x=>x.to.cid===o.id)){          // bus OUTPUT: bit k from the block labelled …k
+      parts.forEach(c=>{ const k=whIdx(c), p=getPorts(c).find(p=>p.dir==="out"&&p.id.toLowerCase()===n&&W(p)===1);
+        if(k!=null && k<w && p && !sch.wires.some(x=>x.from.cid===c.id&&x.from.pid===p.id))
+          H.push({from:`${mcpName(c)}.${p.id}`, to:`${mcpName(o)}.i[${k}]`, why:`บิตที่ ${k} ของบัส ${mcpName(o)} ← ${p.id} ของ ${mcpName(c)}`, kind:"bus", cid:o.id, pid:"i"}); });
+    }
+  });
+  return H;
+}
+function whApply(hints){
+  if(!hints.length) return {connected:[]};
+  const r=MCP_OPS.connect({connections:hints.map(h=>[h.from, h.to])});
+  try{ renderAll(); }catch(_){}
+  return r;
+}
+/* the Inspector: hints for the selected part, or for the whole sheet when nothing is selected */
+{
+  const _insp=renderInspector;
+  renderInspector=function(){ const r=_insp.apply(this, arguments);
+    try{ const sch=activeSch(), pane=$("#inspectorPane"); if(!sch||!pane) return r;
+      const sel=[...state.selection]; if(sel.length>1) return r;
+      let H=wireHints(sch); if(sel.length) H=H.filter(h=>h.cid===sel[0] || h.from.split(".")[0]===mcpName(comp(sel[0],sch)||{id:sel[0]}));
+      if(!H.length) return r;
+      const box=document.createElement("div"); box.className="wh-box";
+      box.innerHTML=`<div class="wh-h">💡 แนะนำการต่อสาย <span class="muted">(${H.length})</span></div>
+        <div class="wh-list">${H.slice(0,12).map((h,i)=>`<div class="wh-i"><div><code>${esc(h.from)}</code> → <code>${esc(h.to)}</code><div class="muted">${esc(h.why)}</div></div><button class="btn2" data-wh="${i}">ต่อ</button></div>`).join("")}</div>
+        ${H.length>1?`<button class="btn" data-wh="all">ต่อทั้งหมด ${H.length} เส้น</button>`:""}`;
+      pane.appendChild(box);
+      box.addEventListener("click", e=>{ const b=e.target.closest("[data-wh]"); if(!b) return;
+        try{ const x=whApply(b.dataset.wh==="all"?H:[H[+b.dataset.wh]]); toast("ต่อแล้ว: "+x.connected.join(", "), "ok", 4000); }
+        catch(err){ toast("ต่อไม่ได้: "+err.message, "warn", 6000); } });
+    }catch(e){ console.warn("wire hints", e); }
+    return r; };
+  // dashed guide lines for the selected part's hints
+  const _render=render;
+  render=function(){ const r=_render.apply(this, arguments);
+    try{ const sch=activeSch(), world=canvas.firstChild; if(!sch||!world||state.selection.size!==1) return r;
+      const id=[...state.selection][0], c0=comp(id,sch); if(!c0) return r;
+      const H=wireHints(sch).filter(h=>h.cid===id || h.from.split(".")[0]===mcpName(c0)); if(!H.length) return r;
+      const layer=el("g",{class:"wh-ghost"});
+      const pos=ref=>{ const b=ref.replace(/\[\d+\]$/,""), i=b.lastIndexOf("."), c=findCompRef(sch, i>0?b.slice(0,i):b) || findCompRef(sch,b);
+        if(!c) return null; const p=i>0&&getPort(c,b.slice(i+1)) ? b.slice(i+1) : (getPorts(c)[0]||{}).id; return portPos(c,p); };
+      H.forEach(h=>{ const a=pos(h.from), b=pos(h.to); if(!a||!b) return;
+        layer.appendChild(el("path",{d:`M${a.x},${a.y} C${a.x+40},${a.y} ${b.x-40},${b.y} ${b.x},${b.y}`, class:"wh-line"})); });
+      world.appendChild(layer);
+    }catch(_){}
+    return r; };
+}
+MCP_OPS.suggest_wires = a=>{
+  const sch=mcpUse(a.sheet), H=wireHints(sch);
+  if(a.apply && H.length){ const r=whApply(H); return {applied:r.connected, count:H.length}; }
+  return {sheet:sch.name, hints:H.map(h=>({from:h.from, to:h.to, why:h.why})),
+    note:H.length?"connect them with connect {connections:[[from,to],…]} or suggest_wires {apply:true}":"no unconnected pin has an obvious partner"};
+};
+
+/* ===== 31. "The board doesn't do what the sim did": questions → a cause, checked on THIS design =====
+   After loading the .bit a beginner sees a dark board, an inverted digit or a counter that never
+   moves, and has no way to tell which of ten causes it is. A few questions about what they see
+   narrow it down; each answer is then checked against the design (pins, polarity, clock source,
+   reset, a stale .bit, the sim's own findings) so the verdict names the pin or part to fix.
+   ลงบอร์ด page ▸ "🔧 บอร์ดไม่ทำงานเหมือนที่จำลอง?", the board doctor, MCP board_troubleshoot. */
+function bhFacts(sch){
+  const bits=uxPortBits(sch).map(b=>Object.assign({t:uxPinTarget(b, sch)}, b));
+  const of=re=>bits.filter(b=>re.test(b.t||""));
+  const F={sch, bits, leds:of(/^led:/), segs:of(/^seg:[a-g]$/), ans:of(/^an:/), sws:of(/^sw:/), pbs:of(/^pb:/),
+    unmapped:bits.filter(b=>!b.t), doctor:[], clock:null, resets:[], ffs:0, sim:[]};
+  try{ F.doctor=boardDoctor(sch); }catch(_){}
+  try{ F.sim=explainSim(sch).filter(x=>x.lvl==="err"); }catch(_){}
+  try{ const fs=flattenSchematic(sch).sch, m=probeModel(fs, probeStruct(fs)), ff=fs.components.filter(c=>PROBE_SEQ[c.type]); F.ffs=ff.length;
+    ff.forEach(c=>{ const s=m.source(c.id,"clk"); if(s&&s.type==="IN"&&!F.clock){ const ic=sch.components.find(x=>x.id===s.cid);
+      if(ic){ const b=bits.find(x=>x.port===sanId(ic.params.name)&&x.bit==null); F.clock={name:ic.params.name, t:b&&b.t}; } } }); }catch(_){}
+  F.resets=bits.filter(b=>b.dir==="in" && /^(rst|reset|clr|clear|n?rst_?n?)$/i.test(b.port));
+  F.stale=typeof BRD==="object" && BRD.bit ? BRD.bit.current===false : null;
+  return F;
+}
+const bhL=b=>`<b>${esc(b.key)}</b> → ${esc(pinTargetLabel(b.t))}`;
+const BH_TREE={
+  start:{q:"บอร์ดทำอะไรต่างไปจากที่จำลองไว้?", opts:[
+    ["โหลดลงบอร์ดไม่สำเร็จ / หาบอร์ดไม่เจอ","load"], ["โหลดสำเร็จ แต่ไม่มีอะไรติดเลย","dark"],
+    ["LED ติดผิดดวง หรือโยกสวิตช์แล้วผิดตัว","map"], ["7-segment แสดงผิด","seg"],
+    ["ตัวนับไม่นับ / ค้าง / ติดสลัวๆ","count"], ["นับข้าม หรือกดทีเดียวขยับหลายค่า","bounce"],
+    ["ทำงานตอนปล่อยปุ่ม แทนที่จะเป็นตอนกด","btninv"]]},
+  dark:{q:"ลองโยกสวิตช์ที่วงจรใช้ — มี LED ดวงไหนเปลี่ยนบ้างไหม?", opts:[["มี แต่ไม่ใช่ดวงที่คิด","map"],["ไม่มีอะไรเปลี่ยนเลย","darkx"]]},
+  seg:{q:"ส่วนที่ควรติดกลับดับ ส่วนที่ควรดับกลับติด (เหมือนภาพกลับสี) ใช่ไหม?", opts:[["ใช่ กลับสีทั้งตัว","segpol"],["ไม่ใช่","seg2"]]},
+  seg2:{q:"ตัวเลขขึ้นผิดหลัก, ขึ้นทุกหลักพร้อมกัน หรือไม่มีหลักไหนติด?", opts:[["ใช่ เป็นเรื่องหลัก","segan"],["หลักถูก แต่รูปตัวเลขเพี้ยน","segmap"]]},
+  count:{q:"LED ของตัวนับติดสลัวๆ ทุกดวงพร้อมกัน (ไม่เห็นกระพริบ) ใช่ไหม?", opts:[["ใช่ สลัวค้าง","fast"],["ไม่ใช่ ติดนิ่ง/ดับนิ่ง ไม่เปลี่ยน","stuck"]]},
+};
+function bhDiag(id, F){
+  const ok=t=>`<li class="bh-ok">✓ ${t}</li>`, bad=t=>`<li class="bh-bad">⚠ ${t}</li>`, tip=t=>`<li>${t}</li>`;
+  const doc=re=>F.doctor.filter(f=>re.test(f.title));
+  const staleLine=F.stale===true?bad("ไฟล์ .bit ที่โหลดสร้างจากวงจรเวอร์ชันก่อน — วงจรตอนนี้เปลี่ยนไปแล้ว กด “สร้าง .bit” ใหม่แล้วโหลดอีกครั้ง"):F.stale===false?ok("ไฟล์ .bit ตรงกับวงจรตอนนี้"):"";
+  const mapTable=(list,label)=>list.length?`<div class="bh-map"><div class="muted">${label}</div>${list.map(b=>`<div>${bhL(b)}</div>`).join("")}</div>`:"";
+  const R={
+    load:{title:"โหลดลงบอร์ดไม่สำเร็จ", checks:[], tips:[
+      "เสียบสาย USB ที่ช่อง PROG/JTAG ของบอร์ด (ไม่ใช่ช่องจ่ายไฟอย่างเดียว) และเปิดสวิตช์ไฟบอร์ด",
+      "กด “ตรวจหาบอร์ด” ในหน้าลงบอร์ด — ถ้าไม่เจอ ไปหน้า Home ▸ เริ่มต้นใช้งาน ▸ ไดรเวอร์ USB (Windows ต้องติดตั้งไดรเวอร์ด้วย Zadig ครั้งแรกครั้งเดียว)",
+      "ปิดโปรแกรมอื่นที่อาจจับสายอยู่ (Vivado Hardware Manager, Adept)",
+      "ลองเปลี่ยน “สาย (cable)” ในตั้งค่าเพิ่ม ถ้าบอร์ดใช้ชิปสายต่างรุ่น"]},
+    darkx:{title:"โหลดสำเร็จ แต่บอร์ดไม่ตอบสนอง", checks:[
+      staleLine,
+      F.leds.length||F.segs.length ? ok(`มี OUTPUT ต่อกับ LED/7-seg ${F.leds.length+F.segs.length} ขา`) : bad("ไม่มี OUTPUT ต่อกับ LED หรือ 7-seg เลย — บอร์ดจึงไม่มีอะไรให้ดู"),
+      F.sws.length||F.pbs.length ? ok(`มี INPUT ต่อกับสวิตช์/ปุ่ม ${F.sws.length+F.pbs.length} ขา`) : (F.bits.some(b=>b.dir==="in")?bad("INPUT ยังไม่ได้ต่อกับสวิตช์หรือปุ่ม"):""),
+      F.unmapped.length ? bad(`ยังไม่ได้เลือกขา: ${F.unmapped.map(b=>esc(b.key)).join(", ")}`) : "",
+      ...F.resets.map(b=>b.t&&/^sw:/.test(b.t) ? bad(`reset <b>${esc(b.key)}</b> อยู่ที่ ${esc(pinTargetLabel(b.t))} — ถ้าสวิตช์นี้โยกขึ้นอยู่ วงจรถูกล้างตลอด ลองโยกลง`) : ""),
+      ...F.sim.slice(0,3).map(x=>bad("ในจำลองก็มีปัญหา: "+esc(x.title)))].filter(Boolean),
+      tips:["กด “เทียบกับบอร์ด” ในหน้าตรวจก่อนลงบอร์ด ตั้งสวิตช์ให้ตรงกับบอร์ดจริง แล้วดูว่าควรเห็นอะไร",
+        "ถ้าในภาพเทียบกับบอร์ดก็ดับ ปัญหาอยู่ที่วงจร ไม่ใช่บอร์ด — กลับไปดูในหน้าจำลอง"]},
+    map:{title:"LED / สวิตช์ ผิดตัว", checks:[mapTable(F.sws.concat(F.pbs),"INPUT ของวงจรใช้:"), mapTable(F.leds,"OUTPUT ของวงจรไปที่:"), ...doc(/ใช้ขาเดียวกัน|ต่อกับ/).map(f=>bad(esc(f.title)))].filter(Boolean),
+      tips:["บนบอร์ด SW 0 และ LED 0 อยู่ <b>ขวาสุด</b> ตัวเลขเพิ่มไปทางซ้าย (เหมือนบิต 0 = LSB)",
+        "บัสเช่น q[3:0]: บิต 0 ควรอยู่ที่ LED 0 (ขวาสุด) — ถ้าเห็นลำดับกลับหัว แปลว่าเลือกขากลับด้าน",
+        "แก้ในหน้าเลือกขา แล้วสร้าง .bit ใหม่"], pins:true},
+    segpol:{title:"7-segment กลับสี", checks:[
+      doc(/active-high/).length ? bad("วงจรนี้เขียน a–g แบบ active-high (1 = ติด) — แต่จอบนบอร์ดเป็น common-anode: 0 = ติด") : ok("ตารางของวงจรออกแบบ active-low แล้ว — ถ้ายังกลับสี ตรวจว่ามี NOT เกินมาที่ขา a–g ไหม")],
+      tips:["ใช้ชิ้นส่วน “BCD → 7-segment” แบบ active-low (แท็บ Modules ▸ ชิ้นส่วน) หรือใส่ NOT ที่ขา a–g ทุกขา"]},
+    segan:{title:"เรื่องหลักของ 7-segment", checks:[
+      F.ans.length ? mapTable(F.ans,"ขาเลือกหลัก:") : bad("ไม่ได้ขับขาเลือกหลัก (an0–an3) — หลักจะติดตามค่าเริ่มต้นของบอร์ด ซึ่งอาจเป็นทุกหลักหรือไม่ติดเลย"),
+      ...doc(/ทุกหลักดับ/).map(f=>bad(esc(f.title)))].filter(Boolean),
+      tips:["an เป็น active-low: 0 = หลักนั้นติด, 1 = ดับ · an0 = หลักขวาสุด",
+        "จะเปิดหลักเดียว: OUTPUT an0 ต่อ GND แล้ว an1–an3 ต่อ VCC",
+        "จะแสดงหลายหลักพร้อมกันต้องสลับหลักเร็วๆ (time-multiplex) — ดูแลป 4 เรื่องการหารความถี่"], pins:true},
+    segmap:{title:"รูปตัวเลขเพี้ยน", checks:[mapTable(F.segs,"ขา a–g ของวงจรไปที่:"), F.segs.length<7?bad(`ต่อขา a–g ไว้แค่ ${F.segs.length} ขา`):""].filter(Boolean),
+      tips:["ตำแหน่งส่วน: a บน · b ขวาบน · c ขวาล่าง · d ล่าง · e ซ้ายล่าง · f ซ้ายบน · g กลาง",
+        "ถ้าเลขบางตัวถูกบางตัวผิด มักเป็นเพราะเลือกขาสลับกัน 2 ขา หรือบิตอินพุตสลับ (b0 กับ b3)",
+        "ใช้ “เทียบกับบอร์ด” ตั้งสวิตช์ให้เหมือนบอร์ด แล้วเทียบรูปทีละส่วน"], pins:true},
+    fast:{title:"ติดสลัวค้าง = เปลี่ยนเร็วเกินตาเห็น", checks:[
+      F.clock&&F.clock.t==="clk" ? bad(`นาฬิกา <b>${esc(F.clock.name)}</b> มาจาก 50 MHz ตรงๆ — ค่าเปลี่ยน 50 ล้านครั้งต่อวินาที`) : ok("นาฬิกาไม่ได้มาจาก 50 MHz ตรงๆ — ถ้ายังสลัว ตรวจว่าตัวหารความถี่หารพอไหม"),
+      ok(`มี flip-flop ${F.ffs} ตัว`)],
+      tips:["ใส่ตัวหารความถี่ระหว่าง clk กับวงจร: ÷50000000 = 1 Hz, ÷5000000 = 10 Hz (แท็บ Modules ▸ ชิ้นส่วน ▸ หารความถี่)",
+        "ในหน้าจำลอง “⚡ เล่นเวลาจริง (50 MHz)” จะเห็นอาการเดียวกันก่อนลงบอร์ด"]},
+    stuck:{title:"ตัวนับไม่เดิน", checks:[
+      staleLine,
+      !F.ffs ? bad("วงจรนี้ไม่มี flip-flop — จึงไม่มีอะไรนับ") : F.clock ? (F.clock.t ? ok(`นาฬิกา <b>${esc(F.clock.name)}</b> มาจาก ${esc(pinTargetLabel(F.clock.t))}`) : bad(`นาฬิกา <b>${esc(F.clock.name)}</b> ยังไม่ได้เลือกขา`)) : bad("หาไม่เจอว่า flip-flop รับนาฬิกาจาก INPUT ตัวไหน"),
+      F.clock&&/^sw:/.test(F.clock.t||"") ? bad("นาฬิกามาจากสวิตช์เลื่อน — ต้องโยกขึ้น-ลงเองทีละครั้งถึงจะนับ 1 ค่า") : "",
+      ...F.resets.map(b=>b.t ? bad(`reset <b>${esc(b.key)}</b> อยู่ที่ ${esc(pinTargetLabel(b.t))} — ถ้าค้างที่ 1 (สวิตช์โยกขึ้น) ตัวนับถูกล้างตลอด`) : bad(`reset ${esc(b.key)} ยังไม่ได้เลือกขา`)),
+      ...F.sim.slice(0,3).map(x=>bad("ในจำลอง: "+esc(x.title)))].filter(Boolean),
+      tips:["ตั้งทุกสวิตช์ลง (0) ก่อน แล้วค่อยลองทีละตัว",
+        "ถ้าในหน้าจำลองก็ไม่นับ แก้ที่วงจรก่อน (ปุ่ม 🐞 Debug จะบอกว่าติดที่ไหน)"]},
+    bounce:{title:"นับข้าม = หน้าสัมผัสเด้ง (bounce)", checks:[
+      F.clock&&/^(pb|sw):/.test(F.clock.t||"") ? bad(`นาฬิกา <b>${esc(F.clock.name)}</b> มาจาก ${esc(pinTargetLabel(F.clock.t))} — กดหนึ่งครั้งหน้าสัมผัสเด้งหลายสิบครั้ง แต่ละครั้งเป็นขอบขาขึ้นใหม่`) : ok("นาฬิกาไม่ได้มาจากปุ่มโดยตรง — ถ้าปุ่มเป็น enable ก็ควรผ่าน debounce เหมือนกัน")],
+      tips:["ใช้ clk 50 MHz + ตัวหาร (~100 Hz) เป็นนาฬิกาของชิ้นส่วน Debounce แล้วต่อ Edge detector ให้ได้ 1 พัลส์ต่อการกด 1 ครั้ง",
+        "จากนั้นใช้พัลส์นั้นเป็น enable ของตัวนับ (ตัวนับยังใช้นาฬิกาเดียวกันทั้งวงจร)",
+        "ทั้งสามอย่างอยู่ในแท็บ Modules ▸ ชิ้นส่วน"]},
+    btninv:{title:"ปุ่มทำงานกลับด้าน", checks:[F.pbs.length?mapTable(F.pbs,"ปุ่มที่วงจรใช้:"):bad("วงจรนี้ไม่ได้ใช้ปุ่มกด")].filter(Boolean),
+      tips:["ปุ่มบางแบบให้ 1 ตอนปล่อย และ 0 ตอนกด (active-low) — ใส่ NOT หลัง INPUT ของปุ่มนั้น",
+        "ในหน้าจำลองจะเห็นเหมือนเดิมเพราะตัวจำลองถือว่ากด = 1 — ถ้าบอร์ดเป็นแบบนี้ ให้ทดสอบด้วยค่าที่กลับกัน"]},
+  };
+  return R[id];
+}
+function bhDiagHtml(d){
+  return `<div class="bh-diag"><h3>${d.title}</h3>
+    ${d.checks.length?`<div class="muted">ตรวจจากวงจรนี้แล้ว:</div><ul class="bh-checks">${d.checks.join("")}</ul>`:""}
+    <div class="muted">ลองทำ:</div><ol class="bh-tips">${d.tips.map(t=>`<li>${t}</li>`).join("")}</ol>
+    <div class="bh-acts">${d.pins?'<button class="btn2" data-bh="pins">ไปเลือกขา</button>':""}
+      <button class="btn2" data-bh="compare">เทียบกับบอร์ด</button><button class="btn2" data-bh="sim">ไปหน้าจำลอง</button>
+      <button class="btn2" data-bh="ask">💬 ถาม AI ต่อ</button></div></div>`;
+}
+function openBoardHelp(start){
+  const sch=brdSheet(), F=bhFacts(sch), path=[start||"start"];
+  const m=uxModal("🔧 บอร์ดไม่ทำงานเหมือนที่จำลอง — "+esc(sch.name), `<div id="bhBody"></div>`, {width:720});
+  const draw=()=>{ const id=path[path.length-1], node=BH_TREE[id], body=m.querySelector("#bhBody");
+    const back=path.length>1?'<button class="btn2 bh-back" data-bh="back">← ย้อน</button>':"";
+    if(node) body.innerHTML=`${back}<div class="bh-q">${esc(node.q)}</div><div class="bh-opts">${node.opts.map(([t,go])=>`<button class="btn bh-o" data-go="${go}">${esc(t)}</button>`).join("")}</div>`;
+    else body.innerHTML=back+bhDiagHtml(bhDiag(id, F)); };
+  m.addEventListener("click", e=>{ const g=e.target.closest("[data-go]"); if(g){ path.push(g.dataset.go); draw(); return; }
+    const b=e.target.closest("[data-bh]"); if(!b) return; const a=b.dataset.bh;
+    if(a==="back"){ path.pop(); draw(); return; }
+    m.close();
+    if(a==="pins") brdAct("pins");
+    else if(a==="compare") openBoardDoctor();
+    else if(a==="sim"){ brdShow(false); setStage("sim"); }
+    else if(a==="ask"){ const d=bhDiag(path[path.length-1], F); if(!AICHAT.open) toggleAiChat(); aiSetMode("qa");
+      const t=$("#acInput"); t.value=`บอร์ดจริงมีอาการ: ${d.title} (แผ่น ${sch.name}) ต้องตรวจอะไรต่อ`; t.focus(); } });
+  draw();
+  return m;
+}
+/* entry points: the board page (next to ตรวจหาบอร์ด) and the doctor's dialog */
+{
+  const _ref=brdRefresh;
+  brdRefresh=function(){ const r=_ref.apply(this, arguments);
+    const d=$('#boardPage [data-brd="detect"]');
+    if(d && !$('#boardPage [data-brd="help"]')) d.insertAdjacentHTML("afterend", ' <button class="btn" data-brd="help" title="ตอบคำถามสั้นๆ ว่าเห็นอะไรบนบอร์ด แล้วระบบหาสาเหตุจากวงจรนี้">🔧 บอร์ดไม่ทำงานเหมือนที่จำลอง?</button>');
+    return r; };
+  const _act=brdAct;
+  brdAct=function(a){ if(a==="help") return openBoardHelp(); return _act.apply(this, arguments); };
+  const _doc=openBoardDoctor;
+  openBoardDoctor=function(){ const r=_doc.apply(this, arguments);
+    const h=[...document.querySelectorAll(".modal-bg .bd-h")].pop();
+    if(h) h.insertAdjacentHTML("beforebegin", '<div class="bd-help"><button class="btn2" data-bdh="1">🔧 ลงบอร์ดแล้วแต่ไม่ทำงานเหมือนที่จำลอง?</button></div>');
+    const mb=h&&h.closest(".modal-bg"); if(mb) mb.querySelector("[data-bdh]").onclick=()=>{ mb.remove(); openBoardHelp(); };
+    return r; };
+}
+MCP_OPS.board_troubleshoot = a=>{
+  const sch=a.sheet ? mcpSheet(a.sheet) : brdSheet(), F=bhFacts(sch);
+  const ids=["load","darkx","map","segpol","segan","segmap","fast","stuck","bounce","btninv"];
+  if(!a.symptom) return {symptoms:ids, note:"load = cannot program · darkx = nothing reacts · map = wrong LED/switch · segpol = digit inverted · segan = wrong/all/no digit · segmap = digit shape wrong · fast = LEDs dim · stuck = counter does not move · bounce = skips counts · btninv = acts on release"};
+  if(!ids.includes(a.symptom)) mcpFail(`unknown symptom '${a.symptom}'`, "one of: "+ids.join(", "));
+  const d=bhDiag(a.symptom, F), txt=h=>String(h).replace(/<[^>]+>/g,"").replace(/&[a-z]+;/g," ").trim();
+  return {sheet:sch.name, title:d.title, checked:d.checks.map(txt).filter(Boolean), try:d.tips.map(txt)};
+};
 
 </script>
 <!-- UX-LAYER:END -->

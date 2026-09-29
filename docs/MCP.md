@@ -57,12 +57,12 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 | The app | `about` (app + version, update available and what's new, workspace, editor open?, Vivado / openFPGALoader / USB driver / AI model ready?), `check_update`, `open_home` (Home / setup checklist / settings — the user clicks อัปเดตเลย there) |
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
 | Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
-| Edit | `add_component`, `connect`, `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
+| Edit | `add_component`, `connect`, `suggest_wires` (hints for unconnected pins: cout→cin chains, a2 → the block labelled …2; `apply:true` wires them), `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
 | Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, JK-FF counter, `clock_divider` for any N such as 50 MHz → 20 Hz, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist (sub-circuits as `block:<sheet>`). With `bus: true`, numbered ports come out as one bus port (q0..q3 → `q[3:0]`). `make_bus_ports` does the same for an existing sheet. |
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
-| Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation` |
-| Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc` |
-| Output | `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `new_project`, `list_projects`, `open_project` |
+| Verify | `check` (errors with suggested fixes), `simulate`, `verify_truth_table`, `probe` (every net's value), `explain_simulation`, `set_spec` / `check_spec` (the sheet's acceptance test) |
+| Board | `board_pins`, `get_pins`, `set_pins`, `auto_pins`, `get_xdc`, `board_check` (what will go wrong on the real board, before a build), `board_troubleshoot` (the board misbehaves: symptom → causes checked on the design) |
+| Output | `make_report` (the lab report into the project folder), `get_vhdl`, `export_files` (writes .vhd / .xdc / project into the workspace), `save_project`, `new_project`, `list_projects`, `open_project` |
 | Real board | `board_build` (Vivado → .bit), `board_program` (load into the FPGA, or `detect`), `board_status` (follow the job: log tail, Thai explanation of an error, does the .bit match the circuit). Writing the Flash stays the user's click. |
 | History | `undo`, `redo`, `checkpoint`, `list_checkpoints`, `restore_checkpoint` |
 | With you | `focus` (centres your view on a part), `notify_user` (a message in the editor) |
@@ -79,9 +79,24 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
   - An expectation identical to the table the sheet was built from proves nothing. The result says so
     (`independent: false`), and it does not count as verified.
   - `recognized` names the standard circuit the sheet is.
+- **`build_fsm`:** a state machine from a few lines (`inputs: x`, `state S0: z=0`, `S0 -> S1 when x`, `else`,
+  Mealy `/ z=1`, `reset S0`) or an object. It is built from D flip-flops, checked clock by clock against the
+  diagram, and the diagram becomes the sheet's acceptance test.
+- **`set_spec` / `check_spec`:** what a sheet must do, written from the requirement: a formula, a table, or
+  a sequence of clocks. The app re-checks it after every edit (✓/✗ in the project tree). A pass marks the
+  sheet verified. Set it first, then build until it passes.
 - **`save_module`:** refuses a sheet that is not verified, unless you pass `force: true`.
 - **Calls that only wait** (`approval_status`, `board_status`, `ai_chat_status`) run beside the others. They
   no longer hold up the queue.
+
+### Before the board
+`board_check` lists what will go wrong on the real EDGE board, so you can fix it before a one-minute Vivado build:
+- a port without a pin, two ports on one pin, or an input on an LED
+- 7-seg segments written active-high for this common-anode display, or no digit enabled
+- a clock from a bouncing push button, or a counter on the raw 50 MHz clock
+
+The same check is behind the ลงบอร์ด page's 🩺 button. That button also has a preview: flip the mapped
+switches and see which LEDs and digits the design lights.
 
 ### Course notes (RAG)
 `search_course` searches the course material that ships with the app: the textbook chapters, the lab sheets

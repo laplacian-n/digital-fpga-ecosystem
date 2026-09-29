@@ -146,6 +146,36 @@ TOOLS = [
     T("apply", "Run several edit steps as one transaction — if a step fails nothing changes (unless keep_going). "
       "Each step is {\"op\": \"add_component\"|\"connect\"|\"disconnect\"|\"delete\"|\"update_component\"|\"set_pins\", …that tool's args}.",
       {"sheet": SHEET, "steps": {"type": "array", "items": {"type": "object"}}, "keep_going": {"type": "boolean"}}, ["steps"]),
+    T("build_fsm", "Build a state machine from its state diagram: binary encoding (reset state = 0), minimised next-state "
+      "and output logic, D flip-flops — then run clock by clock against the diagram before it is handed over (verified). "
+      "fsm as text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\nstate S1: z=1\\nS0 -> S1 when x\\nS0 -> S0 else\\nS1 -> S0 when ~x\\nreset S0' "
+      "(Mealy: 'S0 -> S1 when x / z=1'; conditions & | ^ ~ ( ) else) or an object {inputs, outputs, states:[{name,out}], "
+      "transitions:[{from,to,when,out?}], reset}. Ports: clk, the inputs, the outputs, state bits (state_out:false drops them).",
+      {"fsm": {"type": ["string", "object"]}, "sheet": SHEET, "name": {"type": "string"}, "state_out": {"type": "boolean"}},
+      ["fsm"], timeout=90),
+    T("make_report", "Write the lab report into the project folder (<project>_report.html): every sheet (top first, then its "
+      "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks, state diagram, acceptance "
+      "test, board pin table, VHDL. The user prints it to PDF.",
+      {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}}, timeout=90),
+    T("board_check", "Before building the .bit: what will go wrong on the real EDGE board — ports without a pin, two ports "
+      "on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit "
+      "enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one "
+      "the ลงบอร์ด page builds.", {"sheet": SHEET}),
+    T("suggest_wires", "Wiring hints for the unconnected pins of a sheet: blocks of one kind in a row chain carry-like pins "
+      "(cout→cin, x_out→x_in), a block input named like a sheet INPUT takes it (clk, rst, en; a2 or bit 2 of bus a for "
+      "the block labelled …2), a sheet OUTPUT named like a block output takes it. Each hint has a reason; apply:true "
+      "wires them all (one undo step).", {"sheet": SHEET, "apply": {"type": "boolean"}}),
+    T("board_troubleshoot", "The real board does not do what the simulation did: give the symptom (load, darkx, map, "
+      "segpol, segan, segmap, fast, stuck, bounce, btninv; none = list them) and get the causes checked on this design "
+      "(pins, polarity, clock source, reset, stale .bit) plus what to try.", {"sheet": SHEET, "symptom": {"type": "string"}}),
+    T("set_spec", "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): "
+      "formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, "
+      "inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks "
+      "the sheet verified. Set it FIRST, then build until check_spec passes.",
+      {"sheet": SHEET, "formula": {"type": ["string", "array"], "items": {"type": "string"}}, "table": {"type": "object"},
+       "sequence": {"type": "object"}}),
+    T("check_spec", "Run a sheet's acceptance test (or every sheet's with all_sheets) and get pass / the mismatches.",
+      {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
     T("list_parts", "The part library: standard circuits (adders, subtractors, comparator, mux/demux, decoder, encoder, "
       "BCD→7-seg, parity, majority, counters, clock divider, shift register, register, toggle, edge detector, debounce) "
       "with their parameters and ports. `query` filters.", {"query": {"type": "string"}}),
@@ -325,9 +355,9 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts",
+               "build_part", "list_parts", "build_fsm", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "undo", "list_modules", "use_module", "save_module", "search_course"]
+               "get_pins", "set_pins", "auto_pins", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 
 def openai_tools(names=None):

@@ -40,7 +40,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 APP_NAME = "FPGA Ecosystem"
 APP_ID = "fpga-ecosystem"
-VERSION = "1.2.0"
+VERSION = "2.0.0"
 
 FROZEN = getattr(sys, "frozen", False)
 # ROOT = where the bundled content lives (repo root in dev, _MEIPASS when frozen)
@@ -1076,6 +1076,17 @@ def make_handler():
                 return self._out(200, update_check(force=(q.get("force") or ["0"])[0] == "1"))
             if path == "/api/update/progress":
                 return self._out(200, dict(INSTALLER.snapshot(), log=updater.setup_log_path()))
+            if path == "/api/rag/labs":             # the lab sheets (ai/rag/labs/*.json) for the lab helper
+                labs = []
+                for f in sorted((ROOT / "ai" / "rag" / "labs").glob("*.json")):
+                    try:
+                        d = json.loads(f.read_text("utf-8"))
+                        labs.append({"lab": d.get("lab") or f.stem, "title": d.get("title", ""), "objectives": d.get("objectives") or [],
+                                     "items": [{k: it.get(k) for k in ("id", "question", "subtasks", "topic", "solution")}
+                                               for it in d.get("items") or []]})
+                    except Exception:
+                        pass
+                return self._out(200, {"ok": True, "labs": labs})
             if path == "/api/rag/search":
                 return self._out(200, rag_search((q.get("q") or [""])[0], int((q.get("k") or ["5"])[0] or 5),
                                                  (q.get("group") or [""])[0]))

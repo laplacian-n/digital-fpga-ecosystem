@@ -1,0 +1,40 @@
+name: Release on VERSION change
+
+# A new VERSION in launcher/app.py on main tags vX.Y.Z and builds the installer — no manual tag push.
+# (A tag that already exists, e.g. pushed by hand, is left alone: build-windows.yml runs on it itself.)
+on:
+  push:
+    branches: [main]
+    paths: ["launcher/app.py"]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.t.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: t
+        run: |
+          v=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' launcher/app.py | head -n1)
+          test -n "$v" || { echo "no VERSION in launcher/app.py"; exit 1; }
+          if git ls-remote --exit-code --tags origin "refs/tags/v$v" >/dev/null; then
+            echo "v$v is already tagged — nothing to do"
+          else
+            git tag "v$v" "$GITHUB_SHA"
+            git push origin "v$v"
+            echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: tag
+    if: needs.tag.outputs.tag != ''
+    uses: ./.github/workflows/build-windows.yml
+    with:
+      tag: ${{ needs.tag.outputs.tag }}
+    secrets: inherit
