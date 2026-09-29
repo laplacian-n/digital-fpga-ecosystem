@@ -40,7 +40,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 APP_NAME = "FPGA Ecosystem"
 APP_ID = "fpga-ecosystem"
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 FROZEN = getattr(sys, "frozen", False)
 # ROOT = where the bundled content lives (repo root in dev, _MEIPASS when frozen)
@@ -302,6 +302,11 @@ def llm_chat(req: dict) -> dict:
                                                     "top_k", "max_tokens", "stop", "chat_template_kwargs",
                                                     "parallel_tool_calls")}
     body.setdefault("temperature", 0.6)
+    if isinstance(body.get("messages"), list):      # one system message, first (Qwen3.5's template)
+        sysm = [m for m in body["messages"] if m.get("role") == "system"]
+        if len(sysm) > 1 or (sysm and body["messages"][0].get("role") != "system"):
+            body["messages"] = [{"role": "system", "content": "\n\n".join(m.get("content") or "" for m in sysm)}] + \
+                [m for m in body["messages"] if m.get("role") != "system"]
     t0 = time.time()
     restarted = False
     for attempt in (0, 1):

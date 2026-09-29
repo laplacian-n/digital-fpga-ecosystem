@@ -56,7 +56,7 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 |---|---|
 | The app | `about` (app + version, update available and what's new, workspace, editor open?, Vivado / openFPGALoader / USB driver / AI model ready?), `check_update`, `open_home` (Home / setup checklist / settings — the user clicks อัปเดตเลย there) |
 | Look | `status`, `get_sheet`, `get_netlist`, `list_component_types`, `screenshot` (PNG), `get_events` (what you changed) |
-| Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `set_top_sheet` |
+| Sheets | `open_sheet`, `new_sheet`, `rename_sheet`, `delete_sheet` (undoable; `force` for one used as a block), `set_top_sheet` |
 | Edit | `add_component`, `connect`, `suggest_wires` (hints for unconnected pins: cout→cin chains, a2 → the block labelled …2; `apply:true` wires them), `disconnect`, `delete`, `update_component` (rename / params / type / move / rotate), `apply` (many steps in one all-or-nothing transaction) |
 | Build | `build_circuit`: from a truth table (minimised), a generator (mod-N, JK-FF counter, `clock_divider` for any N such as 50 MHz → 20 Hz, sequence, ripple counter, shift register, register, BCD→7-seg) or an intent netlist (sub-circuits as `block:<sheet>`). With `bus: true`, numbered ports come out as one bus port (q0..q3 → `q[3:0]`). `make_bus_ports` does the same for an existing sheet. |
 | Layout | `auto_layout`, `layout_report` (overlaps, wires through parts, score), `lock_layout` |
@@ -83,7 +83,8 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
   Mealy `/ z=1`, `reset S0`) or an object. It is built from D flip-flops, checked clock by clock against the
   diagram, and the diagram becomes the sheet's acceptance test.
 - **`set_spec` / `check_spec`:** what a sheet must do, written from the requirement: a formula, a table, or
-  a sequence of clocks. The app re-checks it after every edit (✓/✗ in the project tree). A pass marks the
+  a sequence of clocks. On bus ports a formula is arithmetic: `{cout,sum} = a + b + cin` or `sum = a + b + cin`
+  on a 4-bit adder, one bit as `a[2]` / `sum[0] = …`, a slice `a[3:0]` means the whole port. The app re-checks it after every edit (✓/✗ in the project tree). A pass marks the
   sheet verified. Set it first, then build until it passes.
 - **`save_module`:** refuses a sheet that is not verified, unless you pass `force: true`.
 - **Calls that only wait** (`approval_status`, `board_status`, `ai_chat_status`) run beside the others. They

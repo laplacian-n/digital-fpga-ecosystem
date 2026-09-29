@@ -15057,6 +15057,23 @@ MCP_OPS.new_sheet = a=>{
 MCP_OPS.set_top_sheet = a=>{ const s=mcpSheet(a.sheet); state.project.topId=s.id; mcpCommit(null); return {top_sheet:s.name}; };
 MCP_OPS.rename_sheet = a=>{ const s=mcpSheet(a.sheet); s.name=uniqueSchName(a.name, s.id); mcpCommit(null); return {sheet:s.name}; };
 
+/* delete a sheet (undoable). One another sheet uses as a block is refused unless force (then its
+   instances go too, as the project tree's 🗑 does); the last sheet stays. */
+MCP_OPS.delete_sheet = a=>{
+  const s=mcpSheet(a.sheet), P=state.project.schematics;
+  if(Object.keys(P).length===1) mcpFail("the project must keep at least one sheet");
+  const users=Object.values(P).filter(x=>x.id!==s.id && x.components.some(c=>c.type==="SCH:"+s.id));
+  if(users.length && !a.force) mcpFail(`'${s.name}' is used as a block on ${users.map(x=>x.name).join(", ")}`, "force:true deletes those block instances too");
+  mcpBeforeChange("ลบแผ่น "+s.name);
+  delete P[s.id];
+  const removed=users.length ? removeInstancesOf("SCH:"+s.id) : 0;
+  state.openTabs=(state.openTabs||[]).filter(t=>t!==s.id);
+  if(state.activeId===s.id){ state.activeId=state.openTabs[0]||Object.keys(P)[0]; state.selection.clear(); state.pendingWire=null; }
+  if(!state.openTabs.includes(state.activeId)) state.openTabs.push(state.activeId);
+  if(state.project.topId===s.id) state.project.topId=Object.keys(P)[0];
+  mcpCommit(null);
+  return {deleted:s.name, block_instances_removed:removed, top_sheet:P[state.project.topId].name, sheets:Object.values(P).map(x=>x.name)};
+};
 MCP_OPS.add_component = a=>{
   const sch=mcpUse(a.sheet);
   let type=String(a.type||"").trim();
@@ -15249,12 +15266,17 @@ MCP_OPS.simulate = a=>{
   const sch=mcpSheet(a.sheet);
   const hasFF=flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]);
   if(hasFF){
-    const hold={}; Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); hold[c.id]=mcpProbeVal(c, v); });
-    const j=clientSeqSim(sch, Math.max(1,Math.min(256,+a.cycles||16)), {hold});
+    const put=(o,src)=>{ Object.entries(src||{}).forEach(([n,v])=>{ const c=sch.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); o[c.id]=mcpProbeVal(c, v); }); return o; };
+    const hold=put({}, a.inputs);
+    // vectors in sequential mode: the inputs held during each clock (the last one stays)
+    const V=Array.isArray(a.vectors)&&a.vectors.length ? a.vectors.map(v=>put(Object.assign({},hold), v)) : null;
+    if(V && V.length>256) mcpFail("at most 256 vectors per call");
+    const cycles=Math.max(1,Math.min(256,+a.cycles||(V?V.length:16)));
+    const j=clientSeqSim(sch, cycles, V ? {hold:V[0], holdAt:i=>V[Math.min(i,V.length-1)]} : {hold});
     if(!j.ok) mcpFail(j.reason||"cannot simulate");
     const sq=j.sequence;
     const outW=sch.components.filter(c=>c.type==="OUT").map(c=>Math.max(1,+(c.params.width||1))), busOut=outW.some(w=>w>1);
-    return {sheet:sch.name, kind:"sequential", note:j.note||undefined, clocks_pulsed:"every INPUT that drives a flip-flop clock", held_inputs:a.inputs||{},
+    return {sheet:sch.name, kind:"sequential", note:j.note||undefined, clocks_pulsed:"every INPUT that drives a flip-flop clock", held_inputs:V?"per clock from vectors":(a.inputs||{}),
       columns:{inputs:sq.inputs, state:sq.dffs, outputs:sq.outputs},
       // a bus OUTPUT reads as its value in binary: outputs become {name: value}
       rows:sq.rows.map(r=>({cycle:r[0], inputs:r[1].join(""), state:r[2].join(""),
@@ -15325,6 +15347,9 @@ MCP_OPS.probe = a=>{
     const nets=mcpNets(sch).map(n=>{ if(!n.driver) return Object.assign({value:"undriven"},n);
       const [cn,pid]=[n.driver.slice(0,n.driver.lastIndexOf(".")), n.driver.slice(n.driver.lastIndexOf(".")+1)];
       const c=findCompRef(sch,cn); let v=null; try{ v=c?m.outVal(c.id,pid,new Set()):null; }catch(_){}
+      // a block's output: flattened, it is the block's inner OUTPUT (now a BUF named <block>__<out>)
+      const sub=v==null&&c?subSchOf(c):null, pp=sub&&schPortList(sub).find(q=>q.id===pid&&q.dir==="out");
+      if(pp){ try{ v=m.outVal(c.id+"__"+pp.cid,"o",new Set()); }catch(_){} }
       return Object.assign({value:v==null?"unknown":v}, n); });
     return {sheet:sch.name, inputs:a.inputs||{}, outputs:outs, nets};
   } finally { Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved); }
@@ -18031,7 +18056,7 @@ MCP_OPS.build_part = a=>{
   const kind=String(a.kind||"").trim(); if(!kind) mcpFail("kind is required", "list_parts shows the kinds");
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
-  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet");
+  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet — or delete_sheet it first to rebuild it");
   mcpBeforeChange("สร้าง "+kind);
   const r=partBuild(kind, a);
   let sch=r.sch;
@@ -18359,8 +18384,9 @@ function specCheck(sch){
       const sim=clientCombSim(sch);
       if(!sim.ok) return {pass:false, reason:sim.reason||"จำลองไม่ได้"};
       const tt=sim.truth_table;
-      const cols = sp.kind==="formula" ? formulaTable(sp.text, tt.inputs).cols : sp.cols;
-      const bad=[];
+      if(sp.kind==="formula"){ const bad=specFormulaMismatches(sp.text, tt);
+        return {pass:!bad.length, checked:`${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs}; }
+      const cols=sp.cols, bad=[];
       Object.entries(cols).forEach(([o,col])=>{ const k=tt.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
         if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้"}); return; }
         String(col).toLowerCase().split("").forEach((ch,r)=>{ if(ch==="x"||!tt.rows[r]) return; const got=tt.rows[r][1][k];
@@ -18384,6 +18410,46 @@ function specCheck(sch){
     }
     return {pass:false, reason:"ข้อกำหนดไม่รู้จักชนิด "+sp.kind};
   }catch(e){ return {pass:false, reason:String(e&&e.message||e)}; }
+}
+/* A formula spec against the sheet's truth table, port by port: a bus port is one number (a = 5), so
+   "{cout,sum} = a + b + cin" or "sum = a + b + cin" on a 4-bit adder means the addition; one bit is
+   a[2]; a slice a[3:0] is the port. An equation is arithmetic when its left side is {…}, its output
+   is a bus, or it reads a bus; otherwise boolean (+ = OR). Outputs of earlier equations may be used. */
+function specFormulaMismatches(text, tt){
+  const group=names=>{ const P={}; names.forEach((n,i)=>{ const m=/^(.*)\[(\d+)\]$/.exec(n), base=(m?m[1]:n), k=base.toLowerCase();
+      (P[k]=P[k]||{name:base, bits:[]}).bits.push({i, bit:m?+m[2]:0, col:n}); });
+    Object.values(P).forEach(p=>p.width=Math.max(...p.bits.map(b=>b.bit))+1); return P; };
+  const IN=group(tt.inputs), OUT=group(tt.outputs);
+  const src=String(text).replace(/(\w+)\[\d+:\d+\]/g,"$1").replace(/(\w+)\[(\d+)\]/g,"$1__b$2");
+  const eqs=src.split(/[;\n]+/).map(x=>x.trim()).filter(Boolean);
+  if(!eqs.length) throw new Error("formula is empty");
+  const low=e=>{ if(!e) return e; if(e.id!=null) return {id:e.id.toLowerCase()}; return Object.assign({}, e, {not:low(e.not), neg:low(e.neg), l:low(e.l), r:low(e.r)}); };
+  const ids=(e,a=[])=>{ if(!e) return a; if(e.id!=null) a.push(e.id); ids(e.not,a); ids(e.neg,a); ids(e.l,a); ids(e.r,a); return a; };
+  const parsed=eqs.map(q=>{ const i=q.indexOf("="); if(i<1) throw new Error(`"${q}" is not an equation`);
+    const lhs=q.slice(0,i).trim(), cat=/^\{(.*)\}$/.exec(lhs);
+    const outs=(cat?cat[1]:lhs).split(",").map(x=>x.trim().toLowerCase()).filter(Boolean);
+    let rhsT; try{ rhsT=fxTokens(q.slice(i+1)); fxParse(rhsT,true); }catch(e){ throw new Error(`"${q.replace(/__b(\d+)/g,"[$1]")}": ${e.message.replace(/__b(\d+)/g,"[$1]")}`); }
+    const busIn=ids(low(fxParse(rhsT,true))).some(id=>IN[id]&&IN[id].width>1);
+    const arith=!!cat || outs.some(o=>OUT[o]&&OUT[o].width>1) || busIn;
+    return {q:q.replace(/__b(\d+)/g,"[$1]"), outs, arith, ast:low(fxParse(rhsT, arith))}; });
+  parsed.forEach(p=>p.outs.forEach(o=>{ const m=/^(.*)__b(\d+)$/.exec(o); if(OUT[o]||!m||!OUT[m[1]]) return;   // s[0] = …
+    const b=OUT[m[1]].bits.find(x=>x.bit===+m[2]); if(b) OUT[o]={name:b.col, width:1, bits:[{i:b.i, bit:0, col:b.col}]}; }));
+  const known=[...Object.values(IN).map(p=>p.name)];
+  const bad=[];
+  parsed.forEach(p=>p.outs.forEach(o=>{ if(!OUT[o]) bad.push({output:o, reason:"ไม่มีขาออกนี้ (มี: "+Object.values(OUT).map(x=>x.name).join(", ")+")"}); }));
+  if(bad.length) return bad;
+  tt.rows.forEach(([iv,ov],r)=>{
+    const env={};
+    Object.entries(IN).forEach(([k,p])=>{ let v=0; p.bits.forEach(b=>{ if(iv[b.i]) v|=1<<b.bit; env[k+"__b"+b.bit]=iv[b.i]; }); env[k]=v; });
+    parsed.forEach(p=>{
+      let v; try{ v=fxEval(p.ast, env, p.arith); }catch(e){ throw new Error(`"${p.q}": ${e.message.replace(/__b(\d+)/g,"[$1]")} (ขาเข้า: ${known.join(", ")})`); }
+      let shift=0; const L=p.outs.map(o=>OUT[o].width);
+      for(let k=p.outs.length-1;k>=0;k--){ const o=OUT[p.outs[k]], w=L[k];
+        const M=2**w, val=p.arith ? ((Math.floor(v/2**shift)%M)+M)%M : (v?1:0); shift+=w; env[p.outs[k]]=val;
+        o.bits.forEach(b=>{ const want=(val>>b.bit)&1, got=ov[b.i];
+          if(String(got)!==String(want)) bad.push({output:b.col, row:r, inputs:iv.join(""), want, got}); }); }
+    }); });
+  return bad;
 }
 /* run it, remember the result, stamp the sheet when it passes */
 function specRun(sch){
@@ -18726,7 +18792,7 @@ MCP_OPS.build_fsm = a=>{
   if(!a.fsm) mcpFail("fsm is required", "text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\n…\\nS0 -> S1 when x\\nreset S0', or {inputs, outputs, states:[{name, out}], transitions:[{from,to,when,out?}], reset}");
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
-  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name");
+  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name, or delete_sheet it first to rebuild it");
   mcpBeforeChange("สร้าง FSM");
   let r; try{ r=fsmBuild(a.fsm, {sheet:want||a.name, name:a.name, state_out:a.state_out}); }catch(e){ mcpFail(e.message); }
   let sch=r.sch;

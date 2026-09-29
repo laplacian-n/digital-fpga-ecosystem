@@ -118,6 +118,8 @@ TOOLS = [
     T("open_sheet", "Make a sheet the active tab (the user sees it).", {"sheet": SHEET}, ["sheet"]),
     T("new_sheet", "Create an empty sheet (a new sub-circuit or top level).",
       {"name": {"type": "string"}, "make_top": {"type": "boolean"}}, ["name"]),
+    T("delete_sheet", "Delete a sheet (undo brings it back). Refused when another sheet uses it as a block, unless "
+      "force (the block instances go too); the last sheet stays.", {"sheet": SHEET, "force": {"type": "boolean"}}, ["sheet"]),
     T("rename_sheet", "Rename a sheet.", {"sheet": SHEET, "name": {"type": "string"}}, ["sheet", "name"]),
     T("set_top_sheet", "Choose which sheet is the top entity (what goes to the board).", {"sheet": SHEET}, ["sheet"]),
     # --- editing
@@ -224,7 +226,8 @@ TOOLS = [
     T("simulate", "Simulate a sheet. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) "
       "up to 10 input bits; for more, or to check chosen rows, give `vectors` [{input: value, …}, …] (≤256, inputs "
       "left out are 0, bus values as in probe). "
-      "Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0).",
+      "Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0), "
+      "or `vectors` = the inputs during each clock ([{x:1},{x:1},{x:0},…]; the last one stays).",
       {"sheet": SHEET, "cycles": {"type": "integer", "minimum": 1, "maximum": 256}, "inputs": INPUTS,
        "vectors": {"type": "array", "items": {"type": "object"}, "maxItems": 256}}),
     T("verify_truth_table", "Compare a combinational sheet against what it MUST do: expected output columns ({out:\"0110…\"}, "

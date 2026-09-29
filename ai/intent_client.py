@@ -144,7 +144,26 @@ def _extract_json(text: str) -> dict | None:
     return None
 
 
+def one_system_message(messages: list) -> list:
+    """Qwen3.5's chat template refuses a second system message ("System message must be at the
+    beginning" -> HTTP 500), and the RAG paths add the library context as one. Fold every system
+    message into the first, keeping a trailing /no_think switch last."""
+    if not messages:
+        return messages
+    sys_parts = [m.get("content") or "" for m in messages if m.get("role") == "system"]
+    if not sys_parts or (len(sys_parts) == 1 and messages[0].get("role") == "system"):
+        return messages
+    tail = ""
+    first = sys_parts[0]
+    if first.rstrip().endswith("/no_think"):
+        first, tail = first.rstrip()[:-len("/no_think")].rstrip(), "\n/no_think"
+    merged = "\n\n".join([first] + sys_parts[1:]) + tail
+    return [{"role": "system", "content": merged}] + [m for m in messages if m.get("role") != "system"]
+
+
 def _post(endpoint: str, payload: dict, timeout: float) -> dict:
+    if isinstance(payload.get("messages"), list):
+        payload = dict(payload, messages=one_system_message(payload["messages"]))
     req = urllib.request.Request(
         endpoint, data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"}, method="POST")
