@@ -177,6 +177,26 @@ TOOLS = [
       "the sheet verified. Set it FIRST, then build until check_spec passes.",
       {"sheet": SHEET, "formula": {"type": ["string", "array"], "items": {"type": "string"}}, "table": {"type": "object"},
        "sequence": {"type": "object"}}),
+    T("build_hierarchy", "Build a whole top sheet from a block list in ONE call: the blocks (an existing sheet or a library part), "
+      "the top inputs / outputs, and the connections by name — buses expand to bits (cnt.ones = ones0..ones3, sw[3:0], x[2]), "
+      "0 / 1 drive a pin low / high. Widths, directions and double drivers are checked before anything is drawn; pins named "
+      "like a top port join it (auto: a block's clk ← INPUT clk, OUTPUT err ← the one block output err). Drawn, routed, declared "
+      "buses become bus ports; one undo step; nothing is left behind on an error. Answers what is still unconnected. "
+      "Use it instead of many connect calls for any design made of blocks.",
+      {"sheet": {"type": "string", "description": "the top sheet (made, an empty one filled; one with parts needs replace:true)"},
+       "blocks": {"type": "array", "items": {"type": "object", "properties": {
+           "name": {"type": "string"}, "sheet": {"type": "string", "description": "an existing sheet"},
+           "part": {"type": "string", "description": "a list_parts kind, drawn once and verified"},
+           "params": {"type": "object", "description": "the part's parameters"}}, "required": ["name"]}},
+       "inputs": {"type": "array", "items": {"type": "string"}, "description": "top inputs: 'clk', 'sw[7:0]'"},
+       "outputs": {"type": "array", "items": {"type": "string"}, "description": "top outputs: 'err', 'seg[6:0]'"},
+       "connect": {"type": "array", "items": {"type": "array", "items": {"type": "string"}},
+                   "description": "[driver, receiver, …]: ['clk','cnt.clk'], ['cnt.ones','cmp.a_lo'], ['sw[3:0]','cmp.b_lo'], ['1','cnt.en']"},
+       "auto": {"type": "boolean", "description": "join same-named pins and ports (default true)"},
+       "bus": {"type": "boolean", "description": "declared buses as bus ports (default true)"},
+       "pins": {"type": "object", "description": "board pins for the top ports, e.g. {'btn':'pb:4','sw[0]':'sw:0'}"},
+       "top": {"type": "boolean", "description": "also make it the project's top sheet"},
+       "replace": {"type": "boolean"}}, ["blocks"], timeout=120),
     T("derive_spec", "Derive a sheet's acceptance test from the user's REQUEST by code — independent of any circuit: "
       "equations in it, a minterm list (f(a,b,c) = Σm(1,2,4,7)), 'output 1 when the n-bit input is prime / even / > k …', "
       "or a standard part it names (4-bit adder, BCD→7-seg, mod-6 counter → checked against that part's reference model). "
@@ -390,7 +410,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts", "build_fsm", "derive_spec", "set_spec", "check_spec",
+               "build_part", "list_parts", "build_fsm", "build_hierarchy", "derive_spec", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
                "get_pins", "set_pins", "auto_pins", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
 

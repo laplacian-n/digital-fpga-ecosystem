@@ -140,7 +140,7 @@ MCP_OPS.derive_spec = a=>{
 function aiagOracleAfter(run, tool, r){
   if(!r || !r.ok || !r.result) return null;
   const R=r.result, name=R.sheet;
-  if(run.oracle && /^build_(circuit|part|fsm)$/.test(tool) && name){
+  if(run.oracle && /^build_(circuit|part|fsm|hierarchy)$/.test(tool) && name){
     const s=aifSheetByName(name);
     if(s && !oracleIsRequestSpec(s)){ const x=oracleAttach(s, run.oracle);
       if(x) R.spec_check={pass:x.pass, checked:x.checked, reason:x.reason, independent:true, source:"request",

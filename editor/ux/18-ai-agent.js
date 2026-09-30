@@ -11,7 +11,7 @@ const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null 
 const AIAG_MAX_STEPS = 24;
 const AIAG_BUDGET_S = 300;        // a local run past 5 minutes is told to answer (one ran 10 min for 0 wires)
 const AIAG_STALL = 4;             // rounds in a row that changed nothing: nudged, and stopped at +2
-const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
+const AIAG_EDIT_OPS = new Set(["build_hierarchy","add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
 const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table","check_spec","set_spec"]);
 
 function aiagSystemPrompt(){
@@ -31,8 +31,9 @@ function aiagSystemPrompt(){
 "   Anything else: build_circuit with formula (equations like \"y = a&b | ~c\", \"{cout,sum} = a+b+cin\") — never type",
 "   0/1 columns yourself unless the user gave the table. Output 1 for certain input values (primes, a range, a list)?",
 "   give the ROWS: truth_table:{inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}} (set_spec table takes ones too).",
-"   Bigger designs: build the pieces, then place them as blocks",
-"   (block:<sheet>) and connect. Edit with add_component, connect, disconnect, delete, update_component, or apply.",
+"   Bigger designs: build the pieces, then ONE build_hierarchy call with every block, the top ports and all the",
+"   connections (buses by name: cnt.ones → cmp.a_lo) — never wire blocks with connect one pin at a time.",
+"   Edit with add_component, connect, disconnect, delete, update_component, or apply.",
 "3. After ANY change: call check AND simulate ON THE SHEET YOU CHANGED — pass its name as `sheet`. For logic you",
 "   derived, verify_truth_table with a formula written from the REQUIREMENT (not the table you built from — that",
 "   proves nothing). Look at `recognized` in the answer. Never say it works without that.",
@@ -230,7 +231,7 @@ async function aiAgentRun(msg, opts){
           catch(_){ bad="the arguments are not valid JSON: "+aiagClip(tc.function.arguments, 200); }
           live(`กำลังใช้ ${tool}…`);
           // a rebuild of a sheet this run made replaces it (it used to leave prime3, prime3_2 … prime3_5)
-          if(!bad && /^build_(circuit|part|fsm)$/.test(tool)){ const nm=String(args.sheet||args.name||"").trim().toLowerCase();
+          if(!bad && /^build_(circuit|part|fsm|hierarchy)$/.test(tool)){ const nm=String(args.sheet||args.name||"").trim().toLowerCase();
             const s=nm && Object.values(state.project.schematics).find(x=>String(x.name).toLowerCase()===nm);
             if(s && made.has(s.id) && s.components.some(c=>c.type!=="JUNCTION")) args=Object.assign({}, args, {sheet:s.name, replace:true}); }
           const before=new Set(Object.keys(state.project.schematics));
@@ -239,7 +240,7 @@ async function aiAgentRun(msg, opts){
           Object.keys(state.project.schematics).forEach(id=>{ if(!before.has(id)) made.add(id); });
           const passNote=typeof aiagOracleAfter==="function" ? aiagOracleAfter(run, tool, r) : null;
           let content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
-          if(r.ok && /^build_(circuit|part|fsm)$/.test(tool) && r.result && r.result.sheet){
+          if(r.ok && /^build_(circuit|part|fsm|hierarchy)$/.test(tool) && r.result && r.result.sheet){
             const s=Object.values(state.project.schematics).find(x=>x.name===r.result.sheet), key=r.result.sheet+"|"+(s?sheetHash(s):"");
             if(built.has(key)) content+="\n(system) This is exactly the circuit you had already built on that sheet — rebuilding changed nothing. Do not rebuild it again.";
             built.add(key); }
