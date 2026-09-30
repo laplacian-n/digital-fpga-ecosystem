@@ -384,9 +384,15 @@ TOOLS = [
       {"sheet": SHEET, "name": {"type": "string"}, "description": {"type": "string"},
        "replace": {"type": "boolean", "description": "overwrite a module with the same name"},
        "force": {"type": "boolean", "description": "save a sheet that is not verified (only when the user asks for it)"}}),
+    T("where_used", "Every copy of a library module in the projects open in the editor: which sheet, its version (outdated or "
+      "not) and the sheets that place it.", {"module": {"type": "string"}}, ["module"]),
+    T("update_module", "Bring the copies of a module placed in this project (all_projects: every open project) up to the "
+      "library's current version, in place — parents keep their blocks; port changes are reported. One undo step.",
+      {"module": {"type": "string"}, "all_projects": {"type": "boolean"}}, ["module"]),
     T("use_module", "Place a library module on a sheet as a block (its sheet is brought into the project once, then "
-      "reused). Returns the block with its pins — connect them like any part.",
-      {"module": {"type": "string", "description": "module name or id"}, "sheet": SHEET,
+      "reused). A part kind from list_parts works too (+ params): the standard lab modules need no saving first. "
+      "Returns the block with its pins — connect them like any part.",
+      {"module": {"type": "string", "description": "module name or id, or a part kind"}, "params": {"type": "object"}, "sheet": SHEET,
        "name": {"type": "string", "description": "label for the block"}, "x": {"type": "number"}, "y": {"type": "number"}},
       ["module"]),
     T("open_module", "Open a library module as a new sheet (a copy) to look at or change it.",
