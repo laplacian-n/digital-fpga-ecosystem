@@ -108,7 +108,46 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
 - **Calls that only wait** (`approval_status`, `board_status`, `ai_chat_status`) run beside the others. They
   no longer hold up the queue.
 
+### Independent checks, and big designs in one call
+- **`derive_spec {request, sheet}`:** the acceptance test read from the user's own words by code, not by a model.
+  - It reads equations, a minterm list (`f(a,b,c) = Σm(1,2,4,7)`), "1 when the n-bit input is prime / even / > k", or a
+    standard part it names (then the sheet is checked against that part's reference model, by port name).
+  - A circuit that passes it is right. A check against the table the circuit was built from proves nothing (see below).
+  - The in-app agent derives it before its first model call, attaches it to the sheet it builds, and stops when it passes.
+    Its final answer always ends with the app's own verdict line (✓ checked / ⚠ not checked).
+- **`build_hierarchy`:** a top sheet from a block list in one call: the blocks (a sheet or a library part), the top
+  ports (`sw[7:0]`) and the connections by name (`["cnt.ones","cmp.a_lo"]`, `["1","cnt.en"]`).
+  - Buses expand to bits; widths, directions and double drivers are checked before anything is drawn.
+  - Pins named like a top port join it by themselves (a block's `clk` ← INPUT `clk`).
+  - It is one undo step, and a failed call leaves nothing behind.
+- **`compare_sheets`:** are two circuits the same? Same inputs into both, outputs compared by name — every row, or clock
+  by clock for flip-flops. Also against a formula, a table, a library part or the request (marking a student's gates).
+- **`batch {ops}`:** several editing tools as one undo step; if one fails, the ones before it are undone too.
+
+### Projects
+- **`delete_project`** removes a project from the editor and moves its folder to `Projects/.trash`.
+- **`rename_project`** renames the folder, the `.schproj.json` and the name inside it.
+- **`rescan_projects {prune}`** compares the editor with the folders; an empty project only the editor remembers no
+  longer turns the next `new_project` into `test_2`.
+- **`export_project` / `import_project`** move a project as JSON text. `open_project` names the project after its folder.
+
+### Debugging a circuit
+- **`simulate`** also gives every port as one number (`table` / `values`; a bus or a group q0..q3) and a text `waveform`
+  for flip-flop sheets.
+- **`probe {inside:"u"}`** gives the nets inside block `u` (or a path `u/v`), with its inputs from the whole circuit.
+- **`check`** also reports a net with two drivers and logic whose output goes nowhere.
+- **`get_events {since, wait}`** waits for the next edit, so an outside tool can follow the user.
+
+### Driving the in-app AI
+- **`ai_chat_stop`** stops a run now; **`ai_chat {resume:true}`** continues it; `max_steps` / `budget_s` cap a run.
+- **`ai_chat_status`** keeps the last 10 finished runs across page reloads (`run_id`, `recent_runs`).
+- A run stuck on a small model continues on the bigger installed agent model, then the small one comes back
+  (`escalate:false` turns it off).
+
 ### Before the board
+- **`board_check {fix:true}`** repairs what it can: a NOT before each active-high a–g OUTPUT, an OUTPUT an0 = 0 on
+  digit 0, pins guessed. **`pin_preset {lab}`** maps ports the way lab 6 / 7 / 8 wire the board.
+- **`make_report`** also writes `<project>_report.pdf` (headless Edge / Chrome) with a timing diagram for counters.
 `board_check` lists what will go wrong on the real EDGE board, so you can fix it before a one-minute Vivado build:
 - a port without a pin, two ports on one pin, or an input on an LED
 - 7-seg segments written active-high for this common-anode display, or no digit enabled
@@ -125,6 +164,8 @@ closest notes automatically, and can call `search_course` for more. Search is by
 model runs on the CPU, so the graphics card stays free for the chat model.
 
 ### Module library (the Modules tab)
+- **Versions:** saving over a module bumps its version. **`update_module`** brings placed copies up to date in place;
+  **`where_used`** lists them. **`use_module`** also takes a library part kind (the standard lab modules).
 - `list_modules` shows the library. It is shared by every project in the editor.
 - `save_module` stores a sheet in the library, together with every sheet it uses as a block.
 - `use_module` places a module as a block, and `open_module` opens it as a sheet you can edit.

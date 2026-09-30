@@ -113,7 +113,9 @@ TOOLS = [
       {"sheet": SHEET, "fit": {"type": "boolean", "description": "Zoom to fit first (default true)."},
        "show_problems": {"type": "boolean"}}, timeout=40),
     T("get_events", "What happened in the editor since sequence number `since` (user edits, issue count changes). "
-      "Use it to follow along with the user.", {"since": {"type": "integer"}}),
+      "Use it to follow along with the user; wait:N (≤40 s) waits for the next event instead of answering empty — "
+      "call it in a loop with since = latest to follow every edit.",
+      {"since": {"type": "integer"}, "wait": {"type": "integer", "minimum": 0, "maximum": 40}}, timeout=55),
     # --- sheets
     T("open_sheet", "Make a sheet the active tab (the user sees it).", {"sheet": SHEET}, ["sheet"]),
     T("new_sheet", "Create an empty sheet (a new sub-circuit or top level).",
