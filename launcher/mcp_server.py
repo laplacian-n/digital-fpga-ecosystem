@@ -413,7 +413,8 @@ TOOLS = [
        "budget_s": {"type": "integer", "minimum": 10, "description": "agent: after this many seconds it is told to answer (default 300)"},
        "resume": {"type": "boolean", "description": "agent: continue the last run that stopped before answering (ai_chat_stop, "
                   "the step limit or the time budget) from its conversation, instead of starting over; message not needed"},
-       "run_id": {"type": "integer", "description": "with resume: which run"}}),
+       "run_id": {"type": "integer", "description": "with resume: which run"},
+       "escalate": {"type": "boolean", "description": "agent: false = never switch to a bigger installed model when this run stalls (default: it does, and switches back after)"}}),
     T("ai_chat_status", "Wait (≤`wait` s) for the chat to finish the message sent with ai_chat, then return what "
       "appeared in the chat and, for agent mode, the run: every step (the model's thinking, each tool call with its "
       "arguments and result or error, nudges), the final answer, model calls, tokens and time. detail:'full' "

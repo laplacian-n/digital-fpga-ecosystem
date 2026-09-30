@@ -133,7 +133,7 @@ function aiagStop(why){
 function aiagRunSummary(run, full){
   return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
     model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
-    resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined,
+    resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
     steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
       : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
       : {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms})};
@@ -160,7 +160,7 @@ async function aiAgentRun(msg, opts){
   const maxSteps=Math.max(1, Math.min(60, +opts.maxSteps||AIAG_MAX_STEPS)), budgetS=Math.max(10, +opts.budgetS||AIAG_BUDGET_S);
   const run={id:++AIAG.seq, message:prev?prev.message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
              model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0, max_steps:maxSteps, budget_s:budgetS,
-             resumed_from:prev?prev.id:undefined, cancel:false, ctl:null};
+             resumed_from:prev?prev.id:undefined, cancel:false, ctl:null, noEscalate:!!opts.noEscalate};
   if(prev) msg=prev.message;
   AIAG.cur=run; AIAG.runs.push(run); if(AIAG.runs.length>20) AIAG.runs.shift();
   const status=aiagLine('<span class="ac-badge v">เอเจนต์</span> <span class="ag-live">กำลังคิด…</span> <button class="btn2 ag-stop" title="หยุดเอเจนต์ตอนนี้">⏹ หยุด</button>');
@@ -194,10 +194,17 @@ async function aiAgentRun(msg, opts){
     const needCheck=new Set(), needSim=new Set(), made=new Set();
     let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0, gated=false;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
+    let budgetStart=run.started;    // restarts when a bigger model takes over
     for(let i=0; i<maxSteps && !run.final; i++){
       if(run.cancel) break;
-      if(i>=stopAt){ run.final=aiagWrapUp(run, stopWhy); break; }
-      if(stopAt===Infinity && (Date.now()-run.started)/1000>budgetS){ stopAt=i+2; stopWhy="time";
+      if(i>=stopAt){
+        // stuck on a small model: a bigger installed one continues the same conversation (44-escalate)
+        if((stopWhy==="stall"||stopWhy==="time") && typeof aiagEscalate==="function" && await aiagEscalate(run, live)){
+          stopAt=Infinity; stopWhy=""; stall=0; budgetStart=Date.now(); think=true;
+          messages.push({role:"user", content:"(system) A larger model now continues this task from where it stopped. Look at what is on the sheets (get_sheet), then finish it — for a design made of blocks use ONE build_hierarchy call."});
+          continue; }
+        run.final=aiagWrapUp(run, stopWhy); break; }
+      if(stopAt===Infinity && (Date.now()-budgetStart)/1000>budgetS){ stopAt=i+2; stopWhy="time";
         run.steps.push({kind:"nudge", text:"time budget used — asked to finish"});
         messages.push({role:"user", content:"(system) Time is up. Make no more changes: answer now in Thai with what is done, what is still missing, and what the user should do next."}); }
       const fp0=aiagFingerprint();
@@ -301,6 +308,7 @@ async function aiAgentRun(msg, opts){
   }catch(e){ run.error=String(e&&e.message||e); }
   run.state=run.final?"done":run.stopped?"stopped":"error"; run.seconds=Math.round((Date.now()-run.started)/100)/10;
   run.resumable=!run.final && !!run._messages;
+  if(typeof aiagDeescalate==="function") aiagDeescalate(run);
   if(sb) sb.remove();
   aiagRemember(run);
   live(run.error?"หยุด":`เสร็จ · ${run.steps.filter(s=>s.kind==="tool").length} ขั้น · ${run.seconds} วิ`);
@@ -348,7 +356,7 @@ MCP_OPS.ai_chat = a=>{
     if(!prev || !prev.resumable) mcpFail("no run to resume"+(prev?` — run ${prev.id} ended with an answer or cannot be continued`:""), "resume works on a run stopped by ai_chat_stop, the step limit or the time budget, in this page (not after a reload)");
     a=Object.assign({}, a, {message:"(ทำต่อ) "+prev.message, mode:"agent"}); }
   const msg=String(a.message||"").trim(); if(!msg) mcpFail("message is required — what the user would type in the chat");
-  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev};
+  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev, noEscalate:a.escalate===false};
   if(!AICHAT.open) toggleAiChat();
   if(a.mode){ if(!["build","qa","agent"].includes(a.mode)) mcpFail("mode is build | qa | agent"); aiSetMode(a.mode); }
   const t=$("#acInput"); t.value=msg;

@@ -138,7 +138,7 @@ test("start the model from Settings, then the chat answers with it", async ({ pa
 });
 
 test("agent mode: the local model works through the tools; Claude drives the chat over MCP and reads every step", async ({ page, context }) => {
-  test.setTimeout(90000);
+  test.setTimeout(180000);
   await page.goto(BASE + "/");
   await page.click('nav button[data-tab="settings"]');
   await page.click("#llmStart");
@@ -269,6 +269,16 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.recent_runs.length).toBeGreaterThan(3);
     s = await tool("ai_chat_status", { run_id: stop.data.run });
     expect(s.data.agent.state).toBe("stopped");
+    // stuck on the small model: the bigger installed one takes over the same run, then the small one comes back
+    fs.writeFileSync(path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-4B-Q6_K.gguf"), "GGUF");
+    let m = await tool("ai_model", { action: "start", model: "qwen3.5-4b", wait: 20 });
+    expect(m.data.model).toMatch(/4B/);
+    await tool("ai_chat", { message: "ต่อสาย STALL อีกรอบ", mode: "agent" });
+    for (let k = 0; k < 4; k++) { s = await tool("ai_chat_status", { wait: 40 }); if (s.data.state === "done") break; }
+    expect(s.data.agent.escalated, JSON.stringify(s.data.agent.steps.filter(x => x.kind))).toEqual({ from: "qwen3.5-4b", to: "qwen3.5-9b", back: expect.stringMatching(/4B/) });
+    expect(s.data.agent.steps.some(x => x.kind === "escalate")).toBe(true);
+    for (let k = 0; k < 20; k++) { m = await tool("ai_model", { action: "status" }); if (/4B/.test(m.data.model) && m.data.state === "ready") break; await ed.waitForTimeout(500); }
+    expect(m.data.model).toMatch(/4B/);
   } finally { srv.kill(); }
 });
 
