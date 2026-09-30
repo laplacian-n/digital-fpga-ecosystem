@@ -177,6 +177,13 @@ TOOLS = [
       "the sheet verified. Set it FIRST, then build until check_spec passes.",
       {"sheet": SHEET, "formula": {"type": ["string", "array"], "items": {"type": "string"}}, "table": {"type": "object"},
        "sequence": {"type": "object"}}),
+    T("derive_spec", "Derive a sheet's acceptance test from the user's REQUEST by code — independent of any circuit: "
+      "equations in it, a minterm list (f(a,b,c) = Σm(1,2,4,7)), 'output 1 when the n-bit input is prime / even / > k …', "
+      "or a standard part it names (4-bit adder, BCD→7-seg, mod-6 counter → checked against that part's reference model). "
+      "With `sheet` it is set as that sheet's spec (the sheet is made if missing); a circuit that passes it is right, "
+      "unlike a check against the table the circuit was built from. Answers derived:false when the request gives nothing to read.",
+      {"request": {"type": "string", "description": "the user's words, as written"}, "sheet": SHEET,
+       "apply": {"type": "boolean", "description": "false = only return the spec (default: set it on `sheet`)"}}, ["request"]),
     T("check_spec", "Run a sheet's acceptance test (or every sheet's with all_sheets) and get pass / the mismatches.",
       {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
     T("list_parts", "The part library: standard circuits (adders, subtractors, comparator, mux/demux, decoder, encoder, "
@@ -374,7 +381,7 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts", "build_fsm", "set_spec", "check_spec",
+               "build_part", "list_parts", "build_fsm", "derive_spec", "set_spec", "check_spec",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
                "get_pins", "set_pins", "auto_pins", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
 

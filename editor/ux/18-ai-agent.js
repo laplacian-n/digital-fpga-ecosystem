@@ -106,6 +106,7 @@ function aiagWrapUp(run, why){
   const tools=run.steps.filter(s=>s.kind==="tool" && s.ok), last=[...tools].reverse().find(s=>/^build_/.test(s.tool));
   const sim=[...tools].reverse().find(s=>s.tool==="simulate");
   const tail=(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+(sim?`\nผลจำลอง: ${sim.summary||""}`:"");
+  if(why==="verified" && run.verified) return `เสร็จแล้ว: แผ่น ${run.verified.sheet} ผ่านการตรวจ`+tail;
   if(why==="stall" || why==="time"){
     // what is still open on the sheet it worked on, from the editor, not the model
     let open="";
@@ -141,7 +142,15 @@ async function aiAgentRun(msg){
     // alone that answers the request with no model round; otherwise the model gets told it exists
     let notes="";
     if(typeof aiagFastPath==="function"){ live("สร้างจากคลังชิ้นส่วน…");
-      try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final) run.final=fp.final; else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
+      try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final){ run.final=fp.final; run.fastFinal=true; } else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
+    // the acceptance test the request itself states, derived by code (36-oracle-gate): attached to the
+    // sheet it builds, and a pass ends the run
+    run.touched=new Set();
+    if(!run.final && typeof oracleDerive==="function") try{ const o=oracleDerive(msg);
+      if(o.ok){ run.oracle=o; run.steps.push({kind:"oracle", text:o.what});
+        notes+=`\n\n(system) The app derived this request's acceptance test by code, independent of any circuit: ${o.what}.`
+          +` Name the ports — inputs: ${o.ports.in.join(", ")}; outputs: ${o.ports.out.join(", ")}.`
+          +" It is put on the sheet you build and checked automatically (spec_check in the answer); when it passes you are done."; } }catch(e){ console.warn("oracle", e); }
     // the course notes most related to the request go in up front (RAG); more via search_course
     if(!run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
       const rj=await (await fetch("/api/rag/search?k=2&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
@@ -150,7 +159,7 @@ async function aiAgentRun(msg){
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
-    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0;
+    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0, gated=false;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
     for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
       if(i>=stopAt){ run.final=aiagWrapUp(run, stopWhy); break; }
@@ -191,12 +200,16 @@ async function aiAgentRun(msg){
           const t0=performance.now();
           const r=bad ? {ok:false, error:bad} : await aiagCall(tool, args);
           Object.keys(state.project.schematics).forEach(id=>{ if(!before.has(id)) made.add(id); });
+          const passNote=typeof aiagOracleAfter==="function" ? aiagOracleAfter(run, tool, r) : null;
           let content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
           if(r.ok && /^build_(circuit|part|fsm)$/.test(tool) && r.result && r.result.sheet){
             const s=Object.values(state.project.schematics).find(x=>x.name===r.result.sheet), key=r.result.sheet+"|"+(s?sheetHash(s):"");
             if(built.has(key)) content+="\n(system) This is exactly the circuit you had already built on that sheet — rebuilding changed nothing. Do not rebuild it again.";
             built.add(key); }
+          if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
+          if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
+            messages.push({role:"user", content:passNote}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -204,6 +217,7 @@ async function aiAgentRun(msg){
           // which sheet this call worked on: the tool's own answer, else its argument, else the one on screen
           const on=(r.ok && r.result && r.result.sheet) || args.sheet || (activeSch()||{}).name;
           if(r.ok && AIAG_EDIT_OPS.has(tool) && on){ needCheck.add(on); needSim.add(on); }
+          if(r.ok && (AIAG_EDIT_OPS.has(tool) || /^build_/.test(tool)) && on) run.touched.add(on);
           if(r.ok && tool==="check") needCheck.delete(on);
           const R=r.ok&&r.result||{}, circular=r.ok && (R.independent===false || R.pass===null || R.pending || (R.result&&(R.result.independent===false||R.result.pending)));
           // a spec still waiting for its circuit (set first, as asked) is not a failed check
@@ -233,10 +247,18 @@ async function aiAgentRun(msg){
         messages.push({role:"user", content:`(system) You changed ${miss} but did not verify ${needCheck.size+needSim.size>2?"them":"it"}. Call those tools with sheet set to that name, compare the result with what the circuit must do, fix it if it is wrong, then answer.`});
         continue;
       }
-      run.final=String(m.content||"").trim() || "(ไม่มีคำตอบ)";
+      // it changed a circuit that nothing independent has confirmed: once, point at derive_spec / set_spec
+      if(!run.verified && run.touched.size && !gated && stopAt===Infinity){
+        gated=true; think=true; const sh=[...run.touched].join(", ");
+        run.steps.push({kind:"nudge", text:"not checked against the request: "+sh});
+        messages.push({role:"user", content:`(system) Nothing has checked '${sh}' against the REQUEST yet. Call derive_spec {request:<the user's words>, sheet} — or set_spec with what the request says (formula / table.ones), not your circuit's table — then check_spec. If the request gives nothing to check against, answer and say it is unchecked.`});
+        continue;
+      }
+      run.final=(String(m.content||"").trim() || "(ไม่มีคำตอบ)");
       break;
     }
     if(!run.final && !run.error) run.error=`หยุดที่ ${AIAG_MAX_STEPS} รอบ — งานนี้อาจใหญ่เกินไปสำหรับโมเดลในเครื่อง`;
+    if(run.final && typeof aiagVerdict==="function" && !run.fastFinal) run.final+=aiagVerdict(run);
   }catch(e){ run.error=String(e&&e.message||e); }
   run.state=run.error?"error":"done"; run.seconds=Math.round((Date.now()-run.started)/100)/10;
   live(run.error?"หยุด":`เสร็จ · ${run.steps.filter(s=>s.kind==="tool").length} ขั้น · ${run.seconds} วิ`);

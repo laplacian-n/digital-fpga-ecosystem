@@ -55,6 +55,14 @@ class H(BaseHTTPRequestHandler):
                 "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
         with open(sys.argv[0] + ".sys", "a") as f: f.write(str(hash(msgs[0].get("content", ""))) + "\\n")
         ask = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+        if "GATE" in ask:        # the request's own spec (derived by the app) judges the circuit, and a pass ends the run
+            tt = lambda col: {"name": "og", "truth_table": {"inputs": ["a", "b", "c"], "outputs": ["f"], "columns": {"f": col}}}
+            if len(done) == 0:
+                return call("build_circuit", tt("01101000"), "minterms 1 2 4 (forgot 7)")
+            if len(done) == 1:
+                assert '"spec_check"' in last and '"pass":false' in last, last
+                return call("build_circuit", dict(tt("01101001"), sheet="og", replace=True), "add 7")
+            return self._j({"choices": [{"message": {"content": "สร้าง f แล้ว"}}]})
         if "STALL" in ask:       # a model that keeps wiring pins that do not exist (lab 6: 10 min, 0 wires)
             return call("connect", {"connections": [["cnt%d.q" % len(done), "disp.d"]], "sheet": "top"}, "")
         if "LOOP" in ask:        # a model that only ever checks against itself: it must be stopped
@@ -223,6 +231,12 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "nudge" && /no independent check/.test(x.text))).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(8);
     expect(s.data.agent.final).toContain("ตารางของตัวเอง");
+    // the app derives the spec from the request: the wrong table fails it, the right one passes and ends the run
+    await tool("ai_chat", { message: "GATE: f(a,b,c) = Σm(1,2,4,7)", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "oracle")).toBe(true);
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBe(2);
+    expect(s.data.agent.final).toContain("✓ ตรวจโดยโปรแกรม");
     // rounds that change nothing: told once (suggest_wires), then the app answers for it
     await tool("ai_chat", { message: "ต่อสาย STALL ให้ครบ", mode: "agent" });
     s = await tool("ai_chat_status", { wait: 40 });
