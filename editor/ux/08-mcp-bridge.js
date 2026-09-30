@@ -829,6 +829,9 @@ function mcpShowChange(pre){
 }
 
 /* ---------- transport: long-poll the launcher ---------- */
+// closing the page says so: the launcher waits for a busy editor (a long build does not poll) but
+// must not wait for one that is gone
+window.addEventListener("pagehide", ()=>{ try{ if(MCPB.on) navigator.sendBeacon("/api/mcp/bye?client="+MCPB.client, ""); }catch(_){} });
 async function mcpLoop(){
   let fails=0;
   while(MCPB.on){

@@ -253,6 +253,7 @@ function partVerifyComb(sch, part, p){
 }
 function partVerifySeq(sch, part, p){
   const S=part.seq(p), ports=part.ports(p), pm=partPortMap(sch);
+  if(S.small) return {pass:false, method:"—", mismatch:{reason:"too many clocks to run one by one — check a copy built at "+JSON.stringify(S.small)}};
   const ins=sch.components.filter(c=>c.type==="IN");
   const byName=n=>ins.find(c=>c.params.name===n);
   const holdAt=i=>{ const v=S.drive(i)||{}, o={};

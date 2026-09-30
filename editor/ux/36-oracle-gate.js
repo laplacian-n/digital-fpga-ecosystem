@@ -74,6 +74,15 @@ function oracleAttach(sch, o){
         const L=pm[side][b]||[], ok=L.some(x=>x.bit==null && x.width===w) || (w===1&&L.length) || L.filter(x=>x.bit!=null).length===w;
         if(!ok) miss.push(w>1?`${side} ${b}${w-1}..${b}0 (หรือบัส ${b}[${w-1}:0])`:`${side} ${b}`); }));
       if(miss.length) return {pass:false, reason:"ชื่อขาไม่ตรงกับที่ต้องมี: "+miss.join(", "), expected_ports:oraclePartPorts(sp.part, sp.params, false)};
+      // a part too slow to run clock by clock (lab 6: a count every 2 500 000 clocks) is checked on a small
+      // copy when it is built: a sheet still exactly as that generator drew it passes on that check
+      if(P.seq && P.seq(sp.params).small){
+        const how=sch.verified && String(sch.verified.how||"");
+        if(sheetVerified(sch) && how.startsWith(`part ${sp.part} ${JSON.stringify(sp.params)}`))
+          return {pass:true, checked:"drawn by the part's own generator, unchanged since — "+how.replace(/^part \S+ \{[^}]*\} — /,"")};
+        return {pass:null, reason:`${P.label}: ${JSON.stringify(sp.params)} runs too many clocks to compare one by one`,
+          hint:`build both at a small scale and compare those — e.g. build_part {kind:'${sp.part}', ${Object.entries(P.seq(sp.params).small).map(([k,v])=>k+":"+v).join(", ")}} on another sheet, then compare_sheets {with}`};
+      }
       try{ const v=P.seq ? partVerifySeq(sch, P, sp.params) : partVerifyComb(sch, P, sp.params);
         return {pass:v.pass, checked:v.method, mismatches:v.mismatch?[v.mismatch]:[], total_mismatches:v.pass?0:1, reason:v.pass?undefined:"ไม่ตรงกับโมเดลอ้างอิง: "+JSON.stringify(v.mismatch)}; }
       catch(e){ return {pass:false, reason:String(e&&e.message||e)}; }
@@ -160,4 +169,18 @@ function aiagVerdict(run){
   if(run.verified) return `\n\n✓ ตรวจโดยโปรแกรม: แผ่น ${run.verified.sheet} ผ่าน${run.verified.how}${run.verified.checked?" — "+run.verified.checked:""}`;
   if(run.touched && run.touched.size) return `\n\n⚠ โปรแกรมยังไม่ได้ยืนยันแผ่น ${[...run.touched].join(", ")} กับข้อกำหนดที่เป็นอิสระจากวงจร — โปรดเทียบกับใบงาน`;
   return "";
+}
+/* "cout = a + b + cin" on one-bit ports is an OR (the course's notation) — right, but not what someone
+   meaning addition expects: say so wherever such a formula comes in */
+function oraclePlusWarning(text){
+  const t=String(text||"");
+  if(!/\+/.test(t) || /\{[^}]*\}\s*=/.test(t)) return null;
+  return "'+' here is OR (boolean). For addition write the outputs as one number: {cout,s} = a + b + cin (or name the part: 'full adder', '4-bit adder')";
+}
+{
+  const _ds=MCP_OPS.derive_spec;
+  MCP_OPS.derive_spec=a=>{ const r=_ds(a); const w=r.spec&&r.spec.kind==="formula"&&oraclePlusWarning(r.spec.text); if(w) r.warning=w; return r; };
+  const _ss=MCP_OPS.set_spec;
+  MCP_OPS.set_spec=a=>{ const r=_ss(a); const w=a.formula!=null&&oraclePlusWarning(Array.isArray(a.formula)?a.formula.join("; "):a.formula);
+    if(w && !(r.result&&r.result.pass)) r.warning=w; return r; };
 }

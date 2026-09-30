@@ -382,6 +382,9 @@ MCP_OPS.ai_chat_status = async a=>{
   if(cap.error) out.error=cap.error;
   const run=AIAG.seq>cap.runBefore ? AIAG.runs.find(r=>r.id===cap.runBefore+1) : null;
   if(run) out.agent=aiagRunSummary(run, a.detail==="full");
+  // the latest finished run's answer rides on every status, so a poll that timed out never loses it
+  const last=aiagStored().slice(-1)[0];
+  if(last && (!run || last.id!==run.id)) out.last_finished_run={id:last.id, state:last.state, message:aiagClip(last.message, 120), final:last.final, error:last.error, at:last.at};
   if(run && run.resumable) out.next_resume="ai_chat {resume:true} continues this run from where it stopped";
   if(!cap.done) out.next="still running — call ai_chat_status again";
   return out;

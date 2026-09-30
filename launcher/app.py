@@ -606,32 +606,70 @@ def list_projects() -> list:
     return out
 
 
+def _pdf_browsers() -> list:
+    """Edge first (every Windows has it), then Chrome, then whatever find_browser gives"""
+    out = [find_browser()]
+    if IS_WIN:
+        pf = [os.environ.get(k) for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+        for rel in (r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"):
+            out += [str(Path(b) / rel) for b in pf if b and (Path(b) / rel).is_file()]
+    seen, res = set(), []
+    for b in out:
+        if b and b.lower() not in seen and Path(b).is_file():
+            seen.add(b.lower())
+            res.append(b)
+    return res
+
+
 def html_to_pdf(html: Path) -> dict:
-    """print a report page to PDF with the browser the app already uses (headless Edge / Chrome)"""
-    br = find_browser()
-    if not br:
+    """print a report page to PDF with the browser the app already uses (headless Edge / Chrome).
+    It prints in a plain temp folder and copies the result: the project folder can be under OneDrive
+    with a Thai name (C:\\Users\\…\\OneDrive\\เอกสาร), and the Edge launcher may hand the job to another
+    process and return before the file is written — so the file is waited for, not assumed."""
+    browsers = _pdf_browsers()
+    if not browsers:
         return {"ok": False, "error": "ไม่พบ Edge / Chrome สำหรับพิมพ์ PDF — เปิดรายงาน .html แล้วกดพิมพ์เป็น PDF เองได้"}
-    pdf = html.with_suffix(".pdf")
-    try:
-        pdf.unlink()
-    except OSError:
-        pass
     import tempfile
-    with tempfile.TemporaryDirectory() as prof:            # its own profile: an open Edge window does not block it
-        args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer", f"--user-data-dir={prof}",
-                f"--print-to-pdf={pdf}", html.resolve().as_uri()]
-        # Linux: as root, or where the distro blocks its sandbox (Ubuntu 23.10+), Chromium exits at once
-        # without this — it only renders our own report file
-        if not IS_WIN and sys.platform != "darwin":
-            args.insert(1, "--no-sandbox")
-        try:
-            p = subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
-        except Exception as e:
-            return {"ok": False, "error": f"พิมพ์ PDF ไม่ได้: {e}"}
-    if not pdf.is_file() or pdf.stat().st_size < 500:
-        tail = (p.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
-        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF" + (": " + " | ".join(tail) if tail else ""), "browser": br}
-    return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size}
+    pdf = html.with_suffix(".pdf")
+    work = Path(tempfile.mkdtemp(prefix="fe_pdf_"))
+    errors = []
+    try:
+        src = work / "report.html"
+        shutil.copyfile(html, src)                        # the report is one self-contained file
+        for n, br in enumerate(browsers):
+            out = work / f"report{n}.pdf"
+            args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+                    "--no-pdf-header-footer", f"--user-data-dir={work / f'prof{n}'}", f"--print-to-pdf={out}", src.as_uri()]
+            # Linux: as root, or where the distro blocks its sandbox (Ubuntu 23.10+), Chromium exits at once
+            # without this — it only renders our own report file
+            if not IS_WIN and sys.platform != "darwin":
+                args.insert(1, "--no-sandbox")
+            try:
+                p = subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
+            except Exception as e:
+                errors.append(f"{Path(br).name}: {e}")
+                continue
+            # wait for the file to appear and stop growing
+            last, stable, end = -1, 0, time.time() + 60
+            while time.time() < end:
+                size = out.stat().st_size if out.is_file() else -1
+                stable = stable + 1 if size == last and size > 500 else 0
+                if stable >= 3:
+                    break
+                last = size
+                time.sleep(0.5)
+            if out.is_file() and out.stat().st_size > 500:
+                try:
+                    pdf.unlink()
+                except OSError:
+                    pass
+                shutil.copyfile(out, pdf)
+                return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size, "browser": Path(br).name}
+            tail = (p.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-2:]
+            errors.append(f"{Path(br).name} (exit {p.returncode})" + (": " + " | ".join(tail) if tail else ""))
+        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF — " + " ; ".join(errors)}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def delete_project(name: str) -> dict:
@@ -788,7 +826,10 @@ class McpRelay:
         self.n = 0
         self.opened_at = 0.0
 
-    def live_client(self, within=35.0):
+    # an editor busy with a long synchronous job (drawing a whole lab: ~30 s) does not poll meanwhile —
+    # it is busy, not gone: taking it for closed opened a SECOND Studio window, which answered with an
+    # empty history (ai_chat_status "none") and doubled the memory in use
+    def live_client(self, within=150.0):
         now = time.time()
         live = [(t, c) for c, t in self.seen.items() if now - t < within or c in self.running]
         return max(live)[1] if live else None
@@ -822,6 +863,12 @@ class McpRelay:
                 self.replies[jid] = reply
             self.cv.notify_all()
 
+    def forget(self, client):
+        with self.cv:
+            self.seen.pop(client, None)
+            self.running.pop(client, None)
+            self.cv.notify_all()
+
     def busy(self, client):
         r = self.running.get(client)
         return (r[1], time.time() - r[2]) if r else None
@@ -830,8 +877,20 @@ class McpRelay:
         with self.cv:
             client = self.live_client()
         if client is None:
-            # nobody has the editor open: open it (once in a while) and wait for it to connect
-            if time.time() - self.opened_at > 20:
+            # nobody has the editor open: open it (once in a while) and wait for it to connect —
+            # unless one was there in the last 5 minutes (then it is only busy: wait for it)
+            with self.cv:
+                recent = any(time.time() - t < 300 for t in self.seen.values())
+            if recent:
+                end = time.time() + 45
+                with self.cv:
+                    while client is None and time.time() < end:
+                        self.cv.wait(1.0)
+                        client = self.live_client(within=330)
+                if client is None:
+                    return {"ok": False, "error": "the editor has not answered for a while — it is busy with a long job",
+                            "hint": "wait a little and call again (a whole lab takes ~30 s to draw)"}
+            elif time.time() - self.opened_at > 20:
                 self.opened_at = time.time()
                 try:
                     open_window("studio")
@@ -1209,6 +1268,9 @@ def make_handler():
                 return self._out(403, {"ok": False, "error": "forbidden (cross-origin)"})
             if path == "/api/mcp/result":
                 RELAY.result(json.loads(self._body() or b"{}"))
+                return self._out(200, {"ok": True})
+            if path == "/api/mcp/bye":                   # the editor page is closing: forget it now
+                RELAY.forget((q.get("client") or [""])[0])
                 return self._out(200, {"ok": True})
             if path == "/api/mcp/install_desktop":
                 return self._out(200, install_claude_desktop())
