@@ -55,6 +55,8 @@ class H(BaseHTTPRequestHandler):
                 "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
         with open(sys.argv[0] + ".sys", "a") as f: f.write(str(hash(msgs[0].get("content", ""))) + "\\n")
         ask = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+        if "STALL" in ask:       # a model that keeps wiring pins that do not exist (lab 6: 10 min, 0 wires)
+            return call("connect", {"connections": [["cnt%d.q" % len(done), "disp.d"]], "sheet": "top"}, "")
         if "LOOP" in ask:        # a model that only ever checks against itself: it must be stopped
             lt = {"inputs": ["a", "b"], "outputs": ["y"], "columns": {"y": "0110"}}
             if any("nothing independent" in str(m.get("content")) for m in msgs):
@@ -221,6 +223,12 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "nudge" && /no independent check/.test(x.text))).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(8);
     expect(s.data.agent.final).toContain("ตารางของตัวเอง");
+    // rounds that change nothing: told once (suggest_wires), then the app answers for it
+    await tool("ai_chat", { message: "ต่อสาย STALL ให้ครบ", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "nudge" && /without a change/.test(x.text))).toBe(true);
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(9);
+    expect(s.data.agent.final).toContain("ไม่มีอะไรบนแผ่นเปลี่ยน");
     expect(ed.errors).toEqual([]);
   } finally { srv.kill(); }
 });

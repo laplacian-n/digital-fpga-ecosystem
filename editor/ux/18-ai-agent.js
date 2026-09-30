@@ -9,6 +9,8 @@
    drive the chat over MCP (ai_chat / ai_chat_status) to test and debug this feature. */
 const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null };
 const AIAG_MAX_STEPS = 24;
+const AIAG_BUDGET_S = 300;        // a local run past 5 minutes is told to answer (one ran 10 min for 0 wires)
+const AIAG_STALL = 4;             // rounds in a row that changed nothing: nudged, and stopped at +2
 const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
 const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table","check_spec","set_spec"]);
 
@@ -51,6 +53,8 @@ function aiagSystemPrompt(){
 "Add bus:true to build_circuit to get q[3:0] instead of q0..q3.",
 "If the request is only a question (no change needed), answer it directly in Thai.",
 "For how the course / a lab sheet does something, or the board's pins, call search_course.",
+"EDGE board facts: 3.3 V I/O, 50 MHz clock, 4-digit common-anode 7-seg (a..g, dp, an[3:0] all active-low: 0 = on),",
+"push buttons 1 when pressed, 16 switches, 16 LEDs (1 = on). A whole lab 6 (counter 00-yy): build_part kind lab6_counter.",
 "",
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
@@ -97,13 +101,26 @@ async function aiagCall(tool, rawArgs){
   }catch(e){ return {ok:false, error:String(e&&e.message||e)+(e&&e.hint?"\nhint: "+e.hint:"")}; }
   finally{ MCPB.busy=false; }
 }
-/* the answer when the run is stopped for looping: what was built, and how far it was checked */
-function aiagWrapUp(run){
+/* the answer when the run is stopped: what was built, and how far it was checked */
+function aiagWrapUp(run, why){
   const tools=run.steps.filter(s=>s.kind==="tool" && s.ok), last=[...tools].reverse().find(s=>/^build_/.test(s.tool));
   const sim=[...tools].reverse().find(s=>s.tool==="simulate");
-  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+
-    (sim?`\nผลจำลอง: ${sim.summary||""}`:"")+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
+  const tail=(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+(sim?`\nผลจำลอง: ${sim.summary||""}`:"");
+  if(why==="stall" || why==="time"){
+    // what is still open on the sheet it worked on, from the editor, not the model
+    let open="";
+    try{ const edits=[...tools].reverse().find(s=>AIAG_EDIT_OPS.has(s.tool)||/^build_/.test(s.tool));
+      const nm=edits&&((edits.args&&edits.args.sheet)||(edits.result&&(/"sheet":"([^"]+)"/.exec(edits.result)||[])[1]));
+      const sch=(nm&&Object.values(state.project.schematics).find(x=>x.name===nm))||activeSch();
+      if(sch){ const c=MCP_OPS.check({sheet:sch.name}), H=typeof wireHints==="function"?wireHints(sch):[];
+        open=`\nแผ่น ${sch.name}: error ${c.errors}, warning ${c.warnings}`+(H.length?` · ยังมีสายที่เดาได้ ${H.length} เส้น — กด 💡 "ต่อทั้งหมด" ใน Inspector (ไม่ต้องใช้โมเดล)`:""); } }catch(_){}
+    return (why==="time" ? `หยุดเอง: ใช้เวลาเกิน ${AIAG_BUDGET_S/60} นาที` : `หยุดเอง: ${AIAG_STALL+2} รอบติดกันไม่มีอะไรบนแผ่นเปลี่ยน (เรียกเครื่องมือไม่สำเร็จ / ต่อสายไม่ได้)`)
+      +tail+open+"\nงานที่ต้องต่อบล็อกหลายตัวเข้าด้วยกันยากเกินโมเดลในเครื่อง — ลองสั่งทีละบล็อก, ใช้ 💡 แนะนำการต่อสาย หรือชิ้นส่วนทั้งแลปในคลัง (เช่น แลป 6)";
+  }
+  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+tail+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
 }
+/* every sheet's content: a round that leaves it unchanged made no progress */
+function aiagFingerprint(){ try{ return Object.values(state.project.schematics).map(s=>s.id+":"+sheetHash(s)).join("|"); }catch(_){ return ""; } }
 /* a chat line that is NOT part of the conversation memory (the live status, each tool step) */
 function aiagLine(html, cls){
   const log=$("#acLog"); if(!log) return null;
@@ -133,10 +150,14 @@ async function aiAgentRun(msg){
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
-    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity;
+    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
     for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
-      if(i>=stopAt){ run.final=aiagWrapUp(run); break; }
+      if(i>=stopAt){ run.final=aiagWrapUp(run, stopWhy); break; }
+      if(stopAt===Infinity && (Date.now()-run.started)/1000>AIAG_BUDGET_S){ stopAt=i+2; stopWhy="time";
+        run.steps.push({kind:"nudge", text:"time budget used — asked to finish"});
+        messages.push({role:"user", content:"(system) Time is up. Make no more changes: answer now in Thai with what is done, what is still missing, and what the user should do next."}); }
+      const fp0=aiagFingerprint();
       live(`กำลังคิด… (รอบ ${i+1})`);
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
@@ -190,8 +211,15 @@ async function aiAgentRun(msg){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
+        if(aiagFingerprint()===fp0) stall++; else stall=0;
+        if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";
+          run.steps.push({kind:"nudge", text:`${stall} rounds without a change — asked to finish`});
+          messages.push({role:"user", content:`(system) The last ${stall} rounds changed nothing on any sheet. Stop trying the same thing. `
+            +"If you were wiring blocks: suggest_wires {sheet, apply:true} connects the pins it can match by name in one call — try it once. "
+            +"Then answer in Thai: what is done, what is still not connected, and what the user should do."}); }
         // twice nothing independent to check against: say so and finish — do not loop until the step limit
-        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3;
+        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3; stopWhy="circular";
           run.steps.push({kind:"nudge", text:"no independent check possible — asked to finish"});
           messages.push({role:"user", content:"(system) There is nothing independent to check this circuit against. Stop building and answer now in Thai: what you built, what the simulation shows, and that it was checked only against your own table / formula (the user should confirm it against the lab sheet)."}); }
         continue;

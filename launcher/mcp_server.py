@@ -187,7 +187,8 @@ TOOLS = [
       "and marked verified. Prefer this over drawing gates or typing truth tables. Place it on other sheets as block:<sheet>.",
       {"kind": {"type": "string", "description": "a kind from list_parts, e.g. full_adder, adder, mux, bcd_7seg, mod_counter, clock_divider; "
                "lab parts: bcd_valid, one_pulse, counter_digit, bcd_counter_multi, bcd2_compare, add3, bin2bcd, hex_7seg, seg7_mux4, "
-               "addsub, alu_slice, alu, register_en, mux_bus, bcd_ascii"},
+               "addsub, alu_slice, alu, register_en, mux_bus, bcd_ascii; "
+               "a whole lab: lab6_counter (lab 6, counter 00-yy on the EDGE board: every block wired, pins mapped)"},
        "n": {"type": "integer", "description": "size: bits / inputs / modulus / divisor, per kind"},
        "bus": {"type": "boolean", "description": "a0..a3 → one bus port a[3:0]"},
        "cin": {"type": "boolean"}, "en": {"type": "boolean"}, "odd": {"type": "boolean"}, "active_low": {"type": "boolean"},
@@ -199,6 +200,8 @@ TOOLS = [
        "k": {"type": "integer", "description": "mux_bus: number of buses (2, 4, 8)"},
        "hex": {"type": "boolean", "description": "seg7_mux4: show 0–F"}, "dp": {"type": "boolean", "description": "seg7_mux4: decimal points"},
        "async": {"type": "boolean", "description": "register_en: clear without waiting for the clock"},
+       "tick": {"type": "integer", "description": "lab6_counter: 50 MHz clocks per count (default 2500000 = 20 Hz)"},
+       "scan": {"type": "integer", "description": "lab6_counter: display scan divider (default 50000 = 1 kHz)"},
        "sheet": {"type": "string", "description": "sheet to build on (created, or an empty one filled)"},
        "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"},
        "name": {"type": "string", "description": "entity name when no sheet is given"}}, ["kind"], timeout=90),

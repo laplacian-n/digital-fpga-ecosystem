@@ -14299,7 +14299,16 @@ function openExplainSim(){
   const _send=aiSend;
   aiSend=async function(){
     const t=$("#acInput"), msg=((t&&t.value)||"").trim();
-    const why=/^\/(why|ทำไม)\b/i.test(msg) || (/(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg) && /(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ทำไม|ผิด|ค้าง)/.test(msg));
+    // a symptom of THIS sheet ("ทำไมไม่นับ", "จำลองแล้วค้าง") gets the check; a question about the idea
+    // ("ทำไมตัวนับต้องมีตัวหารความถี่") goes to the model — it used to get this sheet's problems instead
+    const concept=/(ทำไมต้อง|ต้องมี|ต้องใช้|คืออะไร|คือไร|ต่างกัน|แตกต่าง|เลือก|หลักการ|อธิบาย|เพราะอะไรถึง|ใช้ทำอะไร|\bwhy (do|does|is|are) (we|a|an|the)\b)/i.test(msg);
+    const sym=/(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ไม่ตรง|ผิด|ค้าง|doesn'?t|not (work|count|change))/i.test(msg);
+    const mine=/(นี้|นี่|ของผม|ของฉัน|ของหนู|ของเรา|ที่ทำ|ผลจำลอง|ตอนจำลอง|this|my)/i.test(msg);
+    const sch=activeSch(), hasParts=!!(sch && sch.components.some(c=>c.type!=="JUNCTION"));
+    const why=/^\/(why|ทำไม)\b/i.test(msg) || (hasParts && !concept && /(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg)
+      && (sym || (/ทำไม|\bwhy\b/i.test(msg) && mine)));
+    // Q&A mode answers — the builders ahead of it in aiSend took "JK กับ D เลือกตัวไหนทำตัวนับ" as a counter to draw
+    if(!why && AICHAT.mode==="qa" && msg && msg[0]!=="/" && !AICHAT.busy){ aiAppend("user", msg); t.value=""; await aiAsk(msg); return; }
     if(!why) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
     const list=explainSim(activeSch()).slice(0,6);
@@ -17238,6 +17247,8 @@ GENERATORS.push({id:"busports", icon:"⫼", name:"รวมขาเป็นบ
    drive the chat over MCP (ai_chat / ai_chat_status) to test and debug this feature. */
 const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null };
 const AIAG_MAX_STEPS = 24;
+const AIAG_BUDGET_S = 300;        // a local run past 5 minutes is told to answer (one ran 10 min for 0 wires)
+const AIAG_STALL = 4;             // rounds in a row that changed nothing: nudged, and stopped at +2
 const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
 const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table","check_spec","set_spec"]);
 
@@ -17280,6 +17291,8 @@ function aiagSystemPrompt(){
 "Add bus:true to build_circuit to get q[3:0] instead of q0..q3.",
 "If the request is only a question (no change needed), answer it directly in Thai.",
 "For how the course / a lab sheet does something, or the board's pins, call search_course.",
+"EDGE board facts: 3.3 V I/O, 50 MHz clock, 4-digit common-anode 7-seg (a..g, dp, an[3:0] all active-low: 0 = on),",
+"push buttons 1 when pressed, 16 switches, 16 LEDs (1 = on). A whole lab 6 (counter 00-yy): build_part kind lab6_counter.",
 "",
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
@@ -17326,13 +17339,26 @@ async function aiagCall(tool, rawArgs){
   }catch(e){ return {ok:false, error:String(e&&e.message||e)+(e&&e.hint?"\nhint: "+e.hint:"")}; }
   finally{ MCPB.busy=false; }
 }
-/* the answer when the run is stopped for looping: what was built, and how far it was checked */
-function aiagWrapUp(run){
+/* the answer when the run is stopped: what was built, and how far it was checked */
+function aiagWrapUp(run, why){
   const tools=run.steps.filter(s=>s.kind==="tool" && s.ok), last=[...tools].reverse().find(s=>/^build_/.test(s.tool));
   const sim=[...tools].reverse().find(s=>s.tool==="simulate");
-  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+
-    (sim?`\nผลจำลอง: ${sim.summary||""}`:"")+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
+  const tail=(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+(sim?`\nผลจำลอง: ${sim.summary||""}`:"");
+  if(why==="stall" || why==="time"){
+    // what is still open on the sheet it worked on, from the editor, not the model
+    let open="";
+    try{ const edits=[...tools].reverse().find(s=>AIAG_EDIT_OPS.has(s.tool)||/^build_/.test(s.tool));
+      const nm=edits&&((edits.args&&edits.args.sheet)||(edits.result&&(/"sheet":"([^"]+)"/.exec(edits.result)||[])[1]));
+      const sch=(nm&&Object.values(state.project.schematics).find(x=>x.name===nm))||activeSch();
+      if(sch){ const c=MCP_OPS.check({sheet:sch.name}), H=typeof wireHints==="function"?wireHints(sch):[];
+        open=`\nแผ่น ${sch.name}: error ${c.errors}, warning ${c.warnings}`+(H.length?` · ยังมีสายที่เดาได้ ${H.length} เส้น — กด 💡 "ต่อทั้งหมด" ใน Inspector (ไม่ต้องใช้โมเดล)`:""); } }catch(_){}
+    return (why==="time" ? `หยุดเอง: ใช้เวลาเกิน ${AIAG_BUDGET_S/60} นาที` : `หยุดเอง: ${AIAG_STALL+2} รอบติดกันไม่มีอะไรบนแผ่นเปลี่ยน (เรียกเครื่องมือไม่สำเร็จ / ต่อสายไม่ได้)`)
+      +tail+open+"\nงานที่ต้องต่อบล็อกหลายตัวเข้าด้วยกันยากเกินโมเดลในเครื่อง — ลองสั่งทีละบล็อก, ใช้ 💡 แนะนำการต่อสาย หรือชิ้นส่วนทั้งแลปในคลัง (เช่น แลป 6)";
+  }
+  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+tail+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
 }
+/* every sheet's content: a round that leaves it unchanged made no progress */
+function aiagFingerprint(){ try{ return Object.values(state.project.schematics).map(s=>s.id+":"+sheetHash(s)).join("|"); }catch(_){ return ""; } }
 /* a chat line that is NOT part of the conversation memory (the live status, each tool step) */
 function aiagLine(html, cls){
   const log=$("#acLog"); if(!log) return null;
@@ -17362,10 +17388,14 @@ async function aiAgentRun(msg){
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
-    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity;
+    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
     for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
-      if(i>=stopAt){ run.final=aiagWrapUp(run); break; }
+      if(i>=stopAt){ run.final=aiagWrapUp(run, stopWhy); break; }
+      if(stopAt===Infinity && (Date.now()-run.started)/1000>AIAG_BUDGET_S){ stopAt=i+2; stopWhy="time";
+        run.steps.push({kind:"nudge", text:"time budget used — asked to finish"});
+        messages.push({role:"user", content:"(system) Time is up. Make no more changes: answer now in Thai with what is done, what is still missing, and what the user should do next."}); }
+      const fp0=aiagFingerprint();
       live(`กำลังคิด… (รอบ ${i+1})`);
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
@@ -17419,8 +17449,15 @@ async function aiAgentRun(msg){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
+        if(aiagFingerprint()===fp0) stall++; else stall=0;
+        if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";
+          run.steps.push({kind:"nudge", text:`${stall} rounds without a change — asked to finish`});
+          messages.push({role:"user", content:`(system) The last ${stall} rounds changed nothing on any sheet. Stop trying the same thing. `
+            +"If you were wiring blocks: suggest_wires {sheet, apply:true} connects the pins it can match by name in one call — try it once. "
+            +"Then answer in Thai: what is done, what is still not connected, and what the user should do."}); }
         // twice nothing independent to check against: say so and finish — do not loop until the step limit
-        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3;
+        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3; stopWhy="circular";
           run.steps.push({kind:"nudge", text:"no independent check possible — asked to finish"});
           messages.push({role:"user", content:"(system) There is nothing independent to check this circuit against. Stop building and answer now in Thai: what you built, what the simulation shows, and that it was checked only against your own table / formula (the user should confirm it against the lab sheet)."}); }
         continue;
@@ -18057,7 +18094,8 @@ function partBuild(kind, a){
   let it=part.build(p); if(it && it.W) it={module:it.module, components:it.components, nets:it.nets};
   const bits=it.bits;
   it.module=sanId(a.name||it.module||kind);
-  const dr=aiDrawIntent(it);
+  // the throw-away copy a big part is checked on needs connections, not routed wires (20 s for lab 6's top)
+  const dr=a._check ? drawIntent(it, {noRoute:true}) : aiDrawIntent(it);
   if(!dr||!dr.ok) mcpFail("could not draw the part: "+((dr&&(dr.error||(dr.errors||[]).map(e=>e.msg||e).join("; ")))||"?"));
   const sch=dr.sch;
   if(part.after) part.after(sch, p, Object.assign({bits}, it));
@@ -18073,9 +18111,12 @@ function partBuild(kind, a){
   // a big divider cannot be run clock by clock: its generator is checked on a small N instead
   let v;
   if(part.seq){ const S=part.seq(p);
-    if(S.small){ const tmp=partBuild(kind, Object.assign({}, a, {n:S.small, name:"__chk", bus:false}));
-      delete state.project.schematics[tmp.sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==tmp.sch.id);
-      v=Object.assign({}, tmp.verify, {method:`ตัวสร้างเดียวกันที่ N=${S.small}: `+tmp.verify.method}); }
+    if(S.small){ const sp=typeof S.small==="object"?S.small:{n:S.small}, had=new Set(Object.keys(state.project.schematics));
+      const tmp=partBuild(kind, Object.assign({}, a, sp, {name:"__chk", bus:false, _check:true}));
+      // the check copy and any sub-sheet only it needed (a small divider) go again
+      Object.keys(state.project.schematics).forEach(id=>{ if(!had.has(id)) delete state.project.schematics[id]; });
+      state.openTabs=(state.openTabs||[]).filter(i=>state.project.schematics[i]);
+      v=Object.assign({}, tmp.verify, {method:`ตัวสร้างเดียวกันที่ ${Object.entries(sp).map(([k,x])=>(k==="n"?"N":k)+"="+x).join(", ")}: `+tmp.verify.method}); }
     else v=partVerifySeq(sch, part, p); }
   else v=partVerifyComb(sch, part, p);
   if(!v.pass){ delete state.project.schematics[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); renderAll();
@@ -18102,7 +18143,7 @@ MCP_OPS.build_part = a=>{
   mcpBeforeChange("สร้าง "+kind);
   const r=partBuild(kind, a);
   let sch=r.sch;
-  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
+  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified","pinmap"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
     delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
   else if(want) sch.name=uniqueSchName(want, sch.id);
   openSchTab(sch.id); mcpActivity("สร้าง "+PARTS[kind].label); mcpCommit(sch); try{ zoomFit(); }catch(_){}
@@ -19827,6 +19868,8 @@ function aifInputsOf(sch){ try{ const j=clientCombSim(sch); return j.ok ? j.trut
     const fp=partFromMessage(msg);
     if(!fp || !fp.simple) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
+    // a big part (a whole lab) takes half a minute: say so before the page is busy drawing it
+    aiAppend("ai", `⏳ กำลังสร้าง ${PARTS[fp.kind].label} จากคลังชิ้นส่วน…`); await new Promise(r=>setTimeout(r, 60));
     try{
       const r=await MCP_OPS.build_part(Object.assign({kind:fp.kind}, fp.args));
       const io=d=>r.ports.filter(p=>p.dir===d).map(p=>p.name+(p.width>1?"["+(p.width-1)+":0]":"")).join(", ");
@@ -19978,6 +20021,94 @@ const AIO_MORE=/(ต่อ(กับ|เข้า|ไป)|เชื่อม|con
   specRun=function(sch){ const r=_sr.apply(this, arguments);
     if(r && r.pending && sch.specResult){ sch.specResult.summary="⏳ รอวงจร"; delete sch.verified; }
     return r; };
+}
+
+/* ===== 35. Whole lab systems as parts: the top sheet of lab 6 assembled by code ===================
+   Testing the in-app AI on lab 6 (Qwen3.5 4B, agent mode): it split the design into blocks and built
+   each one well, then spent 250 s + 10 min and connected 2 wires — wiring a dozen blocks together is
+   past what a 4B model can do. So the system is a part like any other: the verified blocks from the
+   library (divider, edge detector, BCD validity, 2-digit counter, BCD comparator, 4-digit scanner)
+   placed and wired by code, the glue (button sampled every tick, start/stop toggle, error inhibit,
+   clear at yy) checked clock by clock against a model of the lab's rules — on a small divider, since
+   2 500 000 clocks per count cannot be run one by one — and the EDGE pins mapped. */
+
+const PARTS_SYS_BEFORE=new Set(Object.keys(PARTS));
+/* the clock_divider part's own model: clk_out of a ÷N divider, one clock at a time */
+function sysDivStep(N, s){
+  const M=N%2?N:N/2, bits=Math.max(1,(M-1).toString(2).length), wrap=s.c===M-1;
+  return {out:N%2?(s.c>>(bits-1))&1:s.t, c:wrap?0:s.c+1, t:N%2?0:(wrap?s.t^1:s.t)};
+}
+Object.assign(PARTS, {
+  lab6_counter:{ label:"แลป 6: ตัวนับ 00–yy ทั้งระบบ (บอร์ด EDGE)", group:"ระบบทั้งแลป",
+    desc:"yy_tens/yy_ones = ค่าสิ้นสุด yy จากสวิตช์ (SW7–4 / SW3–0, BCD) · btn = ปุ่มกลาง Start/Stop (toggle, กันเด้งด้วยการอ่านทุก tick) · นับขึ้นทีละ 1 ทุก tick (50 MHz ÷ tick = 20 Hz) วนกลับ 00 เมื่อถึง yy · err = yy ไม่ใช่ BCD หรือค่านับ > yy (หยุดนับ, กดปุ่มไม่มีผล) · a..g + an[3:0] ต่อจอ 7-seg 2 หลักขวา (สแกนด้วย 50 MHz ÷ scan) · running, tens, ones ออก LED · จับขาบอร์ดให้แล้ว",
+    params:{tick:{min:2,max:2147483648,def:2500000}, scan:{min:2,max:2147483648,def:50000}},
+    ports:()=>({in:{clk:1, btn:1, yy_tens:4, yy_ones:4}, out:{a:1,b:1,c:1,d:1,e:1,f:1,g:1, an:4, err:1, running:1, tens:4, ones:4}}),
+    build:p=>{ const t=ptIntent("lab6_counter"), clk=t.IN("clk"), btn=t.IN("btn");
+      const YT=[0,1,2,3].map(i=>t.IN("yy_tens"+i)), YO=[0,1,2,3].map(i=>t.IN("yy_ones"+i));
+      // tick: one clock-wide pulse every `tick` clocks (divider → rising-edge detector)
+      const dv=ptBlock(t, ptSub("clock_divider", {n:p.tick})); t.W(clk, dv+".clk_in");
+      const ed=ptBlock(t, ptSub("edge_detector")); t.W(clk, ed+".clk"); t.W(dv+".clk_out", ed+".x");
+      const tick=ed+".pulse";
+      // the button, sampled on every tick (~50 ms: no bounce survives) → one press = one pulse
+      const hold=d=>{ const f=t.X("DFF"), m=t.X("MUX",{params:{inputs:2}});
+        t.W(f+".q", m+".d0"); t.W(d, m+".d1"); t.W(tick, m+".s0"); t.W(m+".y", f+".d"); t.W(clk, f+".clk"); return f; };
+      const s0=hold(btn), s1=hold(s0+".q");
+      const press=t.G("AND",[tick, s0+".q", s1+".qn"]);
+      // yy must be BCD, and the count may not be past it
+      const sv=ptSub("bcd_valid"), vt=ptBlock(t, sv), vo=ptBlock(t, sv);
+      YT.forEach((x,i)=>t.W(x, vt+".d"+i)); YO.forEach((x,i)=>t.W(x, vo+".d"+i));
+      const cnt=ptBlock(t, ptSub("bcd_counter_multi", {format:"00-99"})), cmp=ptBlock(t, ptSub("bcd2_compare"));
+      for(let i=0;i<4;i++){ t.W(cnt+".tens"+i, cmp+".a_hi"+i); t.W(cnt+".ones"+i, cmp+".a_lo"+i); t.W(YT[i], cmp+".b_hi"+i); t.W(YO[i], cmp+".b_lo"+i); }
+      const err=t.G("OR",[vt+".invalid", vo+".invalid", cmp+".gt"]), ok=t.G("NOT",[err]);
+      // start/stop: a toggle flip-flop, ignored while there is an error
+      const run=t.X("DFF"); t.W(clk, run+".clk"); t.W(t.G("XOR",[run+".q", t.G("AND",[press, ok])]), run+".d");
+      const en=t.G("AND",[tick, run+".q", ok]);
+      t.W(clk, cnt+".clk"); t.W(en, cnt+".en"); t.W(t.G("AND",[en, cmp+".eq"]), cnt+".clr");    // yy → 00
+      // display: the two right-hand digits, the other two kept dark
+      const sd=ptBlock(t, ptSub("clock_divider", {n:p.scan})); t.W(clk, sd+".clk_in");
+      const disp=ptBlock(t, ptSub("seg7_mux4")); t.W(sd+".clk_out", disp+".clk");
+      for(let i=0;i<4;i++){ t.W(cnt+".ones"+i, disp+".ones"+i); t.W(cnt+".tens"+i, disp+".tens"+i);
+        t.W(t.X("GND"), disp+".hundreds"+i); t.W(t.X("GND"), disp+".thousands"+i); }
+      for(const s of "abcdefg") t.OUT(s, disp+"."+s);
+      t.OUT("an0", disp+".an0"); t.OUT("an1", disp+".an1"); t.OUT("an2", t.X("VCC")); t.OUT("an3", t.X("VCC"));
+      t.OUT("err", err); t.OUT("running", run+".q");
+      for(let i=0;i<4;i++){ t.OUT("tens"+i, cnt+".tens"+i); t.OUT("ones"+i, cnt+".ones"+i); }
+      return t; },
+    // EDGE board: SW7–4 = tens of yy, SW3–0 = ones, centre button, 7-seg, LED0 = err, LED1 = running, LED15–8 = count
+    after:sch=>{ const pm={clk:"clk", btn:"pb:4", err:"led:0", running:"led:1"};
+      for(let i=0;i<4;i++){ pm["yy_ones"+i]="sw:"+i; pm["yy_tens"+i]="sw:"+(4+i); pm["an"+i]="an:"+i; pm["ones"+i]="led:"+(8+i); pm["tens"+i]="led:"+(12+i); }
+      for(const s of "abcdefg") pm[s]="seg:"+s;
+      sch.pinmap=pm; },
+    // the glue against the lab's rules; the display is the seg7_mux4 block, checked on its own sheet
+    seq:p=>{ if(p.tick>8 || p.scan>8) return {small:{tick:4, scan:2}};
+      const N=p.tick, cycles=150;
+      const btnOn=i=>(i>=3&&i<13) || (i>=52&&i<60) || (i>=66&&i<74) || (i>=120&&i<128);
+      const yy=i=>i<90?[0,3] : i<108?[0,12] : i<135?[0,1] : [2,0];
+      return {cycles, init:{c:0,t:0,pT:0,s0:0,s1:0,run:0,cnt:0},
+        drive:i=>({btn:btnOn(i)?1:0, yy_tens:yy(i)[0], yy_ones:yy(i)[1]}),
+        step:(s,v)=>{ const d=sysDivStep(N, s), tick=d.out&&!s.pT?1:0;
+          const T=Math.floor(s.cnt/10), O=s.cnt%10;
+          const err=v.yy_tens>9 || v.yy_ones>9 || T*16+O > v.yy_tens*16+v.yy_ones ? 1 : 0;
+          const press=tick && s.s0 && !s.s1, en=tick && s.run && !err;
+          const eq=T===v.yy_tens && O===v.yy_ones;
+          return {out:{err, running:s.run, tens:T, ones:O},
+            state:{c:d.c, t:d.t, pT:d.out, s0:tick?v.btn:s.s0, s1:tick?s.s0:s.s1,
+              run:s.run^(press && !err ? 1 : 0), cnt:en&&eq ? 0 : en ? (s.cnt+1)%100 : s.cnt}}; }}; } },
+});
+const PARTS_SYSTEMS=Object.keys(PARTS).filter(k=>!PARTS_SYS_BEFORE.has(k));
+
+/* "ทำแลป 6", "digital counter 00-yy" → the whole system, from the agent and from build mode */
+{
+  const _pf=partFromMessage;
+  partFromMessage=function(msg){
+    const t=" "+String(msg||"").toLowerCase()+" ";
+    if(/(lab|แลป|แล็บ|แลบ|ใบงาน(?:ที่)?)\s*-?\s*0?6(?![\d.])|00\s*[-–]\s*yy|digital\s*counter|ตัวนับดิจิ(ทั|ตอ)ล/.test(t)
+       && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
+      const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
+      return {kind:"lab6_counter", args:sm?{sheet:sm[1]}:{}, simple:true, named:[]};
+    }
+    return _pf.apply(this, arguments);
+  };
 }
 
 </script>
