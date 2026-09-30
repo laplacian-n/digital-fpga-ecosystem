@@ -163,7 +163,13 @@ TOOLS = [
     T("board_check", "Before building the .bit: what will go wrong on the real EDGE board — ports without a pin, two ports "
       "on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit "
       "enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one "
-      "the ลงบอร์ด page builds.", {"sheet": SHEET}),
+      "the ลงบอร์ด page builds. fix:true repairs what it can (a NOT before each active-high a–g OUTPUT, an OUTPUT an0 = 0 "
+      "on digit 0, pins guessed for ports without one) — one undo step each; `fixable` lists them otherwise.",
+      {"sheet": SHEET, "fix": {"type": "boolean"}}),
+    T("pin_preset", "Board pins as the lab sheet wires them, by each port's role: lab 6 (SW7–4 = tens of yy, SW3–0 = ones, "
+      "centre button = start/stop, LED0 = error), lab 7 (SW15–0 = mm.ss digits, start/stop, clear), lab 8 (SW15–0 = four BCD "
+      "digits); a–g, dp, an, clk on any lab. Answers what it could not place (auto_pins guesses those).",
+      {"sheet": SHEET, "lab": {"type": "string", "enum": ["6", "7", "8"]}, "apply": {"type": "boolean"}}, ["lab"]),
     T("suggest_wires", "Wiring hints for the unconnected pins of a sheet: blocks of one kind in a row chain carry-like pins "
       "(cout→cin, x_out→x_in), a block input named like a sheet INPUT takes it (clk, rst, en; a2 or bit 2 of bus a for "
       "the block labelled …2), a sheet OUTPUT named like a block output takes it. Each hint has a reason; apply:true "
@@ -197,6 +203,13 @@ TOOLS = [
        "pins": {"type": "object", "description": "board pins for the top ports, e.g. {'btn':'pb:4','sw[0]':'sw:0'}"},
        "top": {"type": "boolean", "description": "also make it the project's top sheet"},
        "replace": {"type": "boolean"}}, ["blocks"], timeout=120),
+    T("compare_sheets", "Are two circuits the same? Drive `sheet` and `with` (another sheet) with the same inputs, port by port "
+      "by name, and compare every output: all rows up to 12 input bits (else corners + 1000 random vectors); with flip-flops, "
+      "clock by clock from reset on the same random stimulus. Or compare `sheet` with a formula, a table (columns or ones), "
+      "a library part (+ params) or the request's words — e.g. a student's gates against the reference. No AI involved.",
+      {"sheet": SHEET, "with": {"type": "string", "description": "the other sheet"},
+       "formula": {"type": "string"}, "table": {"type": "object"}, "part": {"type": "string"}, "params": {"type": "object"},
+       "request": {"type": "string"}, "cycles": {"type": "integer", "minimum": 4, "maximum": 512}}, timeout=90),
     T("derive_spec", "Derive a sheet's acceptance test from the user's REQUEST by code — independent of any circuit: "
       "equations in it, a minterm list (f(a,b,c) = Σm(1,2,4,7)), 'output 1 when the n-bit input is prime / even / > k …', "
       "or a standard part it names (4-bit adder, BCD→7-seg, mod-6 counter → checked against that part's reference model). "
@@ -427,9 +440,9 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts", "build_fsm", "build_hierarchy", "derive_spec", "set_spec", "check_spec",
+               "build_part", "list_parts", "build_fsm", "build_hierarchy", "derive_spec", "set_spec", "check_spec", "compare_sheets",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
+               "get_pins", "set_pins", "auto_pins", "pin_preset", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 
 def openai_tools(names=None):

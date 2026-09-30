@@ -20629,6 +20629,263 @@ MCP_OPS.batch = async a=>{
   return {ok:true, done:results.length, results:results.map(r=>({tool:r.tool, result:r.result})), undo:"one undo step undoes the whole batch"};
 };
 
+/* ===== 39. Design rule checks the netlist needed ===================================================
+   `check` caught floating inputs and combinational loops, but not: a net two outputs drive (drawn by
+   hand through a junction — MCP connect refuses it, the canvas does not), an input pin fed from two
+   nets, logic whose output goes nowhere (a gate the student forgot to wire on — its part of the
+   circuit does nothing), an INPUT nothing reads, and a wire with no source. They join the same issue
+   list, so check, the stepper badge and the Debug list all show them. */
+const DRC_SRC=new Set(["IN","VCC","GND","CONST"]), DRC_SKIP=new Set(["JUNCTION","BUSTAP","OUT","TEXT","NOTE","LABEL"]);
+function drcSheet(sch){
+  const I=[], name=c=>compDisplay?compDisplay(c):(c.label||c.id), add=(lvl,msg,cid)=>I.push({lvl, msg, cid, schId:sch.id, ref:sch.name});
+  const outUsed=new Set(sch.wires.map(w=>w.from.cid+"|"+w.from.pid));
+  // several drivers on one net (through junctions)
+  try{ const seen=new Set();
+    sch.wires.forEach(w=>{ if(seen.has(w.id)) return; const ids=[...netWires(sch, w)]; ids.forEach(id=>seen.add(id));
+      const drv=new Map();
+      ids.map(id=>sch.wires.find(x=>x.id===id)).filter(Boolean).forEach(x=>[x.from,x.to].forEach(ep=>{ const c=comp(ep.cid,sch);
+        if(!c||c.type==="JUNCTION"||c.type==="BUSTAP") return; const p=getPorts(c).find(q=>q.id===ep.pid); if(p&&p.dir==="out") drv.set(ep.cid+"|"+ep.pid, c); }));
+      if(drv.size>1){ const L=[...drv.entries()].map(([k,c])=>name(c)+"."+k.split("|")[1]);
+        add("err", `สายเส้นเดียวมีต้นทาง ${drv.size} ตัว (multi-driver): ${L.join(", ")} — สัญญาณชนกัน`, [...drv.values()][0].id); } });
+  }catch(e){ console.warn("drc nets", e); }
+  // one input pin fed from two nets
+  const into={}; sch.wires.forEach(w=>{ const k=w.to.cid+"|"+w.to.pid; (into[k]=into[k]||new Set()).add(netKey(sch, w)); });
+  Object.entries(into).forEach(([k,S])=>{ if(S.size<2) return; const [cid,pid]=k.split("|"), c=comp(cid,sch);
+    if(!c || c.type==="JUNCTION" || c.type==="BUSTAP") return;
+    add("err", `${name(c)} ขา '${pid}' รับสายจาก ${S.size} เส้นที่ต่างกัน (multi-driver)`, cid); });
+  // logic that goes nowhere, INPUTs nothing reads
+  sch.components.forEach(c=>{
+    if(DRC_SKIP.has(c.type)) return;
+    const outs=getPorts(c).filter(p=>p.dir==="out"); if(!outs.length) return;
+    const used=outs.filter(p=>outUsed.has(c.id+"|"+p.id));
+    if(c.type==="IN"){ if(!used.length) add("warn", `INPUT ${name(c)} ไม่ได้ต่อไปไหน (ไม่มีอะไรใช้ค่านี้)`, c.id); return; }
+    if(DRC_SRC.has(c.type)) return;
+    if(!used.length) add("warn", `เอาต์พุตของ ${name(c)} ไม่ได้ต่อไปไหน — ส่วนนี้ของวงจรไม่มีผลกับขาออก`, c.id);
+  });
+  return I;
+}
+/* the net a wire belongs to, as a stable key (its lowest wire id) */
+function netKey(sch, w){ try{ return [...netWires(sch, w)].sort()[0]; }catch(_){ return w.id; } }
+{
+  const _q=uxQuietIssues;
+  uxQuietIssues=function(){
+    const base=_q.apply(this, arguments)||[];
+    const extra=[]; Object.values(state.project.schematics).forEach(s=>{ try{ extra.push(...drcSheet(s)); }catch(_){} });
+    // what the editor already says stays as it is: no second message for the same pin / part
+    const dup=i=>base.some(b=>b.schId===i.schId && b.cid && b.cid===i.cid && (/multi-driver|สายเข้าซ้อน/.test(b.msg)===/multi-driver/.test(i.msg)));
+    return base.concat(extra.filter(i=>!dup(i)));
+  };
+  const _fix=issueFix;
+  issueFix=function(m){
+    if(/ต้นทาง \d+ ตัว|รับสายจาก \d+ เส้น/.test(m)) return _fix("multi-driver");
+    if(/INPUT .* ไม่ได้ต่อไปไหน/.test(m)) return "ต่อ INPUT นี้เข้ากับเกตที่ควรใช้ค่านี้ หรือลบทิ้งถ้าไม่ได้ใช้";
+    if(/ไม่ได้ต่อไปไหน/.test(m)) return "ต่อเอาต์พุตนี้ไปยังที่ที่ต้องใช้ (เกตถัดไปหรือ OUTPUT) หรือลบเกตนี้ถ้าไม่ต้องการ";
+    return _fix.apply(this, arguments);
+  };
+}
+
+/* ===== 40. Are two circuits the same? (Tools ▸ เทียบวงจร, MCP compare_sheets) =======================
+   Marking a student's gates against a reference with no AI at all: the two sheets are driven with the
+   same inputs, port by port by name, and every output is compared —
+     - no flip-flops: every input row (≤ 12 input bits), else corners + 1000 random vectors;
+     - flip-flops: clock by clock from reset, the same random stimulus into both (clk is the clock).
+   A sheet can also be compared with a formula, a truth table, a library part or the request's own words
+   (36-oracle-gate: the same checks as an acceptance test, run once without touching the sheet's spec). */
+const eqPorts=sch=>schPortList(sch).map(p=>({name:p.id, dir:p.dir, width:p.width||1}));
+const eqHasFF=sch=>{ try{ return flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]); }catch(_){ return false; } };
+const eqNum=v=>typeof v==="string" ? (/^[01]+$/.test(v)?parseInt(v,2):NaN) : (v==null?NaN:+v);
+const EQ_CLOCK=/^(clk|clock|clk_?in|clk50|clk_?50m?)$/i;
+function eqRng(seed){ let s=seed>>>0||1; return ()=>{ s=(Math.imul(s,1103515245)+12345)>>>0; return s; }; }
+/* compare sheet A with sheet B */
+function eqSheets(A, B, opts){
+  opts=opts||{};
+  const pa=eqPorts(A), pb=eqPorts(B), k=p=>p.name.toLowerCase();
+  const ins=pa.filter(p=>p.dir==="in"), insB=pb.filter(p=>p.dir==="in");
+  const diffPorts=[];
+  ins.forEach(p=>{ const q=insB.find(x=>k(x)===k(p)); if(!q) diffPorts.push(`INPUT ${p.name} อยู่ใน ${A.name} แต่ไม่มีใน ${B.name}`); else if(q.width!==p.width) diffPorts.push(`INPUT ${p.name}: ${p.width} บิต กับ ${q.width} บิต`); });
+  insB.forEach(q=>{ if(!ins.find(p=>k(p)===k(q))) diffPorts.push(`INPUT ${q.name} อยู่ใน ${B.name} แต่ไม่มีใน ${A.name}`); });
+  const outsA=pa.filter(p=>p.dir==="out"), outsB=pb.filter(p=>p.dir==="out");
+  const common=outsA.filter(p=>outsB.find(q=>k(q)===k(p) && q.width===p.width));
+  const onlyA=outsA.filter(p=>!common.includes(p)).map(p=>p.name), onlyB=outsB.filter(q=>!common.find(p=>k(p)===k(q))).map(q=>q.name);
+  if(diffPorts.length) return {equivalent:false, reason:"ขาเข้าไม่ตรงกัน", port_differences:diffPorts, hint:"ตั้งชื่อ/ความกว้างขาเข้าให้ตรงกันก่อน แล้วเทียบอีกครั้ง"};
+  if(!common.length) return {equivalent:false, reason:"ไม่มีขาออกชื่อเดียวกันให้เทียบ", only_in_a:onlyA, only_in_b:onlyB};
+  const seq=eqHasFF(A) || eqHasFF(B), diffs=[];
+  let method;
+  if(!seq){
+    const total=ins.reduce((n,p)=>n+p.width,0), V=[];
+    if(total<=12){ for(let r=0;r<(1<<total);r++){ let s=0; const v={}; ins.forEach(p=>{ v[p.name]=(r>>s)&((1<<p.width)-1); s+=p.width; }); V.push(v); } method=`ทุกแถว (${V.length} แถว)`; }
+    else { const rnd=eqRng(opts.seed||7);
+      V.push(Object.fromEntries(ins.map(p=>[p.name,0])), Object.fromEntries(ins.map(p=>[p.name,2**p.width-1])));
+      for(let i=0;i<1000;i++) V.push(Object.fromEntries(ins.map(p=>[p.name, p.width>=31 ? rnd() : rnd()%(2**p.width)])));
+      method=`${V.length} ชุดอินพุต (มุม + สุ่ม) จาก ${total} บิต`; }
+    const fa=flattenSchematic(A).sch, fb=flattenSchematic(B).sch, sa=probeStruct(fa), sb=probeStruct(fb);
+    for(const v of V){ const oa=mcpEvalOuts(A, fa, sa, v), ob=mcpEvalOuts(B, fb, sb, v);
+      common.forEach(p=>{ const x=eqNum(oa[p.name]), y=eqNum(ob[Object.keys(ob).find(n=>n.toLowerCase()===k(p))]);
+        if(x!==y && diffs.length<20) diffs.push({inputs:v, output:p.name, a:isNaN(x)?"undriven":x, b:isNaN(y)?"undriven":y}); });
+      if(diffs.length>=20) break; }
+  } else {
+    const cycles=Math.max(4, Math.min(512, +opts.cycles||64)), rnd=eqRng(opts.seed||11);
+    const drive=ins.filter(p=>!EQ_CLOCK.test(p.name)), stim=[];
+    for(let i=0;i<cycles;i++) stim.push(Object.fromEntries(drive.map(p=>{
+      // reset-like inputs mostly off, so the circuit gets to run between resets
+      const rare=/^(rst|reset|clr|clear|load|ld)$/i.test(p.name); return [p.name, rare ? (rnd()%9===0?1:0) : rnd()%(2**p.width)]; })));
+    const run=S=>{ const INs=S.components.filter(c=>c.type==="IN"), id=n=>(INs.find(c=>String(c.params.name).toLowerCase()===n.toLowerCase())||{}).id;
+      const holdAt=i=>{ const o={}; Object.entries(stim[i]||stim[stim.length-1]).forEach(([n,v])=>{ const c=id(n); if(c) o[c]=v; }); return o; };
+      const j=clientSeqSim(S, cycles, {holdAt, hold:holdAt(0)}); if(!j.ok) throw new Error(S.name+": "+(j.reason||"จำลองไม่ได้")); return j.sequence; };
+    let qa, qb; try{ qa=run(A); qb=run(B); }catch(e){ return {equivalent:false, reason:e.message}; }
+    const at=(sq,row,n)=>{ const i=sq.outputs.findIndex(x=>x.toLowerCase()===n.toLowerCase()); return i<0?NaN:(row[4]?row[4][i]:row[3][i]); };
+    for(let i=0;i<Math.min(qa.rows.length, qb.rows.length) && diffs.length<20;i++)
+      common.forEach(p=>{ const x=at(qa, qa.rows[i], p.name), y=at(qb, qb.rows[i], p.name);
+        if(x!==y && diffs.length<20) diffs.push({cycle:i, inputs:stim[i], output:p.name, a:x, b:y}); });
+    method=`${cycles} clock จาก reset ด้วยอินพุตสุ่มชุดเดียวกัน`;
+  }
+  return {equivalent:!diffs.length, method, compared_outputs:common.map(p=>p.name),
+    only_in_a:onlyA.length?onlyA:undefined, only_in_b:onlyB.length?onlyB:undefined, differences:diffs.length?diffs:undefined};
+}
+/* a sheet against a formula / table / part / the request: the acceptance-test checks, run once */
+function eqAgainst(sch, spec){
+  const keep={spec:sch.spec, specResult:sch.specResult, verified:sch.verified, specSource:sch.specSource, specSig:sch.specSig};
+  try{ sch.spec=spec; delete sch.specResult; const r=specCheck(sch) || {pass:false, reason:"ตรวจไม่ได้"};
+    return {equivalent:r.pass===true, method:r.checked, reason:r.reason, differences:(r.mismatches||[]).length?r.mismatches:undefined, total_differences:r.total_mismatches||undefined}; }
+  finally{ Object.entries(keep).forEach(([k,v])=>{ if(v===undefined) delete sch[k]; else sch[k]=v; }); }
+}
+MCP_OPS.compare_sheets = a=>{
+  const A=mcpSheet(a.sheet);
+  let r, what;
+  if(a.with){ const B=mcpSheet(a.with); if(B.id===A.id) mcpFail("compare a sheet with ANOTHER sheet"); r=eqSheets(A, B, a); what="sheet "+B.name; }
+  else if(a.formula!=null){ r=eqAgainst(A, {kind:"formula", text:Array.isArray(a.formula)?a.formula.join("; "):String(a.formula)}); what="formula"; }
+  else if(a.table){ const t=a.table; r=eqAgainst(A, t.ones ? {kind:"table", inputs:t.inputs, cols:ttOnesToCols((t.inputs||[]).length, t.ones)} : {kind:"table", inputs:t.inputs, cols:t.columns||t}); what="table"; }
+  else if(a.part){ if(!PARTS[a.part]) mcpFail(`unknown part '${a.part}'`, "list_parts shows them"); r=eqAgainst(A, {kind:"part", part:a.part, params:partParams(a.part, a.params||{})}); what="part "+a.part; }
+  else if(a.request){ const o=oracleDerive(a.request); if(!o.ok) mcpFail("the request gives nothing to compare with: "+o.reason); r=eqAgainst(A, o.spec); what=o.what; }
+  else mcpFail("compare with what? with:<sheet>, formula, table, part or request");
+  return Object.assign({sheet:A.name, against:what}, r);
+};
+/* Tools ▸ เทียบวงจร: pick two sheets (or a sheet and a library part) */
+GENERATORS.push({id:"equiv", icon:"⚖", name:"เทียบวงจรสองแผ่น", desc:"ตรวจว่าวงจรสองแผ่นทำงานเหมือนกันไหม — เช่น วงจรของนักศึกษา เทียบกับวงจรอ้างอิง", run:()=>{
+  const S=Object.values(state.project.schematics), opt=sel=>S.map(s=>`<option value="${esc(s.id)}"${s.id===sel?" selected":""}>${esc(s.name)}</option>`).join("");
+  const cur=(activeSch()||{}).id, other=(S.find(s=>s.id!==cur)||{}).id;
+  const m=uxModal("⚖ เทียบวงจร", `<p class="muted" style="margin:0 0 10px">ป้อนอินพุตชุดเดียวกันให้ทั้งสองแผ่น แล้วเทียบขาออกที่ชื่อเดียวกัน (มี flip-flop = เทียบทีละ clock)</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="eqA">${opt(cur)}</select> เทียบกับ
+      <select id="eqB">${opt(other)}<option value="part:">— ชิ้นส่วนมาตรฐาน —</option>${Object.keys(PARTS).map(k=>`<option value="part:${k}">${esc(PARTS[k].label)}</option>`).join("")}</select>
+      <button class="btn" id="eqGo">เทียบ</button></div><div id="eqOut" style="margin-top:12px"></div>`, {width:640});
+  m.querySelector("#eqGo").onclick=()=>{ const out=m.querySelector("#eqOut"), a=state.project.schematics[m.querySelector("#eqA").value], bv=m.querySelector("#eqB").value;
+    let r; try{ r = bv.startsWith("part:") ? (bv.length>5 ? Object.assign({against:PARTS[bv.slice(5)].label}, eqAgainst(a, {kind:"part", part:bv.slice(5), params:partParams(bv.slice(5), {})})) : null)
+      : eqSheets(a, state.project.schematics[bv]); }catch(e){ r={equivalent:false, reason:e.message}; }
+    if(!r){ out.textContent="เลือกชิ้นส่วนก่อน"; return; }
+    const d=(r.differences||[]).slice(0,8).map(x=>`<li>${x.cycle!=null?`clock ${x.cycle}: `:""}${esc(x.output)} — ${esc(JSON.stringify(x.inputs||x.inputs===0?x.inputs:x.row))}: ได้ ${esc(String(x.a!=null?x.a:x.got))} กับ ${esc(String(x.b!=null?x.b:x.want))}</li>`).join("");
+    out.innerHTML=r.equivalent ? `<b style="color:var(--ok,#16a34a)">✓ ทำงานเหมือนกัน</b> <span class="muted">(${esc(r.method||"")})</span>`
+      : `<b style="color:var(--err,#dc2626)">✗ ไม่เหมือนกัน</b> ${esc(r.reason||"")}${(r.port_differences||[]).map(x=>`<div class="muted">• ${esc(x)}</div>`).join("")}${d?`<ul>${d}</ul>`:""}`; };
+}});
+{
+  const last=[...document.querySelectorAll('#menu [data-gen]')].pop();
+  if(last && !document.querySelector('#menu [data-gen="equiv"]')){
+    last.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="equiv" title="ตรวจว่าวงจรสองแผ่นทำงานเหมือนกันไหม"><span class="gi">⚖</span>เทียบวงจรสองแผ่น…</button>`);
+    document.querySelector('#menu [data-gen="equiv"]').addEventListener("click", ()=>runGenerator("equiv"));
+  }
+}
+
+/* ===== 41. The board doctor fixes what it can, and lab pin presets ==================================
+   The doctor (29) found segments written active-high for the common-anode display and a 7-seg with no
+   digit enabled, then only said what to do. Now each of those has "🔧 แก้ให้" (and MCP board_check
+   {fix:true}): a NOT in front of every a–g OUTPUT, an OUTPUT an0 driven by GND on "หลัก 0", and the pins
+   guessed for ports that have none. One undo step each, through MCP apply.
+   pin_preset {lab} maps ports by their role the way the lab sheet wires the board — lab 6: SW7–4 = tens
+   of yy, SW3–0 = ones, the centre button = start/stop, LED0 = error; lab 7 / 8: SW15–0 = four BCD
+   digits — plus a–g / an / clk; what it cannot place is left for auto_pins. */
+function bfixSegOuts(sch){
+  return uxPortBits(sch).map(b=>Object.assign({t:uxPinTarget(b, sch)}, b)).filter(b=>b.dir==="out" && /^seg:[a-g]$/.test(b.t||""));
+}
+/* the fixes: {id, label, run(sch) → what was done} */
+const BFIX={
+  seg:{label:"ใส่ NOT ที่ขา a–g", run:sch=>{
+    const segs=bfixSegOuts(sch), steps=[], done=[];
+    segs.forEach(b=>{ const o=sch.components.find(c=>c.type==="OUT" && sanId(c.params.name)===b.port);
+      if(!o || (o.params.width||1)>1) return;                         // a bus OUTPUT: one bit cannot be inverted here
+      const w=sch.wires.find(x=>x.to.cid===o.id); if(!w) return;
+      let d=null; try{ d=netDriverPort(sch, w); }catch(_){} const dc=d&&comp(d.cid, sch); if(!dc) return;
+      const nm="inv_"+sanId(o.params.name), drv=mcpName(dc)+"."+d.pid;
+      steps.push({op:"disconnect", from:drv, to:o.params.name}, {op:"add_component", type:"NOT", name:nm},
+        {op:"connect", from:drv, to:nm}, {op:"connect", from:nm, to:o.params.name});
+      done.push(o.params.name); });
+    if(!steps.length) mcpFail("no single-bit a–g OUTPUT with a driver to invert", "for a bus OUTPUT use the BCD → 7-segment part with active_low");
+    MCP_OPS.apply({sheet:sch.name, steps});
+    return "กลับค่า "+done.join(", ")+" ด้วย NOT (active-low)"; }},
+  an:{label:"เพิ่ม an0 ต่อ GND", run:sch=>{
+    const nm=sch.components.some(c=>(c.type==="IN"||c.type==="OUT") && String(c.params.name).toLowerCase()==="an0") ? "an0_on" : "an0";
+    MCP_OPS.apply({sheet:sch.name, steps:[{op:"add_component", type:"OUT", name:nm}, {op:"add_component", type:"GND", name:"gnd_"+nm}, {op:"connect", from:"gnd_"+nm, to:nm}]});
+    sch.pinmap=Object.assign({}, sch.pinmap||{}, {[sanId(nm)]:"an:0"}); mcpCommit(sch);
+    return `เพิ่ม OUTPUT ${nm} = 0 ที่ขา “หลัก 0” (เปิดหลักขวาสุด)`; }},
+  pins:{label:"เดาขาให้", run:sch=>{ const r=MCP_OPS.auto_pins({sheet:sch.name}); return "เลือกขาให้แล้ว"+(r.missing&&r.missing.length?` (ยังเหลือ ${r.missing.join(", ")})`:""); }},
+};
+/* which finding each fix answers */
+function bfixOf(f){
+  if(/active-high/.test(f.title)) return "seg";
+  if(/ไม่ได้กำหนดขาเลือกหลัก/.test(f.title)) return "an";
+  if(/ยังไม่ได้เลือกขา/.test(f.title)) return "pins";
+  return null;
+}
+{
+  const _bd=boardDoctor;
+  boardDoctor=function(){ const F=_bd.apply(this, arguments); F.forEach(f=>{ const k=bfixOf(f); if(k) f.fixable=k; }); return F; };
+  const _open=openBoardDoctor;
+  openBoardDoctor=function(){
+    const F=_open.apply(this, arguments), m=[...document.querySelectorAll(".modal-bg")].pop(); if(!m) return F;
+    m.querySelectorAll(".bd-f").forEach((el,i)=>{ const f=F[i]; if(!f || !f.fixable) return;
+      const b=document.createElement("button"); b.className="btn"; b.textContent="🔧 "+BFIX[f.fixable].label; b.style.marginTop="6px";
+      b.onclick=()=>{ const sch=brdSheet(); try{ const said=BFIX[f.fixable].run(sch); toast("แก้แล้ว: "+said, "ok", 5000); }catch(e){ toast("แก้ไม่ได้: "+e.message, "warn", 6000); return; }
+        if(typeof m.close==="function") m.close(); else m.remove(); try{ brdRefresh(); }catch(_){} openBoardDoctor(); };
+      el.appendChild(b); });
+    return F;
+  };
+}
+{
+  const _bc=MCP_OPS.board_check;
+  MCP_OPS.board_check=a=>{
+    if(!a.fix) { const r=_bc(a); const F=boardDoctor(a.sheet?mcpSheet(a.sheet):brdSheet()); r.fixable=F.filter(f=>f.fixable).map(f=>({title:f.title, fix:f.fixable})); return r; }
+    const sch=a.sheet ? mcpSheet(a.sheet) : brdSheet(), fixed=[], failed=[];
+    ["pins","seg","an"].forEach(k=>{ if(!boardDoctor(sch).some(f=>f.fixable===k)) return;
+      try{ fixed.push(BFIX[k].run(sch)); }catch(e){ failed.push(k+": "+e.message); } });
+    const r=_bc({sheet:sch.name});
+    return Object.assign(r, {fixed, failed:failed.length?failed:undefined});
+  };
+}
+
+/* ---- pin presets per lab ---- */
+const LAB_PIN_PRESETS={
+  "6":{title:"แลป 6 ตัวนับ 00–yy", rules:[
+    {re:/tens|yy_?t|_hi$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|yy_?[ou]|_lo$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/btn|start|stop|^ss$|run|toggle/i, dir:"in", t:()=>"pb:4"}, {re:/err/i, dir:"out", t:()=>"led:0"},
+    {re:/^(running|run_led|led_run)$/i, dir:"out", t:()=>"led:1"}]},
+  "7":{title:"แลป 7 ตัวจับเวลา mm.ss", rules:[
+    {re:/min_?hi|min_?tens|m_?hi|^mt$/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/min_?lo|min_?ones|m_?lo|^mo$/i, dir:"in", t:i=>"sw:"+(8+i)},
+    {re:/sec_?hi|sec_?tens|s_?hi|^st$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/sec_?lo|sec_?ones|s_?lo|^so$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/start|stop|btn|^ss$|run/i, dir:"in", t:()=>"pb:4"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:1"},
+    {re:/err/i, dir:"out", t:()=>"led:0"}]},
+  "8":{title:"แลป 8 ตัวเลข 4 หลักจาก SW15–0", rules:[
+    {re:/thousands|d3|dig3/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/hundreds|d2|dig2/i, dir:"in", t:i=>"sw:"+(8+i)},
+    {re:/tens|d1|dig1/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|d0|dig0/i, dir:"in", t:i=>"sw:"+i}]},
+};
+const PIN_COMMON=[{re:/^(seg_?)?([a-g])$/i, dir:"out", t:(i,m)=>"seg:"+m[2].toLowerCase()}, {re:/^(an|dig|digit)_?([0-3])?$/i, dir:"out", t:(i,m)=>"an:"+(m[2]!=null?m[2]:i)},
+  {re:/^(dp|seg_?dp)$/i, dir:"out", t:()=>"seg:dp"}, {re:/^(clk|clock|clk50m?)$/i, dir:"in", t:()=>"clk"}];
+function pinPreset(sch, lab){
+  const P=LAB_PIN_PRESETS[String(lab).replace(/\D/g,"")]; if(!P) mcpFail(`no pin preset for lab '${lab}'`, "presets: "+Object.keys(LAB_PIN_PRESETS).map(k=>"lab "+k).join(", ")+" — auto_pins guesses any design");
+  const pm=Object.assign({}, sch.pinmap||{}), set=[], left=[], used=new Set();
+  uxPortBits(sch).forEach(b=>{
+    // the port's base name and this bit's index: a bus bit, or the number at the end of a per-bit port
+    let base=b.port, i=b.bit; if(i==null){ const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(b.port); if(m && !/^(an|dig|digit)$/i.test(m[1])){ base=m[1]; i=+m[2]; } else i=0; }
+    const rule=[...P.rules, ...PIN_COMMON].find(r=>r.dir===b.dir && r.re.test(base));
+    if(!rule){ left.push(b.key); return; }
+    const t=rule.t(i, rule.re.exec(base)); if(used.has(t)){ left.push(b.key+" (ขา "+t+" ถูกใช้แล้ว)"); return; }
+    used.add(t); pm[b.key]=t; set.push(`${b.key} → ${t}`); });
+  return {pm, set, left, title:P.title};
+}
+MCP_OPS.pin_preset = a=>{
+  const sch=mcpUse(a.sheet); const r=pinPreset(sch, a.lab);
+  if(a.apply!==false){ mcpBeforeChange("ขาตามแลป"); sch.pinmap=r.pm; mcpCommit(sch); }
+  return {sheet:sch.name, preset:r.title, assigned:r.set, not_placed:r.left,
+    note:r.left.length?"auto_pins guesses the rest (or set_pins)":"every port has a pin — board_check to confirm"};
+};
+
 </script>
 <!-- UX-LAYER:END -->
 </body>
