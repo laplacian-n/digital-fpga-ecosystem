@@ -56,3 +56,23 @@ test("build mode: 'full adder' comes from the part library, no model call", asyn
   expect(await page.evaluate(() => sheetVerified(activeSch()))).toBe(true);
   expect(page.errors).toEqual([]);
 });
+
+test("the app reads equations and conditions in the request itself (build mode, no model); a spec waits for its circuit", async ({ page }) => {
+  await openEditor(page);
+  await page.evaluate(() => { AICHAT.mode = "build"; if (!AICHAT.open) toggleAiChat(); });
+  await page.fill("#acInput", "สร้าง y = (a และ b) หรือ (c และ ไม่ d) ลงแผ่น fx");
+  await page.evaluate(() => aiSend());
+  await expect(page.locator("#acLog")).toContainText("อ่านจากคำขอ");
+  await page.fill("#acInput", "ทำ prime detector 3 บิต x2 x1 x0 ลงแผ่น prime3");
+  await page.evaluate(() => aiSend());
+  await expect(page.locator("#acLog")).toContainText("จำนวนเฉพาะ");
+  const r = await page.evaluate(() => {
+    const col = n => clientCombSim(mcpSheet(n)).truth_table.rows.map(x => x[1][0]).join("");
+    const sp = MCP_OPS.set_spec({ sheet: "later", formula: "y = a ^ b" });
+    return { fx: col("fx") === formulaTable("y = (a & b) | (c & ~d)").cols.y, fxv: sheetVerified(mcpSheet("fx")),
+      prime: col("prime3"), pv: sheetVerified(mcpSheet("prime3")), pending: [sp.result.pass, sp.result.pending, mcpSheet("later").specResult.summary] };
+  });
+  expect(r).toMatchObject({ fx: true, fxv: true, prime: "00110101", pv: true });
+  expect(r.pending).toEqual([null, true, "⏳ รอวงจร"]);
+  expect(page.errors).toEqual([]);
+});

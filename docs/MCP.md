@@ -96,6 +96,10 @@ Claude ──stdio──▶ mcp_server.py ──HTTP + token──▶ launcher (
   This works in `build_circuit`, `set_spec` and `verify_truth_table`, and is safer than typing a 0/1 column.
 - **Rebuilding:** `replace:true` rebuilds a sheet that already has parts, instead of making a new one.
 - **Spec before the sheet:** `set_spec` on a sheet that doesn't exist yet makes it empty. Building into it then answers `spec_check`.
+- **Requests the app reads itself:** the in-app AI (agent and build mode) reads some requests itself before asking the model:
+  equations written in the request (Thai or English operators), and conditions like "1 when the 3-bit input is prime /
+  even / > 9 / divisible by 3". It builds those directly and checks them on every row. A model run that can only check against its own table is stopped
+  after two such checks, and says so.
 - **A check that proves nothing:** a check against the very table a sheet was built from returns `pass: null`.
 - **`save_module`:** refuses a sheet that is not verified, unless you pass `force: true`.
 - **Calls that only wait** (`approval_status`, `board_status`, `ai_chat_status`) run beside the others. They
