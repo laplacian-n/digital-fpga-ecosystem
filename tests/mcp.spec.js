@@ -1,5 +1,5 @@
 // End-to-end: MCP client (this test) → launcher/mcp_server.py (stdio) → launcher relay → live editor page.
-const { test, expect } = require("@playwright/test");
+const { test, expect, chromium } = require("@playwright/test");
 const { spawn } = require("child_process");
 const fs = require("fs"), os = require("os"), path = require("path");
 
@@ -32,7 +32,8 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ browser: b }) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "fe-mcp-"));
   env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), APPDATA: path.join(home, "AppData"),
-          NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost" };
+          NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost",
+          FE_BROWSER: chromium.executablePath() };        // the report PDF is printed with it (Edge on Windows)
   // no network in tests: the update check is off (about then says so instead of asking GitHub)
   const cfgDir = path.join(home, ".config", "fpga-ecosystem"); fs.mkdirSync(cfgDir, { recursive: true });
   fs.writeFileSync(path.join(cfgDir, "config.json"), JSON.stringify({ update: { auto_check: false } }));
@@ -571,5 +572,19 @@ test("batch: several edits are one undo step, and a failing op undoes the ones b
   expect(await page.evaluate(() => activeSch().components.length)).toBe(n0 + 2);
   await mcp.tool("undo");
   expect(await page.evaluate(() => activeSch().components.length)).toBe(n0);
+  expect(page.errors).toEqual([]);
+});
+
+test("make_report writes the PDF next to the HTML, with a timing diagram for a counter", async () => {
+  await mcp.tool("new_project", { name: "rep" });
+  await mcp.tool("build_part", { kind: "mod_counter", n: 4, sheet: "cnt" });
+  await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "cnt"); state.project.topId = s.id; });
+  const r = await mcp.tool("make_report", {});
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.pdf, r.text + JSON.stringify(r.data.pdf_error)).toMatch(/rep_report\.pdf$/);
+  const pdf = fs.readFileSync(r.data.pdf);
+  expect(pdf.slice(0, 5).toString()).toBe("%PDF-");
+  expect(pdf.length).toBeGreaterThan(5000);
+  expect(fs.readFileSync(r.data.saved, "utf8")).toContain("ไทมิ่งไดอะแกรม");
   expect(page.errors).toEqual([]);
 });

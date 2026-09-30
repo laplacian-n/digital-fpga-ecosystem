@@ -157,9 +157,10 @@ TOOLS = [
        "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"}},
       ["fsm"], timeout=90),
     T("make_report", "Write the lab report into the project folder (<project>_report.html): every sheet (top first, then its "
-      "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks, state diagram, acceptance "
-      "test, board pin table, VHDL. The user prints it to PDF.",
-      {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}}, timeout=90),
+      "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks with a timing diagram, state "
+      "diagram, acceptance test, board pin table, VHDL — and <project>_report.pdf next to it (printed by headless Edge / "
+      "Chrome; pdf:false skips it).",
+      {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}, "pdf": {"type": "boolean"}}, timeout=180),
     T("board_check", "Before building the .bit: what will go wrong on the real EDGE board — ports without a pin, two ports "
       "on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit "
       "enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one "

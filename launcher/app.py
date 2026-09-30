@@ -203,6 +203,8 @@ def detect_llama() -> tuple[str, str]:
 
 def find_browser() -> str:
     """Edge ships with every Windows 10/11, so --app windows work out of the box."""
+    if os.environ.get("FE_BROWSER") and Path(os.environ["FE_BROWSER"]).is_file():
+        return os.environ["FE_BROWSER"]
     if IS_WIN:
         pf = [os.environ.get(k) for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
         rel = [r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"]
@@ -602,6 +604,31 @@ def list_projects() -> list:
                     "files": [{"name": f.name, "size": f.stat().st_size} for f in files[:50]]})
     out.sort(key=lambda p: p["mtime"], reverse=True)
     return out
+
+
+def html_to_pdf(html: Path) -> dict:
+    """print a report page to PDF with the browser the app already uses (headless Edge / Chrome)"""
+    br = find_browser()
+    if not br:
+        return {"ok": False, "error": "ไม่พบ Edge / Chrome สำหรับพิมพ์ PDF — เปิดรายงาน .html แล้วกดพิมพ์เป็น PDF เองได้"}
+    pdf = html.with_suffix(".pdf")
+    try:
+        pdf.unlink()
+    except OSError:
+        pass
+    import tempfile
+    with tempfile.TemporaryDirectory() as prof:            # its own profile: an open Edge window does not block it
+        args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer", f"--user-data-dir={prof}",
+                f"--print-to-pdf={pdf}", html.resolve().as_uri()]
+        if hasattr(os, "geteuid") and os.geteuid() == 0:     # Chromium refuses to start as root otherwise (Linux only)
+            args.insert(1, "--no-sandbox")
+        try:
+            subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
+        except Exception as e:
+            return {"ok": False, "error": f"พิมพ์ PDF ไม่ได้: {e}"}
+    if not pdf.is_file() or pdf.stat().st_size < 500:
+        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF"}
+    return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size}
 
 
 def delete_project(name: str) -> dict:
@@ -1273,6 +1300,8 @@ def make_handler():
                 rel = data.get("path") or ""
                 reveal(inside(projects_dir(), rel) if rel else projects_dir())
                 return self._out(200, {"ok": True})
+            if path == "/api/report/pdf":
+                return self._out(200, html_to_pdf(inside(projects_dir(), str(data.get("path") or ""))))
             if path == "/api/projects/delete":
                 return self._out(200, delete_project(str(data.get("name") or "")))
             if path == "/api/projects/rename":
