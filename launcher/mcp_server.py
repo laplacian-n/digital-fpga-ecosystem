@@ -279,7 +279,8 @@ TOOLS = [
     # --- verification
     T("check", "Design-rule check (what Vivado would reject + common mistakes): errors and warnings with the "
       "component and a suggested fix.", {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
-    T("simulate", "Simulate a sheet. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) "
+    T("simulate", "Simulate a sheet — ports as numbers too (`table` / `values`: a bus or a numbered group q0..q3 is one "
+      "value), and for flip-flops a text `waveform`. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) "
       "up to 10 input bits; for more, or to check chosen rows, give `vectors` [{input: value, …}, …] (≤256, inputs "
       "left out are 0, bus values as in probe). "
       "Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0), "
@@ -293,8 +294,9 @@ TOOLS = [
       {"sheet": SHEET, "expected": {"type": "object"}, "formula": {"type": ["string", "array"], "items": {"type": "string"}}}),
     T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong. "
       "A bus INPUT takes its whole value: 5, \"0101\" (binary as wide as the bus), \"0b0101\" or \"0x5\"; "
-      "a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated.",
-      {"sheet": SHEET, "inputs": INPUTS}),
+      "a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated. "
+      "inside:'u' (or a path 'u/v') gives the nets and ports INSIDE that block instead, with its inputs from the whole circuit.",
+      {"sheet": SHEET, "inputs": INPUTS, "inside": {"type": "string", "description": "a block on the sheet (label / name), or a path u/v"}}),
     T("explain_simulation", "Likely reasons a simulation doesn't behave as expected (clock not reaching FFs, reset stuck, "
       "gated clock, floating pins, multi-driver, constant outputs, unused inputs, divider chains).", {"sheet": SHEET}),
     # --- board
