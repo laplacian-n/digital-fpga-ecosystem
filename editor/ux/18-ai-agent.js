@@ -36,7 +36,8 @@ function aiagSystemPrompt(){
 "   proves nothing). Look at `recognized` in the answer. Never say it works without that.",
 "4. If a tool returns an error, read its hint and correct the call. Do not repeat the same failing call.",
 "   A wrong circuit: rebuild it ON THE SAME SHEET (same sheet name, replace:true) — never a new sheet per try.",
-"   verify / check_spec answering pass:null or independent:false checked nothing: check against the request instead.",
+"   verify / check_spec answering pass:null or independent:false checked nothing: check against the request instead —",
+"   and if there is nothing else to check against, STOP and answer, saying it is checked only against your own table.",
 "5. Finish with a short answer IN THAI: what you did and what the check / simulation showed.",
 "",
 "Be quick: call SEVERAL tools in one turn when they do not depend on each other (e.g. every add_component at once),",
@@ -96,6 +97,13 @@ async function aiagCall(tool, rawArgs){
   }catch(e){ return {ok:false, error:String(e&&e.message||e)+(e&&e.hint?"\nhint: "+e.hint:"")}; }
   finally{ MCPB.busy=false; }
 }
+/* the answer when the run is stopped for looping: what was built, and how far it was checked */
+function aiagWrapUp(run){
+  const tools=run.steps.filter(s=>s.kind==="tool" && s.ok), last=[...tools].reverse().find(s=>/^build_/.test(s.tool));
+  const sim=[...tools].reverse().find(s=>s.tool==="simulate");
+  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+
+    (sim?`\nผลจำลอง: ${sim.summary||""}`:"")+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
+}
 /* a chat line that is NOT part of the conversation memory (the live status, each tool step) */
 function aiagLine(html, cls){
   const log=$("#acLog"); if(!log) return null;
@@ -125,8 +133,10 @@ async function aiAgentRun(msg){
     const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
-    let nudges=0, think=true, planned=false;
+    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity;
+    const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
     for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
+      if(i>=stopAt){ run.final=aiagWrapUp(run); break; }
       live(`กำลังคิด… (รอบ ${i+1})`);
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
@@ -160,7 +170,11 @@ async function aiAgentRun(msg){
           const t0=performance.now();
           const r=bad ? {ok:false, error:bad} : await aiagCall(tool, args);
           Object.keys(state.project.schematics).forEach(id=>{ if(!before.has(id)) made.add(id); });
-          const content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
+          let content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
+          if(r.ok && /^build_(circuit|part|fsm)$/.test(tool) && r.result && r.result.sheet){
+            const s=Object.values(state.project.schematics).find(x=>x.name===r.result.sheet), key=r.result.sheet+"|"+(s?sheetHash(s):"");
+            if(built.has(key)) content+="\n(system) This is exactly the circuit you had already built on that sheet — rebuilding changed nothing. Do not rebuild it again.";
+            built.add(key); }
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
@@ -170,15 +184,21 @@ async function aiAgentRun(msg){
           const on=(r.ok && r.result && r.result.sheet) || args.sheet || (activeSch()||{}).name;
           if(r.ok && AIAG_EDIT_OPS.has(tool) && on){ needCheck.add(on); needSim.add(on); }
           if(r.ok && tool==="check") needCheck.delete(on);
-          const circular=r.ok && r.result && (r.result.independent===false || (r.result.result&&r.result.result.independent===false));
+          const R=r.ok&&r.result||{}, circular=r.ok && (R.independent===false || R.pass===null || R.pending || (R.result&&(R.result.independent===false||R.result.pending)));
+          // a spec still waiting for its circuit (set first, as asked) is not a failed check
+          if(r.ok && (R.independent===false || (R.result&&R.result.independent===false) || (tool==="verify_truth_table" && R.pass===null))) circularN++;
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        // twice nothing independent to check against: say so and finish — do not loop until the step limit
+        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3;
+          run.steps.push({kind:"nudge", text:"no independent check possible — asked to finish"});
+          messages.push({role:"user", content:"(system) There is nothing independent to check this circuit against. Stop building and answer now in Thai: what you built, what the simulation shows, and that it was checked only against your own table / formula (the user should confirm it against the lab sheet)."}); }
         continue;
       }
       // it changed a circuit but did not check / simulate THAT sheet (it once verified an empty sheet
       // while the real one had a wrong carry): name the sheets and what is missing
-      if((needCheck.size || needSim.size) && nudges<2){
+      if((needCheck.size || needSim.size) && nudges<2 && stopAt===Infinity){
         nudges++; think=true;
         const miss=[...new Set([...needCheck, ...needSim])].map(n=>`'${n}' (${[needCheck.has(n)&&"check", needSim.has(n)&&"simulate or verify_truth_table"].filter(Boolean).join(" + ")})`).join(", ");
         run.steps.push({kind:"nudge", text:"not verified yet: "+miss});

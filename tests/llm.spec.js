@@ -55,6 +55,13 @@ class H(BaseHTTPRequestHandler):
                 "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
         with open(sys.argv[0] + ".sys", "a") as f: f.write(str(hash(msgs[0].get("content", ""))) + "\\n")
         ask = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+        if "LOOP" in ask:        # a model that only ever checks against itself: it must be stopped
+            lt = {"inputs": ["a", "b"], "outputs": ["y"], "columns": {"y": "0110"}}
+            if any("nothing independent" in str(m.get("content")) for m in msgs):
+                return self._j({"choices": [{"message": {"content": "สร้างแล้ว ตรวจได้แค่เทียบกับตารางของตัวเอง"}}]})
+            if len(done) % 2 == 0:
+                return call("build_circuit", {"name": "lp", "truth_table": lt}, "")
+            return call("verify_truth_table", {"sheet": "lp", "expected": lt["columns"]}, "")
         if "prime" in ask:       # the in-app test: wrong column, a circular "check", then a retry
             px = ["x2", "x1", "x0"]
             if len(done) == 0:
@@ -191,7 +198,7 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.final).toContain("fa3");
     expect(s.data.agent.final).toContain("ตรวจแล้วถูกต้อง");
     // the prime detector from the in-app test: a circular check says so, the retry replaces the sheet
-    await tool("ai_chat", { message: "ทำ prime detector 3 บิต x2 x1 x0 ลงแผ่น prime3", mode: "agent" });
+    await tool("ai_chat", { message: "ทำวงจร p ตามใบงานข้อ 3 ลงแผ่น prime3", mode: "agent" });
     s = await tool("ai_chat_status", { wait: 40 });
     const pt = s.data.agent.steps.filter(x => x.tool);
     expect(pt.map(x => x.tool)).toEqual(["build_circuit", "verify_truth_table", "build_circuit", "check", "simulate"]);
@@ -201,6 +208,19 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(sheets.filter(n => /^prime3/.test(n))).toEqual(["prime3"]);
     expect(await ed.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "prime3");
       const j = clientCombSim(s); return j.truth_table.rows.map(r => r[1][0]).join(""); })).toBe("00110101");
+    // an equation in the request: the app reads it itself — the model is never asked
+    await tool("ai_chat", { message: "สร้าง y = (a และ b) หรือ (c และ ไม่ d) ลงแผ่น fx", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 30 });
+    expect(s.data.agent.model_calls).toBe(0);
+    expect(s.data.agent.final).toContain("ไม่ผ่านการตีความของโมเดล");
+    expect(await ed.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "fx");
+      return clientCombSim(s).truth_table.rows.map(r => r[1][0]).join("") === formulaTable("y = (a & b) | (c & ~d)").cols.y && sheetVerified(s); })).toBe(true);
+    // a model that can only check against itself is stopped after the second circular check
+    await tool("ai_chat", { message: "ทำวงจร LOOP ลงแผ่น lp", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "nudge" && /no independent check/.test(x.text))).toBe(true);
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(8);
+    expect(s.data.agent.final).toContain("ตารางของตัวเอง");
     expect(ed.errors).toEqual([]);
   } finally { srv.kill(); }
 });
