@@ -30,3 +30,14 @@ test("simulate gives numbers per port and a waveform; probe sees the nets inside
   expect(r.inside.nets.every(n => n.value !== "unknown"), JSON.stringify(r.inside.nets.filter(n => n.value === "unknown"))).toBe(true);
   expect(r.bad).toMatch(/no block 'nope'/);
 });
+
+test("the sim page's table shows each bus as a number beside its bits", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 860 });
+  await openEditor(page);
+  await page.evaluate(() => { MCP_OPS.build_part({ kind: "adder", n: 4, bus: true, sheet: "ad" }); showSimPage("signals"); });
+  await expect(page.locator("#simBoardTable th.bus-num")).toHaveCount(3);          // a, b in · s out
+  const row = await page.evaluate(() => { const t = document.querySelector("#simBoardTable table"), h = [...t.rows[0].cells].map(c => c.childNodes[0].textContent.trim());
+    const r = [...t.rows].slice(1).find(tr => { const c = [...tr.cells].map(x => x.textContent); return c[h.indexOf("a")] === "5" && c[h.indexOf("b")] === "3" && c[h.indexOf("cin")] === "0"; });
+    return r ? Object.fromEntries(h.map((k, i) => [k, r.cells[i].textContent])) : null; });
+  expect(row && row.s).toBe("8");
+});

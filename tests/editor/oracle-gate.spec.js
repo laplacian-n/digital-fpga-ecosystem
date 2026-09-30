@@ -39,3 +39,18 @@ test("derive_spec: request → spec; a wrong circuit built from its own table fa
   expect([r.fah, r.fao]).toEqual([false, true]);
   expect(r.none).toBe(false);
 });
+
+test("a formula spec on per-bit ports: a0..a3 is the number a, s0..s3 the number s", async ({ page }) => {
+  await openEditor(page);
+  const r = await page.evaluate(() => {
+    MCP_OPS.build_part({ kind: "adder", n: 4, sheet: "bitadd" });
+    const ok = MCP_OPS.set_spec({ sheet: "bitadd", formula: "{cout,s} = a + b + cin" }).result;
+    const bad = MCP_OPS.set_spec({ sheet: "bitadd", formula: "{cout,s} = a + b" }).result;       // forgot cin: must fail
+    const bit = MCP_OPS.set_spec({ sheet: "bitadd", formula: "s0 = a0 ^ b0 ^ cin" }).result;       // one bit by its own name
+    return { ok: ok.pass, bad: bad.pass, badN: bad.total_mismatches, bit: bit.pass };
+  });
+  expect(r.ok).toBe(true);
+  expect(r.bad).toBe(false);
+  expect(r.badN).toBeGreaterThan(0);
+  expect(r.bit).toBe(true);
+});

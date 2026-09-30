@@ -48,6 +48,10 @@ function specCheck(sch){
 function specFormulaMismatches(text, tt){
   const group=names=>{ const P={}; names.forEach((n,i)=>{ const m=/^(.*)\[(\d+)\]$/.exec(n), base=(m?m[1]:n), k=base.toLowerCase();
       (P[k]=P[k]||{name:base, bits:[]}).bits.push({i, bit:m?+m[2]:0, col:n}); });
+    // per-bit ports a0..a3 are also the number a (when no port is called a): "{cout,s} = a + b + cin" on a0..a3, s0..s3
+    const num={}; names.forEach((n,i)=>{ const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(n); if(m) (num[m[1].toLowerCase()]=num[m[1].toLowerCase()]||{name:m[1], bits:[]}).bits.push({i, bit:+m[2], col:n}); });
+    Object.entries(num).forEach(([k,g])=>{ if(P[k] || g.bits.length<2) return; const b=g.bits.map(x=>x.bit).sort((x,y)=>x-y);
+      if(b.every((v,j)=>v===j)) P[k]=g; });
     Object.values(P).forEach(p=>p.width=Math.max(...p.bits.map(b=>b.bit))+1); return P; };
   const IN=group(tt.inputs), OUT=group(tt.outputs);
   const src=String(text).replace(/(\w+)\[\d+:\d+\]/g,"$1").replace(/(\w+)\[(\d+)\]/g,"$1__b$2");

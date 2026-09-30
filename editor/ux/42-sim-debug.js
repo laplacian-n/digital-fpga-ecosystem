@@ -93,3 +93,22 @@ function sdWaveform(rowsVals, G){
     } finally { Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved); }
   };
 }
+/* the sim page's table: one column per bit (each is a switch / LED) — plus each bus as a number */
+function sdBusCols(){
+  const tbl=document.querySelector("#simBoardTable table"), tt=typeof SIM_LAST_TT!=="undefined" ? SIM_LAST_TT : null;
+  if(!tbl || !tt || tbl.dataset.busCols) return;
+  const GI=sdGroups(tt.inputs).filter(g=>g.bits.length>1), GO=sdGroups(tt.outputs).filter(g=>g.bits.length>1);
+  if(!GI.length && !GO.length) return;
+  tbl.dataset.busCols="1";
+  const n=tt.inputs.length, rows=[...tbl.rows];
+  const G=[...GI.map(g=>({g, off:0, out:false})), ...GO.map(g=>({g, off:n, out:true}))];
+  G.forEach(({g,out})=>{ const th=document.createElement("th"); th.className="bus-num"+(out?" out":"");
+    th.innerHTML=`${esc(g.name)}<span class="bp">${out?"OUT":"IN"} · เลข</span>`; th.title=`${g.name} ${g.bits.length} บิตเป็นเลขฐานสิบ`; rows[0].appendChild(th); });
+  rows.slice(1).forEach(tr=>{ const cells=[...tr.cells];
+    G.forEach(({g,off,out})=>{ const td=document.createElement("td"); td.className="bus-num";
+      const v=sdVal(g, i=>+((cells[off+i]||{}).textContent)); td.textContent=isNaN(v)?"?":String(v); if(out) td.style.color="var(--ok)"; tr.appendChild(td); }); });
+}
+{
+  const host=document.querySelector("#simBoardTable");
+  if(host) new MutationObserver(()=>{ try{ sdBusCols(); }catch(_){} }).observe(host, {childList:true});
+}
