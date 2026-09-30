@@ -55,6 +55,9 @@ class H(BaseHTTPRequestHandler):
                 "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
         with open(sys.argv[0] + ".sys", "a") as f: f.write(str(hash(msgs[0].get("content", ""))) + "\\n")
         ask = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+        if "SLOW" in ask:        # a model that takes its time: stopped from outside, then resumed
+            import time; time.sleep(1.2)
+            return call("get_sheet", {"detail": "brief"}, "")
         if "GATE" in ask:        # the request's own spec (derived by the app) judges the circuit, and a pass ends the run
             tt = lambda col: {"name": "og", "truth_table": {"inputs": ["a", "b", "c"], "outputs": ["f"], "columns": {"f": col}}}
             if len(done) == 0:
@@ -243,7 +246,29 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "nudge" && /without a change/.test(x.text))).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(9);
     expect(s.data.agent.final).toContain("ไม่มีอะไรบนแผ่นเปลี่ยน");
+    // stopped from outside (it used to run on for 10 minutes), resumed with a step cap, still readable after a reload
+    await tool("ai_chat", { message: "SLOW ทำงานยาวๆ", mode: "agent" });
+    await ed.waitForTimeout(2000);
+    const stop = await tool("ai_chat_stop", {});
+    expect(stop.data.stopped, stop.text).toBe(true);
+    expect(stop.data.resumable).toBe(true);
+    s = await tool("ai_chat_status", { wait: 5 });
+    expect(s.data.agent.state).toBe("stopped");
+    await tool("ai_chat", { resume: true, max_steps: 2 });
+    s = await tool("ai_chat_status", { wait: 30 });
+    expect(s.data.agent.resumed_from).toBe(stop.data.run);
+    expect(s.data.agent.state).toBe("stopped");
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBe(2);
+    const lastId = s.data.agent.id;
     expect(ed.errors).toEqual([]);
+    await ed.reload();
+    await ed.waitForFunction(() => typeof MCPB === "object" && MCPB.on);
+    s = await tool("ai_chat_status", {});
+    expect(s.data.from).toContain("saved");
+    expect(s.data.agent.id).toBe(lastId);
+    expect(s.data.recent_runs.length).toBeGreaterThan(3);
+    s = await tool("ai_chat_status", { run_id: stop.data.run });
+    expect(s.data.agent.state).toBe("stopped");
   } finally { srv.kill(); }
 });
 

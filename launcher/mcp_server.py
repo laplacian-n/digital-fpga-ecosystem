@@ -350,13 +350,22 @@ TOOLS = [
       "sees it). mode: 'agent' = the local model works step by step with the editor's tools (a core set of these "
       "same tools); 'build' = the older one-shot circuit pipeline; 'qa' = questions. Returns at once — then "
       "ai_chat_status. Use it to test the app's AI feature and find what goes wrong.",
-      {"message": {"type": "string"}, "mode": {"type": "string", "enum": ["agent", "build", "qa"]}}, ["message"]),
+      {"message": {"type": "string"}, "mode": {"type": "string", "enum": ["agent", "build", "qa"]},
+       "max_steps": {"type": "integer", "minimum": 1, "maximum": 60, "description": "agent: model rounds for this run (default 24)"},
+       "budget_s": {"type": "integer", "minimum": 10, "description": "agent: after this many seconds it is told to answer (default 300)"},
+       "resume": {"type": "boolean", "description": "agent: continue the last run that stopped before answering (ai_chat_stop, "
+                  "the step limit or the time budget) from its conversation, instead of starting over; message not needed"},
+       "run_id": {"type": "integer", "description": "with resume: which run"}}),
     T("ai_chat_status", "Wait (≤`wait` s) for the chat to finish the message sent with ai_chat, then return what "
       "appeared in the chat and, for agent mode, the run: every step (the model's thinking, each tool call with its "
       "arguments and result or error, nudges), the final answer, model calls, tokens and time. detail:'full' "
       "includes the complete tool results and thinking.",
-      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}, "detail": {"type": "string", "enum": ["steps", "full"]}},
+      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}, "detail": {"type": "string", "enum": ["steps", "full"]},
+       "run_id": {"type": "integer", "description": "a finished run (ids in recent_runs) — the last 10 are kept across page reloads"}},
       timeout=55),
+    T("ai_chat_stop", "Stop the agent run in progress now: the model call in flight is aborted and no further tool runs. "
+      "The run can be continued later with ai_chat {resume:true}.",
+      {"reason": {"type": "string"}}, timeout=25),
     T("notify_user", "Show a short message to the user inside the editor.",
       {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
 ]

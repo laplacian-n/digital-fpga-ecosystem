@@ -17297,8 +17297,8 @@ function aiagSystemPrompt(){
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
 }
-async function aiagPost(url, body){
-  const r=await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{})});
+async function aiagPost(url, body, signal){
+  const r=await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{}), signal});
   return r.json();
 }
 async function aiagTools(){
@@ -17360,56 +17360,92 @@ function aiagWrapUp(run, why){
 }
 /* every sheet's content: a round that leaves it unchanged made no progress */
 function aiagFingerprint(){ try{ return Object.values(state.project.schematics).map(s=>s.id+":"+sheetHash(s)).join("|"); }catch(_){ return ""; } }
+/* stop the running agent now: the model call in flight is aborted, no further tool runs */
+function aiagStop(why){
+  const run=AIAG.cur; if(!run || run.state!=="running") return false;
+  run.cancel=true; run.cancelWhy=why||"สั่งหยุด"; try{ run.ctl && run.ctl.abort(); }catch(_){}
+  return true;
+}
+/* finished runs outlive a reload of the page: ai_chat_status can still read the answer */
+function aiagRunSummary(run, full){
+  return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
+    model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
+    resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined,
+    steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
+      : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
+      : {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms})};
+}
+function aiagRemember(run){
+  try{ const L=JSON.parse(localStorage.getItem("schstudio.agentRuns")||"[]").filter(x=>x.id!==run.id);
+    L.push(Object.assign(aiagRunSummary(run, false), {at:new Date().toISOString()}));
+    localStorage.setItem("schstudio.agentRuns", JSON.stringify(L.slice(-10))); }catch(_){}
+}
+function aiagStored(){ try{ return JSON.parse(localStorage.getItem("schstudio.agentRuns")||"[]"); }catch(_){ return []; } }
 /* a chat line that is NOT part of the conversation memory (the live status, each tool step) */
 function aiagLine(html, cls){
   const log=$("#acLog"); if(!log) return null;
   const d=document.createElement("div"); d.className="ac-msg ai ag "+(cls||""); d.innerHTML=html;
   log.appendChild(d); log.scrollTop=log.scrollHeight; return d;
 }
-async function aiAgentRun(msg){
+/* opts: maxSteps, budgetS (a ceiling for this run), resume (a run that stopped before answering: go on from
+   its conversation instead of starting over) */
+async function aiAgentRun(msg, opts){
+  opts=opts||{};
+  const prev=opts.resume||null;
   // earlier turns (not this message, which the caller already put in the log)
   const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
-  const run={id:++AIAG.seq, message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
-             model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0};
+  const maxSteps=Math.max(1, Math.min(60, +opts.maxSteps||AIAG_MAX_STEPS)), budgetS=Math.max(10, +opts.budgetS||AIAG_BUDGET_S);
+  const run={id:++AIAG.seq, message:prev?prev.message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
+             model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0, max_steps:maxSteps, budget_s:budgetS,
+             resumed_from:prev?prev.id:undefined, cancel:false, ctl:null};
+  if(prev) msg=prev.message;
   AIAG.cur=run; AIAG.runs.push(run); if(AIAG.runs.length>20) AIAG.runs.shift();
-  const status=aiagLine('<span class="ac-badge v">เอเจนต์</span> <span class="ag-live">กำลังคิด…</span>');
+  const status=aiagLine('<span class="ac-badge v">เอเจนต์</span> <span class="ag-live">กำลังคิด…</span> <button class="btn2 ag-stop" title="หยุดเอเจนต์ตอนนี้">⏹ หยุด</button>');
   const live=t=>{ const e=status&&status.querySelector(".ag-live"); if(e) e.textContent=t; };
+  const sb=status&&status.querySelector(".ag-stop"); if(sb) sb.onclick=()=>aiagStop("ผู้ใช้กดหยุด");
   try{
     await aiagTools();
+    if(prev) run.steps.push({kind:"resume", text:`continuing run ${prev.id} (${prev.steps.filter(x=>x.kind==="tool").length} tool steps so far)`});
     // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
     // alone that answers the request with no model round; otherwise the model gets told it exists
     let notes="";
-    if(typeof aiagFastPath==="function"){ live("สร้างจากคลังชิ้นส่วน…");
+    if(!prev && typeof aiagFastPath==="function"){ live("สร้างจากคลังชิ้นส่วน…");
       try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final){ run.final=fp.final; run.fastFinal=true; } else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
     // the acceptance test the request itself states, derived by code (36-oracle-gate): attached to the
     // sheet it builds, and a pass ends the run
-    run.touched=new Set();
-    if(!run.final && typeof oracleDerive==="function") try{ const o=oracleDerive(msg);
+    run.touched=new Set(prev&&prev.touched||[]); if(prev&&prev.oracle) run.oracle=prev.oracle;
+    if(!prev && !run.final && typeof oracleDerive==="function") try{ const o=oracleDerive(msg);
       if(o.ok){ run.oracle=o; run.steps.push({kind:"oracle", text:o.what});
         notes+=`\n\n(system) The app derived this request's acceptance test by code, independent of any circuit: ${o.what}.`
           +` Name the ports — inputs: ${o.ports.in.join(", ")}; outputs: ${o.ports.out.join(", ")}.`
           +" It is put on the sheet you build and checked automatically (spec_check in the answer); when it passes you are done."; } }catch(e){ console.warn("oracle", e); }
     // the course notes most related to the request go in up front (RAG); more via search_course
-    if(!run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
+    if(!prev && !run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
       const rj=await (await fetch("/api/rag/search?k=2&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
-      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,350)}`).join("\n");
+      if(rj.ok && rj.hits.length){ notes+="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,350)}`).join("\n");
         run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
-    const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
+    const messages=prev ? prev._messages.concat([{role:"user", content:"(system) You were stopped before you finished. Carry on from where you were — do not redo what is already built — and finish the request."}])
+      : [{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
+    run._messages=messages;
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
     let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0, gated=false;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
-    for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
+    for(let i=0; i<maxSteps && !run.final; i++){
+      if(run.cancel) break;
       if(i>=stopAt){ run.final=aiagWrapUp(run, stopWhy); break; }
-      if(stopAt===Infinity && (Date.now()-run.started)/1000>AIAG_BUDGET_S){ stopAt=i+2; stopWhy="time";
+      if(stopAt===Infinity && (Date.now()-run.started)/1000>budgetS){ stopAt=i+2; stopWhy="time";
         run.steps.push({kind:"nudge", text:"time budget used — asked to finish"});
         messages.push({role:"user", content:"(system) Time is up. Make no more changes: answer now in Thai with what is done, what is still missing, and what the user should do next."}); }
       const fp0=aiagFingerprint();
       live(`กำลังคิด… (รอบ ${i+1})`);
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
-      const j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
-        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}});
+      run.ctl=new AbortController();
+      let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
+        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}}, run.ctl.signal); }
+      catch(e){ if(run.cancel) break; throw e; }
+      if(run.cancel) break;
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
       if(j.restarted){ run.steps.push({kind:"restart", text:"the model server had stopped — restarted it and repeated the call"});
         aiagLine('<div class="ag-step bad"><span class="ag-tool">↻ โมเดลหยุดทำงาน</span><div class="ag-res">เริ่มใหม่ให้แล้ว ทำต่อจากเดิม</div></div>', "step"); }
@@ -17426,6 +17462,7 @@ async function aiAgentRun(msg){
       think=false;
       if(calls.length){
         for(const tc of calls){
+          if(run.cancel) break;
           const tool=tc.function.name; let args={}, bad=null;
           try{ args=typeof tc.function.arguments==="string" ? JSON.parse(tc.function.arguments||"{}") : (tc.function.arguments||{}); }
           catch(_){ bad="the arguments are not valid JSON: "+aiagClip(tc.function.arguments, 200); }
@@ -17495,10 +17532,14 @@ async function aiAgentRun(msg){
       run.final=(String(m.content||"").trim() || "(ไม่มีคำตอบ)");
       break;
     }
-    if(!run.final && !run.error) run.error=`หยุดที่ ${AIAG_MAX_STEPS} รอบ — งานนี้อาจใหญ่เกินไปสำหรับโมเดลในเครื่อง`;
+    if(run.cancel && !run.final){ run.error="หยุดแล้ว ("+(run.cancelWhy||"สั่งหยุด")+")"; run.stopped=true; }
+    if(!run.final && !run.error){ run.error=`หยุดที่ ${maxSteps} รอบ — งานนี้อาจใหญ่เกินไปสำหรับโมเดลในเครื่อง`; run.stopped=true; }
     if(run.final && typeof aiagVerdict==="function" && !run.fastFinal) run.final+=aiagVerdict(run);
   }catch(e){ run.error=String(e&&e.message||e); }
-  run.state=run.error?"error":"done"; run.seconds=Math.round((Date.now()-run.started)/100)/10;
+  run.state=run.final?"done":run.stopped?"stopped":"error"; run.seconds=Math.round((Date.now()-run.started)/100)/10;
+  run.resumable=!run.final && !!run._messages;
+  if(sb) sb.remove();
+  aiagRemember(run);
   live(run.error?"หยุด":`เสร็จ · ${run.steps.filter(s=>s.kind==="tool").length} ขั้น · ${run.seconds} วิ`);
   if(run.final) aiAppend("ai", run.final);
   if(run.error) aiAppend("ai", "เอเจนต์: "+run.error, {err:true});
@@ -17526,7 +17567,8 @@ async function aiAgentRun(msg){
     if(AICHAT.mode!=="agent" || !msg || msg[0]==="/" || AICHAT.busy) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
     AICHAT.busy=true; aiSetBusy(true);
-    try{ return await aiAgentRun(msg); } finally{ AICHAT.busy=false; aiSetBusy(false); }
+    const opts=AIAG.nextOpts||{}; AIAG.nextOpts=null;
+    try{ return await aiAgentRun(msg, opts); } finally{ AICHAT.busy=false; aiSetBusy(false); }
   };
   try{ const m=localStorage.getItem("schstudio.aiMode"); if(m==="agent" && /^https?:/.test(location.protocol)) aiSetMode("agent"); }catch(_){}
 }
@@ -17537,8 +17579,13 @@ function aiagChatLog(from){
     text:aiagClip(d.innerText.trim(), 3000), error:d.classList.contains("err")||undefined}));
 }
 MCP_OPS.ai_chat = a=>{
+  if(AICHAT.busy || AIAG.pending) mcpFail("the chat is still busy with the previous message", "call ai_chat_status until it is done, or ai_chat_stop");
+  let prev=null;
+  if(a.resume){ prev=[...AIAG.runs].reverse().find(r=>a.run_id ? r.id===+a.run_id : true);
+    if(!prev || !prev.resumable) mcpFail("no run to resume"+(prev?` — run ${prev.id} ended with an answer or cannot be continued`:""), "resume works on a run stopped by ai_chat_stop, the step limit or the time budget, in this page (not after a reload)");
+    a=Object.assign({}, a, {message:"(ทำต่อ) "+prev.message, mode:"agent"}); }
   const msg=String(a.message||"").trim(); if(!msg) mcpFail("message is required — what the user would type in the chat");
-  if(AICHAT.busy || AIAG.pending) mcpFail("the chat is still busy with the previous message", "call ai_chat_status until it is done");
+  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev};
   if(!AICHAT.open) toggleAiChat();
   if(a.mode){ if(!["build","qa","agent"].includes(a.mode)) mcpFail("mode is build | qa | agent"); aiSetMode(a.mode); }
   const t=$("#acInput"); t.value=msg;
@@ -17549,22 +17596,31 @@ MCP_OPS.ai_chat = a=>{
   return {started:true, mode:AICHAT.mode, next:"call ai_chat_status (it waits up to `wait` s) until state is 'done'"};
 };
 MCP_OPS.ai_chat_status = async a=>{
-  const cap=AIAG.capture; if(!cap) return {state:"none", next:"send something with ai_chat first"};
+  const cap=AIAG.capture;
+  // a finished run by id, or the latest one when this page has no capture (it was reloaded)
+  if(a.run_id!=null || !cap){
+    const live=AIAG.runs.find(r=>r.id===+a.run_id), old=aiagStored(), hit=live ? aiagRunSummary(live, a.detail==="full") : (a.run_id!=null ? old.find(x=>x.id===+a.run_id) : old[old.length-1]);
+    if(!hit) return {state:"none", next:"send something with ai_chat first", recent_runs:old.map(x=>({id:x.id, message:aiagClip(x.message,80), state:x.state}))};
+    return {state:hit.state==="running"?"running":"done", from:live?"this page":"saved (the page was reloaded since)", agent:hit,
+      recent_runs:old.map(x=>({id:x.id, message:aiagClip(x.message,80), state:x.state, at:x.at}))};
+  }
   const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
   while(!cap.done && Date.now()<until) await new Promise(r=>setTimeout(r, 300));
   const out={state:cap.done?"done":"running", mode:cap.mode, message:cap.message, seconds:cap.done?cap.seconds:Math.round((Date.now()-cap.started)/1000),
              chat:aiagChatLog(cap.from)};
   if(cap.error) out.error=cap.error;
   const run=AIAG.seq>cap.runBefore ? AIAG.runs.find(r=>r.id===cap.runBefore+1) : null;
-  if(run){
-    const detail=a.detail||"steps";
-    out.agent={state:run.state, final:run.final, error:run.error||undefined, model_calls:run.model_calls,
-      model_seconds:Math.round(run.model_seconds*10)/10, tokens:run.tokens,
-      steps:run.steps.map(s=>s.kind!=="tool" ? (detail==="full"||s.kind==="nudge" ? s : {kind:s.kind, text:aiagClip(s.text, 300)})
-        : detail==="full" ? s : {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms})};
-  }
+  if(run) out.agent=aiagRunSummary(run, a.detail==="full");
+  if(run && run.resumable) out.next_resume="ai_chat {resume:true} continues this run from where it stopped";
   if(!cap.done) out.next="still running — call ai_chat_status again";
   return out;
+};
+MCP_OPS.ai_chat_stop = async a=>{
+  const run=AIAG.cur;
+  if(!aiagStop(a.reason||"สั่งหยุดผ่าน MCP")) return {stopped:false, note:"nothing is running", last:run?{id:run.id, state:run.state}:null};
+  // wait for the loop to notice (the model call is aborted at once; a tool that is running finishes first)
+  const until=Date.now()+15000; while(run.state==="running" && Date.now()<until) await new Promise(r=>setTimeout(r, 200));
+  return {stopped:true, run:run.id, state:run.state, resumable:!!run.resumable, next:"ai_chat {resume:true} to continue it, or ai_chat with a new message"};
 };
 MCP_OPS.ai_model = async a=>{
   if(!/^https?:/.test(location.protocol)) mcpFail("the local model needs the FPGA Ecosystem app");
@@ -17584,6 +17640,8 @@ MCP_OPS.ai_model = async a=>{
     embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
 };
+/* run ids go on across reloads, so a saved run is never overwritten by a new one with the same id */
+try{ AIAG.seq=Math.max(0, ...aiagStored().map(x=>+x.id||0)); }catch(_){}
 
 /* ===== 19. The module library (Modules tab) over MCP — and modules that keep their sub-blocks ===
    "เพิ่มโมดูลผ่าน mcp ได้ไหม": Claude (and the local agent) can list, save, place, open and delete
