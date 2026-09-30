@@ -1435,7 +1435,10 @@ def main(argv=None):
         HTTPD = _bind(0)
     SERVER_PORT = HTTPD.server_address[1]
     write_runtime()
-    start_llama()
+    # a model server from our llama folder running now was left by an earlier run (closed by the updater,
+    # a crash): it holds RAM / VRAM for nothing — stop it before anything else
+    if not start_llama().get("ok"):                  # (a start stops them itself)
+        threading.Thread(target=llm.stop_strays, daemon=True).start()
     LAST_PING = time.time()
     threading.Thread(target=_watchdog, daemon=True).start()
     print(f"{APP_NAME} {VERSION} on {base_url()}  (backend: "

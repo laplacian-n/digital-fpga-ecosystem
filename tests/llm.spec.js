@@ -122,8 +122,18 @@ test("start the model from Settings, then the chat answers with it", async ({ pa
   await expect(page.locator("#llmModels .mdl").first()).toContainText("มีแล้ว");
   await expect(page.locator("#llmState")).toContainText("ยังไม่ได้เริ่ม");
   await page.locator("#llmCard").screenshot({ path: test.info().outputPath("llm-card.png") });
+  // a model server left running by an earlier run of the app (closed by the updater): stopped on start
+  const binDir = path.join(home, ".local", "share", "fpga-ecosystem", "llama", "llama-test-bin");
+  const stray = spawn(path.join(binDir, "llama-server"), ["-m", "old.gguf", "--port", String(LPORT + 7)], { stdio: "ignore" });
+  let gone = false; stray.on("exit", () => { gone = true; });
+  await new Promise(r => setTimeout(r, 400));
   await page.click("#llmStart");
   await expect(page.locator("#llmState")).toContainText("พร้อมใช้", { timeout: 10000 });
+  for (let i = 0; i < 20 && !gone; i++) await new Promise(r => setTimeout(r, 200));
+  expect(gone).toBe(true);
+  const st = await (await fetch(BASE + "/api/llm/status")).json();
+  expect(st.leftovers_stopped.length).toBe(1);
+  expect(st.processes.filter(p => !p.ours && p.path.includes("llama-test-bin"))).toEqual([]);
   // the editor's chat (llm was "off" at start-up) now reaches the model without a restart
   const ed = await context.newPage();
   await ed.goto(BASE + "/studio.html");
