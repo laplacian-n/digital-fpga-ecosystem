@@ -517,3 +517,59 @@ test("a call that only waits (approval_status) does not hold up the others", asy
   expect((await waiting).data.status).toBe("waiting");
   await page.evaluate(() => { const c = document.getElementById("mcpApproval"); if (c) c.remove(); MCPB.approval = { state: "none" }; });
 });
+
+test("projects in step with their folders: rename, delete (to .trash), a stale name given back, import/export, folder name wins", async () => {
+  let r = await mcp.tool("new_project", { name: "prjx" });
+  await mcp.tool("build_circuit", { name: "g", formula: "y = a & b" });
+  await mcp.tool("save_project");
+  const folder = (await mcp.tool("list_projects")).data.folder;
+  expect(fs.existsSync(path.join(folder, "prjx", "prjx.schproj.json"))).toBe(true);
+  const ex = await mcp.tool("export_project");
+  expect(JSON.parse(ex.data.json).project.name).toBe("prjx");
+  r = await mcp.tool("rename_project", { name: "prjx", to: "prjy" });
+  expect(r.error, r.text).toBe(false);
+  expect(JSON.parse(fs.readFileSync(path.join(folder, "prjy", "prjy.schproj.json"), "utf8")).project.name).toBe("prjy");
+  expect(await page.evaluate(() => state.project.name)).toBe("prjy");
+  r = await mcp.tool("delete_project", { name: "prjy" });
+  expect(r.error, r.text).toBe(false);
+  expect(fs.existsSync(path.join(folder, "prjy"))).toBe(false);
+  expect(fs.readdirSync(path.join(folder, ".trash")).some(n => n.startsWith("prjy-"))).toBe(true);
+  expect((await mcp.tool("list_projects")).data.projects.map(p => p.name)).not.toContain("prjy");
+  expect(await page.evaluate(() => Object.values(state.projects).some(p => p.name === "prjy"))).toBe(false);
+  // an empty project only the editor remembers gives its name back (it used to be ghost_2, ghost_3 …)
+  await mcp.tool("new_project", { name: "ghost" });
+  await mcp.tool("new_project", { name: "other" });
+  r = await mcp.tool("new_project", { name: "ghost" });
+  expect(r.data.created).toBe("ghost");
+  r = await mcp.tool("rescan_projects", { prune: true });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.pruned).toContain("other");
+  // import from JSON text, saved under a new name
+  r = await mcp.tool("import_project", { json: ex.data.json, name: "imp", save: true });
+  expect(r.error, r.text).toBe(false);
+  expect((await mcp.tool("list_projects")).data.projects.map(p => p.name)).toContain("imp");
+  // a folder whose file says another name: the folder wins
+  fs.mkdirSync(path.join(folder, "fold"), { recursive: true });
+  fs.writeFileSync(path.join(folder, "fold", "fold.schproj.json"), ex.data.json);
+  r = await mcp.tool("open_project", { path: "fold/fold.schproj.json" });
+  expect(r.data.renamed_from).toBe("prjx");
+  expect(await page.evaluate(() => state.project.name)).toBe("fold");
+  expect(page.errors).toEqual([]);
+});
+
+test("batch: several edits are one undo step, and a failing op undoes the ones before it", async () => {
+  await mcp.tool("new_sheet", { name: "bt" });
+  const n0 = await page.evaluate(() => activeSch().components.length);
+  let r = await mcp.tool("batch", { ops: [{ tool: "add_component", args: { type: "NOT", name: "N9" } }, { tool: "connect", args: { from: "N9", to: "nope" } }] });
+  expect(r.data.ok, r.text).toBe(false);
+  expect(r.data.failed_at).toBe(1);
+  expect(r.data.rolled_back).toBe(true);
+  expect(await page.evaluate(() => activeSch().components.length)).toBe(n0);
+  r = await mcp.tool("batch", { ops: [{ tool: "add_component", args: { type: "IN", name: "p" } }, { tool: "add_component", args: { type: "NOT", name: "N8" } },
+    { tool: "connect", args: { from: "p", to: "N8" } }] });
+  expect(r.data.ok, r.text).toBe(true);
+  expect(await page.evaluate(() => activeSch().components.length)).toBe(n0 + 2);
+  await mcp.tool("undo");
+  expect(await page.evaluate(() => activeSch().components.length)).toBe(n0);
+  expect(page.errors).toEqual([]);
+});

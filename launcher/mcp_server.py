@@ -317,6 +317,23 @@ TOOLS = [
     T("list_projects", "Projects saved in the user's workspace folder (paths usable with open_project)."),
     T("open_project", "Open a saved project from the workspace (replaces what's on screen; a checkpoint is kept).",
       {"path": {"type": "string", "description": "e.g. 'lab4/lab4.schproj.json'"}}, ["path"]),
+    T("delete_project", "Delete a project: from the editor's project list AND its workspace folder (the folder is moved to "
+      "Projects/.trash, so it can be restored by moving it back). files:false keeps the folder.",
+      {"name": {"type": "string"}, "files": {"type": "boolean"}}, ["name"]),
+    T("rename_project", "Rename a project in the editor and on disk (folder, <name>.schproj.json and the name written inside).",
+      {"name": {"type": "string"}, "to": {"type": "string"}}, ["name", "to"]),
+    T("rescan_projects", "Compare the editor's open projects with the workspace folders (names inside files that differ from "
+      "their folder included). prune:true drops editor-only projects that hold no parts — they are why new_project "
+      "answered test_2 after 'test' was deleted.", {"prune": {"type": "boolean"}}),
+    T("export_project", "The project as .schproj.json text (the active one, or `name`).", {"name": {"type": "string"}}, timeout=60),
+    T("import_project", "Load a project from .schproj.json text (replaces what's on screen; a checkpoint is kept). "
+      "`name` renames it, `save` writes it to the workspace.",
+      {"json": {"type": "string"}, "name": {"type": "string"}, "save": {"type": "boolean"}}, ["json"], timeout=60),
+    T("batch", "Run several editing tools as ONE step: ops = [{tool, args}, …] in order. One undo undoes them all, and if "
+      "one fails the ones before it are undone too (atomic:false keeps them) — the answer names the failing op.",
+      {"ops": {"type": "array", "items": {"type": "object", "properties": {"tool": {"type": "string"}, "args": {"type": "object"}},
+                                                  "required": ["tool"]}},
+       "atomic": {"type": "boolean"}}, ["ops"], timeout=120),
     # --- history & collaboration
     T("undo", "Undo the last change (yours or the user's)."),
     T("redo", "Redo."),
