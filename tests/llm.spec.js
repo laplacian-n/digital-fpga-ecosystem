@@ -55,6 +55,19 @@ class H(BaseHTTPRequestHandler):
                 "usage": {"prompt_tokens": 1000 + 50 * len(msgs), "completion_tokens": 40}})
         with open(sys.argv[0] + ".sys", "a") as f: f.write(str(hash(msgs[0].get("content", ""))) + "\\n")
         ask = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+        if "SLOW" in ask:        # a model that takes its time: stopped from outside, then resumed
+            import time; time.sleep(1.2)
+            return call("get_sheet", {"detail": "brief"}, "")
+        if "GATE" in ask:        # the request's own spec (derived by the app) judges the circuit, and a pass ends the run
+            tt = lambda col: {"name": "og", "truth_table": {"inputs": ["a", "b", "c"], "outputs": ["f"], "columns": {"f": col}}}
+            if len(done) == 0:
+                return call("build_circuit", tt("01101000"), "minterms 1 2 4 (forgot 7)")
+            if len(done) == 1:
+                assert '"spec_check"' in last and '"pass":false' in last, last
+                return call("build_circuit", dict(tt("01101001"), sheet="og", replace=True), "add 7")
+            return self._j({"choices": [{"message": {"content": "สร้าง f แล้ว"}}]})
+        if "STALL" in ask:       # a model that keeps wiring pins that do not exist (lab 6: 10 min, 0 wires)
+            return call("connect", {"connections": [["cnt%d.q" % len(done), "disp.d"]], "sheet": "top"}, "")
         if "LOOP" in ask:        # a model that only ever checks against itself: it must be stopped
             lt = {"inputs": ["a", "b"], "outputs": ["y"], "columns": {"y": "0110"}}
             if any("nothing independent" in str(m.get("content")) for m in msgs):
@@ -125,7 +138,7 @@ test("start the model from Settings, then the chat answers with it", async ({ pa
 });
 
 test("agent mode: the local model works through the tools; Claude drives the chat over MCP and reads every step", async ({ page, context }) => {
-  test.setTimeout(90000);
+  test.setTimeout(180000);
   await page.goto(BASE + "/");
   await page.click('nav button[data-tab="settings"]');
   await page.click("#llmStart");
@@ -221,7 +234,51 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "nudge" && /no independent check/.test(x.text))).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(8);
     expect(s.data.agent.final).toContain("ตารางของตัวเอง");
+    // the app derives the spec from the request: the wrong table fails it, the right one passes and ends the run
+    await tool("ai_chat", { message: "GATE: f(a,b,c) = Σm(1,2,4,7)", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "oracle")).toBe(true);
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBe(2);
+    expect(s.data.agent.final).toContain("✓ ตรวจโดยโปรแกรม");
+    // rounds that change nothing: told once (suggest_wires), then the app answers for it
+    await tool("ai_chat", { message: "ต่อสาย STALL ให้ครบ", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "nudge" && /without a change/.test(x.text))).toBe(true);
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBeLessThan(9);
+    expect(s.data.agent.final).toContain("ไม่มีอะไรบนแผ่นเปลี่ยน");
+    // stopped from outside (it used to run on for 10 minutes), resumed with a step cap, still readable after a reload
+    await tool("ai_chat", { message: "SLOW ทำงานยาวๆ", mode: "agent" });
+    await ed.waitForTimeout(2000);
+    const stop = await tool("ai_chat_stop", {});
+    expect(stop.data.stopped, stop.text).toBe(true);
+    expect(stop.data.resumable).toBe(true);
+    s = await tool("ai_chat_status", { wait: 5 });
+    expect(s.data.agent.state).toBe("stopped");
+    await tool("ai_chat", { resume: true, max_steps: 2 });
+    s = await tool("ai_chat_status", { wait: 30 });
+    expect(s.data.agent.resumed_from).toBe(stop.data.run);
+    expect(s.data.agent.state).toBe("stopped");
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBe(2);
+    const lastId = s.data.agent.id;
     expect(ed.errors).toEqual([]);
+    await ed.reload();
+    await ed.waitForFunction(() => typeof MCPB === "object" && MCPB.on);
+    s = await tool("ai_chat_status", {});
+    expect(s.data.from).toContain("saved");
+    expect(s.data.agent.id).toBe(lastId);
+    expect(s.data.recent_runs.length).toBeGreaterThan(3);
+    s = await tool("ai_chat_status", { run_id: stop.data.run });
+    expect(s.data.agent.state).toBe("stopped");
+    // stuck on the small model: the bigger installed one takes over the same run, then the small one comes back
+    fs.writeFileSync(path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-4B-Q6_K.gguf"), "GGUF");
+    let m = await tool("ai_model", { action: "start", model: "qwen3.5-4b", wait: 20 });
+    expect(m.data.model).toMatch(/4B/);
+    await tool("ai_chat", { message: "ต่อสาย STALL อีกรอบ", mode: "agent" });
+    for (let k = 0; k < 4; k++) { s = await tool("ai_chat_status", { wait: 40 }); if (s.data.state === "done") break; }
+    expect(s.data.agent.escalated, JSON.stringify(s.data.agent.steps.filter(x => x.kind))).toEqual({ from: "qwen3.5-4b", to: "qwen3.5-9b", back: expect.stringMatching(/4B/) });
+    expect(s.data.agent.steps.some(x => x.kind === "escalate")).toBe(true);
+    for (let k = 0; k < 20; k++) { m = await tool("ai_model", { action: "status" }); if (/4B/.test(m.data.model) && m.data.state === "ready") break; await ed.waitForTimeout(500); }
+    expect(m.data.model).toMatch(/4B/);
   } finally { srv.kill(); }
 });
 

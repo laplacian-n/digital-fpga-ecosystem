@@ -40,7 +40,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 APP_NAME = "FPGA Ecosystem"
 APP_ID = "fpga-ecosystem"
-VERSION = "2.1.2"
+VERSION = "2.2.0"
 
 FROZEN = getattr(sys, "frozen", False)
 # ROOT = where the bundled content lives (repo root in dev, _MEIPASS when frozen)
@@ -203,6 +203,8 @@ def detect_llama() -> tuple[str, str]:
 
 def find_browser() -> str:
     """Edge ships with every Windows 10/11, so --app windows work out of the box."""
+    if os.environ.get("FE_BROWSER") and Path(os.environ["FE_BROWSER"]).is_file():
+        return os.environ["FE_BROWSER"]
     if IS_WIN:
         pf = [os.environ.get(k) for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
         rel = [r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"]
@@ -576,20 +578,100 @@ def inside(base: Path, rel: str) -> Path:
     return p
 
 
+def _project_name_in(f: Path) -> str:
+    """the project name written inside a .schproj.json (the active project of an older multi-project file)"""
+    try:
+        o = json.loads(f.read_text(encoding="utf-8"))
+        return str((o.get("project") or {}).get("name") or "")
+    except Exception:
+        return ""
+
+
 def list_projects() -> list:
     out = []
     for d in projects_dir().iterdir():
-        if not d.is_dir():
+        if not d.is_dir() or d.name.startswith("."):          # .trash holds deleted projects
             continue
         files = sorted((f for f in d.iterdir() if f.is_file()),
                        key=lambda f: f.stat().st_mtime, reverse=True)
         main = next((f for f in files if f.name.endswith(".schproj.json")), None)
         mtime = max([d.stat().st_mtime] + [f.stat().st_mtime for f in files])
+        inner = _project_name_in(main) if main else ""
         out.append({"name": d.name, "mtime": mtime,
                     "main": f"{d.name}/{main.name}" if main else None,
+                    "project_name": inner or None,
+                    "name_mismatch": bool(inner and inner != d.name) or None,
                     "files": [{"name": f.name, "size": f.stat().st_size} for f in files[:50]]})
     out.sort(key=lambda p: p["mtime"], reverse=True)
     return out
+
+
+def html_to_pdf(html: Path) -> dict:
+    """print a report page to PDF with the browser the app already uses (headless Edge / Chrome)"""
+    br = find_browser()
+    if not br:
+        return {"ok": False, "error": "ไม่พบ Edge / Chrome สำหรับพิมพ์ PDF — เปิดรายงาน .html แล้วกดพิมพ์เป็น PDF เองได้"}
+    pdf = html.with_suffix(".pdf")
+    try:
+        pdf.unlink()
+    except OSError:
+        pass
+    import tempfile
+    with tempfile.TemporaryDirectory() as prof:            # its own profile: an open Edge window does not block it
+        args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer", f"--user-data-dir={prof}",
+                f"--print-to-pdf={pdf}", html.resolve().as_uri()]
+        # Linux: as root, or where the distro blocks its sandbox (Ubuntu 23.10+), Chromium exits at once
+        # without this — it only renders our own report file
+        if not IS_WIN and sys.platform != "darwin":
+            args.insert(1, "--no-sandbox")
+        try:
+            p = subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
+        except Exception as e:
+            return {"ok": False, "error": f"พิมพ์ PDF ไม่ได้: {e}"}
+    if not pdf.is_file() or pdf.stat().st_size < 500:
+        tail = (p.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
+        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF" + (": " + " | ".join(tail) if tail else ""), "browser": br}
+    return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size}
+
+
+def delete_project(name: str) -> dict:
+    """move a project folder to Projects/.trash/<name>-<time> (recoverable, not erased)"""
+    d = inside(projects_dir(), safe_name(name))
+    if not name or not d.is_dir():
+        return {"ok": False, "error": f"no project folder '{name}'"}
+    trash = projects_dir() / ".trash"
+    trash.mkdir(exist_ok=True)
+    dest = trash / f"{d.name}-{time.strftime('%Y%m%d-%H%M%S')}"
+    shutil.move(str(d), str(dest))
+    return {"ok": True, "trashed": str(dest)}
+
+
+def rename_project(name: str, to: str) -> dict:
+    """rename a project folder, its <name>.schproj.json and the project name written inside it"""
+    src = inside(projects_dir(), safe_name(name))
+    to = safe_name(to)
+    dst = inside(projects_dir(), to)
+    if not name or not src.is_dir():
+        return {"ok": False, "error": f"no project folder '{name}'"}
+    if not to:
+        return {"ok": False, "error": "the new name is empty"}
+    if dst.exists() and dst.resolve() != src.resolve():
+        return {"ok": False, "error": f"a project folder '{to}' already exists"}
+    tmp = src.with_name(src.name + ".renaming")               # case-only renames on Windows
+    src.rename(tmp)
+    tmp.rename(dst)
+    for f in dst.glob("*.schproj.json"):
+        try:
+            o = json.loads(f.read_text(encoding="utf-8"))
+            for p in [o.get("project")] + list(((o.get("workspace") or {}).get("projects") or {}).values()):
+                if isinstance(p, dict) and p.get("name") in (name, src.name):
+                    p["name"] = to
+            f.write_text(json.dumps(o, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        if f.name == f"{src.name}.schproj.json":
+            f.rename(dst / f"{to}.schproj.json")
+    return {"ok": True, "name": to}
 
 
 def status() -> dict:
@@ -1221,6 +1303,12 @@ def make_handler():
                 rel = data.get("path") or ""
                 reveal(inside(projects_dir(), rel) if rel else projects_dir())
                 return self._out(200, {"ok": True})
+            if path == "/api/report/pdf":
+                return self._out(200, html_to_pdf(inside(projects_dir(), str(data.get("path") or ""))))
+            if path == "/api/projects/delete":
+                return self._out(200, delete_project(str(data.get("name") or "")))
+            if path == "/api/projects/rename":
+                return self._out(200, rename_project(str(data.get("name") or ""), str(data.get("to") or "")))
             if path == "/api/projects/new":
                 name = safe_name(data.get("name") or "")
                 d = inside(projects_dir(), name)

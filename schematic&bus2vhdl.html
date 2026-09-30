@@ -13230,6 +13230,9 @@ init();
 .bh-diag h3{margin:4px 0 8px}.bh-checks,.bh-tips{margin:4px 0 12px;padding-left:22px;line-height:1.6}
 .bh-checks{list-style:none;padding-left:4px}.bh-ok{color:#1f8a3b}.bh-bad{color:#c4271d}
 .bh-map{margin:4px 0 8px;font-size:13px}.bh-acts{display:flex;flex-wrap:wrap;gap:6px}.bd-help{margin:10px 0 0}
+/* 45: board pin under each INPUT / OUTPUT once pins are being chosen */
+.pin-tags .pin-tag{font-size:10px;fill:var(--muted,#6b7280);font-family:system-ui,sans-serif;pointer-events:all}
+.pin-tags .pin-tag.bad{fill:#dc2626;font-weight:600}
 </style>
 <script>
 "use strict";
@@ -14299,7 +14302,16 @@ function openExplainSim(){
   const _send=aiSend;
   aiSend=async function(){
     const t=$("#acInput"), msg=((t&&t.value)||"").trim();
-    const why=/^\/(why|ทำไม)\b/i.test(msg) || (/(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg) && /(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ทำไม|ผิด|ค้าง)/.test(msg));
+    // a symptom of THIS sheet ("ทำไมไม่นับ", "จำลองแล้วค้าง") gets the check; a question about the idea
+    // ("ทำไมตัวนับต้องมีตัวหารความถี่") goes to the model — it used to get this sheet's problems instead
+    const concept=/(ทำไมต้อง|ต้องมี|ต้องใช้|คืออะไร|คือไร|ต่างกัน|แตกต่าง|เลือก|หลักการ|อธิบาย|เพราะอะไรถึง|ใช้ทำอะไร|\bwhy (do|does|is|are) (we|a|an|the)\b)/i.test(msg);
+    const sym=/(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ไม่ตรง|ผิด|ค้าง|doesn'?t|not (work|count|change))/i.test(msg);
+    const mine=/(นี้|นี่|ของผม|ของฉัน|ของหนู|ของเรา|ที่ทำ|ผลจำลอง|ตอนจำลอง|this|my)/i.test(msg);
+    const sch=activeSch(), hasParts=!!(sch && sch.components.some(c=>c.type!=="JUNCTION"));
+    const why=/^\/(why|ทำไม)\b/i.test(msg) || (hasParts && !concept && /(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg)
+      && (sym || (/ทำไม|\bwhy\b/i.test(msg) && mine)));
+    // Q&A mode answers — the builders ahead of it in aiSend took "JK กับ D เลือกตัวไหนทำตัวนับ" as a counter to draw
+    if(!why && AICHAT.mode==="qa" && msg && msg[0]!=="/" && !AICHAT.busy){ aiAppend("user", msg); t.value=""; await aiAsk(msg); return; }
     if(!why) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
     const list=explainSim(activeSch()).slice(0,6);
@@ -17238,7 +17250,9 @@ GENERATORS.push({id:"busports", icon:"⫼", name:"รวมขาเป็นบ
    drive the chat over MCP (ai_chat / ai_chat_status) to test and debug this feature. */
 const AIAG = { runs:[], cur:null, tools:null, seq:0, pending:null, capture:null };
 const AIAG_MAX_STEPS = 24;
-const AIAG_EDIT_OPS = new Set(["add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
+const AIAG_BUDGET_S = 300;        // a local run past 5 minutes is told to answer (one ran 10 min for 0 wires)
+const AIAG_STALL = 4;             // rounds in a row that changed nothing: nudged, and stopped at +2
+const AIAG_EDIT_OPS = new Set(["build_hierarchy","add_component","connect","disconnect","delete","update_component","apply","build_circuit","make_bus_ports","new_sheet","set_pins","auto_pins","undo"]);
 const AIAG_VERIFY_OPS = new Set(["check","simulate","probe","verify_truth_table","check_spec","set_spec"]);
 
 function aiagSystemPrompt(){
@@ -17258,8 +17272,9 @@ function aiagSystemPrompt(){
 "   Anything else: build_circuit with formula (equations like \"y = a&b | ~c\", \"{cout,sum} = a+b+cin\") — never type",
 "   0/1 columns yourself unless the user gave the table. Output 1 for certain input values (primes, a range, a list)?",
 "   give the ROWS: truth_table:{inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}} (set_spec table takes ones too).",
-"   Bigger designs: build the pieces, then place them as blocks",
-"   (block:<sheet>) and connect. Edit with add_component, connect, disconnect, delete, update_component, or apply.",
+"   Bigger designs: build the pieces, then ONE build_hierarchy call with every block, the top ports and all the",
+"   connections (buses by name: cnt.ones → cmp.a_lo) — never wire blocks with connect one pin at a time.",
+"   Edit with add_component, connect, disconnect, delete, update_component, or apply.",
 "3. After ANY change: call check AND simulate ON THE SHEET YOU CHANGED — pass its name as `sheet`. For logic you",
 "   derived, verify_truth_table with a formula written from the REQUIREMENT (not the table you built from — that",
 "   proves nothing). Look at `recognized` in the answer. Never say it works without that.",
@@ -17280,12 +17295,14 @@ function aiagSystemPrompt(){
 "Add bus:true to build_circuit to get q[3:0] instead of q0..q3.",
 "If the request is only a question (no change needed), answer it directly in Thai.",
 "For how the course / a lab sheet does something, or the board's pins, call search_course.",
+"EDGE board facts: 3.3 V I/O, 50 MHz clock, 4-digit common-anode 7-seg (a..g, dp, an[3:0] all active-low: 0 = on),",
+"push buttons 1 when pressed, 16 switches, 16 LEDs (1 = on). A whole lab 6 (counter 00-yy): build_part kind lab6_counter.",
 "",
 `Project: ${P.name}. Sheets: ${sheets}. Active sheet: ${s?s.name:"-"}${ports?" (ports: "+ports+")":""}.`
   ].join("\n");
 }
-async function aiagPost(url, body){
-  const r=await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{})});
+async function aiagPost(url, body, signal){
+  const r=await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body||{}), signal});
   return r.json();
 }
 async function aiagTools(){
@@ -17326,51 +17343,120 @@ async function aiagCall(tool, rawArgs){
   }catch(e){ return {ok:false, error:String(e&&e.message||e)+(e&&e.hint?"\nhint: "+e.hint:"")}; }
   finally{ MCPB.busy=false; }
 }
-/* the answer when the run is stopped for looping: what was built, and how far it was checked */
-function aiagWrapUp(run){
+/* the answer when the run is stopped: what was built, and how far it was checked */
+function aiagWrapUp(run, why){
   const tools=run.steps.filter(s=>s.kind==="tool" && s.ok), last=[...tools].reverse().find(s=>/^build_/.test(s.tool));
   const sim=[...tools].reverse().find(s=>s.tool==="simulate");
-  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+
-    (sim?`\nผลจำลอง: ${sim.summary||""}`:"")+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
+  const tail=(last?`\nวงจรล่าสุดอยู่ที่แผ่น ${(last.args&&(last.args.sheet||last.args.name))||"-"}`:"")+(sim?`\nผลจำลอง: ${sim.summary||""}`:"");
+  if(why==="verified" && run.verified) return `เสร็จแล้ว: แผ่น ${run.verified.sheet} ผ่านการตรวจ`+tail;
+  if(why==="stall" || why==="time"){
+    // what is still open on the sheet it worked on, from the editor, not the model
+    let open="";
+    try{ const edits=[...tools].reverse().find(s=>AIAG_EDIT_OPS.has(s.tool)||/^build_/.test(s.tool));
+      const nm=edits&&((edits.args&&edits.args.sheet)||(edits.result&&(/"sheet":"([^"]+)"/.exec(edits.result)||[])[1]));
+      const sch=(nm&&Object.values(state.project.schematics).find(x=>x.name===nm))||activeSch();
+      if(sch){ const c=MCP_OPS.check({sheet:sch.name}), H=typeof wireHints==="function"?wireHints(sch):[];
+        open=`\nแผ่น ${sch.name}: error ${c.errors}, warning ${c.warnings}`+(H.length?` · ยังมีสายที่เดาได้ ${H.length} เส้น — กด 💡 "ต่อทั้งหมด" ใน Inspector (ไม่ต้องใช้โมเดล)`:""); } }catch(_){}
+    return (why==="time" ? `หยุดเอง: ใช้เวลาเกิน ${AIAG_BUDGET_S/60} นาที` : `หยุดเอง: ${AIAG_STALL+2} รอบติดกันไม่มีอะไรบนแผ่นเปลี่ยน (เรียกเครื่องมือไม่สำเร็จ / ต่อสายไม่ได้)`)
+      +tail+open+"\nงานที่ต้องต่อบล็อกหลายตัวเข้าด้วยกันยากเกินโมเดลในเครื่อง — ลองสั่งทีละบล็อก, ใช้ 💡 แนะนำการต่อสาย หรือชิ้นส่วนทั้งแลปในคลัง (เช่น แลป 6)";
+  }
+  return `หยุดเอง: ตรวจเทียบกับสิ่งที่เป็นอิสระจากวงจรไม่ได้ จึงไม่สร้างซ้ำต่อ`+tail+"\n⚠ ตรวจแค่เทียบกับตาราง/สมการที่โมเดลเขียนเอง — โปรดเทียบกับใบงานอีกครั้ง";
 }
+/* every sheet's content: a round that leaves it unchanged made no progress */
+function aiagFingerprint(){ try{ return Object.values(state.project.schematics).map(s=>s.id+":"+sheetHash(s)).join("|"); }catch(_){ return ""; } }
+/* stop the running agent now: the model call in flight is aborted, no further tool runs */
+function aiagStop(why){
+  const run=AIAG.cur; if(!run || run.state!=="running") return false;
+  run.cancel=true; run.cancelWhy=why||"สั่งหยุด"; try{ run.ctl && run.ctl.abort(); }catch(_){}
+  return true;
+}
+/* finished runs outlive a reload of the page: ai_chat_status can still read the answer */
+function aiagRunSummary(run, full){
+  return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
+    model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
+    resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
+    steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
+      : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
+      : {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms})};
+}
+function aiagRemember(run){
+  try{ const L=JSON.parse(localStorage.getItem("schstudio.agentRuns")||"[]").filter(x=>x.id!==run.id);
+    L.push(Object.assign(aiagRunSummary(run, false), {at:new Date().toISOString()}));
+    localStorage.setItem("schstudio.agentRuns", JSON.stringify(L.slice(-10))); }catch(_){}
+}
+function aiagStored(){ try{ return JSON.parse(localStorage.getItem("schstudio.agentRuns")||"[]"); }catch(_){ return []; } }
 /* a chat line that is NOT part of the conversation memory (the live status, each tool step) */
 function aiagLine(html, cls){
   const log=$("#acLog"); if(!log) return null;
   const d=document.createElement("div"); d.className="ac-msg ai ag "+(cls||""); d.innerHTML=html;
   log.appendChild(d); log.scrollTop=log.scrollHeight; return d;
 }
-async function aiAgentRun(msg){
+/* opts: maxSteps, budgetS (a ceiling for this run), resume (a run that stopped before answering: go on from
+   its conversation instead of starting over) */
+async function aiAgentRun(msg, opts){
+  opts=opts||{};
+  const prev=opts.resume||null;
   // earlier turns (not this message, which the caller already put in the log)
   const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
-  const run={id:++AIAG.seq, message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
-             model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0};
+  const maxSteps=Math.max(1, Math.min(60, +opts.maxSteps||AIAG_MAX_STEPS)), budgetS=Math.max(10, +opts.budgetS||AIAG_BUDGET_S);
+  const run={id:++AIAG.seq, message:prev?prev.message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
+             model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0, max_steps:maxSteps, budget_s:budgetS,
+             resumed_from:prev?prev.id:undefined, cancel:false, ctl:null, noEscalate:!!opts.noEscalate};
+  if(prev) msg=prev.message;
   AIAG.cur=run; AIAG.runs.push(run); if(AIAG.runs.length>20) AIAG.runs.shift();
-  const status=aiagLine('<span class="ac-badge v">เอเจนต์</span> <span class="ag-live">กำลังคิด…</span>');
+  const status=aiagLine('<span class="ac-badge v">เอเจนต์</span> <span class="ag-live">กำลังคิด…</span> <button class="btn2 ag-stop" title="หยุดเอเจนต์ตอนนี้">⏹ หยุด</button>');
   const live=t=>{ const e=status&&status.querySelector(".ag-live"); if(e) e.textContent=t; };
+  const sb=status&&status.querySelector(".ag-stop"); if(sb) sb.onclick=()=>aiagStop("ผู้ใช้กดหยุด");
   try{
     await aiagTools();
+    if(prev) run.steps.push({kind:"resume", text:`continuing run ${prev.id} (${prev.steps.filter(x=>x.kind==="tool").length} tool steps so far)`});
     // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
     // alone that answers the request with no model round; otherwise the model gets told it exists
     let notes="";
-    if(typeof aiagFastPath==="function"){ live("สร้างจากคลังชิ้นส่วน…");
-      try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final) run.final=fp.final; else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
+    if(!prev && typeof aiagFastPath==="function"){ live("สร้างจากคลังชิ้นส่วน…");
+      try{ const fp=await aiagFastPath(msg, run); if(fp&&fp.final){ run.final=fp.final; run.fastFinal=true; } else if(fp&&fp.note) notes+="\n\n"+fp.note; }catch(e){ console.warn("fast path", e); } }
+    // the acceptance test the request itself states, derived by code (36-oracle-gate): attached to the
+    // sheet it builds, and a pass ends the run
+    run.touched=new Set(prev&&prev.touched||[]); if(prev&&prev.oracle) run.oracle=prev.oracle;
+    if(!prev && !run.final && typeof oracleDerive==="function") try{ const o=oracleDerive(msg);
+      if(o.ok){ run.oracle=o; run.steps.push({kind:"oracle", text:o.what});
+        notes+=`\n\n(system) The app derived this request's acceptance test by code, independent of any circuit: ${o.what}.`
+          +` Name the ports — inputs: ${o.ports.in.join(", ")}; outputs: ${o.ports.out.join(", ")}.`
+          +" It is put on the sheet you build and checked automatically (spec_check in the answer); when it passes you are done."; } }catch(e){ console.warn("oracle", e); }
     // the course notes most related to the request go in up front (RAG); more via search_course
-    if(!run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
+    if(!prev && !run.final) try{ const ctl=new AbortController(); setTimeout(()=>ctl.abort(), 8000);   // never wait long on it
       const rj=await (await fetch("/api/rag/search?k=2&q="+encodeURIComponent(msg), {signal:ctl.signal})).json();
-      if(rj.ok && rj.hits.length){ notes="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,350)}`).join("\n");
+      if(rj.ok && rj.hits.length){ notes+="\n\nCourse notes that may help (search_course finds more):\n"+rj.hits.map(h=>`[${h.group}] ${h.title}: ${h.text.slice(0,350)}`).join("\n");
         run.steps.push({kind:"rag", text:rj.hits.map(h=>h.group+": "+h.title).join(" | ")}); } }catch(_){}
-    const messages=[{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
+    const messages=prev ? prev._messages.concat([{role:"user", content:"(system) You were stopped before you finished. Carry on from where you were — do not redo what is already built — and finish the request."}])
+      : [{role:"system", content:aiagSystemPrompt()+notes}, ...hist, {role:"user", content:msg}];
+    run._messages=messages;
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
-    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity;
+    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0, gated=false;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
-    for(let i=0; i<AIAG_MAX_STEPS && !run.final; i++){
-      if(i>=stopAt){ run.final=aiagWrapUp(run); break; }
+    let budgetStart=run.started;    // restarts when a bigger model takes over
+    for(let i=0; i<maxSteps && !run.final; i++){
+      if(run.cancel) break;
+      if(i>=stopAt){
+        // stuck on a small model: a bigger installed one continues the same conversation (44-escalate)
+        if((stopWhy==="stall"||stopWhy==="time") && typeof aiagEscalate==="function" && await aiagEscalate(run, live)){
+          stopAt=Infinity; stopWhy=""; stall=0; budgetStart=Date.now(); think=true;
+          messages.push({role:"user", content:"(system) A larger model now continues this task from where it stopped. Look at what is on the sheets (get_sheet), then finish it — for a design made of blocks use ONE build_hierarchy call."});
+          continue; }
+        run.final=aiagWrapUp(run, stopWhy); break; }
+      if(stopAt===Infinity && (Date.now()-budgetStart)/1000>budgetS){ stopAt=i+2; stopWhy="time";
+        run.steps.push({kind:"nudge", text:"time budget used — asked to finish"});
+        messages.push({role:"user", content:"(system) Time is up. Make no more changes: answer now in Thai with what is done, what is still missing, and what the user should do next."}); }
+      const fp0=aiagFingerprint();
       live(`กำลังคิด… (รอบ ${i+1})`);
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
-      const j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
-        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}});
+      run.ctl=new AbortController();
+      let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
+        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}}, run.ctl.signal); }
+      catch(e){ if(run.cancel) break; throw e; }
+      if(run.cancel) break;
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
       if(j.restarted){ run.steps.push({kind:"restart", text:"the model server had stopped — restarted it and repeated the call"});
         aiagLine('<div class="ag-step bad"><span class="ag-tool">↻ โมเดลหยุดทำงาน</span><div class="ag-res">เริ่มใหม่ให้แล้ว ทำต่อจากเดิม</div></div>', "step"); }
@@ -17387,24 +17473,29 @@ async function aiAgentRun(msg){
       think=false;
       if(calls.length){
         for(const tc of calls){
+          if(run.cancel) break;
           const tool=tc.function.name; let args={}, bad=null;
           try{ args=typeof tc.function.arguments==="string" ? JSON.parse(tc.function.arguments||"{}") : (tc.function.arguments||{}); }
           catch(_){ bad="the arguments are not valid JSON: "+aiagClip(tc.function.arguments, 200); }
           live(`กำลังใช้ ${tool}…`);
           // a rebuild of a sheet this run made replaces it (it used to leave prime3, prime3_2 … prime3_5)
-          if(!bad && /^build_(circuit|part|fsm)$/.test(tool)){ const nm=String(args.sheet||args.name||"").trim().toLowerCase();
+          if(!bad && /^build_(circuit|part|fsm|hierarchy)$/.test(tool)){ const nm=String(args.sheet||args.name||"").trim().toLowerCase();
             const s=nm && Object.values(state.project.schematics).find(x=>String(x.name).toLowerCase()===nm);
             if(s && made.has(s.id) && s.components.some(c=>c.type!=="JUNCTION")) args=Object.assign({}, args, {sheet:s.name, replace:true}); }
           const before=new Set(Object.keys(state.project.schematics));
           const t0=performance.now();
           const r=bad ? {ok:false, error:bad} : await aiagCall(tool, args);
           Object.keys(state.project.schematics).forEach(id=>{ if(!before.has(id)) made.add(id); });
+          const passNote=typeof aiagOracleAfter==="function" ? aiagOracleAfter(run, tool, r) : null;
           let content=r.ok ? aiagClip(JSON.stringify(r.result), 6000) : "ERROR: "+r.error;
-          if(r.ok && /^build_(circuit|part|fsm)$/.test(tool) && r.result && r.result.sheet){
+          if(r.ok && /^build_(circuit|part|fsm|hierarchy)$/.test(tool) && r.result && r.result.sheet){
             const s=Object.values(state.project.schematics).find(x=>x.name===r.result.sheet), key=r.result.sheet+"|"+(s?sheetHash(s):"");
             if(built.has(key)) content+="\n(system) This is exactly the circuit you had already built on that sheet — rebuilding changed nothing. Do not rebuild it again.";
             built.add(key); }
+          if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
+          if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
+            messages.push({role:"user", content:passNote}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -17412,6 +17503,7 @@ async function aiAgentRun(msg){
           // which sheet this call worked on: the tool's own answer, else its argument, else the one on screen
           const on=(r.ok && r.result && r.result.sheet) || args.sheet || (activeSch()||{}).name;
           if(r.ok && AIAG_EDIT_OPS.has(tool) && on){ needCheck.add(on); needSim.add(on); }
+          if(r.ok && (AIAG_EDIT_OPS.has(tool) || /^build_/.test(tool)) && on) run.touched.add(on);
           if(r.ok && tool==="check") needCheck.delete(on);
           const R=r.ok&&r.result||{}, circular=r.ok && (R.independent===false || R.pass===null || R.pending || (R.result&&(R.result.independent===false||R.result.pending)));
           // a spec still waiting for its circuit (set first, as asked) is not a failed check
@@ -17419,8 +17511,15 @@ async function aiAgentRun(msg){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
+        if(aiagFingerprint()===fp0) stall++; else stall=0;
+        if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";
+          run.steps.push({kind:"nudge", text:`${stall} rounds without a change — asked to finish`});
+          messages.push({role:"user", content:`(system) The last ${stall} rounds changed nothing on any sheet. Stop trying the same thing. `
+            +"If you were wiring blocks: suggest_wires {sheet, apply:true} connects the pins it can match by name in one call — try it once. "
+            +"Then answer in Thai: what is done, what is still not connected, and what the user should do."}); }
         // twice nothing independent to check against: say so and finish — do not loop until the step limit
-        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3;
+        if(circularN>=2 && stopAt===Infinity){ stopAt=i+3; stopWhy="circular";
           run.steps.push({kind:"nudge", text:"no independent check possible — asked to finish"});
           messages.push({role:"user", content:"(system) There is nothing independent to check this circuit against. Stop building and answer now in Thai: what you built, what the simulation shows, and that it was checked only against your own table / formula (the user should confirm it against the lab sheet)."}); }
         continue;
@@ -17434,12 +17533,25 @@ async function aiAgentRun(msg){
         messages.push({role:"user", content:`(system) You changed ${miss} but did not verify ${needCheck.size+needSim.size>2?"them":"it"}. Call those tools with sheet set to that name, compare the result with what the circuit must do, fix it if it is wrong, then answer.`});
         continue;
       }
-      run.final=String(m.content||"").trim() || "(ไม่มีคำตอบ)";
+      // it changed a circuit that nothing independent has confirmed: once, point at derive_spec / set_spec
+      if(!run.verified && run.touched.size && !gated && stopAt===Infinity){
+        gated=true; think=true; const sh=[...run.touched].join(", ");
+        run.steps.push({kind:"nudge", text:"not checked against the request: "+sh});
+        messages.push({role:"user", content:`(system) Nothing has checked '${sh}' against the REQUEST yet. Call derive_spec {request:<the user's words>, sheet} — or set_spec with what the request says (formula / table.ones), not your circuit's table — then check_spec. If the request gives nothing to check against, answer and say it is unchecked.`});
+        continue;
+      }
+      run.final=(String(m.content||"").trim() || "(ไม่มีคำตอบ)");
       break;
     }
-    if(!run.final && !run.error) run.error=`หยุดที่ ${AIAG_MAX_STEPS} รอบ — งานนี้อาจใหญ่เกินไปสำหรับโมเดลในเครื่อง`;
+    if(run.cancel && !run.final){ run.error="หยุดแล้ว ("+(run.cancelWhy||"สั่งหยุด")+")"; run.stopped=true; }
+    if(!run.final && !run.error){ run.error=`หยุดที่ ${maxSteps} รอบ — งานนี้อาจใหญ่เกินไปสำหรับโมเดลในเครื่อง`; run.stopped=true; }
+    if(run.final && typeof aiagVerdict==="function" && !run.fastFinal) run.final+=aiagVerdict(run);
   }catch(e){ run.error=String(e&&e.message||e); }
-  run.state=run.error?"error":"done"; run.seconds=Math.round((Date.now()-run.started)/100)/10;
+  run.state=run.final?"done":run.stopped?"stopped":"error"; run.seconds=Math.round((Date.now()-run.started)/100)/10;
+  run.resumable=!run.final && !!run._messages;
+  if(typeof aiagDeescalate==="function") aiagDeescalate(run);
+  if(sb) sb.remove();
+  aiagRemember(run);
   live(run.error?"หยุด":`เสร็จ · ${run.steps.filter(s=>s.kind==="tool").length} ขั้น · ${run.seconds} วิ`);
   if(run.final) aiAppend("ai", run.final);
   if(run.error) aiAppend("ai", "เอเจนต์: "+run.error, {err:true});
@@ -17467,7 +17579,8 @@ async function aiAgentRun(msg){
     if(AICHAT.mode!=="agent" || !msg || msg[0]==="/" || AICHAT.busy) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
     AICHAT.busy=true; aiSetBusy(true);
-    try{ return await aiAgentRun(msg); } finally{ AICHAT.busy=false; aiSetBusy(false); }
+    const opts=AIAG.nextOpts||{}; AIAG.nextOpts=null;
+    try{ return await aiAgentRun(msg, opts); } finally{ AICHAT.busy=false; aiSetBusy(false); }
   };
   try{ const m=localStorage.getItem("schstudio.aiMode"); if(m==="agent" && /^https?:/.test(location.protocol)) aiSetMode("agent"); }catch(_){}
 }
@@ -17478,8 +17591,13 @@ function aiagChatLog(from){
     text:aiagClip(d.innerText.trim(), 3000), error:d.classList.contains("err")||undefined}));
 }
 MCP_OPS.ai_chat = a=>{
+  if(AICHAT.busy || AIAG.pending) mcpFail("the chat is still busy with the previous message", "call ai_chat_status until it is done, or ai_chat_stop");
+  let prev=null;
+  if(a.resume){ prev=[...AIAG.runs].reverse().find(r=>a.run_id ? r.id===+a.run_id : true);
+    if(!prev || !prev.resumable) mcpFail("no run to resume"+(prev?` — run ${prev.id} ended with an answer or cannot be continued`:""), "resume works on a run stopped by ai_chat_stop, the step limit or the time budget, in this page (not after a reload)");
+    a=Object.assign({}, a, {message:"(ทำต่อ) "+prev.message, mode:"agent"}); }
   const msg=String(a.message||"").trim(); if(!msg) mcpFail("message is required — what the user would type in the chat");
-  if(AICHAT.busy || AIAG.pending) mcpFail("the chat is still busy with the previous message", "call ai_chat_status until it is done");
+  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev, noEscalate:a.escalate===false};
   if(!AICHAT.open) toggleAiChat();
   if(a.mode){ if(!["build","qa","agent"].includes(a.mode)) mcpFail("mode is build | qa | agent"); aiSetMode(a.mode); }
   const t=$("#acInput"); t.value=msg;
@@ -17490,22 +17608,31 @@ MCP_OPS.ai_chat = a=>{
   return {started:true, mode:AICHAT.mode, next:"call ai_chat_status (it waits up to `wait` s) until state is 'done'"};
 };
 MCP_OPS.ai_chat_status = async a=>{
-  const cap=AIAG.capture; if(!cap) return {state:"none", next:"send something with ai_chat first"};
+  const cap=AIAG.capture;
+  // a finished run by id, or the latest one when this page has no capture (it was reloaded)
+  if(a.run_id!=null || !cap){
+    const live=AIAG.runs.find(r=>r.id===+a.run_id), old=aiagStored(), hit=live ? aiagRunSummary(live, a.detail==="full") : (a.run_id!=null ? old.find(x=>x.id===+a.run_id) : old[old.length-1]);
+    if(!hit) return {state:"none", next:"send something with ai_chat first", recent_runs:old.map(x=>({id:x.id, message:aiagClip(x.message,80), state:x.state}))};
+    return {state:hit.state==="running"?"running":"done", from:live?"this page":"saved (the page was reloaded since)", agent:hit,
+      recent_runs:old.map(x=>({id:x.id, message:aiagClip(x.message,80), state:x.state, at:x.at}))};
+  }
   const until=Date.now()+1000*Math.max(1, Math.min(40, +a.wait||40));
   while(!cap.done && Date.now()<until) await new Promise(r=>setTimeout(r, 300));
   const out={state:cap.done?"done":"running", mode:cap.mode, message:cap.message, seconds:cap.done?cap.seconds:Math.round((Date.now()-cap.started)/1000),
              chat:aiagChatLog(cap.from)};
   if(cap.error) out.error=cap.error;
   const run=AIAG.seq>cap.runBefore ? AIAG.runs.find(r=>r.id===cap.runBefore+1) : null;
-  if(run){
-    const detail=a.detail||"steps";
-    out.agent={state:run.state, final:run.final, error:run.error||undefined, model_calls:run.model_calls,
-      model_seconds:Math.round(run.model_seconds*10)/10, tokens:run.tokens,
-      steps:run.steps.map(s=>s.kind!=="tool" ? (detail==="full"||s.kind==="nudge" ? s : {kind:s.kind, text:aiagClip(s.text, 300)})
-        : detail==="full" ? s : {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms})};
-  }
+  if(run) out.agent=aiagRunSummary(run, a.detail==="full");
+  if(run && run.resumable) out.next_resume="ai_chat {resume:true} continues this run from where it stopped";
   if(!cap.done) out.next="still running — call ai_chat_status again";
   return out;
+};
+MCP_OPS.ai_chat_stop = async a=>{
+  const run=AIAG.cur;
+  if(!aiagStop(a.reason||"สั่งหยุดผ่าน MCP")) return {stopped:false, note:"nothing is running", last:run?{id:run.id, state:run.state}:null};
+  // wait for the loop to notice (the model call is aborted at once; a tool that is running finishes first)
+  const until=Date.now()+15000; while(run.state==="running" && Date.now()<until) await new Promise(r=>setTimeout(r, 200));
+  return {stopped:true, run:run.id, state:run.state, resumable:!!run.resumable, next:"ai_chat {resume:true} to continue it, or ai_chat with a new message"};
 };
 MCP_OPS.ai_model = async a=>{
   if(!/^https?:/.test(location.protocol)) mcpFail("the local model needs the FPGA Ecosystem app");
@@ -17525,6 +17652,8 @@ MCP_OPS.ai_model = async a=>{
     embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
 };
+/* run ids go on across reloads, so a saved run is never overwritten by a new one with the same id */
+try{ AIAG.seq=Math.max(0, ...aiagStored().map(x=>+x.id||0)); }catch(_){}
 
 /* ===== 19. The module library (Modules tab) over MCP — and modules that keep their sub-blocks ===
    "เพิ่มโมดูลผ่าน mcp ได้ไหม": Claude (and the local agent) can list, save, place, open and delete
@@ -18057,7 +18186,8 @@ function partBuild(kind, a){
   let it=part.build(p); if(it && it.W) it={module:it.module, components:it.components, nets:it.nets};
   const bits=it.bits;
   it.module=sanId(a.name||it.module||kind);
-  const dr=aiDrawIntent(it);
+  // the throw-away copy a big part is checked on needs connections, not routed wires (20 s for lab 6's top)
+  const dr=a._check ? drawIntent(it, {noRoute:true}) : aiDrawIntent(it);
   if(!dr||!dr.ok) mcpFail("could not draw the part: "+((dr&&(dr.error||(dr.errors||[]).map(e=>e.msg||e).join("; ")))||"?"));
   const sch=dr.sch;
   if(part.after) part.after(sch, p, Object.assign({bits}, it));
@@ -18073,9 +18203,12 @@ function partBuild(kind, a){
   // a big divider cannot be run clock by clock: its generator is checked on a small N instead
   let v;
   if(part.seq){ const S=part.seq(p);
-    if(S.small){ const tmp=partBuild(kind, Object.assign({}, a, {n:S.small, name:"__chk", bus:false}));
-      delete state.project.schematics[tmp.sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==tmp.sch.id);
-      v=Object.assign({}, tmp.verify, {method:`ตัวสร้างเดียวกันที่ N=${S.small}: `+tmp.verify.method}); }
+    if(S.small){ const sp=typeof S.small==="object"?S.small:{n:S.small}, had=new Set(Object.keys(state.project.schematics));
+      const tmp=partBuild(kind, Object.assign({}, a, sp, {name:"__chk", bus:false, _check:true}));
+      // the check copy and any sub-sheet only it needed (a small divider) go again
+      Object.keys(state.project.schematics).forEach(id=>{ if(!had.has(id)) delete state.project.schematics[id]; });
+      state.openTabs=(state.openTabs||[]).filter(i=>state.project.schematics[i]);
+      v=Object.assign({}, tmp.verify, {method:`ตัวสร้างเดียวกันที่ ${Object.entries(sp).map(([k,x])=>(k==="n"?"N":k)+"="+x).join(", ")}: `+tmp.verify.method}); }
     else v=partVerifySeq(sch, part, p); }
   else v=partVerifyComb(sch, part, p);
   if(!v.pass){ delete state.project.schematics[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); renderAll();
@@ -18102,7 +18235,7 @@ MCP_OPS.build_part = a=>{
   mcpBeforeChange("สร้าง "+kind);
   const r=partBuild(kind, a);
   let sch=r.sch;
-  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
+  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified","pinmap"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
     delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
   else if(want) sch.name=uniqueSchName(want, sch.id);
   openSchTab(sch.id); mcpActivity("สร้าง "+PARTS[kind].label); mcpCommit(sch); try{ zoomFit(); }catch(_){}
@@ -18465,6 +18598,10 @@ function specCheck(sch){
 function specFormulaMismatches(text, tt){
   const group=names=>{ const P={}; names.forEach((n,i)=>{ const m=/^(.*)\[(\d+)\]$/.exec(n), base=(m?m[1]:n), k=base.toLowerCase();
       (P[k]=P[k]||{name:base, bits:[]}).bits.push({i, bit:m?+m[2]:0, col:n}); });
+    // per-bit ports a0..a3 are also the number a (when no port is called a): "{cout,s} = a + b + cin" on a0..a3, s0..s3
+    const num={}; names.forEach((n,i)=>{ const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(n); if(m) (num[m[1].toLowerCase()]=num[m[1].toLowerCase()]||{name:m[1], bits:[]}).bits.push({i, bit:+m[2], col:n}); });
+    Object.entries(num).forEach(([k,g])=>{ if(P[k] || g.bits.length<2) return; const b=g.bits.map(x=>x.bit).sort((x,y)=>x-y);
+      if(b.every((v,j)=>v===j)) P[k]=g; });
     Object.values(P).forEach(p=>p.width=Math.max(...p.bits.map(b=>b.bit))+1); return P; };
   const IN=group(tt.inputs), OUT=group(tt.outputs);
   const src=String(text).replace(/(\w+)\[\d+:\d+\]/g,"$1").replace(/(\w+)\[(\d+)\]/g,"$1__b$2");
@@ -18876,6 +19013,21 @@ function reportSheetSvg(sch){
   if(back && back!==sch.id) openSchTab(back);
   return new XMLSerializer().serializeToString(clone);
 }
+/* a timing diagram of the first clocks: 1-bit signals as high/low lines, buses as their value per clock */
+function reportWaveSvg(sq, n){
+  n=Math.min(n||16, sq.rows.length);
+  const sig=[...sq.inputs.map((nm,k)=>({nm, v:r=>r[1][k]})), ...sq.outputs.map((nm,k)=>({nm, v:r=>(r[4]||r[3])[k]}))];
+  const W=34, H=24, L=Math.max(40, 8*Math.max(...sig.map(s=>s.nm.length))+10), wid=L+W*n+10, hgt=H*(sig.length+1)+6;
+  const one=s=>sq.rows.slice(0,n).every(r=>{ const x=+s.v(r); return x===0||x===1; });
+  let g=`<text x="4" y="16" font-size="11" fill="#555">clock</text>`+Array.from({length:n},(_,i)=>`<text x="${L+W*i+W/2}" y="16" font-size="10" text-anchor="middle" fill="#555">${i}</text><line x1="${L+W*i}" y1="20" x2="${L+W*i}" y2="${hgt}" stroke="#eee"/>`).join("");
+  sig.forEach((s,k)=>{ const y=H*(k+1)+4, hi=y+3, lo=y+H-5;
+    g+=`<text x="4" y="${y+H/2+4}" font-size="12" font-family="monospace">${esc(s.nm)}</text>`;
+    if(one(s)){ let d=""; sq.rows.slice(0,n).forEach((r,i)=>{ const yy=+s.v(r)?hi:lo; d+=(i?` L${L+W*i},${yy}`:`M${L},${yy}`)+` L${L+W*(i+1)},${yy}`; });
+      g+=`<path d="${d}" fill="none" stroke="#1d4ed8" stroke-width="1.6"/>`; }
+    else sq.rows.slice(0,n).forEach((r,i)=>{ const x=L+W*i; g+=`<path d="M${x+2},${(hi+lo)/2} L${x+5},${hi} L${x+W-5},${hi} L${x+W-2},${(hi+lo)/2} L${x+W-5},${lo} L${x+5},${lo} Z" fill="#f1f5f9" stroke="#1d4ed8"/><text x="${x+W/2}" y="${(hi+lo)/2+4}" font-size="10" text-anchor="middle">${esc(String(s.v(r)))}</text>`; });
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${wid}" height="${hgt}" viewBox="0 0 ${wid} ${hgt}" style="max-width:100%;background:#fff">${g}</svg>`;
+}
 function reportSheets(){
   const P=state.project, top=P.schematics[P.topId], out=[], seen=new Set();
   const walk=s=>{ if(!s||seen.has(s.id)) return; seen.add(s.id); out.push(s); s.components.forEach(c=>{ const sub=subSchOf(c); if(sub) walk(sub); }); };
@@ -18901,7 +19053,8 @@ function reportHtml(opts){
       else if(j.ok) body+=`<p class="muted">อินพุต ${j.truth_table.inputs.length} บิต — ตารางความจริงยาวเกินกว่าจะใส่ในรายงาน</p>`; }
     else { const j=clientSeqSim(s, 16);
       if(j.ok){ const sq=j.sequence;
-        body+=`<h3>การทำงานทีละ clock (16 clock แรก)</h3>`+tbl(["clock", ...sq.inputs, ...sq.outputs], sq.rows.map(r=>[String(r[0]), ...r[1].map(String), ...(r[4]||r[3]).map(String)])); } }
+        body+=`<h3>การทำงานทีละ clock (16 clock แรก)</h3>`+tbl(["clock", ...sq.inputs, ...sq.outputs], sq.rows.map(r=>[String(r[0]), ...r[1].map(String), ...(r[4]||r[3]).map(String)]));
+        try{ body+=`<h3>ไทมิ่งไดอะแกรม</h3><div class="wave">${reportWaveSvg(sq, 16)}</div>`; }catch(_){} } }
     if(s.fsm && s.fsm.model){ try{ body+=`<h3>State diagram</h3>${fsmSvg(s.fsm.model)}${fsmTableHtml(s.fsm.model)}`; }catch(_){} }
     if(s.spec){ const r=specCheck(s); body+=`<h3>ข้อกำหนด (acceptance test)</h3><p>${esc2(specDescribe(s.spec))} — <b>${r&&r.pass?"✓ ผ่าน":"✗ ไม่ผ่าน"}</b></p>`; }
     if(sheetVerified(s)) body+=`<p class="muted">ตรวจแล้ว: ${esc2(s.verified.how)}</p>`;
@@ -18926,10 +19079,13 @@ pre{font-size:11px;background:#f6f6f6;border:1px solid #ccc;padding:8px;white-sp
 ${sec}${vhdl}<p class="muted">สร้างโดย FPGA Ecosystem — Schematic Studio</p></body></html>`;
 }
 async function makeReport(opts){
+  opts=opts||{};
   const html=reportHtml(opts), name=sanId(($("#projectName")||{}).value||state.project.name||"project");
-  let saved=null;
-  if(/^https?:/.test(location.protocol)){ try{ saved=await mcpSaveFile(name, name+"_report.html", html); }catch(_){} }
-  return {html, saved};
+  let saved=null, pdf=null, pdfError=null;
+  if(/^https?:/.test(location.protocol)){ try{ saved=await mcpSaveFile(name, name+"_report.html", html); }catch(_){}
+    // the PDF, printed by the app's own browser (Edge on Windows) — no print dialog for the student
+    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:name+"/"+name+"_report.html"}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
+  return {html, saved, pdf, pdf_error:pdfError||undefined};
 }
 GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแลป", desc:"รูปวงจรทุกชั้น, ตารางความจริง, สมการ, ผลทีละ clock, ขาบอร์ด, VHDL — พิมพ์เป็น PDF หรือเปิดใน Word", run:async()=>{
   const r=await makeReport({});
@@ -18939,7 +19095,7 @@ GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแล�
   // Word opens an HTML file named .doc as a document
   const doc=new Blob(["﻿"+r.html.replace('<div class="bar">','<div class="bar" style="display:none">')], {type:"application/msword"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(doc); a.download=sanId(state.project.name||"project")+"_report.doc"; a.textContent="report.doc";
-  toast(r.saved?`บันทึกรายงานลงโฟลเดอร์โปรเจกต์แล้ว (${r.saved})`:"เปิดรายงานในแท็บใหม่แล้ว — พิมพ์เป็น PDF ได้จากปุ่มบนหน้า", "ok", 6000);
+  toast(r.pdf?`บันทึกรายงานเป็น PDF แล้ว (${r.pdf})`:r.saved?`บันทึกรายงานลงโฟลเดอร์โปรเจกต์แล้ว (${r.saved})`+(r.pdf_error?` — PDF: ${r.pdf_error}`:""):"เปิดรายงานในแท็บใหม่แล้ว — พิมพ์เป็น PDF ได้จากปุ่มบนหน้า", "ok", 7000);
   setTimeout(()=>{ try{ a.click(); }catch(_){} }, 300);
 }});
 {
@@ -18951,9 +19107,9 @@ GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแล�
 }
 MCP_OPS.make_report = async a=>{
   const sheets=a.sheets&&a.sheets.length ? a.sheets.map(n=>mcpSheet(n)) : null;
-  const r=await makeReport({sheets, vhdl:a.vhdl});
-  return {saved:r.saved||null, sheets:(sheets||reportSheets()).map(s=>s.name), size_kb:Math.round(r.html.length/1024),
-    note:r.saved?"the user opens it from the project folder and prints to PDF":"(not saved: the editor was opened from disk)"};
+  const r=await makeReport({sheets, vhdl:a.vhdl, pdf:a.pdf});
+  return {saved:r.saved||null, pdf:r.pdf||null, pdf_error:r.pdf_error, sheets:(sheets||reportSheets()).map(s=>s.name), size_kb:Math.round(r.html.length/1024),
+    note:r.pdf?"the PDF is in the project folder next to the .html":r.saved?"the user opens the .html from the project folder and prints to PDF":"(not saved: the editor was opened from disk)"};
 };
 
 /* ===== 28. Lab helper: the lab sheet as a checklist, one step at a time (Tools ▸ ผู้ช่วยทำแลป) =====
@@ -19827,6 +19983,8 @@ function aifInputsOf(sch){ try{ const j=clientCombSim(sch); return j.ok ? j.trut
     const fp=partFromMessage(msg);
     if(!fp || !fp.simple) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
+    // a big part (a whole lab) takes half a minute: say so before the page is busy drawing it
+    aiAppend("ai", `⏳ กำลังสร้าง ${PARTS[fp.kind].label} จากคลังชิ้นส่วน…`); await new Promise(r=>setTimeout(r, 60));
     try{
       const r=await MCP_OPS.build_part(Object.assign({kind:fp.kind}, fp.args));
       const io=d=>r.ports.filter(p=>p.dir===d).map(p=>p.name+(p.width>1?"["+(p.width-1)+":0]":"")).join(", ");
@@ -19978,6 +20136,1092 @@ const AIO_MORE=/(ต่อ(กับ|เข้า|ไป)|เชื่อม|con
   specRun=function(sch){ const r=_sr.apply(this, arguments);
     if(r && r.pending && sch.specResult){ sch.specResult.summary="⏳ รอวงจร"; delete sch.verified; }
     return r; };
+}
+
+/* ===== 35. Whole lab systems as parts: the top sheet of lab 6 assembled by code ===================
+   Testing the in-app AI on lab 6 (Qwen3.5 4B, agent mode): it split the design into blocks and built
+   each one well, then spent 250 s + 10 min and connected 2 wires — wiring a dozen blocks together is
+   past what a 4B model can do. So the system is a part like any other: the verified blocks from the
+   library (divider, edge detector, BCD validity, 2-digit counter, BCD comparator, 4-digit scanner)
+   placed and wired by code, the glue (button sampled every tick, start/stop toggle, error inhibit,
+   clear at yy) checked clock by clock against a model of the lab's rules — on a small divider, since
+   2 500 000 clocks per count cannot be run one by one — and the EDGE pins mapped. */
+
+const PARTS_SYS_BEFORE=new Set(Object.keys(PARTS));
+/* the clock_divider part's own model: clk_out of a ÷N divider, one clock at a time */
+function sysDivStep(N, s){
+  const M=N%2?N:N/2, bits=Math.max(1,(M-1).toString(2).length), wrap=s.c===M-1;
+  return {out:N%2?(s.c>>(bits-1))&1:s.t, c:wrap?0:s.c+1, t:N%2?0:(wrap?s.t^1:s.t)};
+}
+Object.assign(PARTS, {
+  lab6_counter:{ label:"แลป 6: ตัวนับ 00–yy ทั้งระบบ (บอร์ด EDGE)", group:"ระบบทั้งแลป",
+    desc:"yy_tens/yy_ones = ค่าสิ้นสุด yy จากสวิตช์ (SW7–4 / SW3–0, BCD) · btn = ปุ่มกลาง Start/Stop (toggle, กันเด้งด้วยการอ่านทุก tick) · นับขึ้นทีละ 1 ทุก tick (50 MHz ÷ tick = 20 Hz) วนกลับ 00 เมื่อถึง yy · err = yy ไม่ใช่ BCD หรือค่านับ > yy (หยุดนับ, กดปุ่มไม่มีผล) · a..g + an[3:0] ต่อจอ 7-seg 2 หลักขวา (สแกนด้วย 50 MHz ÷ scan) · running, tens, ones ออก LED · จับขาบอร์ดให้แล้ว",
+    params:{tick:{min:2,max:2147483648,def:2500000}, scan:{min:2,max:2147483648,def:50000}},
+    ports:()=>({in:{clk:1, btn:1, yy_tens:4, yy_ones:4}, out:{a:1,b:1,c:1,d:1,e:1,f:1,g:1, an:4, err:1, running:1, tens:4, ones:4}}),
+    build:p=>{ const t=ptIntent("lab6_counter"), clk=t.IN("clk"), btn=t.IN("btn");
+      const YT=[0,1,2,3].map(i=>t.IN("yy_tens"+i)), YO=[0,1,2,3].map(i=>t.IN("yy_ones"+i));
+      // tick: one clock-wide pulse every `tick` clocks (divider → rising-edge detector)
+      const dv=ptBlock(t, ptSub("clock_divider", {n:p.tick})); t.W(clk, dv+".clk_in");
+      const ed=ptBlock(t, ptSub("edge_detector")); t.W(clk, ed+".clk"); t.W(dv+".clk_out", ed+".x");
+      const tick=ed+".pulse";
+      // the button, sampled on every tick (~50 ms: no bounce survives) → one press = one pulse
+      const hold=d=>{ const f=t.X("DFF"), m=t.X("MUX",{params:{inputs:2}});
+        t.W(f+".q", m+".d0"); t.W(d, m+".d1"); t.W(tick, m+".s0"); t.W(m+".y", f+".d"); t.W(clk, f+".clk"); return f; };
+      const s0=hold(btn), s1=hold(s0+".q");
+      const press=t.G("AND",[tick, s0+".q", s1+".qn"]);
+      // yy must be BCD, and the count may not be past it
+      const sv=ptSub("bcd_valid"), vt=ptBlock(t, sv), vo=ptBlock(t, sv);
+      YT.forEach((x,i)=>t.W(x, vt+".d"+i)); YO.forEach((x,i)=>t.W(x, vo+".d"+i));
+      const cnt=ptBlock(t, ptSub("bcd_counter_multi", {format:"00-99"})), cmp=ptBlock(t, ptSub("bcd2_compare"));
+      for(let i=0;i<4;i++){ t.W(cnt+".tens"+i, cmp+".a_hi"+i); t.W(cnt+".ones"+i, cmp+".a_lo"+i); t.W(YT[i], cmp+".b_hi"+i); t.W(YO[i], cmp+".b_lo"+i); }
+      const err=t.G("OR",[vt+".invalid", vo+".invalid", cmp+".gt"]), ok=t.G("NOT",[err]);
+      // start/stop: a toggle flip-flop, ignored while there is an error
+      const run=t.X("DFF"); t.W(clk, run+".clk"); t.W(t.G("XOR",[run+".q", t.G("AND",[press, ok])]), run+".d");
+      const en=t.G("AND",[tick, run+".q", ok]);
+      t.W(clk, cnt+".clk"); t.W(en, cnt+".en"); t.W(t.G("AND",[en, cmp+".eq"]), cnt+".clr");    // yy → 00
+      // display: the two right-hand digits, the other two kept dark
+      const sd=ptBlock(t, ptSub("clock_divider", {n:p.scan})); t.W(clk, sd+".clk_in");
+      const disp=ptBlock(t, ptSub("seg7_mux4")); t.W(sd+".clk_out", disp+".clk");
+      for(let i=0;i<4;i++){ t.W(cnt+".ones"+i, disp+".ones"+i); t.W(cnt+".tens"+i, disp+".tens"+i);
+        t.W(t.X("GND"), disp+".hundreds"+i); t.W(t.X("GND"), disp+".thousands"+i); }
+      for(const s of "abcdefg") t.OUT(s, disp+"."+s);
+      t.OUT("an0", disp+".an0"); t.OUT("an1", disp+".an1"); t.OUT("an2", t.X("VCC")); t.OUT("an3", t.X("VCC"));
+      t.OUT("err", err); t.OUT("running", run+".q");
+      for(let i=0;i<4;i++){ t.OUT("tens"+i, cnt+".tens"+i); t.OUT("ones"+i, cnt+".ones"+i); }
+      return t; },
+    // EDGE board: SW7–4 = tens of yy, SW3–0 = ones, centre button, 7-seg, LED0 = err, LED1 = running, LED15–8 = count
+    after:sch=>{ const pm={clk:"clk", btn:"pb:4", err:"led:0", running:"led:1"};
+      for(let i=0;i<4;i++){ pm["yy_ones"+i]="sw:"+i; pm["yy_tens"+i]="sw:"+(4+i); pm["an"+i]="an:"+i; pm["ones"+i]="led:"+(8+i); pm["tens"+i]="led:"+(12+i); }
+      for(const s of "abcdefg") pm[s]="seg:"+s;
+      sch.pinmap=pm; },
+    // the glue against the lab's rules; the display is the seg7_mux4 block, checked on its own sheet
+    seq:p=>{ if(p.tick>8 || p.scan>8) return {small:{tick:4, scan:2}};
+      const N=p.tick, cycles=150;
+      const btnOn=i=>(i>=3&&i<13) || (i>=52&&i<60) || (i>=66&&i<74) || (i>=120&&i<128);
+      const yy=i=>i<90?[0,3] : i<108?[0,12] : i<135?[0,1] : [2,0];
+      return {cycles, init:{c:0,t:0,pT:0,s0:0,s1:0,run:0,cnt:0},
+        drive:i=>({btn:btnOn(i)?1:0, yy_tens:yy(i)[0], yy_ones:yy(i)[1]}),
+        step:(s,v)=>{ const d=sysDivStep(N, s), tick=d.out&&!s.pT?1:0;
+          const T=Math.floor(s.cnt/10), O=s.cnt%10;
+          const err=v.yy_tens>9 || v.yy_ones>9 || T*16+O > v.yy_tens*16+v.yy_ones ? 1 : 0;
+          const press=tick && s.s0 && !s.s1, en=tick && s.run && !err;
+          const eq=T===v.yy_tens && O===v.yy_ones;
+          return {out:{err, running:s.run, tens:T, ones:O},
+            state:{c:d.c, t:d.t, pT:d.out, s0:tick?v.btn:s.s0, s1:tick?s.s0:s.s1,
+              run:s.run^(press && !err ? 1 : 0), cnt:en&&eq ? 0 : en ? (s.cnt+1)%100 : s.cnt}}; }}; } },
+});
+const PARTS_SYSTEMS=Object.keys(PARTS).filter(k=>!PARTS_SYS_BEFORE.has(k));
+
+/* "ทำแลป 6", "digital counter 00-yy" → the whole system, from the agent and from build mode */
+{
+  const _pf=partFromMessage;
+  partFromMessage=function(msg){
+    const t=" "+String(msg||"").toLowerCase()+" ";
+    if(/(lab|แลป|แล็บ|แลบ|ใบงาน(?:ที่)?)\s*-?\s*0?6(?![\d.])|00\s*[-–]\s*yy|digital\s*counter|ตัวนับดิจิ(ทั|ตอ)ล/.test(t)
+       && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
+      const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
+      return {kind:"lab6_counter", args:sm?{sheet:sm[1]}:{}, simple:true, named:[]};
+    }
+    return _pf.apply(this, arguments);
+  };
+}
+
+/* ===== 36. The independent oracle, and the gate that makes "verified" mean something ==============
+   The root of most in-app AI failures: the model built a circuit from ITS OWN table and then checked it
+   against that same table — a wrong prime detector / a misread "ไม่ d" came back "ตรวจแล้วถูกต้อง".
+   Marking such a check "NOT A CHECK" (33) made it honest but left the agent nothing that could ever
+   pass, so it looped until the step limit. Here the yardstick comes from the REQUEST, derived by code:
+     - equations written in it (34: aioEquations) → a formula spec;
+     - a minterm list "f(a,b,c) = Σm(1,2,4,7)" → a table over those inputs;
+     - "1 when the n-bit input is prime / even / > k …" (34: aioPredicate) → the rows;
+     - a part it names ("4-bit adder", "BCD to 7-seg", "mod-6 counter") → spec kind "part": the sheet is
+       checked against that part's reference model (22: partVerifyComb / partVerifySeq), by port name.
+   MCP derive_spec (also the agent's) puts it on a sheet; the agent derives it itself before the first
+   model call and attaches it to the sheet it builds. A pass of a spec that is not the circuit's own
+   table ends the run; the final answer always ends with the APP's verdict, not the model's claim. */
+
+/* "f(a,b,c) = Σm(1,2,4,7)", "y = minterms 1,3,5 of a b c" → {out, inputs, ones} or null */
+function oracleMinterms(msg){
+  const s=String(msg||"");
+  const m=/([A-Za-z_]\w*)\s*(?:\(\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)+)\s*\))?\s*=\s*(?:Σ|∑|sum|sigma)?\s*m(?:interms?)?\s*\(?\s*(\d+(?:\s*,\s*\d+)*)\s*\)?/i.exec(s);
+  if(!m) return null;
+  let inputs=m[2] ? m[2].split(",").map(x=>x.trim()) : null;
+  if(!inputs){ const li=/(?:inputs?|ขาเข้า|อินพุต)\s*[:：]?\s*([A-Za-z_]\w*(?:[\s,]+[A-Za-z_]\w*)+)/i.exec(s);
+    if(li) inputs=li[1].split(/[\s,]+/).filter(x=>x && !/^(and|และ|output|ขาออก)$/i.test(x)); }
+  const ones=m[3].split(",").map(x=>+x.trim());
+  if(!inputs){ const n=Math.max(1, (Math.max(...ones)).toString(2).length); inputs=Array.from({length:n},(_,i)=>String.fromCharCode(97+i)); }
+  if(inputs.length>10 || ones.some(v=>v>=(1<<inputs.length))) return null;
+  return {out:m[1], inputs, ones:[...new Set(ones)].sort((a,b)=>a-b)};
+}
+/* the per-bit port names a part gets (bus:true → the base names) */
+function oraclePartPorts(kind, p, bus){
+  const P=PARTS[kind].ports(p), names=side=>Object.entries(P[side]).filter(([,w])=>w>0)
+    .flatMap(([b,w])=>w>1&&!bus ? Array.from({length:w},(_,i)=>b+(w-1-i)) : [w>1?`${b}[${w-1}:0]`:b]);
+  return {in:names("in"), out:names("out")};
+}
+/* the acceptance test a request states, derived by code — {ok, source, what, spec, ports} | {ok:false, reason} */
+function oracleDerive(msg){
+  msg=String(msg||"").trim(); if(!msg) return {ok:false, reason:"empty request"};
+  const mt=oracleMinterms(msg);
+  if(mt) return {ok:true, source:"minterms", what:`${mt.out} = Σm(${mt.ones.join(",")}) ของ ${mt.inputs.join(" ")}`,
+    spec:{kind:"table", inputs:mt.inputs, cols:ttOnesToCols(mt.inputs.length, {[mt.out]:mt.ones})}, ports:{in:mt.inputs, out:[mt.out]}};
+  const eq=typeof aioEquations==="function" && aioEquations(msg);
+  if(eq) return {ok:true, source:"equations", what:"สมการในคำขอ "+eq.text, spec:{kind:"formula", text:eq.text}, ports:{in:eq.F.inputs, out:eq.F.outputs}};
+  const pr=typeof aioPredicate==="function" && aioPredicate(msg);
+  if(pr) return {ok:true, source:"condition", what:`${pr.out} = 1 เมื่อ ${pr.inputs.join(" ")} ${pr.what} (แถว ${pr.ones.join(", ")||"—"})`,
+    spec:{kind:"table", inputs:pr.inputs, cols:ttOnesToCols(pr.inputs.length, {[pr.out]:pr.ones})}, ports:{in:pr.inputs, out:[pr.out]}};
+  const fp=typeof partFromMessage==="function" && partFromMessage(msg);
+  if(fp && PARTS[fp.kind]){
+    let p; try{ p=partParams(fp.kind, fp.args||{}); }catch(e){ return {ok:false, reason:e.message}; }
+    const P=PARTS[fp.kind];
+    if(P.seq){ const S=P.seq(p); if(S.small) return {ok:false, reason:`${P.label}: too many clocks to check one by one — build_part ${fp.kind} is checked on a small copy`}; }
+    else if(!P.ref) return {ok:false, reason:`${P.label} has no reference model`};
+    return {ok:true, source:"part", what:`${P.label} ${JSON.stringify(p)} — เทียบกับโมเดลอ้างอิงของชิ้นส่วน`,
+      spec:{kind:"part", part:fp.kind, params:p}, ports:oraclePartPorts(fp.kind, p, !!(fp.args&&fp.args.bus))};
+  }
+  return {ok:false, reason:"the request states no equations, minterms, numeric condition or standard part the app can read"};
+}
+/* is the sheet's spec the one derived from a request (and not edited since)? */
+const oracleSig=sp=>JSON.stringify(sp||null);
+function oracleIsRequestSpec(sch){ return !!(sch && sch.spec && sch.specSource==="request" && sch.specSig===oracleSig(sch.spec)); }
+function oracleAttach(sch, o){
+  sch.spec=JSON.parse(JSON.stringify(o.spec)); sch.specSource="request"; sch.specSig=oracleSig(sch.spec); sch.specWhat=o.what;
+  delete sch.specResult; return specRun(sch);
+}
+
+/* ---- checking the new spec kinds ---- */
+{
+  const _sc=specCheck;
+  specCheck=function(sch){
+    const sp=sch && sch.spec;
+    if(sp && sp.kind==="part"){
+      if(!sch.components.some(c=>c.type!=="JUNCTION")) return _sc.apply(this, arguments);   // 34: pending
+      const P=PARTS[sp.part]; if(!P) return {pass:false, reason:"ไม่รู้จักชิ้นส่วน "+sp.part};
+      const want=P.ports(sp.params), pm=partPortMap(sch), miss=[];
+      ["in","out"].forEach(side=>Object.entries(want[side]).filter(([,w])=>w>0).forEach(([b,w])=>{
+        const L=pm[side][b]||[], ok=L.some(x=>x.bit==null && x.width===w) || (w===1&&L.length) || L.filter(x=>x.bit!=null).length===w;
+        if(!ok) miss.push(w>1?`${side} ${b}${w-1}..${b}0 (หรือบัส ${b}[${w-1}:0])`:`${side} ${b}`); }));
+      if(miss.length) return {pass:false, reason:"ชื่อขาไม่ตรงกับที่ต้องมี: "+miss.join(", "), expected_ports:oraclePartPorts(sp.part, sp.params, false)};
+      try{ const v=P.seq ? partVerifySeq(sch, P, sp.params) : partVerifyComb(sch, P, sp.params);
+        return {pass:v.pass, checked:v.method, mismatches:v.mismatch?[v.mismatch]:[], total_mismatches:v.pass?0:1, reason:v.pass?undefined:"ไม่ตรงกับโมเดลอ้างอิง: "+JSON.stringify(v.mismatch)}; }
+      catch(e){ return {pass:false, reason:String(e&&e.message||e)}; }
+    }
+    // a table over NAMED inputs: rows matched by name, whatever order the sheet's inputs are in
+    if(sp && sp.kind==="table" && Array.isArray(sp.inputs) && sch.components.some(c=>c.type!=="JUNCTION")){
+      const sim=clientCombSim(sch); if(!sim.ok) return {pass:false, reason:sim.reason||"จำลองไม่ได้"};
+      const tt=sim.truth_table, idx=sp.inputs.map(n=>tt.inputs.findIndex(x=>x.toLowerCase()===String(n).toLowerCase()));
+      if(idx.some(k=>k<0) || tt.inputs.length!==sp.inputs.length)
+        return {pass:false, reason:`ขาเข้าต้องเป็น ${sp.inputs.join(", ")} (แผ่นนี้มี ${tt.inputs.join(", ")})`};
+      const n=sp.inputs.length, bad=[];
+      Object.entries(sp.cols).forEach(([o,col])=>{ const k=tt.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
+        if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้ (มี: "+tt.outputs.join(", ")+")"}); return; }
+        tt.rows.forEach(([iv,ov])=>{ let r=0; idx.forEach((ti,j)=>{ if(+iv[ti]) r|=1<<(n-1-j); });
+          const ch=String(col[r]||"x").toLowerCase(); if(ch==="x") return;
+          if(String(ov[k])!==ch) bad.push({output:o, row:r, inputs:sp.inputs.map((nm,j)=>nm+"="+((r>>(n-1-j))&1)).join(" "), want:+ch, got:ov[k]}); }); });
+      return {pass:!bad.length, checked:`${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs};
+    }
+    return _sc.apply(this, arguments);
+  };
+  // a spec from the request is independent by construction, even when the model typed the same table
+  const _sr=specRun;
+  specRun=function(sch){
+    const r=_sr.apply(this, arguments);
+    if(r && oracleIsRequestSpec(sch)){ r.independent=true; r.source="request"; delete r.warning;
+      if(r.pass){ sheetVerifyStamp(sch, "spec from the request ("+(sch.specWhat||sch.spec.kind)+") — "+r.checked);
+        if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดจากคำขอ (${r.checked})`; } }
+    return r;
+  };
+  const _sd=specDescribe;
+  specDescribe=function(sp){
+    if(sp && sp.kind==="part") return `ชิ้นส่วน ${PARTS[sp.part]?PARTS[sp.part].label:sp.part} ${JSON.stringify(sp.params||{})} (เทียบโมเดลอ้างอิง)`;
+    return _sd.apply(this, arguments);
+  };
+}
+/* set_spec by hand or by a model: remember whether it came before the circuit */
+{
+  const _ss=MCP_OPS.set_spec;
+  MCP_OPS.set_spec=a=>{
+    const s0=a.sheet && aifSheetByName(a.sheet), first=!s0 || !s0.components.some(c=>c.type!=="JUNCTION");
+    const r=_ss(a), sch=aifSheetByName(r.sheet);
+    if(sch){ sch.specSource=first?"spec-first":"after-build"; delete sch.specSig; }
+    if(r && r.result && sch) r.result.spec_source=sch.specSource;
+    return r;
+  };
+}
+MCP_OPS.derive_spec = a=>{
+  const req=String(a.request||a.message||"").trim(); if(!req) mcpFail("request is required: the user's words, as they wrote them");
+  const o=oracleDerive(req);
+  if(!o.ok) return {derived:false, reason:o.reason,
+    hint:"write the spec yourself FROM THE REQUEST before building (set_spec formula / table.ones) — never from your circuit's table"};
+  const out={derived:true, source:o.source, what:o.what, spec:o.spec, ports:o.ports,
+    note:"derived by code from the request, not from any circuit: a sheet that passes it is right; name the ports as listed"};
+  if(a.sheet && a.apply!==false){
+    let s=aifSheetByName(a.sheet); if(!s) s=mcpSheet(MCP_OPS.new_sheet({name:String(a.sheet).trim()}).sheet);
+    mcpBeforeChange("ข้อกำหนดจากคำขอ"); out.result=oracleAttach(s, o); out.sheet=s.name; mcpCommit(s);
+    try{ renderProjectTree(); }catch(_){}
+  }
+  return out;
+};
+
+/* ---- the agent's gate (called from 18-ai-agent) ---- */
+/* after every tool call: put the derived spec on the sheet it built, and notice a pass that counts */
+function aiagOracleAfter(run, tool, r){
+  if(!r || !r.ok || !r.result) return null;
+  const R=r.result, name=R.sheet;
+  if(run.oracle && /^build_(circuit|part|fsm|hierarchy)$/.test(tool) && name){
+    const s=aifSheetByName(name);
+    if(s && !oracleIsRequestSpec(s)){ const x=oracleAttach(s, run.oracle);
+      if(x) R.spec_check={pass:x.pass, checked:x.checked, reason:x.reason, independent:true, source:"request",
+        mismatches:(x.mismatches||[]).slice(0,4), total_mismatches:x.total_mismatches}; } }
+  const sc=R.spec_check || (tool==="check_spec" ? R : null) || (tool==="set_spec"||tool==="derive_spec" ? R.result : null);
+  const s=name && aifSheetByName(name);
+  if(sc && sc.pass===true && sc.independent!==false && s && !run.verified){
+    const req=oracleIsRequestSpec(s), how=req ? "ข้อกำหนดที่โปรแกรมอ่านจากคำขอ ("+(s.specWhat||"")+")"
+      : s.specSource==="spec-first" ? "ข้อกำหนดที่ตั้งจากคำขอก่อนสร้างวงจร: "+specDescribe(s.spec) : "ข้อกำหนด "+specDescribe(s.spec);
+    run.verified={sheet:s.name, how, checked:sc.checked, request:req};
+    return `(system) Sheet '${s.name}' passes its acceptance test (${req?"derived by the app from the request":"set from the request"}, ${sc.checked||""}). It is done: stop changing it and answer now in Thai.`;
+  }
+  return null;
+}
+/* the line the app adds to every final answer that changed a circuit */
+function aiagVerdict(run){
+  if(run.verified) return `\n\n✓ ตรวจโดยโปรแกรม: แผ่น ${run.verified.sheet} ผ่าน${run.verified.how}${run.verified.checked?" — "+run.verified.checked:""}`;
+  if(run.touched && run.touched.size) return `\n\n⚠ โปรแกรมยังไม่ได้ยืนยันแผ่น ${[...run.touched].join(", ")} กับข้อกำหนดที่เป็นอิสระจากวงจร — โปรดเทียบกับใบงาน`;
+  return "";
+}
+
+/* ===== 37. build_hierarchy: a top sheet from a block list, wired in one go ===========================
+   Testing the in-app AI on lab 6: the 4B model split the system into the right blocks, then fired
+   connect after connect and ended with 2 wires in 10 minutes. Laying out a topology is what it does
+   well; wiring bit by bit is not. So one call takes the whole plan —
+     blocks:  [{name:"cnt", part:"bcd_counter_multi", params:{format:"00-99"}}, {name:"cmp", sheet:"compare"}]
+     inputs:  ["clk", "btn", "sw[7:0]"]          outputs: ["err", "seg[6:0]"]
+     connect: [["clk","cnt.clk"], ["cnt.ones","cmp.a_lo"], ["sw[3:0]","cmp.b_lo"], ["cmp.gt","err"], ["1","cnt.en"]]
+   — expands every bus reference to bits (cnt.ones = ones0..ones3 on a per-bit block, sw[3:0], x[2]),
+   checks widths / directions / double drivers BEFORE anything is drawn, joins the obvious rest by name
+   (auto: a block's clk ← INPUT clk), draws it as one intent (placement + routing by the editor), turns
+   the declared buses back into bus ports, and reports what is still open. One undo step; nothing is
+   left behind when it fails (part sheets it made for the call are removed again). */
+const BH_CONST={"0":"GND","gnd":"GND","low":"GND","1":"VCC","vcc":"VCC","high":"VCC"};
+/* "sw[7:0]" | "clk" | {name, width} → {name, width} */
+function bhPortDecl(d){
+  if(d && typeof d==="object") return {name:String(d.name||"").trim(), width:Math.max(1, +d.width||1)};
+  const m=/^\s*([A-Za-z_]\w*)\s*(?:\[\s*(\d+)\s*(?::\s*(\d+)\s*)?\])?\s*$/.exec(String(d||""));
+  if(!m) mcpFail(`'${d}' is not a port: write clk, or sw[7:0] for a bus`);
+  const w=m[2]!=null ? (m[3]!=null ? Math.abs(+m[2]-+m[3])+1 : +m[2]+1) : 1;
+  return {name:m[1], width:w};
+}
+/* a sheet's ports grouped into buses: per-bit pins ones0..ones3 → {ones:{width:4, bits:["ones0",…]}} */
+function bhPinGroups(sub){
+  const G={}, ports=schPortList(sub);
+  ports.forEach(p=>{ const e={id:p.id, dir:p.dir, width:p.width||1};
+    G[p.id.toLowerCase()]={name:p.id, dir:p.dir, width:e.width, bits:e.width>1?null:[p.id]}; });
+  // numbered 1-bit pins also form a group (unless a pin already has that name)
+  const num={}; ports.filter(p=>(p.width||1)===1).forEach(p=>{ const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(p.id); if(!m) return;
+    const k=m[1].toLowerCase(); (num[k]=num[k]||{name:m[1], dir:p.dir, list:[]}).list.push({i:+m[2], id:p.id, dir:p.dir}); });
+  Object.entries(num).forEach(([k,g])=>{ if(G[k]) return; g.list.sort((a,b)=>a.i-b.i);
+    if(g.list.every((x,j)=>x.i===j && x.dir===g.dir)) G[k]={name:g.name, dir:g.dir, width:g.list.length, bits:g.list.map(x=>x.id)}; });
+  return G;
+}
+MCP_OPS.build_hierarchy = async a=>{
+  const P=state.project.schematics;
+  const blocks=Array.isArray(a.blocks)?a.blocks:[]; if(!blocks.length) mcpFail("blocks is required", 'e.g. blocks:[{name:"cnt", part:"bcd_counter_multi"}, {name:"cmp", sheet:"compare"}]');
+  const ins=(a.inputs||[]).map(bhPortDecl), outs=(a.outputs||[]).map(bhPortDecl);
+  const topName=String(a.sheet||a.name||"top").trim();
+  const tgt=Object.values(P).find(s=>String(s.name).toLowerCase()===topName.toLowerCase());
+  if(tgt && tgt.components.some(c=>c.type!=="JUNCTION") && !a.replace) mcpFail(`sheet '${tgt.name}' already has parts`, "replace:true rebuilds it (one undo brings it back), or give a new sheet name");
+  const had=new Set(Object.keys(P)), fail=(m,h)=>{ Object.keys(P).forEach(id=>{ if(!had.has(id)) delete P[id]; }); mcpFail(m,h); };
+  const names=new Set();
+  [...ins, ...outs].forEach(p=>{ const k=p.name.toLowerCase(); if(!p.name) mcpFail("a port without a name");
+    if(names.has(k)) mcpFail(`port '${p.name}' is declared twice`); names.add(k);
+    if(p.width>1 && /\d$/.test(p.name)) mcpFail(`bus '${p.name}' ends with a digit — its bits would be ambiguous`, "e.g. d_in[3:0] instead of d1[3:0]"); });
+  mcpBeforeChange("ประกอบแผ่น "+topName);
+  // 1. the blocks: an existing sheet, or a verified part drawn once for the project
+  const B={};
+  for(const b of blocks){
+    const nm=sanId(String(b.name||b.id||"").trim()); if(!nm) fail("every block needs a name", 'e.g. {name:"cnt", part:"bcd_counter_multi"}');
+    if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
+    let sub=null;
+    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+      try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
+      catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
+    else if(b.sheet || b.module){ const want=String(b.sheet||b.module).toLowerCase(); sub=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
+      if(!sub) fail(`block ${nm}: no sheet '${b.sheet||b.module}'`, "sheets: "+Object.values(P).map(s=>s.name).join(", ")+" — or give part:<kind>"); }
+    else fail(`block ${nm}: give sheet:<sheet name> or part:<kind>`);
+    if(tgt && sub.id===tgt.id) fail(`block ${nm} would place the sheet inside itself`);
+    B[nm.toLowerCase()]={name:nm, sub, pins:bhPinGroups(sub)};
+  }
+  // 2. references → bits (LSB first): {src:true, ref} for what drives, {sink:true, key} for what is driven
+  const IN_=Object.fromEntries(ins.map(p=>[p.name.toLowerCase(), p])), OUT_=Object.fromEntries(outs.map(p=>[p.name.toLowerCase(), p]));
+  const bitName=(p,i)=>p.width>1 ? p.name+i : p.name;
+  const slice=(w, lo, hi, what)=>{ if(hi==null) hi=lo; if(lo==null){ lo=0; hi=w-1; }
+    const L=Math.min(lo,hi), H=Math.max(lo,hi); if(H>=w) fail(`${what}: bit ${H} is past its width ${w}`);
+    const r=[]; for(let i=L;i<=H;i++) r.push(i); return r; };
+  const expand=raw=>{
+    const s=String(raw).trim(), low=s.toLowerCase();
+    if(BH_CONST[low]) return {kind:"const", type:BH_CONST[low]};
+    const m=/^([A-Za-z_]\w*)(?:\.([A-Za-z_]\w*))?(?:\[\s*(\d+)\s*(?::\s*(\d+)\s*)?\])?$/.exec(s);
+    if(!m) fail(`'${raw}' is not a signal`, "a port (clk, sw[3:0], sw[5]), a block pin (cnt.q, cnt.ones[2]) or 0 / 1");
+    const hi=m[3]!=null?+m[3]:null, lo=m[4]!=null?+m[4]:hi;
+    if(m[2]==null){
+      const p=IN_[low.replace(/\[.*$/,"")] || OUT_[low.replace(/\[.*$/,"")];
+      if(!p) fail(`'${m[1]}' is neither a declared port nor a block`, "inputs: "+ins.map(x=>x.name).join(", ")+" · outputs: "+outs.map(x=>x.name).join(", ")+" · blocks: "+Object.values(B).map(x=>x.name).join(", "));
+      const isIn=!!IN_[m[1].toLowerCase()];
+      return {kind:isIn?"src":"sink", label:s, bits:slice(p.width, lo, hi, s).map(i=>isIn ? {ref:"i_"+bitName(p,i)} : {key:"o:"+bitName(p,i), out:bitName(p,i)})};
+    }
+    const bk=B[m[1].toLowerCase()]; if(!bk) fail(`no block '${m[1]}'`, "blocks: "+Object.values(B).map(x=>x.name).join(", "));
+    const g=bk.pins[m[2].toLowerCase()];
+    if(!g) fail(`block ${bk.name} (${bk.sub.name}) has no pin '${m[2]}'`, "its pins: "+Object.values(bk.pins).filter(x=>x.bits).map(x=>x.dir+" "+x.name+(x.width>1?`[${x.width-1}:0]`:"")).join(", "));
+    if(!g.bits) fail(`block ${bk.name}: pin '${g.name}' is a bus port — wire its bits on a sheet with per-bit pins`, `rebuild ${bk.sub.name} without bus:true`);
+    return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>g.dir==="in" ? {key:bk.name+"."+g.bits[i], blk:bk.name, pin:g.bits[i]} : {ref:bk.name+"."+g.bits[i]})};
+  };
+  const drive={}, how={};                       // sink key → source ref (or {c:"GND"})
+  const join=(src, sink, why)=>{ sink.bits.forEach((k,i)=>{ const s=src.kind==="const" ? {c:src.type} : src.bits[i];
+      if(drive[k.key]) fail(`${sink.label}${sink.bits.length>1?` bit ${i}`:""} is driven twice (${how[k.key]} and ${why})`);
+      drive[k.key]=s; how[k.key]=why; }); };
+  (a.connect||a.connections||[]).forEach((c,ci)=>{
+    const list=Array.isArray(c) ? c : (c && c.from!=null ? [c.from].concat(c.to) : null);
+    if(!list || list.length<2) fail(`connect[${ci}] must be [from, to, …]`);
+    const E=list.map(expand), srcs=E.filter(e=>e.kind==="src"||e.kind==="const"), sinks=E.filter(e=>e.kind==="sink");
+    if(srcs.length!==1) fail(`connect[${ci}] ${JSON.stringify(list)}: needs exactly one driver (an input, a block output or 0/1), has ${srcs.length}`,
+      srcs.length ? "two outputs cannot be joined" : "an output port or a block input only receives");
+    sinks.forEach(k=>{ if(srcs[0].kind!=="const" && srcs[0].bits.length!==k.bits.length)
+      fail(`connect[${ci}]: ${srcs[0].label} is ${srcs[0].bits.length} bit(s) but ${k.label} is ${k.bits.length}`, "take a slice, e.g. sw[3:0] or cnt.ones[2]");
+      join(srcs[0], k, srcs[0].label+" → "+k.label); });
+  });
+  // 3. the obvious rest, by name: a block's clk ← INPUT clk, OUTPUT err ← the one block output named err
+  const auto=[];
+  if(a.auto!==false){
+    Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in" && g.bits).forEach(g=>{
+      const p=IN_[g.name.toLowerCase()]; if(!p || p.width!==g.width) return;
+      if(g.bits.some(b=>drive[bk.name+"."+b])) return;
+      join(expand(p.name), expand(bk.name+"."+g.name), "auto (same name)"); auto.push(`${p.name} → ${bk.name}.${g.name}`); }));
+    outs.forEach(p=>{ if(Array.from({length:p.width},(_,i)=>drive["o:"+bitName(p,i)]).some(Boolean)) return;
+      const hits=Object.values(B).flatMap(bk=>Object.values(bk.pins).filter(g=>g.dir==="out" && g.bits && g.name.toLowerCase()===p.name.toLowerCase() && g.width===p.width).map(g=>bk.name+"."+g.name));
+      if(hits.length===1){ join(expand(hits[0]), expand(p.name), "auto (same name)"); auto.push(`${hits[0]} → ${p.name}`); } });
+  }
+  // 4. the intent: one IN per input bit, the blocks, one OUT per output bit
+  const t=ptIntent(sanId(topName));
+  ins.forEach(p=>{ for(let i=0;i<p.width;i++) t.IN(bitName(p,i)); });
+  Object.values(B).forEach(bk=>t.components.push({id:bk.name, type:"block:"+bk.sub.name}));
+  const srcRef=s=>s.c ? t.X(s.c) : s.ref;
+  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return; t.W(srcRef(s), k); });
+  const undriven=[];
+  outs.forEach(p=>{ for(let i=0;i<p.width;i++){ const bn=bitName(p,i), s=drive["o:"+bn];
+    if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
+  const it={module:t.module, components:t.components, nets:t.nets};
+  const v=validateIntent(it);
+  if(!v.ok) fail("could not assemble: "+v.errors.slice(0,4).map(e=>e.msg).join("; "));
+  const dr=aiDrawIntent(it);
+  if(!dr||!dr.ok) fail("could not draw it: "+((dr&&(dr.error||(dr.errors||[]).map(e=>e.msg||e).join("; ")))||"?"));
+  let sch=dr.sch;
+  sch.components.forEach(c=>{ if(B[String(c.id).toLowerCase()]) c.label=B[String(c.id).toLowerCase()].name; });
+  sch.portOrder={in:ins.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i))), out:outs.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i)))};
+  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name);
+  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }catch(e){ console.warn("busify", e); } }
+  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
+    ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
+  else sch.name=uniqueSchName(topName, sch.id);
+  if(a.pins && typeof a.pins==="object") sch.pinmap=Object.assign({}, sch.pinmap||{}, a.pins);
+  if(a.top) state.project.topId=sch.id;
+  openSchTab(sch.id); mcpActivity("ประกอบ "+sch.name+" จาก "+blocks.length+" บล็อก"); mcpCommit(sch); try{ zoomFit(); }catch(_){}
+  // 5. what is still open
+  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in" && g.bits).forEach(g=>{
+    const miss=g.bits.filter(b=>!drive[bk.name+"."+b]); if(miss.length) open.push(`${bk.name}.${g.name}`+(g.width>1&&miss.length<g.width?` (bits ${miss.map(b=>g.bits.indexOf(b)).join(",")})`:"")); }));
+  let chk=null; try{ const c=MCP_OPS.check({sheet:sch.name}); chk={errors:c.errors, warnings:c.warnings}; }catch(_){}
+  return {sheet:sch.name, blocks:Object.values(B).map(bk=>({name:bk.name, sheet:bk.sub.name, verified:sheetVerified(bk.sub)})),
+    connected_bits:Object.keys(drive).length, auto_connected:auto, unconnected_block_inputs:open, undriven_outputs:undriven, check:chk,
+    note:open.length||undriven.length ? "draw the rest with another build_hierarchy {replace:true} (whole plan) or connect" : "every block input and output is wired"};
+};
+
+/* ===== 38. Projects kept in step with the folders, and edits in one transaction ======================
+   Testing over MCP: there was no way to delete or rename a project, so the files were edited by hand —
+   and the editor still held the deleted "test" in its own workspace, so new_project answered test_2,
+   test_3 … A project opened from a renamed folder also kept the old name written inside the file.
+     - delete_project / rename_project act on the editor's workspace AND the folder (deleted folders go
+       to Projects/.trash, not erased);
+     - rescan_projects compares the two and (prune) drops editor-only projects that hold nothing;
+     - new_project takes the name back from an empty editor-only project instead of numbering it;
+     - open_project names the project after its folder;
+     - export_project / import_project move a project as JSON text;
+     - batch runs several edits as ONE undo step, and undoes them all when one fails. */
+function prjByName(name){
+  const low=String(name||"").trim().toLowerCase();
+  return Object.values(state.projects||{}).find(p=>String(p.name||"").toLowerCase()===low) || null;
+}
+const prjParts=p=>Object.values(p.schematics||{}).reduce((n,s)=>n+(s.components||[]).filter(c=>c.type!=="JUNCTION").length, 0);
+async function prjDisk(){
+  if(!/^https?:/.test(location.protocol)) return null;
+  try{ const j=await (await fetch("/api/projects")).json(); return j.ok ? j.projects : null; }catch(_){ return null; }
+}
+/* drop a project from the editor's workspace without asking (the one on screen → another, or a blank one) */
+function prjDropFromEditor(p){
+  if(Object.keys(state.projects).length===1){ const blank=addProject("project", {activate:false}); state.activeProjectId=null; switchProject(blank.id); }
+  delete state.projects[p.id];
+  if(p.id===state.activeProjectId){ state.activeProjectId=null; switchProject(Object.keys(state.projects)[0]); }
+  renderAll();
+}
+MCP_OPS.delete_project = async a=>{
+  const name=String(a.name||"").trim(); if(!name) mcpFail("name is required");
+  const p=prjByName(name), disk=await prjDisk(), onDisk=disk && disk.find(d=>d.name.toLowerCase()===name.toLowerCase());
+  if(!p && !onDisk) mcpFail(`no project '${name}' in the editor or the workspace folder`, "rescan_projects lists both");
+  const out={name};
+  if(p){ mcpBeforeChange("ลบโปรเจกต์ "+p.name); prjDropFromEditor(p); out.removed_from_editor=true; }
+  if(onDisk && a.files!==false){ const r=await aiagPost("/api/projects/delete", {name:onDisk.name}); if(!r.ok) mcpFail(r.error||"could not delete the folder");
+    out.folder_moved_to=r.trashed; out.note="the folder is in Projects/.trash — move it back to restore it"; }
+  else if(onDisk) out.folder_kept=onDisk.name;
+  return Object.assign(out, {active_project:state.project.name});
+};
+MCP_OPS.rename_project = async a=>{
+  const name=String(a.name||"").trim(), to=sanId(String(a.to||"").trim());
+  if(!name || !to) mcpFail("name and to are required");
+  const p=prjByName(name), disk=await prjDisk(), onDisk=disk && disk.find(d=>d.name.toLowerCase()===name.toLowerCase());
+  if(!p && !onDisk) mcpFail(`no project '${name}'`, "rescan_projects lists them");
+  const clash=prjByName(to); if(clash && clash!==p) mcpFail(`the editor already has a project '${clash.name}'`, "delete_project it first, or pick another name");
+  const out={from:name, to};
+  if(onDisk){ const r=await aiagPost("/api/projects/rename", {name:onDisk.name, to}); if(!r.ok) mcpFail(r.error||"could not rename the folder"); out.folder=r.name; }
+  if(p){ mcpBeforeChange("เปลี่ยนชื่อโปรเจกต์"); p.name=to; if(p.id===state.activeProjectId){ const b=$("#projectName"); if(b) b.value=to; } mcpCommit(null); out.in_editor=p.name; }
+  return out;
+};
+MCP_OPS.rescan_projects = async a=>{
+  const disk=await prjDisk(); if(!disk) mcpFail("the workspace folder is only reachable in the app");
+  const ed=Object.values(state.projects);
+  const onDisk=new Set(disk.map(d=>d.name.toLowerCase()));
+  const only=ed.filter(p=>!onDisk.has(String(p.name).toLowerCase()));
+  const pruned=[];
+  if(a.prune) only.filter(p=>!prjParts(p) && p.id!==state.activeProjectId).forEach(p=>{ prjDropFromEditor(p); pruned.push(p.name); });
+  return {folder_projects:disk.map(d=>Object.assign({name:d.name, path:d.main}, d.name_mismatch?{name_inside_file:d.project_name}:{})),
+    editor_projects:Object.values(state.projects).map(p=>({name:p.name, parts:prjParts(p), active:p.id===state.activeProjectId||undefined,
+      saved_in_folder:onDisk.has(String(p.name).toLowerCase())})),
+    only_in_editor:only.filter(p=>!pruned.includes(p.name)).map(p=>p.name), pruned,
+    note:"prune:true drops editor-only projects with no parts (the one on screen stays); a folder whose file holds another name is renamed on open"};
+};
+/* new_project: an empty project the editor still remembers (deleted from disk) gives its name back */
+{
+  const _np=MCP_OPS.new_project;
+  MCP_OPS.new_project=async a=>{
+    const old=prjByName(a.name);
+    if(old && !prjParts(old)){ const disk=await prjDisk();
+      if(disk && !disk.some(d=>d.name.toLowerCase()===String(old.name).toLowerCase())) prjDropFromEditor(old); }
+    return _np(a);
+  };
+}
+/* open_project: the folder's name is the project's name */
+{
+  const _op=MCP_OPS.open_project;
+  MCP_OPS.open_project=async a=>{
+    const r=await _op(a), folder=String(a.path||"").split(/[\\/]/)[0];
+    if(folder && sanId(folder)!==state.project.name){ const was=state.project.name; state.project.name=sanId(folder);
+      const b=$("#projectName"); if(b) b.value=state.project.name; renderAll();
+      return Object.assign(MCP_OPS.status(), {renamed_from:was, note:`the file said '${was}'; the project is named after its folder '${folder}' (save_project writes it)`}); }
+    return r;
+  };
+}
+MCP_OPS.export_project = a=>{
+  const p=a.name ? prjByName(a.name) : state.project; if(!p) mcpFail(`no project '${a.name}' in the editor`);
+  if(p.id!==state.activeProjectId) switchProject(p.id);
+  const json=uxProjectOnlyJson(serialize());
+  return {name:p.name, bytes:json.length, json};
+};
+MCP_OPS.import_project = async a=>{
+  let text=a.json; if(text && typeof text==="object") text=JSON.stringify(text);
+  if(!text) mcpFail("json is required: the .schproj.json text (export_project gives it)");
+  let o; try{ o=JSON.parse(text); }catch(e){ mcpFail("json does not parse: "+e.message); }
+  if(!o.project && !o.workspace) mcpFail("this is not a Schematic Studio project (no project / workspace)");
+  if(a.name){ const nm=sanId(a.name); if(o.project) o.project.name=nm; Object.values((o.workspace||{}).projects||{}).forEach(p=>{ if(p) p.name=nm; }); text=JSON.stringify(o); }
+  await uxTimelineAdd("ก่อน Claude นำเข้าโปรเจกต์", true);
+  UX.expectFileLoad=true; deserialize(uxProjectFromFile(text, a.name||""));
+  const out=MCP_OPS.status();
+  if(a.save) out.saved=(await MCP_OPS.save_project({})).saved;
+  return out;
+};
+
+/* ---- batch: several edits, one undo step, all or nothing ---- */
+const BATCH_NOT=new Set(["batch","ai_chat","ai_chat_status","ai_chat_stop","ai_model","open_project","import_project","new_project","delete_project",
+  "rename_project","board_build","board_program","board_status","save_project","export_files","screenshot","restore_checkpoint","undo","redo"]);
+MCP_OPS.batch = async a=>{
+  const ops=Array.isArray(a.ops)?a.ops:[]; if(!ops.length) mcpFail("ops is required: [{tool, args}, …]");
+  if(ops.length>50) mcpFail("at most 50 ops in one batch");
+  ops.forEach((o,i)=>{ if(!o || !MCP_OPS[o.tool]) mcpFail(`ops[${i}]: unknown tool '${o&&o.tool}'`);
+    if(BATCH_NOT.has(o.tool)) mcpFail(`ops[${i}]: ${o.tool} cannot run inside a batch`); });
+  mcpBeforeChange("batch "+ops.length+" คำสั่ง");
+  snapshot();
+  const H=state.history, mark=H.stack[H.idx], results=[];
+  const back=()=>{ const i=H.stack.lastIndexOf(mark); if(i<0) return false; H.stack=H.stack.slice(0, i+1); H.idx=i; restore(mark); return true; };
+  for(let i=0;i<ops.length;i++){
+    try{ const r=await MCP_OPS[ops[i].tool](ops[i].args||{}); results.push({tool:ops[i].tool, ok:true, result:r}); }
+    catch(e){
+      const undone=a.atomic!==false && back();
+      return {ok:false, failed_at:i, tool:ops[i].tool, error:e.message, hint:e.hint, rolled_back:undone, done:results.length,
+        results:a.atomic===false?results:undefined, note:undone?"nothing of this batch was kept — fix ops["+i+"] and send it again":"the ops before it were kept"};
+    }
+  }
+  // one undo step for the whole batch
+  const i0=H.stack.lastIndexOf(mark);
+  if(i0>=0 && H.idx>i0+1){ const last=H.stack[H.idx]; H.stack=H.stack.slice(0, i0+1).concat([last]); H.idx=i0+1; }
+  try{ renderAll(); }catch(_){}
+  return {ok:true, done:results.length, results:results.map(r=>({tool:r.tool, result:r.result})), undo:"one undo step undoes the whole batch"};
+};
+
+/* ===== 39. Design rule checks the netlist needed ===================================================
+   `check` caught floating inputs and combinational loops, but not: a net two outputs drive (drawn by
+   hand through a junction — MCP connect refuses it, the canvas does not), an input pin fed from two
+   nets, logic whose output goes nowhere (a gate the student forgot to wire on — its part of the
+   circuit does nothing), an INPUT nothing reads, and a wire with no source. They join the same issue
+   list, so check, the stepper badge and the Debug list all show them. */
+const DRC_SRC=new Set(["IN","VCC","GND","CONST"]), DRC_SKIP=new Set(["JUNCTION","BUSTAP","OUT","TEXT","NOTE","LABEL"]);
+function drcSheet(sch){
+  const I=[], name=c=>compDisplay?compDisplay(c):(c.label||c.id), add=(lvl,msg,cid)=>I.push({lvl, msg, cid, schId:sch.id, ref:sch.name});
+  const outUsed=new Set(sch.wires.map(w=>w.from.cid+"|"+w.from.pid));
+  // several drivers on one net (through junctions)
+  try{ const seen=new Set();
+    sch.wires.forEach(w=>{ if(seen.has(w.id)) return; const ids=[...netWires(sch, w)]; ids.forEach(id=>seen.add(id));
+      const drv=new Map();
+      ids.map(id=>sch.wires.find(x=>x.id===id)).filter(Boolean).forEach(x=>[x.from,x.to].forEach(ep=>{ const c=comp(ep.cid,sch);
+        if(!c||c.type==="JUNCTION"||c.type==="BUSTAP") return; const p=getPorts(c).find(q=>q.id===ep.pid); if(p&&p.dir==="out") drv.set(ep.cid+"|"+ep.pid, c); }));
+      if(drv.size>1){ const L=[...drv.entries()].map(([k,c])=>name(c)+"."+k.split("|")[1]);
+        add("err", `สายเส้นเดียวมีต้นทาง ${drv.size} ตัว (multi-driver): ${L.join(", ")} — สัญญาณชนกัน`, [...drv.values()][0].id); } });
+  }catch(e){ console.warn("drc nets", e); }
+  // one input pin fed from two nets
+  const into={}; sch.wires.forEach(w=>{ const k=w.to.cid+"|"+w.to.pid; (into[k]=into[k]||new Set()).add(netKey(sch, w)); });
+  Object.entries(into).forEach(([k,S])=>{ if(S.size<2) return; const [cid,pid]=k.split("|"), c=comp(cid,sch);
+    if(!c || c.type==="JUNCTION" || c.type==="BUSTAP") return;
+    add("err", `${name(c)} ขา '${pid}' รับสายจาก ${S.size} เส้นที่ต่างกัน (multi-driver)`, cid); });
+  // logic that goes nowhere, INPUTs nothing reads
+  sch.components.forEach(c=>{
+    if(DRC_SKIP.has(c.type)) return;
+    const outs=getPorts(c).filter(p=>p.dir==="out"); if(!outs.length) return;
+    const used=outs.filter(p=>outUsed.has(c.id+"|"+p.id));
+    if(c.type==="IN"){ if(!used.length) add("warn", `INPUT ${name(c)} ไม่ได้ต่อไปไหน (ไม่มีอะไรใช้ค่านี้)`, c.id); return; }
+    if(DRC_SRC.has(c.type)) return;
+    if(!used.length) add("warn", `เอาต์พุตของ ${name(c)} ไม่ได้ต่อไปไหน — ส่วนนี้ของวงจรไม่มีผลกับขาออก`, c.id);
+  });
+  return I;
+}
+/* the net a wire belongs to, as a stable key (its lowest wire id) */
+function netKey(sch, w){ try{ return [...netWires(sch, w)].sort()[0]; }catch(_){ return w.id; } }
+{
+  const _q=uxQuietIssues;
+  uxQuietIssues=function(){
+    const base=_q.apply(this, arguments)||[];
+    const extra=[]; Object.values(state.project.schematics).forEach(s=>{ try{ extra.push(...drcSheet(s)); }catch(_){} });
+    // what the editor already says stays as it is: no second message for the same pin / part
+    const dup=i=>base.some(b=>b.schId===i.schId && b.cid && b.cid===i.cid && (/multi-driver|สายเข้าซ้อน/.test(b.msg)===/multi-driver/.test(i.msg)));
+    return base.concat(extra.filter(i=>!dup(i)));
+  };
+  const _fix=issueFix;
+  issueFix=function(m){
+    if(/ต้นทาง \d+ ตัว|รับสายจาก \d+ เส้น/.test(m)) return _fix("multi-driver");
+    if(/INPUT .* ไม่ได้ต่อไปไหน/.test(m)) return "ต่อ INPUT นี้เข้ากับเกตที่ควรใช้ค่านี้ หรือลบทิ้งถ้าไม่ได้ใช้";
+    if(/ไม่ได้ต่อไปไหน/.test(m)) return "ต่อเอาต์พุตนี้ไปยังที่ที่ต้องใช้ (เกตถัดไปหรือ OUTPUT) หรือลบเกตนี้ถ้าไม่ต้องการ";
+    return _fix.apply(this, arguments);
+  };
+}
+
+/* ===== 40. Are two circuits the same? (Tools ▸ เทียบวงจร, MCP compare_sheets) =======================
+   Marking a student's gates against a reference with no AI at all: the two sheets are driven with the
+   same inputs, port by port by name, and every output is compared —
+     - no flip-flops: every input row (≤ 12 input bits), else corners + 1000 random vectors;
+     - flip-flops: clock by clock from reset, the same random stimulus into both (clk is the clock).
+   A sheet can also be compared with a formula, a truth table, a library part or the request's own words
+   (36-oracle-gate: the same checks as an acceptance test, run once without touching the sheet's spec). */
+const eqPorts=sch=>schPortList(sch).map(p=>({name:p.id, dir:p.dir, width:p.width||1}));
+const eqHasFF=sch=>{ try{ return flattenSchematic(sch).sch.components.some(c=>PROBE_SEQ[c.type]); }catch(_){ return false; } };
+const eqNum=v=>typeof v==="string" ? (/^[01]+$/.test(v)?parseInt(v,2):NaN) : (v==null?NaN:+v);
+const EQ_CLOCK=/^(clk|clock|clk_?in|clk50|clk_?50m?)$/i;
+function eqRng(seed){ let s=seed>>>0||1; return ()=>{ s=(Math.imul(s,1103515245)+12345)>>>0; return s; }; }
+/* compare sheet A with sheet B */
+function eqSheets(A, B, opts){
+  opts=opts||{};
+  const pa=eqPorts(A), pb=eqPorts(B), k=p=>p.name.toLowerCase();
+  const ins=pa.filter(p=>p.dir==="in"), insB=pb.filter(p=>p.dir==="in");
+  const diffPorts=[];
+  ins.forEach(p=>{ const q=insB.find(x=>k(x)===k(p)); if(!q) diffPorts.push(`INPUT ${p.name} อยู่ใน ${A.name} แต่ไม่มีใน ${B.name}`); else if(q.width!==p.width) diffPorts.push(`INPUT ${p.name}: ${p.width} บิต กับ ${q.width} บิต`); });
+  insB.forEach(q=>{ if(!ins.find(p=>k(p)===k(q))) diffPorts.push(`INPUT ${q.name} อยู่ใน ${B.name} แต่ไม่มีใน ${A.name}`); });
+  const outsA=pa.filter(p=>p.dir==="out"), outsB=pb.filter(p=>p.dir==="out");
+  const common=outsA.filter(p=>outsB.find(q=>k(q)===k(p) && q.width===p.width));
+  const onlyA=outsA.filter(p=>!common.includes(p)).map(p=>p.name), onlyB=outsB.filter(q=>!common.find(p=>k(p)===k(q))).map(q=>q.name);
+  if(diffPorts.length) return {equivalent:false, reason:"ขาเข้าไม่ตรงกัน", port_differences:diffPorts, hint:"ตั้งชื่อ/ความกว้างขาเข้าให้ตรงกันก่อน แล้วเทียบอีกครั้ง"};
+  if(!common.length) return {equivalent:false, reason:"ไม่มีขาออกชื่อเดียวกันให้เทียบ", only_in_a:onlyA, only_in_b:onlyB};
+  const seq=eqHasFF(A) || eqHasFF(B), diffs=[];
+  let method;
+  if(!seq){
+    const total=ins.reduce((n,p)=>n+p.width,0), V=[];
+    if(total<=12){ for(let r=0;r<(1<<total);r++){ let s=0; const v={}; ins.forEach(p=>{ v[p.name]=(r>>s)&((1<<p.width)-1); s+=p.width; }); V.push(v); } method=`ทุกแถว (${V.length} แถว)`; }
+    else { const rnd=eqRng(opts.seed||7);
+      V.push(Object.fromEntries(ins.map(p=>[p.name,0])), Object.fromEntries(ins.map(p=>[p.name,2**p.width-1])));
+      for(let i=0;i<1000;i++) V.push(Object.fromEntries(ins.map(p=>[p.name, p.width>=31 ? rnd() : rnd()%(2**p.width)])));
+      method=`${V.length} ชุดอินพุต (มุม + สุ่ม) จาก ${total} บิต`; }
+    const fa=flattenSchematic(A).sch, fb=flattenSchematic(B).sch, sa=probeStruct(fa), sb=probeStruct(fb);
+    for(const v of V){ const oa=mcpEvalOuts(A, fa, sa, v), ob=mcpEvalOuts(B, fb, sb, v);
+      common.forEach(p=>{ const x=eqNum(oa[p.name]), y=eqNum(ob[Object.keys(ob).find(n=>n.toLowerCase()===k(p))]);
+        if(x!==y && diffs.length<20) diffs.push({inputs:v, output:p.name, a:isNaN(x)?"undriven":x, b:isNaN(y)?"undriven":y}); });
+      if(diffs.length>=20) break; }
+  } else {
+    const cycles=Math.max(4, Math.min(512, +opts.cycles||64)), rnd=eqRng(opts.seed||11);
+    const drive=ins.filter(p=>!EQ_CLOCK.test(p.name)), stim=[];
+    for(let i=0;i<cycles;i++) stim.push(Object.fromEntries(drive.map(p=>{
+      // reset-like inputs mostly off, so the circuit gets to run between resets
+      const rare=/^(rst|reset|clr|clear|load|ld)$/i.test(p.name); return [p.name, rare ? (rnd()%9===0?1:0) : rnd()%(2**p.width)]; })));
+    const run=S=>{ const INs=S.components.filter(c=>c.type==="IN"), id=n=>(INs.find(c=>String(c.params.name).toLowerCase()===n.toLowerCase())||{}).id;
+      const holdAt=i=>{ const o={}; Object.entries(stim[i]||stim[stim.length-1]).forEach(([n,v])=>{ const c=id(n); if(c) o[c]=v; }); return o; };
+      const j=clientSeqSim(S, cycles, {holdAt, hold:holdAt(0)}); if(!j.ok) throw new Error(S.name+": "+(j.reason||"จำลองไม่ได้")); return j.sequence; };
+    let qa, qb; try{ qa=run(A); qb=run(B); }catch(e){ return {equivalent:false, reason:e.message}; }
+    const at=(sq,row,n)=>{ const i=sq.outputs.findIndex(x=>x.toLowerCase()===n.toLowerCase()); return i<0?NaN:(row[4]?row[4][i]:row[3][i]); };
+    for(let i=0;i<Math.min(qa.rows.length, qb.rows.length) && diffs.length<20;i++)
+      common.forEach(p=>{ const x=at(qa, qa.rows[i], p.name), y=at(qb, qb.rows[i], p.name);
+        if(x!==y && diffs.length<20) diffs.push({cycle:i, inputs:stim[i], output:p.name, a:x, b:y}); });
+    method=`${cycles} clock จาก reset ด้วยอินพุตสุ่มชุดเดียวกัน`;
+  }
+  return {equivalent:!diffs.length, method, compared_outputs:common.map(p=>p.name),
+    only_in_a:onlyA.length?onlyA:undefined, only_in_b:onlyB.length?onlyB:undefined, differences:diffs.length?diffs:undefined};
+}
+/* a sheet against a formula / table / part / the request: the acceptance-test checks, run once */
+function eqAgainst(sch, spec){
+  const keep={spec:sch.spec, specResult:sch.specResult, verified:sch.verified, specSource:sch.specSource, specSig:sch.specSig};
+  try{ sch.spec=spec; delete sch.specResult; const r=specCheck(sch) || {pass:false, reason:"ตรวจไม่ได้"};
+    return {equivalent:r.pass===true, method:r.checked, reason:r.reason, differences:(r.mismatches||[]).length?r.mismatches:undefined, total_differences:r.total_mismatches||undefined}; }
+  finally{ Object.entries(keep).forEach(([k,v])=>{ if(v===undefined) delete sch[k]; else sch[k]=v; }); }
+}
+MCP_OPS.compare_sheets = a=>{
+  const A=mcpSheet(a.sheet);
+  let r, what;
+  if(a.with){ const B=mcpSheet(a.with); if(B.id===A.id) mcpFail("compare a sheet with ANOTHER sheet"); r=eqSheets(A, B, a); what="sheet "+B.name; }
+  else if(a.formula!=null){ r=eqAgainst(A, {kind:"formula", text:Array.isArray(a.formula)?a.formula.join("; "):String(a.formula)}); what="formula"; }
+  else if(a.table){ const t=a.table; r=eqAgainst(A, t.ones ? {kind:"table", inputs:t.inputs, cols:ttOnesToCols((t.inputs||[]).length, t.ones)} : {kind:"table", inputs:t.inputs, cols:t.columns||t}); what="table"; }
+  else if(a.part){ if(!PARTS[a.part]) mcpFail(`unknown part '${a.part}'`, "list_parts shows them"); r=eqAgainst(A, {kind:"part", part:a.part, params:partParams(a.part, a.params||{})}); what="part "+a.part; }
+  else if(a.request){ const o=oracleDerive(a.request); if(!o.ok) mcpFail("the request gives nothing to compare with: "+o.reason); r=eqAgainst(A, o.spec); what=o.what; }
+  else mcpFail("compare with what? with:<sheet>, formula, table, part or request");
+  return Object.assign({sheet:A.name, against:what}, r);
+};
+/* Tools ▸ เทียบวงจร: pick two sheets (or a sheet and a library part) */
+GENERATORS.push({id:"equiv", icon:"⚖", name:"เทียบวงจรสองแผ่น", desc:"ตรวจว่าวงจรสองแผ่นทำงานเหมือนกันไหม — เช่น วงจรของนักศึกษา เทียบกับวงจรอ้างอิง", run:()=>{
+  const S=Object.values(state.project.schematics), opt=sel=>S.map(s=>`<option value="${esc(s.id)}"${s.id===sel?" selected":""}>${esc(s.name)}</option>`).join("");
+  const cur=(activeSch()||{}).id, other=(S.find(s=>s.id!==cur)||{}).id;
+  const m=uxModal("⚖ เทียบวงจร", `<p class="muted" style="margin:0 0 10px">ป้อนอินพุตชุดเดียวกันให้ทั้งสองแผ่น แล้วเทียบขาออกที่ชื่อเดียวกัน (มี flip-flop = เทียบทีละ clock)</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="eqA">${opt(cur)}</select> เทียบกับ
+      <select id="eqB">${opt(other)}<option value="part:">— ชิ้นส่วนมาตรฐาน —</option>${Object.keys(PARTS).map(k=>`<option value="part:${k}">${esc(PARTS[k].label)}</option>`).join("")}</select>
+      <button class="btn" id="eqGo">เทียบ</button></div><div id="eqOut" style="margin-top:12px"></div>`, {width:640});
+  m.querySelector("#eqGo").onclick=()=>{ const out=m.querySelector("#eqOut"), a=state.project.schematics[m.querySelector("#eqA").value], bv=m.querySelector("#eqB").value;
+    let r; try{ r = bv.startsWith("part:") ? (bv.length>5 ? Object.assign({against:PARTS[bv.slice(5)].label}, eqAgainst(a, {kind:"part", part:bv.slice(5), params:partParams(bv.slice(5), {})})) : null)
+      : eqSheets(a, state.project.schematics[bv]); }catch(e){ r={equivalent:false, reason:e.message}; }
+    if(!r){ out.textContent="เลือกชิ้นส่วนก่อน"; return; }
+    const d=(r.differences||[]).slice(0,8).map(x=>`<li>${x.cycle!=null?`clock ${x.cycle}: `:""}${esc(x.output)} — ${esc(JSON.stringify(x.inputs||x.inputs===0?x.inputs:x.row))}: ได้ ${esc(String(x.a!=null?x.a:x.got))} กับ ${esc(String(x.b!=null?x.b:x.want))}</li>`).join("");
+    out.innerHTML=r.equivalent ? `<b style="color:var(--ok,#16a34a)">✓ ทำงานเหมือนกัน</b> <span class="muted">(${esc(r.method||"")})</span>`
+      : `<b style="color:var(--err,#dc2626)">✗ ไม่เหมือนกัน</b> ${esc(r.reason||"")}${(r.port_differences||[]).map(x=>`<div class="muted">• ${esc(x)}</div>`).join("")}${d?`<ul>${d}</ul>`:""}`; };
+}});
+{
+  const last=[...document.querySelectorAll('#menu [data-gen]')].pop();
+  if(last && !document.querySelector('#menu [data-gen="equiv"]')){
+    last.insertAdjacentHTML("afterend", `<button class="gen-mi" data-gen="equiv" title="ตรวจว่าวงจรสองแผ่นทำงานเหมือนกันไหม"><span class="gi">⚖</span>เทียบวงจรสองแผ่น…</button>`);
+    document.querySelector('#menu [data-gen="equiv"]').addEventListener("click", ()=>runGenerator("equiv"));
+  }
+}
+
+/* ===== 41. The board doctor fixes what it can, and lab pin presets ==================================
+   The doctor (29) found segments written active-high for the common-anode display and a 7-seg with no
+   digit enabled, then only said what to do. Now each of those has "🔧 แก้ให้" (and MCP board_check
+   {fix:true}): a NOT in front of every a–g OUTPUT, an OUTPUT an0 driven by GND on "หลัก 0", and the pins
+   guessed for ports that have none. One undo step each, through MCP apply.
+   pin_preset {lab} maps ports by their role the way the lab sheet wires the board — lab 6: SW7–4 = tens
+   of yy, SW3–0 = ones, the centre button = start/stop, LED0 = error; lab 7 / 8: SW15–0 = four BCD
+   digits — plus a–g / an / clk; what it cannot place is left for auto_pins. */
+function bfixSegOuts(sch){
+  return uxPortBits(sch).map(b=>Object.assign({t:uxPinTarget(b, sch)}, b)).filter(b=>b.dir==="out" && /^seg:[a-g]$/.test(b.t||""));
+}
+/* the fixes: {id, label, run(sch) → what was done} */
+const BFIX={
+  seg:{label:"ใส่ NOT ที่ขา a–g", run:sch=>{
+    const segs=bfixSegOuts(sch), steps=[], done=[];
+    segs.forEach(b=>{ const o=sch.components.find(c=>c.type==="OUT" && sanId(c.params.name)===b.port);
+      if(!o || (o.params.width||1)>1) return;                         // a bus OUTPUT: one bit cannot be inverted here
+      const w=sch.wires.find(x=>x.to.cid===o.id); if(!w) return;
+      let d=null; try{ d=netDriverPort(sch, w); }catch(_){} const dc=d&&comp(d.cid, sch); if(!dc) return;
+      const nm="inv_"+sanId(o.params.name), drv=mcpName(dc)+"."+d.pid;
+      steps.push({op:"disconnect", from:drv, to:o.params.name}, {op:"add_component", type:"NOT", name:nm},
+        {op:"connect", from:drv, to:nm}, {op:"connect", from:nm, to:o.params.name});
+      done.push(o.params.name); });
+    if(!steps.length) mcpFail("no single-bit a–g OUTPUT with a driver to invert", "for a bus OUTPUT use the BCD → 7-segment part with active_low");
+    MCP_OPS.apply({sheet:sch.name, steps});
+    return "กลับค่า "+done.join(", ")+" ด้วย NOT (active-low)"; }},
+  an:{label:"เพิ่ม an0 ต่อ GND", run:sch=>{
+    const nm=sch.components.some(c=>(c.type==="IN"||c.type==="OUT") && String(c.params.name).toLowerCase()==="an0") ? "an0_on" : "an0";
+    MCP_OPS.apply({sheet:sch.name, steps:[{op:"add_component", type:"OUT", name:nm}, {op:"add_component", type:"GND", name:"gnd_"+nm}, {op:"connect", from:"gnd_"+nm, to:nm}]});
+    sch.pinmap=Object.assign({}, sch.pinmap||{}, {[sanId(nm)]:"an:0"}); mcpCommit(sch);
+    return `เพิ่ม OUTPUT ${nm} = 0 ที่ขา “หลัก 0” (เปิดหลักขวาสุด)`; }},
+  pins:{label:"เดาขาให้", run:sch=>{ const r=MCP_OPS.auto_pins({sheet:sch.name}); return "เลือกขาให้แล้ว"+(r.missing&&r.missing.length?` (ยังเหลือ ${r.missing.join(", ")})`:""); }},
+};
+/* which finding each fix answers */
+function bfixOf(f){
+  if(/active-high/.test(f.title)) return "seg";
+  if(/ไม่ได้กำหนดขาเลือกหลัก/.test(f.title)) return "an";
+  if(/ยังไม่ได้เลือกขา/.test(f.title)) return "pins";
+  return null;
+}
+{
+  const _bd=boardDoctor;
+  boardDoctor=function(){ const F=_bd.apply(this, arguments); F.forEach(f=>{ const k=bfixOf(f); if(k) f.fixable=k; }); return F; };
+  const _open=openBoardDoctor;
+  openBoardDoctor=function(){
+    const F=_open.apply(this, arguments), m=[...document.querySelectorAll(".modal-bg")].pop(); if(!m) return F;
+    m.querySelectorAll(".bd-f").forEach((el,i)=>{ const f=F[i]; if(!f || !f.fixable) return;
+      const b=document.createElement("button"); b.className="btn"; b.textContent="🔧 "+BFIX[f.fixable].label; b.style.marginTop="6px";
+      b.onclick=()=>{ const sch=brdSheet(); try{ const said=BFIX[f.fixable].run(sch); toast("แก้แล้ว: "+said, "ok", 5000); }catch(e){ toast("แก้ไม่ได้: "+e.message, "warn", 6000); return; }
+        if(typeof m.close==="function") m.close(); else m.remove(); try{ brdRefresh(); }catch(_){} openBoardDoctor(); };
+      el.appendChild(b); });
+    return F;
+  };
+}
+{
+  const _bc=MCP_OPS.board_check;
+  MCP_OPS.board_check=a=>{
+    if(!a.fix) { const r=_bc(a); const F=boardDoctor(a.sheet?mcpSheet(a.sheet):brdSheet()); r.fixable=F.filter(f=>f.fixable).map(f=>({title:f.title, fix:f.fixable})); return r; }
+    const sch=a.sheet ? mcpSheet(a.sheet) : brdSheet(), fixed=[], failed=[];
+    ["pins","seg","an"].forEach(k=>{ if(!boardDoctor(sch).some(f=>f.fixable===k)) return;
+      try{ fixed.push(BFIX[k].run(sch)); }catch(e){ failed.push(k+": "+e.message); } });
+    const r=_bc({sheet:sch.name});
+    return Object.assign(r, {fixed, failed:failed.length?failed:undefined});
+  };
+}
+
+/* ---- pin presets per lab ---- */
+const LAB_PIN_PRESETS={
+  "6":{title:"แลป 6 ตัวนับ 00–yy", rules:[
+    {re:/tens|yy_?t|_hi$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|yy_?[ou]|_lo$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/btn|start|stop|^ss$|run|toggle/i, dir:"in", t:()=>"pb:4"}, {re:/err/i, dir:"out", t:()=>"led:0"},
+    {re:/^(running|run_led|led_run)$/i, dir:"out", t:()=>"led:1"}]},
+  "7":{title:"แลป 7 ตัวจับเวลา mm.ss", rules:[
+    {re:/min_?hi|min_?tens|m_?hi|^mt$/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/min_?lo|min_?ones|m_?lo|^mo$/i, dir:"in", t:i=>"sw:"+(8+i)},
+    {re:/sec_?hi|sec_?tens|s_?hi|^st$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/sec_?lo|sec_?ones|s_?lo|^so$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/start|stop|btn|^ss$|run/i, dir:"in", t:()=>"pb:4"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:1"},
+    {re:/err/i, dir:"out", t:()=>"led:0"}]},
+  "8":{title:"แลป 8 ตัวเลข 4 หลักจาก SW15–0", rules:[
+    {re:/thousands|d3|dig3/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/hundreds|d2|dig2/i, dir:"in", t:i=>"sw:"+(8+i)},
+    {re:/tens|d1|dig1/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|d0|dig0/i, dir:"in", t:i=>"sw:"+i}]},
+};
+const PIN_COMMON=[{re:/^(seg_?)?([a-g])$/i, dir:"out", t:(i,m)=>"seg:"+m[2].toLowerCase()}, {re:/^(an|dig|digit)_?([0-3])?$/i, dir:"out", t:(i,m)=>"an:"+(m[2]!=null?m[2]:i)},
+  {re:/^(dp|seg_?dp)$/i, dir:"out", t:()=>"seg:dp"}, {re:/^(clk|clock|clk50m?)$/i, dir:"in", t:()=>"clk"}];
+function pinPreset(sch, lab){
+  const P=LAB_PIN_PRESETS[String(lab).replace(/\D/g,"")]; if(!P) mcpFail(`no pin preset for lab '${lab}'`, "presets: "+Object.keys(LAB_PIN_PRESETS).map(k=>"lab "+k).join(", ")+" — auto_pins guesses any design");
+  const pm=Object.assign({}, sch.pinmap||{}), set=[], left=[], used=new Set();
+  uxPortBits(sch).forEach(b=>{
+    // the port's base name and this bit's index: a bus bit, or the number at the end of a per-bit port
+    let base=b.port, i=b.bit; if(i==null){ const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(b.port); if(m && !/^(an|dig|digit)$/i.test(m[1])){ base=m[1]; i=+m[2]; } else i=0; }
+    const rule=[...P.rules, ...PIN_COMMON].find(r=>r.dir===b.dir && r.re.test(base));
+    if(!rule){ left.push(b.key); return; }
+    const t=rule.t(i, rule.re.exec(base)); if(used.has(t)){ left.push(b.key+" (ขา "+t+" ถูกใช้แล้ว)"); return; }
+    used.add(t); pm[b.key]=t; set.push(`${b.key} → ${t}`); });
+  return {pm, set, left, title:P.title};
+}
+MCP_OPS.pin_preset = a=>{
+  const sch=mcpUse(a.sheet); const r=pinPreset(sch, a.lab);
+  if(a.apply!==false){ mcpBeforeChange("ขาตามแลป"); sch.pinmap=r.pm; mcpCommit(sch); }
+  return {sheet:sch.name, preset:r.title, assigned:r.set, not_placed:r.left,
+    note:r.left.length?"auto_pins guesses the rest (or set_pins)":"every port has a pin — board_check to confirm"};
+};
+
+/* ===== 42. Simulation you can debug with: numbers, a waveform, and the nets inside a block ==========
+   From testing over MCP: a 4-bit adder's table came back as "000000000 → 00000", a counter as the bit
+   string "100" per clock (q0 first — easy to misread), and probe only saw the top sheet's nets, so a
+   wrong wire inside a block could not be found. Now
+     - simulate adds `table` / `values`: every port as ONE number (a bus a[3:0], or a numbered group
+       q0..q2), and for flip-flop sheets a text `waveform` (1-bit: ▁▔, buses: their values per clock);
+     - probe {inside:"u"} (or a path "u/v") gives every net INSIDE that block, computed in the context
+       of the whole circuit, named as that sheet names them. */
+/* names → ports: "a[2]" → a bit 2, "q1" (with q0..qn-1 all present) → q bit 1, anything else itself */
+function sdGroups(names){
+  const G={}, add=(base,bit,i)=>{ const k=base.toLowerCase(); (G[k]=G[k]||{name:base, bits:[]}).bits.push({bit, i}); };
+  const num={}; names.forEach((n,i)=>{ const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(n); if(m) (num[m[1].toLowerCase()]=num[m[1].toLowerCase()]||[]).push(+m[2]); });
+  names.forEach((n,i)=>{ const b=/^(.*)\[(\d+)\]$/.exec(n); if(b) return add(b[1], +b[2], i);
+    const m=/^(.*?[A-Za-z_])_?(\d+)$/.exec(n), L=m&&num[m[1].toLowerCase()];
+    if(m && L.length>=2 && L.slice().sort((x,y)=>x-y).every((v,k)=>v===k) && !names.some(x=>x.toLowerCase()===m[1].toLowerCase())) return add(m[1], +m[2], i);
+    add(n, 0, i); });
+  return Object.values(G);
+}
+const sdVal=(g, bitAt)=>g.bits.reduce((v,b)=>{ const x=bitAt(b.i); return x==null||isNaN(x) ? NaN : v+(+x?2**b.bit:0); }, 0);
+const sdWide=G=>G.some(g=>g.bits.length>1);
+/* a text waveform: one line per port; 1-bit ▁▔, wider ones their value in each clock's cell */
+function sdWaveform(rowsVals, G){
+  const w=Math.max(2, ...G.filter(g=>g.bits.length>1).map(g=>String(2**g.bits.length-1).length+1));
+  const pad=Math.max(...G.map(g=>g.name.length));
+  const lines=[" ".repeat(pad)+" │"+rowsVals.map((_,i)=>String(i%100).padStart(w)).join("")];
+  G.forEach(g=>{ const one=g.bits.length===1;
+    lines.push(g.name.padEnd(pad)+" │"+rowsVals.map(v=>{ const x=v[g.name]; if(x==null||isNaN(x)) return "?".padStart(w);
+      return one ? (x?"▔":"▁").repeat(w) : String(x).padStart(w); }).join("")); });
+  return lines;
+}
+{
+  const _sim=MCP_OPS.simulate;
+  MCP_OPS.simulate=a=>{
+    const r=_sim(a);
+    try{
+      if(r.kind==="sequential"){
+        const outs=r.columns.outputs, ins=r.columns.inputs, G=sdGroups(outs);
+        const vals=r.rows.map(row=>{ const o={};
+          const bitAt = typeof row.outputs==="string" ? (i=>+row.outputs[i]) : (i=>{ const v=row.outputs[outs[i]]; return typeof v==="string" ? parseInt(v,2) : +v; });
+          G.forEach(g=>{ o[g.name] = g.bits.length===1 && typeof row.outputs!=="string" ? bitAt(g.bits[0].i) : sdVal(g, bitAt); });
+          // inputs, when each is one character of the string (1-bit inputs)
+          if(typeof row.inputs==="string" && row.inputs.length===ins.length) sdGroups(ins).forEach(g=>{ o[g.name]=sdVal(g, i=>+row.inputs[i]); });
+          return o; });
+        r.values=vals.slice(0, 256);
+        const Gin=typeof (r.rows[0]||{}).inputs==="string" && r.rows[0].inputs.length===ins.length ? sdGroups(ins) : [];
+        r.waveform=sdWaveform(vals.slice(0, 64), [...Gin, ...G]);
+        r.note=(r.note?r.note+" · ":"")+"values = every port as one number per clock (q0..qn → q); waveform = the same, drawn";
+      } else if(r.mode==="vectors"){
+        r.rows.forEach(x=>{ x.values=Object.fromEntries(Object.entries(x.outputs).map(([k,v])=>[k, v&&typeof v==="object"?v.value:typeof v==="string"&&/^[01]+$/.test(v)?parseInt(v,2):v])); });
+        const Gi=sdGroups(Object.keys((r.rows[0]||{}).values||{})); if(sdWide(Gi)) r.rows.forEach(x=>Object.assign(x.values, Object.fromEntries(Gi.filter(g=>g.bits.length>1).map(g=>[g.name, sdVal(g, i=>x.values[Object.keys(x.values)[i]])]))));
+      } else if(r.kind==="combinational" && r.inputs){
+        const GI=sdGroups(r.inputs), GO=sdGroups(r.outputs);
+        if(sdWide(GI) || sdWide(GO)){
+          r.table=r.rows.slice(0, 1024).map(s=>{ const [i,o]=s.split(" → "), row={};
+            GI.forEach(g=>row[g.name]=sdVal(g, k=>+i[k])); GO.forEach(g=>row[g.name]=sdVal(g, k=>+o[k])); return row; });
+          r.note=(r.note?r.note+" · ":"")+"table = every port as one number"+(r.rows.length>1024?" (first 1024 rows)":"");
+        }
+      }
+    }catch(e){ console.warn("sim values", e); }
+    return r;
+  };
+}
+/* ---- probe: the nets inside a block ---- */
+{
+  const _probe=MCP_OPS.probe;
+  MCP_OPS.probe=a=>{
+    if(!a.inside) return _probe(a);
+    const top=mcpSheet(a.sheet);
+    // walk the path: u/v = block v inside the sheet of block u
+    let sch=top, prefix="", path=[];
+    for(const part of String(a.inside).split(/[\/.]/).filter(Boolean)){
+      const c=findCompRef(sch, part); const sub=c && subSchOf(c);
+      if(!sub) mcpFail(`no block '${part}' on ${sch.name}`, "blocks: "+sch.components.filter(x=>subSchOf(x)).map(x=>mcpName(x)).join(", "));
+      prefix+=c.id+"__"; path.push(mcpName(c)); sch=sub; }
+    const fs=flattenSchematic(top).sch, saved=Object.assign({}, PROBE_VALS);
+    try{
+      Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]);
+      Object.entries(a.inputs||{}).forEach(([n,v])=>{ const c=top.components.find(x=>x.type==="IN"&&String(x.params.name).toLowerCase()===String(n).toLowerCase()); if(!c) mcpFail(`no INPUT '${n}'`); PROBE_VALS[c.id]=mcpProbeVal(c, v); });
+      const m=probeModel(fs, probeStruct(fs));
+      // a pin's value in the flat circuit: a block's output lives on its inner OUTPUT (a BUF)
+      const valOf=(cid, pid, S, pre)=>{ const c=comp(cid, S); if(!c) return null;
+        const sub=subSchOf(c);
+        if(sub){ const pp=schPortList(sub).find(q=>q.id===pid && q.dir==="out"); if(!pp) return null; try{ return m.outVal(pre+cid+"__"+pp.cid, "o", new Set()); }catch(_){ return null; } }
+        try{ return m.outVal(pre+cid, pid, new Set()); }catch(_){ return null; } };
+      const nets=mcpNets(sch).map(n=>{ if(!n.driver) return Object.assign({value:"undriven"}, n);
+        const k=n.driver.lastIndexOf("."), c=findCompRef(sch, n.driver.slice(0,k)), v=c ? valOf(c.id, n.driver.slice(k+1), sch, prefix) : null;
+        return Object.assign({value:v==null?"unknown":v}, n); });
+      const ports=schPortList(sch).map(p=>{ const c=comp(p.cid, sch); let v=null;
+        try{ v=m.outVal(prefix+p.cid, "o", new Set()); }catch(_){}               // flattened, an inner IN / OUT is a BUF
+        return {name:p.id, dir:p.dir, value:v==null?"unknown":v}; });
+      return {sheet:top.name, inside:path.join("/"), inner_sheet:sch.name, inputs:a.inputs||{}, ports, nets,
+        note:"nets of the block's own sheet, with this block's inputs from the whole circuit"};
+    } finally { Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved); }
+  };
+}
+/* the sim page's table: one column per bit (each is a switch / LED) — plus each bus as a number */
+function sdBusCols(){
+  const tbl=document.querySelector("#simBoardTable table"), tt=typeof SIM_LAST_TT!=="undefined" ? SIM_LAST_TT : null;
+  if(!tbl || !tt || tbl.dataset.busCols) return;
+  const GI=sdGroups(tt.inputs).filter(g=>g.bits.length>1), GO=sdGroups(tt.outputs).filter(g=>g.bits.length>1);
+  if(!GI.length && !GO.length) return;
+  tbl.dataset.busCols="1";
+  const n=tt.inputs.length, rows=[...tbl.rows];
+  const G=[...GI.map(g=>({g, off:0, out:false})), ...GO.map(g=>({g, off:n, out:true}))];
+  G.forEach(({g,out})=>{ const th=document.createElement("th"); th.className="bus-num"+(out?" out":"");
+    th.innerHTML=`${esc(g.name)}<span class="bp">${out?"OUT":"IN"} · เลข</span>`; th.title=`${g.name} ${g.bits.length} บิตเป็นเลขฐานสิบ`; rows[0].appendChild(th); });
+  rows.slice(1).forEach(tr=>{ const cells=[...tr.cells];
+    G.forEach(({g,off,out})=>{ const td=document.createElement("td"); td.className="bus-num";
+      const v=sdVal(g, i=>+((cells[off+i]||{}).textContent)); td.textContent=isNaN(v)?"?":String(v); if(out) td.style.color="var(--ok)"; tr.appendChild(td); }); });
+}
+{
+  const host=document.querySelector("#simBoardTable");
+  if(host) new MutationObserver(()=>{ try{ sdBusCols(); }catch(_){} }).observe(host, {childList:true});
+}
+
+/* ===== 43. Modules with versions: placed copies can be updated, and you can see where one is used ====
+   save_module made a copy; changing the module later left every copy already placed as it was, with
+   no way to tell which were old. Now a module has a version (saving over it = +1), a placed copy
+   remembers the version it came from, and
+     - update_module (and the Modules tab's "อัปเดต" button) brings the outdated copies in this project
+       (or every open project) up to date in place — same sheet, so parents keep their blocks; port
+       changes are reported;
+     - where_used lists every copy in the open projects and the sheets that place it;
+     - use_module also takes a part kind from the library (bcd_counter_multi, seg7_mux4 …): the
+       standard lab modules are there without saving them first. */
+{
+  const _save=moduleSave;
+  moduleSave=function(sch, name, desc, replaceId){
+    loadModules(); const prev=replaceId && state.modules[replaceId] ? (state.modules[replaceId].version||1) : 0;
+    const m=_save.apply(this, arguments); m.version=prev+1; saveModules(); try{ renderModulesPane(); }catch(_){}
+    return m;
+  };
+  const _adopt=moduleAdopt;
+  moduleAdopt=function(m, keepLink){ const s=_adopt.apply(this, arguments); if(s && keepLink) s.moduleVersion=m.version||1; return s; };
+}
+/* every copy of module m in the open projects */
+function moduleInstances(m){
+  const out=[];
+  Object.values(state.projects||{}).forEach(p=>Object.values(p.schematics||{}).forEach(s=>{ if(s.moduleId!==m.id) return;
+    const usedIn=Object.values(p.schematics).filter(x=>(x.components||[]).some(c=>c.type==="SCH:"+s.id)).map(x=>x.name);
+    out.push({project:p.name, projectId:p.id, sheet:s.name, sheetId:s.id, version:s.moduleVersion||1, outdated:(s.moduleVersion||1)<(m.version||1), placed_in:usedIn}); }));
+  return out;
+}
+/* bring one placed copy up to date, in place */
+function moduleUpdateSheet(m, s){
+  const before=schPortList(s).map(p=>p.dir+" "+p.id+(p.width>1?`[${p.width-1}:0]`:""));
+  const fresh=_moduleFresh(m);
+  s.components=fresh.components; s.wires=fresh.wires;
+  ["portOrder","verified","spec","specResult","pinmap"].forEach(k=>{ if(fresh[k]!=null) s[k]=fresh[k]; else delete s[k]; });
+  s.moduleVersion=m.version||1;
+  const after=schPortList(s).map(p=>p.dir+" "+p.id+(p.width>1?`[${p.width-1}:0]`:""));
+  return {sheet:s.name, added_ports:after.filter(x=>!before.includes(x)), removed_ports:before.filter(x=>!after.includes(x))};
+}
+/* the module's sheet as it is now, its blocks adopted into this project (then the extra top sheet dropped) */
+function _moduleFresh(m){
+  const s=moduleAdopt(m, false), copy={components:s.components, wires:s.wires, portOrder:s.portOrder, verified:s.verified, spec:s.spec, pinmap:s.pinmap};
+  delete state.project.schematics[s.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==s.id);
+  return copy;
+}
+MCP_OPS.where_used = a=>{
+  const m=mcpModule(a.module), L=moduleInstances(m);
+  return {module:m.name, version:m.version||1, copies:L.map(x=>({project:x.project, sheet:x.sheet, version:x.version, outdated:x.outdated||undefined, placed_in:x.placed_in})),
+    note:"projects open in the editor only — a project saved on disk and not open is not searched"};
+};
+MCP_OPS.update_module = a=>{
+  const m=mcpModule(a.module), L=moduleInstances(m).filter(x=>x.outdated && (a.all_projects || x.projectId===state.activeProjectId));
+  if(!L.length) return {module:m.name, version:m.version||1, updated:[], note:"every copy "+(a.all_projects?"":"in this project ")+"is up to date"};
+  mcpBeforeChange("อัปเดตโมดูล "+m.name);
+  const here=state.activeProjectId, done=[];
+  L.forEach(x=>{ if(x.projectId!==state.activeProjectId) switchProject(x.projectId);
+    done.push(Object.assign({project:x.project, from:x.version, to:m.version||1}, moduleUpdateSheet(m, state.project.schematics[x.sheetId]))); });
+  if(state.activeProjectId!==here) switchProject(here);
+  mcpCommit(activeSch());
+  return {module:m.name, version:m.version||1, updated:done,
+    note:done.some(d=>d.added_ports.length||d.removed_ports.length) ? "ports changed — check the sheets that place it (check / suggest_wires)" : "same ports: the parents need no change"};
+};
+/* use_module: a part kind works too (the standard lab modules) */
+{
+  const _use=MCP_OPS.use_module;
+  MCP_OPS.use_module=a=>{
+    if(!moduleFind(a.module) && PARTS[a.module]){
+      const target=mcpUse(a.sheet); mcpBeforeChange("วาง "+a.module);
+      const sn=ptSub(a.module, a.params||{}), sub=Object.values(state.project.schematics).find(s=>s.name===sn);
+      const why=subBlockBlockedWhy(sub.id, target.id); if(why) mcpFail(why);
+      mcpUse(target.id);
+      const r=MCP_OPS.add_component({sheet:target.name, type:"block:"+sub.name, name:a.name, x:a.x, y:a.y});
+      return Object.assign({part:a.module, sheet_in_project:sub.name, verified:sheetVerified(sub)}, r);
+    }
+    return _use(a);
+  };
+  const _list=MCP_OPS.list_modules;
+  MCP_OPS.list_modules=a=>{ const r=_list(a);
+    r.modules.forEach(x=>{ const m=moduleFind(x.id); x.version=m.version||1; const L=moduleInstances(m);
+      if(L.length) x.copies_in_open_projects=L.length; if(L.some(i=>i.outdated)) x.outdated_copies=L.filter(i=>i.outdated).length; });
+    r.standard_parts="use_module also takes a part kind (list_parts): "+Object.keys(PARTS).slice(0, 12).join(", ")+" …";
+    return r; };
+}
+/* the Modules tab: version, and "อัปเดต" when this project holds an older copy */
+{
+  const _cards=moduleCardsHtml;
+  moduleCardsHtml=function(){
+    let h=_cards.apply(this, arguments);
+    Object.values(state.modules||{}).forEach(m=>{
+      const old=moduleInstances(m).filter(x=>x.outdated && x.projectId===state.activeProjectId).length;
+      const tag=`<span class="pt-badge" title="เวอร์ชันของโมดูลในคลัง">v${m.version||1}</span>`+(old?` <button class="btn2 mod-upd" data-modupd="${esc(m.id)}" title="แผ่นในโปรเจกต์นี้ยังเป็นเวอร์ชันเก่า">อัปเดต ${old}</button>`:"");
+      h=h.replace(new RegExp(`(<div class="mod-name" title="${esc(m.name).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}">[^<]*)`), `$1 ${tag}`);
+    });
+    return h;
+  };
+  document.addEventListener("click", ev=>{
+    const b=ev.target.closest && ev.target.closest("[data-modupd]"); if(!b) return; ev.stopPropagation();
+    try{ const r=MCP_OPS.update_module({module:b.dataset.modupd}); toast(`อัปเดตโมดูล ${r.module} เป็น v${r.version} แล้ว (${r.updated.length} แผ่น)`, "ok", 5000); renderModulesPane(); }
+    catch(e){ toast("อัปเดตไม่ได้: "+e.message, "warn", 6000); }
+  }, true);
+}
+
+/* ===== 44. A bigger model takes over when the small one is stuck ====================================
+   The 4B model answers routine requests in seconds but loops on a multi-block system; the 9B was
+   installed and never used. When a run stops making progress (18: stall / time budget) and a bigger
+   agent model is installed, the app restarts llama-server with it, the SAME conversation continues
+   (tools, sheets and the plan so far), and the small model comes back when the run is over — the
+   next routine request is fast again. Off: localStorage schstudio.agentEscalate = "0", or
+   ai_chat {escalate:false}. */
+const AIAG_ESC = { on:(()=>{ try{ return localStorage.getItem("schstudio.agentEscalate")!=="0"; }catch(_){ return true; } })() };
+async function aiagModelStatus(){ try{ return await (await fetch("/api/llm/status")).json(); }catch(_){ return null; } }
+/* the installed agent model bigger than the one running, or null */
+function aiagBigger(st){
+  if(!st || !st.catalog) return null;
+  const base=p=>String(p||"").split(/[\\/]/).pop().toLowerCase();
+  const cur=st.catalog.find(m=>base(m.path)===base(st.model));
+  const up=st.catalog.filter(m=>m.agent && m.installed && (!cur || m.size_gb>cur.size_gb)).sort((a,b)=>b.size_gb-a.size_gb)[0];
+  return up && (!cur || up.id!==cur.id) ? {from:cur||{id:base(st.model), path:st.model, name:base(st.model)}, to:up} : null;
+}
+/* switch to the bigger model and wait until it answers; {from,to} or null */
+async function aiagEscalate(run, live){
+  if(!AIAG_ESC.on || run.noEscalate || run.escalated || !/^https?:/.test(location.protocol)) return null;
+  const st=await aiagModelStatus(), b=aiagBigger(st); if(!b) return null;
+  live && live(`โมเดล ${b.from.name} ติดอยู่ — สลับไป ${b.to.name}…`);
+  aiagLine(`<div class="ag-step"><span class="ag-tool">⇪ สลับโมเดล</span><div class="ag-res">${esc(b.from.name)} ไม่คืบหน้า — ให้ ${esc(b.to.name)} ทำต่อจากเดิม (เปลี่ยนกลับเมื่อจบงาน)</div></div>`, "step");
+  const r=await aiagPost("/api/llm/start", {model:b.to.path}); if(!r || r.ok===false) return null;
+  const until=Date.now()+180000;
+  while(Date.now()<until && !run.cancel){ const s=await aiagModelStatus(); if(s && s.state==="ready") break; if(s && s.state==="crashed") return null;
+    await new Promise(res=>setTimeout(res, 800)); }
+  run.escalated={from:b.from.id, to:b.to.id, back:b.from.path};
+  run.steps.push({kind:"escalate", text:`${b.from.id} → ${b.to.id}`});
+  return run.escalated;
+}
+/* after the run: the small model again (not awaited — the answer is already shown) */
+function aiagDeescalate(run){
+  if(!run.escalated || !run.escalated.back) return;
+  aiagPost("/api/llm/start", {model:run.escalated.back}).catch(()=>{});
+}
+
+/* ===== 45. Board pins on the drawing, and events you can wait for ====================================
+   - Once a sheet has any board pin chosen, every INPUT / OUTPUT shows its pin under it on the canvas
+     (SW3, LED0, 7SEG a, หลัก 1, CLK) — red when it has none yet or shares a pin with another port, so
+     a conflict or a forgotten port is seen where it is drawn, not only on the pin page.
+   - get_events {wait}: waits (≤40 s) for the next edit instead of returning nothing — an outside tool
+     follows the user by calling it in a loop. */
+function ptagShort(t){
+  if(!t) return "";
+  if(t==="clk") return "CLK 50M";
+  const [k,v]=t.split(":");
+  return ({sw:"SW", led:"LED", pb:"ปุ่ม", seg:"7SEG ", an:"หลัก "}[k]||k)+(v!=null?v:"");
+}
+function ptagInfo(sch){
+  const bits=uxPortBits(sch).map(b=>Object.assign({t:uxPinTarget(b, sch)}, b));
+  const count={}; bits.forEach(b=>{ if(b.t) count[b.t]=(count[b.t]||0)+1; });
+  const by={}; bits.forEach(b=>(by[b.port]=by[b.port]||[]).push(b));
+  return {by, count};
+}
+{
+  const _render=render;
+  render=function(){ const r=_render.apply(this, arguments);
+    try{ const sch=activeSch(), world=canvas.firstChild;
+      if(!sch || !world || !sch.pinmap || !Object.keys(sch.pinmap).length) return r;
+      const {by, count}=ptagInfo(sch), layer=el("g",{class:"pin-tags"});
+      sch.components.filter(c=>c.type==="IN"||c.type==="OUT").forEach(c=>{
+        const L=by[sanId(c.params.name)] || by[c.params.name]; if(!L) return;
+        const miss=L.filter(b=>!b.t), clash=L.filter(b=>b.t && count[b.t]>1);
+        let txt;
+        if(L.length===1) txt=L[0].t ? ptagShort(L[0].t) : "ยังไม่มีขา";
+        else { const set=L.filter(b=>b.t); txt=set.length===L.length ? (()=>{ const k=new Set(set.map(b=>b.t.split(":")[0])); const v=set.map(b=>b.t.split(":")[1]);
+            return k.size===1 && v.every(x=>/^\d+$/.test(x)) ? `${ptagShort(set[0].t.split(":")[0]+":").trim()}${v[0]}–${v[v.length-1]}` : `${set.length} ขา`; })()
+          : `ยังไม่มีขา ${miss.length}/${L.length}`; }
+        if(clash.length) txt+=" ⚠ ซ้ำ";
+        const sz=getSize(c), t=el("text",{x:c.x+sz.w/2, y:c.y+sz.h+13, class:"pin-tag"+(miss.length||clash.length?" bad":""), "text-anchor":"middle"});
+        t.textContent=txt;
+        const tip=el("title",{}); tip.textContent=L.map(b=>`${b.key} → ${b.t?pinTargetLabel(b.t):"ยังไม่ได้เลือกขา"}${b.t&&count[b.t]>1?" (ใช้ร่วมกับขาอื่น)":""}`).join("\n");
+        t.appendChild(tip); layer.appendChild(t); });
+      world.appendChild(layer);
+    }catch(_){}
+    return r; };
+}
+{
+  const _ev=MCP_OPS.get_events;
+  MCP_OPS.get_events=async a=>{
+    const since=+a.since||0, until=Date.now()+1000*Math.max(0, Math.min(40, +a.wait||0));
+    let r=_ev(a);
+    while(!r.events.length && Date.now()<until){ await new Promise(res=>setTimeout(res, 250)); r=_ev({since}); }
+    return r;
+  };
 }
 
 </script>

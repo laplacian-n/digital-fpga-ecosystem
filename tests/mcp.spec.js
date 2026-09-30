@@ -1,5 +1,5 @@
 // End-to-end: MCP client (this test) → launcher/mcp_server.py (stdio) → launcher relay → live editor page.
-const { test, expect } = require("@playwright/test");
+const { test, expect, chromium } = require("@playwright/test");
 const { spawn } = require("child_process");
 const fs = require("fs"), os = require("os"), path = require("path");
 
@@ -32,7 +32,8 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ browser: b }) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "fe-mcp-"));
   env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), APPDATA: path.join(home, "AppData"),
-          NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost" };
+          NO_PROXY: "127.0.0.1,localhost", no_proxy: "127.0.0.1,localhost",
+          FE_BROWSER: chromium.executablePath() };        // the report PDF is printed with it (Edge on Windows)
   // no network in tests: the update check is off (about then says so instead of asking GitHub)
   const cfgDir = path.join(home, ".config", "fpga-ecosystem"); fs.mkdirSync(cfgDir, { recursive: true });
   fs.writeFileSync(path.join(cfgDir, "config.json"), JSON.stringify({ update: { auto_check: false } }));
@@ -516,4 +517,75 @@ test("a call that only waits (approval_status) does not hold up the others", asy
   expect(Date.now() - t0).toBeLessThan(6000);                          // answered while the other still waits
   expect((await waiting).data.status).toBe("waiting");
   await page.evaluate(() => { const c = document.getElementById("mcpApproval"); if (c) c.remove(); MCPB.approval = { state: "none" }; });
+});
+
+test("projects in step with their folders: rename, delete (to .trash), a stale name given back, import/export, folder name wins", async () => {
+  let r = await mcp.tool("new_project", { name: "prjx" });
+  await mcp.tool("build_circuit", { name: "g", formula: "y = a & b" });
+  await mcp.tool("save_project");
+  const folder = (await mcp.tool("list_projects")).data.folder;
+  expect(fs.existsSync(path.join(folder, "prjx", "prjx.schproj.json"))).toBe(true);
+  const ex = await mcp.tool("export_project");
+  expect(JSON.parse(ex.data.json).project.name).toBe("prjx");
+  r = await mcp.tool("rename_project", { name: "prjx", to: "prjy" });
+  expect(r.error, r.text).toBe(false);
+  expect(JSON.parse(fs.readFileSync(path.join(folder, "prjy", "prjy.schproj.json"), "utf8")).project.name).toBe("prjy");
+  expect(await page.evaluate(() => state.project.name)).toBe("prjy");
+  r = await mcp.tool("delete_project", { name: "prjy" });
+  expect(r.error, r.text).toBe(false);
+  expect(fs.existsSync(path.join(folder, "prjy"))).toBe(false);
+  expect(fs.readdirSync(path.join(folder, ".trash")).some(n => n.startsWith("prjy-"))).toBe(true);
+  expect((await mcp.tool("list_projects")).data.projects.map(p => p.name)).not.toContain("prjy");
+  expect(await page.evaluate(() => Object.values(state.projects).some(p => p.name === "prjy"))).toBe(false);
+  // an empty project only the editor remembers gives its name back (it used to be ghost_2, ghost_3 …)
+  await mcp.tool("new_project", { name: "ghost" });
+  await mcp.tool("new_project", { name: "other" });
+  r = await mcp.tool("new_project", { name: "ghost" });
+  expect(r.data.created).toBe("ghost");
+  r = await mcp.tool("rescan_projects", { prune: true });
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.pruned).toContain("other");
+  // import from JSON text, saved under a new name
+  r = await mcp.tool("import_project", { json: ex.data.json, name: "imp", save: true });
+  expect(r.error, r.text).toBe(false);
+  expect((await mcp.tool("list_projects")).data.projects.map(p => p.name)).toContain("imp");
+  // a folder whose file says another name: the folder wins
+  fs.mkdirSync(path.join(folder, "fold"), { recursive: true });
+  fs.writeFileSync(path.join(folder, "fold", "fold.schproj.json"), ex.data.json);
+  r = await mcp.tool("open_project", { path: "fold/fold.schproj.json" });
+  expect(r.data.renamed_from).toBe("prjx");
+  expect(await page.evaluate(() => state.project.name)).toBe("fold");
+  expect(page.errors).toEqual([]);
+});
+
+test("batch: several edits are one undo step, and a failing op undoes the ones before it", async () => {
+  await mcp.tool("new_sheet", { name: "bt" });
+  const n0 = await page.evaluate(() => activeSch().components.length);
+  let r = await mcp.tool("batch", { ops: [{ tool: "add_component", args: { type: "NOT", name: "N9" } }, { tool: "connect", args: { from: "N9", to: "nope" } }] });
+  expect(r.data.ok, r.text).toBe(false);
+  expect(r.data.failed_at).toBe(1);
+  expect(r.data.rolled_back).toBe(true);
+  expect(await page.evaluate(() => activeSch().components.length)).toBe(n0);
+  r = await mcp.tool("batch", { ops: [{ tool: "add_component", args: { type: "IN", name: "p" } }, { tool: "add_component", args: { type: "NOT", name: "N8" } },
+    { tool: "connect", args: { from: "p", to: "N8" } }] });
+  expect(r.data.ok, r.text).toBe(true);
+  expect(await page.evaluate(() => activeSch().components.length)).toBe(n0 + 2);
+  await mcp.tool("undo");
+  expect(await page.evaluate(() => activeSch().components.length)).toBe(n0);
+  expect(page.errors).toEqual([]);
+});
+
+test("make_report writes the PDF next to the HTML, with a timing diagram for a counter", async () => {
+  await mcp.tool("new_project", { name: "rep" });
+  await mcp.tool("build_part", { kind: "mod_counter", n: 4, sheet: "cnt" });
+  await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "cnt"); state.project.topId = s.id; });
+  const r = await mcp.tool("make_report", {});
+  expect(r.error, r.text).toBe(false);
+  expect(r.data.pdf_error).toBeUndefined();
+  expect(r.data.pdf).toMatch(/rep_report\.pdf$/);
+  const pdf = fs.readFileSync(r.data.pdf);
+  expect(pdf.slice(0, 5).toString()).toBe("%PDF-");
+  expect(pdf.length).toBeGreaterThan(5000);
+  expect(fs.readFileSync(r.data.saved, "utf8")).toContain("ไทมิ่งไดอะแกรม");
+  expect(page.errors).toEqual([]);
 });

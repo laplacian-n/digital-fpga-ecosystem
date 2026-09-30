@@ -113,7 +113,9 @@ TOOLS = [
       {"sheet": SHEET, "fit": {"type": "boolean", "description": "Zoom to fit first (default true)."},
        "show_problems": {"type": "boolean"}}, timeout=40),
     T("get_events", "What happened in the editor since sequence number `since` (user edits, issue count changes). "
-      "Use it to follow along with the user.", {"since": {"type": "integer"}}),
+      "Use it to follow along with the user; wait:N (≤40 s) waits for the next event instead of answering empty — "
+      "call it in a loop with since = latest to follow every edit.",
+      {"since": {"type": "integer"}, "wait": {"type": "integer", "minimum": 0, "maximum": 40}}, timeout=55),
     # --- sheets
     T("open_sheet", "Make a sheet the active tab (the user sees it).", {"sheet": SHEET}, ["sheet"]),
     T("new_sheet", "Create an empty sheet (a new sub-circuit or top level).",
@@ -157,13 +159,20 @@ TOOLS = [
        "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"}},
       ["fsm"], timeout=90),
     T("make_report", "Write the lab report into the project folder (<project>_report.html): every sheet (top first, then its "
-      "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks, state diagram, acceptance "
-      "test, board pin table, VHDL. The user prints it to PDF.",
-      {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}}, timeout=90),
+      "blocks) as a picture, ports, truth table + minimised equations or the first 16 clocks with a timing diagram, state "
+      "diagram, acceptance test, board pin table, VHDL — and <project>_report.pdf next to it (printed by headless Edge / "
+      "Chrome; pdf:false skips it).",
+      {"sheets": {"type": "array", "items": {"type": "string"}}, "vhdl": {"type": "boolean"}, "pdf": {"type": "boolean"}}, timeout=180),
     T("board_check", "Before building the .bit: what will go wrong on the real EDGE board — ports without a pin, two ports "
       "on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit "
       "enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one "
-      "the ลงบอร์ด page builds.", {"sheet": SHEET}),
+      "the ลงบอร์ด page builds. fix:true repairs what it can (a NOT before each active-high a–g OUTPUT, an OUTPUT an0 = 0 "
+      "on digit 0, pins guessed for ports without one) — one undo step each; `fixable` lists them otherwise.",
+      {"sheet": SHEET, "fix": {"type": "boolean"}}),
+    T("pin_preset", "Board pins as the lab sheet wires them, by each port's role: lab 6 (SW7–4 = tens of yy, SW3–0 = ones, "
+      "centre button = start/stop, LED0 = error), lab 7 (SW15–0 = mm.ss digits, start/stop, clear), lab 8 (SW15–0 = four BCD "
+      "digits); a–g, dp, an, clk on any lab. Answers what it could not place (auto_pins guesses those).",
+      {"sheet": SHEET, "lab": {"type": "string", "enum": ["6", "7", "8"]}, "apply": {"type": "boolean"}}, ["lab"]),
     T("suggest_wires", "Wiring hints for the unconnected pins of a sheet: blocks of one kind in a row chain carry-like pins "
       "(cout→cin, x_out→x_in), a block input named like a sheet INPUT takes it (clk, rst, en; a2 or bit 2 of bus a for "
       "the block labelled …2), a sheet OUTPUT named like a block output takes it. Each hint has a reason; apply:true "
@@ -177,6 +186,40 @@ TOOLS = [
       "the sheet verified. Set it FIRST, then build until check_spec passes.",
       {"sheet": SHEET, "formula": {"type": ["string", "array"], "items": {"type": "string"}}, "table": {"type": "object"},
        "sequence": {"type": "object"}}),
+    T("build_hierarchy", "Build a whole top sheet from a block list in ONE call: the blocks (an existing sheet or a library part), "
+      "the top inputs / outputs, and the connections by name — buses expand to bits (cnt.ones = ones0..ones3, sw[3:0], x[2]), "
+      "0 / 1 drive a pin low / high. Widths, directions and double drivers are checked before anything is drawn; pins named "
+      "like a top port join it (auto: a block's clk ← INPUT clk, OUTPUT err ← the one block output err). Drawn, routed, declared "
+      "buses become bus ports; one undo step; nothing is left behind on an error. Answers what is still unconnected. "
+      "Use it instead of many connect calls for any design made of blocks.",
+      {"sheet": {"type": "string", "description": "the top sheet (made, an empty one filled; one with parts needs replace:true)"},
+       "blocks": {"type": "array", "items": {"type": "object", "properties": {
+           "name": {"type": "string"}, "sheet": {"type": "string", "description": "an existing sheet"},
+           "part": {"type": "string", "description": "a list_parts kind, drawn once and verified"},
+           "params": {"type": "object", "description": "the part's parameters"}}, "required": ["name"]}},
+       "inputs": {"type": "array", "items": {"type": "string"}, "description": "top inputs: 'clk', 'sw[7:0]'"},
+       "outputs": {"type": "array", "items": {"type": "string"}, "description": "top outputs: 'err', 'seg[6:0]'"},
+       "connect": {"type": "array", "items": {"type": "array", "items": {"type": "string"}},
+                   "description": "[driver, receiver, …]: ['clk','cnt.clk'], ['cnt.ones','cmp.a_lo'], ['sw[3:0]','cmp.b_lo'], ['1','cnt.en']"},
+       "auto": {"type": "boolean", "description": "join same-named pins and ports (default true)"},
+       "bus": {"type": "boolean", "description": "declared buses as bus ports (default true)"},
+       "pins": {"type": "object", "description": "board pins for the top ports, e.g. {'btn':'pb:4','sw[0]':'sw:0'}"},
+       "top": {"type": "boolean", "description": "also make it the project's top sheet"},
+       "replace": {"type": "boolean"}}, ["blocks"], timeout=120),
+    T("compare_sheets", "Are two circuits the same? Drive `sheet` and `with` (another sheet) with the same inputs, port by port "
+      "by name, and compare every output: all rows up to 12 input bits (else corners + 1000 random vectors); with flip-flops, "
+      "clock by clock from reset on the same random stimulus. Or compare `sheet` with a formula, a table (columns or ones), "
+      "a library part (+ params) or the request's words — e.g. a student's gates against the reference. No AI involved.",
+      {"sheet": SHEET, "with": {"type": "string", "description": "the other sheet"},
+       "formula": {"type": "string"}, "table": {"type": "object"}, "part": {"type": "string"}, "params": {"type": "object"},
+       "request": {"type": "string"}, "cycles": {"type": "integer", "minimum": 4, "maximum": 512}}, timeout=90),
+    T("derive_spec", "Derive a sheet's acceptance test from the user's REQUEST by code — independent of any circuit: "
+      "equations in it, a minterm list (f(a,b,c) = Σm(1,2,4,7)), 'output 1 when the n-bit input is prime / even / > k …', "
+      "or a standard part it names (4-bit adder, BCD→7-seg, mod-6 counter → checked against that part's reference model). "
+      "With `sheet` it is set as that sheet's spec (the sheet is made if missing); a circuit that passes it is right, "
+      "unlike a check against the table the circuit was built from. Answers derived:false when the request gives nothing to read.",
+      {"request": {"type": "string", "description": "the user's words, as written"}, "sheet": SHEET,
+       "apply": {"type": "boolean", "description": "false = only return the spec (default: set it on `sheet`)"}}, ["request"]),
     T("check_spec", "Run a sheet's acceptance test (or every sheet's with all_sheets) and get pass / the mismatches.",
       {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
     T("list_parts", "The part library: standard circuits (adders, subtractors, comparator, mux/demux, decoder, encoder, "
@@ -187,7 +230,8 @@ TOOLS = [
       "and marked verified. Prefer this over drawing gates or typing truth tables. Place it on other sheets as block:<sheet>.",
       {"kind": {"type": "string", "description": "a kind from list_parts, e.g. full_adder, adder, mux, bcd_7seg, mod_counter, clock_divider; "
                "lab parts: bcd_valid, one_pulse, counter_digit, bcd_counter_multi, bcd2_compare, add3, bin2bcd, hex_7seg, seg7_mux4, "
-               "addsub, alu_slice, alu, register_en, mux_bus, bcd_ascii"},
+               "addsub, alu_slice, alu, register_en, mux_bus, bcd_ascii; "
+               "a whole lab: lab6_counter (lab 6, counter 00-yy on the EDGE board: every block wired, pins mapped)"},
        "n": {"type": "integer", "description": "size: bits / inputs / modulus / divisor, per kind"},
        "bus": {"type": "boolean", "description": "a0..a3 → one bus port a[3:0]"},
        "cin": {"type": "boolean"}, "en": {"type": "boolean"}, "odd": {"type": "boolean"}, "active_low": {"type": "boolean"},
@@ -199,6 +243,8 @@ TOOLS = [
        "k": {"type": "integer", "description": "mux_bus: number of buses (2, 4, 8)"},
        "hex": {"type": "boolean", "description": "seg7_mux4: show 0–F"}, "dp": {"type": "boolean", "description": "seg7_mux4: decimal points"},
        "async": {"type": "boolean", "description": "register_en: clear without waiting for the clock"},
+       "tick": {"type": "integer", "description": "lab6_counter: 50 MHz clocks per count (default 2500000 = 20 Hz)"},
+       "scan": {"type": "integer", "description": "lab6_counter: display scan divider (default 50000 = 1 kHz)"},
        "sheet": {"type": "string", "description": "sheet to build on (created, or an empty one filled)"},
        "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"},
        "name": {"type": "string", "description": "entity name when no sheet is given"}}, ["kind"], timeout=90),
@@ -236,7 +282,8 @@ TOOLS = [
     # --- verification
     T("check", "Design-rule check (what Vivado would reject + common mistakes): errors and warnings with the "
       "component and a suggested fix.", {"sheet": SHEET, "all_sheets": {"type": "boolean"}}),
-    T("simulate", "Simulate a sheet. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) "
+    T("simulate", "Simulate a sheet — ports as numbers too (`table` / `values`: a bus or a numbered group q0..q3 is one "
+      "value), and for flip-flops a text `waveform`. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) "
       "up to 10 input bits; for more, or to check chosen rows, give `vectors` [{input: value, …}, …] (≤256, inputs "
       "left out are 0, bus values as in probe). "
       "Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0), "
@@ -250,8 +297,9 @@ TOOLS = [
       {"sheet": SHEET, "expected": {"type": "object"}, "formula": {"type": ["string", "array"], "items": {"type": "string"}}}),
     T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong. "
       "A bus INPUT takes its whole value: 5, \"0101\" (binary as wide as the bus), \"0b0101\" or \"0x5\"; "
-      "a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated.",
-      {"sheet": SHEET, "inputs": INPUTS}),
+      "a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated. "
+      "inside:'u' (or a path 'u/v') gives the nets and ports INSIDE that block instead, with its inputs from the whole circuit.",
+      {"sheet": SHEET, "inputs": INPUTS, "inside": {"type": "string", "description": "a block on the sheet (label / name), or a path u/v"}}),
     T("explain_simulation", "Likely reasons a simulation doesn't behave as expected (clock not reaching FFs, reset stuck, "
       "gated clock, floating pins, multi-driver, constant outputs, unused inputs, divider chains).", {"sheet": SHEET}),
     # --- board
@@ -287,6 +335,23 @@ TOOLS = [
     T("list_projects", "Projects saved in the user's workspace folder (paths usable with open_project)."),
     T("open_project", "Open a saved project from the workspace (replaces what's on screen; a checkpoint is kept).",
       {"path": {"type": "string", "description": "e.g. 'lab4/lab4.schproj.json'"}}, ["path"]),
+    T("delete_project", "Delete a project: from the editor's project list AND its workspace folder (the folder is moved to "
+      "Projects/.trash, so it can be restored by moving it back). files:false keeps the folder.",
+      {"name": {"type": "string"}, "files": {"type": "boolean"}}, ["name"]),
+    T("rename_project", "Rename a project in the editor and on disk (folder, <name>.schproj.json and the name written inside).",
+      {"name": {"type": "string"}, "to": {"type": "string"}}, ["name", "to"]),
+    T("rescan_projects", "Compare the editor's open projects with the workspace folders (names inside files that differ from "
+      "their folder included). prune:true drops editor-only projects that hold no parts — they are why new_project "
+      "answered test_2 after 'test' was deleted.", {"prune": {"type": "boolean"}}),
+    T("export_project", "The project as .schproj.json text (the active one, or `name`).", {"name": {"type": "string"}}, timeout=60),
+    T("import_project", "Load a project from .schproj.json text (replaces what's on screen; a checkpoint is kept). "
+      "`name` renames it, `save` writes it to the workspace.",
+      {"json": {"type": "string"}, "name": {"type": "string"}, "save": {"type": "boolean"}}, ["json"], timeout=60),
+    T("batch", "Run several editing tools as ONE step: ops = [{tool, args}, …] in order. One undo undoes them all, and if "
+      "one fails the ones before it are undone too (atomic:false keeps them) — the answer names the failing op.",
+      {"ops": {"type": "array", "items": {"type": "object", "properties": {"tool": {"type": "string"}, "args": {"type": "object"}},
+                                                  "required": ["tool"]}},
+       "atomic": {"type": "boolean"}}, ["ops"], timeout=120),
     # --- history & collaboration
     T("undo", "Undo the last change (yours or the user's)."),
     T("redo", "Redo."),
@@ -322,9 +387,15 @@ TOOLS = [
       {"sheet": SHEET, "name": {"type": "string"}, "description": {"type": "string"},
        "replace": {"type": "boolean", "description": "overwrite a module with the same name"},
        "force": {"type": "boolean", "description": "save a sheet that is not verified (only when the user asks for it)"}}),
+    T("where_used", "Every copy of a library module in the projects open in the editor: which sheet, its version (outdated or "
+      "not) and the sheets that place it.", {"module": {"type": "string"}}, ["module"]),
+    T("update_module", "Bring the copies of a module placed in this project (all_projects: every open project) up to the "
+      "library's current version, in place — parents keep their blocks; port changes are reported. One undo step.",
+      {"module": {"type": "string"}, "all_projects": {"type": "boolean"}}, ["module"]),
     T("use_module", "Place a library module on a sheet as a block (its sheet is brought into the project once, then "
-      "reused). Returns the block with its pins — connect them like any part.",
-      {"module": {"type": "string", "description": "module name or id"}, "sheet": SHEET,
+      "reused). A part kind from list_parts works too (+ params): the standard lab modules need no saving first. "
+      "Returns the block with its pins — connect them like any part.",
+      {"module": {"type": "string", "description": "module name or id, or a part kind"}, "params": {"type": "object"}, "sheet": SHEET,
        "name": {"type": "string", "description": "label for the block"}, "x": {"type": "number"}, "y": {"type": "number"}},
       ["module"]),
     T("open_module", "Open a library module as a new sheet (a copy) to look at or change it.",
@@ -340,13 +411,23 @@ TOOLS = [
       "sees it). mode: 'agent' = the local model works step by step with the editor's tools (a core set of these "
       "same tools); 'build' = the older one-shot circuit pipeline; 'qa' = questions. Returns at once — then "
       "ai_chat_status. Use it to test the app's AI feature and find what goes wrong.",
-      {"message": {"type": "string"}, "mode": {"type": "string", "enum": ["agent", "build", "qa"]}}, ["message"]),
+      {"message": {"type": "string"}, "mode": {"type": "string", "enum": ["agent", "build", "qa"]},
+       "max_steps": {"type": "integer", "minimum": 1, "maximum": 60, "description": "agent: model rounds for this run (default 24)"},
+       "budget_s": {"type": "integer", "minimum": 10, "description": "agent: after this many seconds it is told to answer (default 300)"},
+       "resume": {"type": "boolean", "description": "agent: continue the last run that stopped before answering (ai_chat_stop, "
+                  "the step limit or the time budget) from its conversation, instead of starting over; message not needed"},
+       "run_id": {"type": "integer", "description": "with resume: which run"},
+       "escalate": {"type": "boolean", "description": "agent: false = never switch to a bigger installed model when this run stalls (default: it does, and switches back after)"}}),
     T("ai_chat_status", "Wait (≤`wait` s) for the chat to finish the message sent with ai_chat, then return what "
       "appeared in the chat and, for agent mode, the run: every step (the model's thinking, each tool call with its "
       "arguments and result or error, nudges), the final answer, model calls, tokens and time. detail:'full' "
       "includes the complete tool results and thinking.",
-      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}, "detail": {"type": "string", "enum": ["steps", "full"]}},
+      {"wait": {"type": "integer", "minimum": 1, "maximum": 40}, "detail": {"type": "string", "enum": ["steps", "full"]},
+       "run_id": {"type": "integer", "description": "a finished run (ids in recent_runs) — the last 10 are kept across page reloads"}},
       timeout=55),
+    T("ai_chat_stop", "Stop the agent run in progress now: the model call in flight is aborted and no further tool runs. "
+      "The run can be continued later with ai_chat {resume:true}.",
+      {"reason": {"type": "string"}}, timeout=25),
     T("notify_user", "Show a short message to the user inside the editor.",
       {"message": {"type": "string"}, "level": {"type": "string", "enum": ["info", "warn"]}}, ["message"]),
 ]
@@ -371,9 +452,9 @@ _apply["description"] += " Step fields (* = required): " + "; ".join(
 # checking and simulating core — a 4–9B model does better with ~20 tools than with all of them
 AGENT_TOOLS = ["status", "get_sheet", "get_netlist", "list_component_types", "open_sheet", "new_sheet",
                "set_top_sheet", "add_component", "connect", "disconnect", "delete", "update_component", "apply",
-               "build_part", "list_parts", "build_fsm", "set_spec", "check_spec",
+               "build_part", "list_parts", "build_fsm", "build_hierarchy", "derive_spec", "set_spec", "check_spec", "compare_sheets",
                "build_circuit", "make_bus_ports", "check", "simulate", "verify_truth_table", "probe", "explain_simulation",
-               "get_pins", "set_pins", "auto_pins", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
+               "get_pins", "set_pins", "auto_pins", "pin_preset", "board_check", "board_troubleshoot", "suggest_wires", "undo", "list_modules", "use_module", "save_module", "search_course"]
 
 
 def openai_tools(names=None):

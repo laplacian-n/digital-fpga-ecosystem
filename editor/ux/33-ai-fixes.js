@@ -120,6 +120,8 @@ function aifInputsOf(sch){ try{ const j=clientCombSim(sch); return j.ok ? j.trut
     const fp=partFromMessage(msg);
     if(!fp || !fp.simple) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
+    // a big part (a whole lab) takes half a minute: say so before the page is busy drawing it
+    aiAppend("ai", `⏳ กำลังสร้าง ${PARTS[fp.kind].label} จากคลังชิ้นส่วน…`); await new Promise(r=>setTimeout(r, 60));
     try{
       const r=await MCP_OPS.build_part(Object.assign({kind:fp.kind}, fp.args));
       const io=d=>r.ports.filter(p=>p.dir===d).map(p=>p.name+(p.width>1?"["+(p.width-1)+":0]":"")).join(", ");

@@ -19,7 +19,7 @@ test("every part in the library builds and passes its reference check", async ({
       try { const res = MCP_OPS.build_part(Object.assign({ kind: k }, a)); if (!res.verified.pass) bad.push(k);
         const s = Object.values(state.project.schematics).find(x => x.name === res.sheet); if (!sheetVerified(s)) bad.push(k + " (no stamp)"); }
       catch (e) { bad.push(k + " " + JSON.stringify(a) + ": " + e.message); } }
-    const missing = Object.keys(PARTS).filter(k => !kinds.has(k) && !PARTS_LABS.includes(k));   // those: parts-labs.spec.js
+    const missing = Object.keys(PARTS).filter(k => !kinds.has(k) && !PARTS_LABS.includes(k) && !PARTS_SYSTEMS.includes(k));   // those: parts-labs / lab-systems.spec.js
     // the stamp dies with an edit
     const fa = MCP_OPS.build_part({ kind: "full_adder", sheet: "fa_stamp" }), s = Object.values(state.project.schematics).find(x => x.name === "fa_stamp");
     const before = sheetVerified(s); s.components.find(c => c.type === "XOR").type = "OR";

@@ -250,7 +250,16 @@ function openExplainSim(){
   const _send=aiSend;
   aiSend=async function(){
     const t=$("#acInput"), msg=((t&&t.value)||"").trim();
-    const why=/^\/(why|ทำไม)\b/i.test(msg) || (/(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg) && /(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ทำไม|ผิด|ค้าง)/.test(msg));
+    // a symptom of THIS sheet ("ทำไมไม่นับ", "จำลองแล้วค้าง") gets the check; a question about the idea
+    // ("ทำไมตัวนับต้องมีตัวหารความถี่") goes to the model — it used to get this sheet's problems instead
+    const concept=/(ทำไมต้อง|ต้องมี|ต้องใช้|คืออะไร|คือไร|ต่างกัน|แตกต่าง|เลือก|หลักการ|อธิบาย|เพราะอะไรถึง|ใช้ทำอะไร|\bwhy (do|does|is|are) (we|a|an|the)\b)/i.test(msg);
+    const sym=/(ไม่ได้|ไม่ทำงาน|ไม่นับ|ไม่เปลี่ยน|ไม่ขึ้น|ไม่ติด|ไม่ตรง|ผิด|ค้าง|doesn'?t|not (work|count|change))/i.test(msg);
+    const mine=/(นี้|นี่|ของผม|ของฉัน|ของหนู|ของเรา|ที่ทำ|ผลจำลอง|ตอนจำลอง|this|my)/i.test(msg);
+    const sch=activeSch(), hasParts=!!(sch && sch.components.some(c=>c.type!=="JUNCTION"));
+    const why=/^\/(why|ทำไม)\b/i.test(msg) || (hasParts && !concept && /(sim|จำลอง|clk|clock|นาฬิกา|นับ|counter)/i.test(msg)
+      && (sym || (/ทำไม|\bwhy\b/i.test(msg) && mine)));
+    // Q&A mode answers — the builders ahead of it in aiSend took "JK กับ D เลือกตัวไหนทำตัวนับ" as a counter to draw
+    if(!why && AICHAT.mode==="qa" && msg && msg[0]!=="/" && !AICHAT.busy){ aiAppend("user", msg); t.value=""; await aiAsk(msg); return; }
     if(!why) return _send.apply(this, arguments);
     aiAppend("user", msg); t.value="";
     const list=explainSim(activeSch()).slice(0,6);

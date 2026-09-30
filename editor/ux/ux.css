@@ -301,3 +301,6 @@
 .bh-diag h3{margin:4px 0 8px}.bh-checks,.bh-tips{margin:4px 0 12px;padding-left:22px;line-height:1.6}
 .bh-checks{list-style:none;padding-left:4px}.bh-ok{color:#1f8a3b}.bh-bad{color:#c4271d}
 .bh-map{margin:4px 0 8px;font-size:13px}.bh-acts{display:flex;flex-wrap:wrap;gap:6px}.bd-help{margin:10px 0 0}
+/* 45: board pin under each INPUT / OUTPUT once pins are being chosen */
+.pin-tags .pin-tag{font-size:10px;fill:var(--muted,#6b7280);font-family:system-ui,sans-serif;pointer-events:all}
+.pin-tags .pin-tag.bad{fill:#dc2626;font-weight:600}

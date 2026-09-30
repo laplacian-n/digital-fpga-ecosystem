@@ -282,7 +282,8 @@ function partBuild(kind, a){
   let it=part.build(p); if(it && it.W) it={module:it.module, components:it.components, nets:it.nets};
   const bits=it.bits;
   it.module=sanId(a.name||it.module||kind);
-  const dr=aiDrawIntent(it);
+  // the throw-away copy a big part is checked on needs connections, not routed wires (20 s for lab 6's top)
+  const dr=a._check ? drawIntent(it, {noRoute:true}) : aiDrawIntent(it);
   if(!dr||!dr.ok) mcpFail("could not draw the part: "+((dr&&(dr.error||(dr.errors||[]).map(e=>e.msg||e).join("; ")))||"?"));
   const sch=dr.sch;
   if(part.after) part.after(sch, p, Object.assign({bits}, it));
@@ -298,9 +299,12 @@ function partBuild(kind, a){
   // a big divider cannot be run clock by clock: its generator is checked on a small N instead
   let v;
   if(part.seq){ const S=part.seq(p);
-    if(S.small){ const tmp=partBuild(kind, Object.assign({}, a, {n:S.small, name:"__chk", bus:false}));
-      delete state.project.schematics[tmp.sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==tmp.sch.id);
-      v=Object.assign({}, tmp.verify, {method:`ตัวสร้างเดียวกันที่ N=${S.small}: `+tmp.verify.method}); }
+    if(S.small){ const sp=typeof S.small==="object"?S.small:{n:S.small}, had=new Set(Object.keys(state.project.schematics));
+      const tmp=partBuild(kind, Object.assign({}, a, sp, {name:"__chk", bus:false, _check:true}));
+      // the check copy and any sub-sheet only it needed (a small divider) go again
+      Object.keys(state.project.schematics).forEach(id=>{ if(!had.has(id)) delete state.project.schematics[id]; });
+      state.openTabs=(state.openTabs||[]).filter(i=>state.project.schematics[i]);
+      v=Object.assign({}, tmp.verify, {method:`ตัวสร้างเดียวกันที่ ${Object.entries(sp).map(([k,x])=>(k==="n"?"N":k)+"="+x).join(", ")}: `+tmp.verify.method}); }
     else v=partVerifySeq(sch, part, p); }
   else v=partVerifyComb(sch, part, p);
   if(!v.pass){ delete state.project.schematics[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); renderAll();
@@ -327,7 +331,7 @@ MCP_OPS.build_part = a=>{
   mcpBeforeChange("สร้าง "+kind);
   const r=partBuild(kind, a);
   let sch=r.sch;
-  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
+  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified","pinmap"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
     delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
   else if(want) sch.name=uniqueSchName(want, sch.id);
   openSchTab(sch.id); mcpActivity("สร้าง "+PARTS[kind].label); mcpCommit(sch); try{ zoomFit(); }catch(_){}
