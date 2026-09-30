@@ -581,7 +581,8 @@ test("make_report writes the PDF next to the HTML, with a timing diagram for a c
   await page.evaluate(() => { const s = Object.values(state.project.schematics).find(x => x.name === "cnt"); state.project.topId = s.id; });
   const r = await mcp.tool("make_report", {});
   expect(r.error, r.text).toBe(false);
-  expect(r.data.pdf, r.text + JSON.stringify(r.data.pdf_error)).toMatch(/rep_report\.pdf$/);
+  expect(r.data.pdf_error).toBeUndefined();
+  expect(r.data.pdf).toMatch(/rep_report\.pdf$/);
   const pdf = fs.readFileSync(r.data.pdf);
   expect(pdf.slice(0, 5).toString()).toBe("%PDF-");
   expect(pdf.length).toBeGreaterThan(5000);

@@ -620,14 +620,17 @@ def html_to_pdf(html: Path) -> dict:
     with tempfile.TemporaryDirectory() as prof:            # its own profile: an open Edge window does not block it
         args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer", f"--user-data-dir={prof}",
                 f"--print-to-pdf={pdf}", html.resolve().as_uri()]
-        if hasattr(os, "geteuid") and os.geteuid() == 0:     # Chromium refuses to start as root otherwise (Linux only)
+        # Linux: as root, or where the distro blocks its sandbox (Ubuntu 23.10+), Chromium exits at once
+        # without this — it only renders our own report file
+        if not IS_WIN and sys.platform != "darwin":
             args.insert(1, "--no-sandbox")
         try:
-            subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
+            p = subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
         except Exception as e:
             return {"ok": False, "error": f"พิมพ์ PDF ไม่ได้: {e}"}
     if not pdf.is_file() or pdf.stat().st_size < 500:
-        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF"}
+        tail = (p.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
+        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF" + (": " + " | ".join(tail) if tail else ""), "browser": br}
     return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size}
 
 
