@@ -373,9 +373,17 @@ def rag_retriever():
                 if str(rag) not in sys.path:
                     sys.path.insert(0, str(rag))
                 import retriever as _rtv
-                if not _rtv.INDEX.exists():
+                # also when a source is newer than the index (a corrected lab solution must not keep
+                # reaching the agent from an old index)
+                newest = max((f.stat().st_mtime for f in rag.rglob("*") if f.is_file() and f.suffix in (".json", ".md", ".txt", ".vhd")
+                              and f.name != _rtv.INDEX.name and "emb" not in f.name), default=0)
+                if not _rtv.INDEX.exists() or newest > _rtv.INDEX.stat().st_mtime:
                     import build_index as _bi
-                    _bi.main()
+                    try:
+                        _bi.main()
+                    except Exception:
+                        if not _rtv.INDEX.exists():     # a read-only install keeps the index it shipped with
+                            raise
                 _RAG["r"] = _rtv.Retriever()
             except Exception as e:
                 _RAG["err"] = f"{type(e).__name__}: {e}"
