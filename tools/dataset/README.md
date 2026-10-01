@@ -49,6 +49,16 @@ python3 tools/dataset/build_dataset.py --runs runs/* --online runs/online --task
 python3 tools/dataset/export_hf.py tools/dataset/data/train.jsonl.gz train_hf.jsonl [--tools-subset 6]
 ```
 
+## Training (QLoRA, one 16 GB GPU)
+
+`train_lora.py` fine-tunes Qwen3.5-4B (the HF weights, not the .gguf) on `data/` — see its header for the install
+lines. `--dry-run` shows what is trained (assistant turns only; schemas, tool results, the greeting, planned
+mistakes and the prompt's empty `<think></think>` are context), `--pilot` measures peak VRAM and speed on the
+longest conversations, then a full run saves the adapter and, with `--merge --gguf ~/llama.cpp`, writes a Q6_K
+.gguf to measure with the commands below. System RAM is not used unless `--offload` (activations, ~10–20 % slower).
+Every conversation fits 12,288 tokens; 3.4 % of the tokens are trained (the 8.3k-token tool schemas repeat in every
+agent row).
+
 ## Measuring a model (before / after training)
 
 ```bash
