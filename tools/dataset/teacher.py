@@ -70,6 +70,7 @@ FIX_WHY = {
     "extra_field": "build_circuit ไม่มีช่อง description — ตัดออก ส่งแค่ sheet กับ formula",
     "no_lhs": "formula ต้องเป็นสมการ ‘ชื่อขาออก = นิพจน์’ — ใส่ชื่อขาออกนำหน้า",
     "thai_ops": "ในสมการต้องใช้ตัวดำเนินการ & | ^ ~ ไม่ใช่คำไทย — เปลี่ยน ‘และ’ เป็น & / ‘หรือ’ เป็น |",
+    "pin_name": "ชื่อขาของบล็อกผิด — ใช้ชื่อขาตามที่ error บอก (full adder: a, b, cin → sum, cout; adder: a, b, cin → s, cout) แล้วส่ง build_hierarchy ใหม่ทั้งชุด",
 }
 
 
@@ -224,6 +225,12 @@ def compose_plan(t):
     return "\n".join(lines)
 
 
+def compose_slip(plan):
+    """The plan with block pins misnamed: a full adder's sum as .s, an adder's s as .sum."""
+    rn = lambda ref: re.sub(r"^(fa\d+)\.sum$", r"\1.s", ref) if ref.startswith("fa") else re.sub(r"^(lo|hi)\.s$", r"\1.sum", ref)
+    return dict(plan, connect=[[rn(x) for x in c] for c in plan["connect"]])
+
+
 def compose_answer(t, results):
     b = next((r for n, r in reversed(results) if n == "build_hierarchy" and isinstance(r, dict)), {}) or {}
     sc = b.get("spec_check") or {}
@@ -249,7 +256,8 @@ CATS = {
                "first": lambda t: [("set_spec", {"sheet": t["use_sheet"], "formula": t["formula"]})],
                "dynamic": fix_then, "answer": fix_answer},
     "nl_compose": {"sheet": lambda t: t["use_sheet"], "plan": compose_plan,
-                   "first": lambda t: [("build_hierarchy", t["plan"])], "answer": compose_answer},
+                   "first": lambda t: [("build_hierarchy", compose_slip(t["plan"]) if t.get("mistake") == "pin_name" else t["plan"])],
+                   "fix": lambda t: [("build_hierarchy", t["plan"])], "answer": compose_answer},
     "qa": {"direct": True, "sheet": lambda t: None, "answer": lambda t, r: t["answer"]},
 }
 

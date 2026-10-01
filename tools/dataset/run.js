@@ -140,7 +140,7 @@ async function main() {
     for (let i = 0; i < (EVAL ? 600 : 40); i++) { const s = await (await fetch(BASE + "/api/llm/status")).json(); if (s.state === "ready") break;
       if (s.state === "crashed") throw new Error("the model server crashed: " + (s.log || "").slice(-800)); await new Promise(r => setTimeout(r, 250)); }
 
-    browser = await chromium.launch();
+    browser = await chromium.launch(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {});   // PW_CHANNEL=chrome where Playwright has no chromium build
     const page = await (await browser.newContext()).newPage();
     const fresh = async () => {        // a new, empty project for every task (the system prompt lists the sheets)
       await page.goto(BASE + "/studio.html");

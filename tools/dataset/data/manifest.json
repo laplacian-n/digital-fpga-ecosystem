@@ -1,25 +1,25 @@
 {
- "train": 3842,
- "train_extra": 3821,
- "eval_tasks": 658,
+ "train": 3728,
+ "train_extra": 3927,
+ "eval_tasks": 666,
  "train_by_category": {
-  "nl_fsm": 461,
-  "nl_logic": 1076,
-  "nl_pins": 269,
-  "general_thai": 653,
-  "nl_fix": 384,
-  "qa": 461,
-  "general_tools": 269,
-  "nl_compose": 269
+  "nl_logic": 1044,
+  "general_thai": 634,
+  "nl_fix": 373,
+  "nl_fsm": 447,
+  "nl_compose": 261,
+  "nl_pins": 261,
+  "qa": 447,
+  "general_tools": 261
  },
  "extra_by_category": {
-  "nl_logic": 2344,
-  "nl_fsm": 64,
-  "nl_pins": 94,
-  "qa": 268,
-  "nl_fix": 73,
-  "general_thai": 847,
-  "general_tools": 131
+  "nl_logic": 2376,
+  "nl_fsm": 78,
+  "nl_pins": 102,
+  "qa": 282,
+  "nl_fix": 84,
+  "general_thai": 866,
+  "general_tools": 139
  },
  "eval_by_category": {
   "nl_logic": 401,
@@ -27,7 +27,7 @@
   "nl_pins": 37,
   "qa": 71,
   "nl_fix": 43,
-  "nl_compose": 31
+  "nl_compose": 39
  },
  "available_by_category": {
   "nl_logic": 3420,
@@ -35,7 +35,7 @@
   "nl_pins": 363,
   "qa": 729,
   "nl_fix": 457,
-  "nl_compose": 269,
+  "nl_compose": 261,
   "general_thai": 1500,
   "general_tools": 400
  },
@@ -59,47 +59,47 @@
  "tokens": {
   "app_tool_schemas": 8325,
   "all": {
-   "median": 10363,
-   "p95": 10946,
-   "max": 11187,
-   "total": 31118509
+   "median": 10365,
+   "p95": 10968,
+   "max": 11228,
+   "total": 30214069
   },
   "by_category": {
-   "nl_fsm": {
-    "median": 10930,
-    "max": 11187
-   },
    "nl_logic": {
     "median": 10377,
     "max": 10917
    },
-   "nl_pins": {
-    "median": 10420,
-    "max": 10604
-   },
    "general_thai": {
-    "median": 394,
-    "max": 870
+    "median": 383,
+    "max": 841
    },
    "nl_fix": {
     "median": 10570,
     "max": 10936
+   },
+   "nl_fsm": {
+    "median": 10928,
+    "max": 11187
+   },
+   "nl_compose": {
+    "median": 10672,
+    "max": 11228
+   },
+   "nl_pins": {
+    "median": 10421,
+    "max": 10604
    },
    "qa": {
     "median": 9843,
     "max": 10023
    },
    "general_tools": {
-    "median": 1211,
+    "median": 1234,
     "max": 3386
-   },
-   "nl_compose": {
-    "median": 10657,
-    "max": 10832
    }
   }
  },
- "with_masked_mistake": 216,
+ "with_masked_mistake": 263,
  "sources": {
   "program": "tools/dataset/gen_*.py → teacher.py through the app's real agent loop (run.js); every circuit checked against the task's known answer outside the conversation; no model wrote any of it",
   "general_thai": "airesearch/wangchanx-seed-free-synthetic-instruct-thai-120k (MIT) — filtered by tools/dataset/online.py",

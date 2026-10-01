@@ -98,8 +98,13 @@ def make(rng, split, k):
         sheet = rng.choice([sheet + "_top", "top2", f"lab{rng.randint(2, 9)}", "my_" + sheet])
         msg += rng.choice([" ลงแผ่น {s}", " บนแผ่น {s}", " ตั้งชื่อแผ่น {s}"]).format(s=sheet)
     plan = dict({"sheet": sheet}, **plan)
-    return {"id": f"compose-{split}-{k:05d}", "cat": "nl_compose", "split": split, "message": msg, "use_sheet": sheet,
-            "plan": plan, "why": why, "check_formula": formula, "kind": gen.__name__}
+    t = {"id": f"compose-{split}-{k:05d}", "cat": "nl_compose", "split": split, "message": msg, "use_sheet": sheet,
+         "plan": plan, "why": why, "check_formula": formula, "kind": gen.__name__}
+    # the slip the 4B baseline made: a block pin by the wrong name (full adder s for sum, adder sum for s) —
+    # the app's error lists the real pins; the next turn uses them
+    if split == "train" and gen.__name__ in ("ripple", "wide_adder") and rng.random() < 0.3:
+        t["mistake"] = "pin_name"
+    return t
 
 
 def main():
