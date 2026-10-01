@@ -8,7 +8,8 @@
 
 Each question goes to the model under test exactly as the app sends it (Q&A mode: same notes, same system
 prompt, temperature 0.3, 512 tokens, thinking off). Both judges grade the answer with the reference answer in
-view; a question passes when both say correct ≥ 4 and relevant ≥ 4. Prints the pass rate per kind of question.
+view; a question passes when both say correct ≥ 4 and relevant ≥ 4. A computed question (gen_qa.py, with a key)
+is checked by code instead: the number must appear in the answer — no judge, no cost. Prints the pass rate per kind of question.
 """
 import argparse
 import collections
@@ -77,6 +78,11 @@ def main():
             ans = ask_model(a.endpoint, a.model, msgs, os.environ.get(a.bearer_env) if a.bearer_env else None)
         except Exception as e:
             return dict(t, answer=None, error=str(e), passed=False)
+        key = (t.get("check") or {}).get("key")
+        if key is not None:                     # a computed question: the number is checked by code, no judge
+            norm = lambda x: re.sub(r"[\s,_]", "", str(x)).lower()
+            return dict(t, answer=ans, grades={"code": {"key": key}}, passed=norm(key) in norm(ans),
+                        markdown=bool(re.search(r"\*\*|^#|```", ans, flags=re.M)))
         grades = {}
         for jm in g.JUDGES:
             grades[jm] = g.first_json(api.chat(jm, [{"role": "user", "content": G_PROMPT.format(

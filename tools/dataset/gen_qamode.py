@@ -110,7 +110,7 @@ anything that answers a different question, and any definition that contradicts 
 
 class OR:
     def __init__(self, key):
-        self.key, self.lock, self.spent = key, threading.Lock(), {"calls": 0, "in": 0, "out": 0, "fail": 0}
+        self.key, self.lock, self.spent = key, threading.Lock(), {"calls": 0, "in": 0, "out": 0, "fail": 0, "usd": 0.0}
 
     def chat(self, model, messages, temperature=0.7, max_tokens=900, tries=4):
         reasoning, room = REASONING.get(model, ({"enabled": False}, 0))
@@ -128,6 +128,7 @@ class OR:
                     self.spent["calls"] += 1
                     self.spent["in"] += u.get("prompt_tokens", 0)
                     self.spent["out"] += u.get("completion_tokens", 0)
+                    self.spent["usd"] = round(self.spent["usd"] + float(u.get("cost") or 0), 4)
                 txt = d["choices"][0]["message"].get("content") or ""
                 return re.sub(r"<think>.*?</think>", "", txt, flags=re.S).strip()
             except urllib.error.HTTPError as e:
@@ -221,10 +222,37 @@ def code_check(a):
     return None
 
 
+def judge(api, row, q, a, hits, rec):
+    """Both judges, the second only when the first passes; sets row["drop"] on a fail. A judge that does not
+    answer (network, credits) raises — the note is then not cached and is tried again on the next run."""
+    notes = chat_server.ask_notes_block(hits) or "(none)"
+    src = re.sub(r"\s+", " ", rec.get("text") or "")[:2000]
+    row["judge"] = {}
+    for jm in JUDGES:
+        raw = api.chat(jm, [{"role": "user", "content": J_PROMPT.format(q=q, notes=notes, a=a, src=src)}], temperature=0.0, max_tokens=800)
+        if raw is None:
+            raise RuntimeError(f"{jm} did not answer")
+        j = first_json(raw)
+        row["judge"][jm] = j
+        try:
+            sc = [int(j[k]) for k in ("correct", "relevant", "thai", "concise")]
+        except Exception:
+            row["drop"] = f"judge {jm}: no scores"
+            return
+        errs = [e for e in (j.get("errors") or []) if str(e).strip()]
+        if sc[0] < 5 or min(sc) < 4 or errs:
+            row["drop"] = f"judge {jm}: {sc} {errs[:2]}"
+            return
+    row["src_seen"] = True
+
+
 def do_chunk(api, r, rec, n, held):
-    qs = first_json(api.chat(WRITER, [{"role": "user", "content": Q_PROMPT.format(
+    raw = api.chat(WRITER, [{"role": "user", "content": Q_PROMPT.format(
         n=n, kinds=", ".join(random.Random(rec["id"]).sample(KINDS, min(len(KINDS), n + 1))), source=rec.get("source", ""),
-        topic=rec.get("topic") or rec.get("title", ""), text=(rec.get("text") or "")[:2500])}], temperature=0.9, max_tokens=900))
+        topic=rec.get("topic") or rec.get("title", ""), text=(rec.get("text") or "")[:2500])}], temperature=0.9, max_tokens=900)
+    if raw is None:
+        raise RuntimeError("writer did not answer")
+    qs = first_json(raw)
     qs = [x for x in ((qs or {}).get("questions") or []) if isinstance(x, dict) and isinstance(x.get("q"), str)]
     out = []
     for x in qs[:n]:
@@ -235,6 +263,8 @@ def do_chunk(api, r, rec, n, held):
         msgs = chat_server.ask_messages(payload(q), hits)
         wmsgs = [{"role": "system", "content": chat_server._ASK_SYS + STYLE}, msgs[1]]
         a = api.chat(WRITER, wmsgs, temperature=0.4, max_tokens=700)
+        if a is None:
+            raise RuntimeError("writer did not answer")
         a = strip_draw_hint(q, (a or "").strip()).strip()
         why = code_check(a)
         row = {"q": q, "kind": x.get("kind", ""), "a": a, "chunk": rec["id"], "hits": [h["source"] + " · " + h["topic"] for h in hits],
@@ -243,21 +273,7 @@ def do_chunk(api, r, rec, n, held):
             row["drop"] = "code: " + why
             out.append(row)
             continue
-        notes = chat_server.ask_notes_block(hits) or "(none)"
-        src = re.sub(r"\s+", " ", rec.get("text") or "")[:2000]
-        row["judge"] = {}
-        for jm in JUDGES:
-            j = first_json(api.chat(jm, [{"role": "user", "content": J_PROMPT.format(q=q, notes=notes, a=a, src=src)}], temperature=0.0, max_tokens=800))
-            row["judge"][jm] = j
-            try:
-                sc = [int(j[k]) for k in ("correct", "relevant", "thai", "concise")]
-            except Exception:
-                row["drop"] = f"judge {jm}: no scores"
-                break
-            errs = [e for e in (j.get("errors") or []) if str(e).strip()]
-            if sc[0] < 5 or min(sc) < 4 or errs:
-                row["drop"] = f"judge {jm}: {sc} {errs[:2]}"
-                break                                   # the second judge is asked only when the first passes
+        judge(api, row, q, a, hits, rec)
         row["messages"] = msgs + [{"role": "assistant", "content": a}]
         out.append(row)
     return out
@@ -274,6 +290,8 @@ def main():
     ap.add_argument("--computed", default=None, help="gen_qa.py tasks: their questions + program answers in the Q&A-mode prompt (no model)")
     ap.add_argument("--computed-only", action="store_true", help="only the --computed rows (no OpenRouter calls)")
     ap.add_argument("--cached-only", action="store_true", help="write out what the cache holds (no OpenRouter calls)")
+    ap.add_argument("--recheck", action="store_true", help="judge again, with the source note in view, kept rows judged without it")
+    ap.add_argument("--max-usd", type=float, default=0, help="stop starting new notes once this run has spent this much")
     a = ap.parse_args()
     key = os.environ.get("OR_KEY", "").strip()
     if not key and not (a.computed_only or a.cached_only):
@@ -288,18 +306,37 @@ def main():
         recs = recs[:a.limit]
     if a.computed_only:
         recs = []
-    if a.cached_only:
+    if a.cached_only and not a.recheck:
         recs = [d for d in recs if (cache / (hashlib.sha1(d["id"].encode()).hexdigest()[:16] + ".json")).exists()]
 
     def held(rec):  # one note in ten: its questions are eval tasks only
         return int(hashlib.sha1(rec["id"].encode()).hexdigest(), 16) % 10 == 0
 
+    def over():
+        return a.max_usd and api.spent["usd"] >= a.max_usd
+
     def job(rec):
         f = cache / (hashlib.sha1(rec["id"].encode()).hexdigest()[:16] + ".json")
         if f.exists():
-            return json.loads(f.read_text(encoding="utf-8"))
+            rows = json.loads(f.read_text(encoding="utf-8"))
+            todo = [x for x in rows if a.recheck and "drop" not in x and not x.get("src_seen")]
+            if todo and not over():
+                try:
+                    for x in todo:
+                        judge(api, x, x["q"], x["a"], retrieve(r, x["q"]), rec)
+                except Exception as e:
+                    print(f"recheck stopped: {e}", file=sys.stderr, flush=True)
+                    return rows                          # not saved: tried again next time
+                f.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+            return rows
+        if a.cached_only or over():
+            return []
         n = max(1, round(a.per_chunk * PER_GROUP.get(rec["group"], 1.0)))
-        rows = do_chunk(api, r, rec, n, held(rec))
+        try:
+            rows = do_chunk(api, r, rec, n, held(rec))
+        except Exception as e:
+            print(f"note {rec['id']} not finished: {e}", file=sys.stderr, flush=True)
+            return []
         f.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
         return rows
 
