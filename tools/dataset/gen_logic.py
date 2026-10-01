@@ -180,6 +180,8 @@ MULTI = [
     ("วงจรมีอินพุต {ins} ให้ {o1} = 1 เมื่อ {c1} และให้ {o2} = 1 เมื่อ {c2}", "E"),
 ]
 MISTAKES = ["extra_field", "no_lhs", "thai_ops"]
+DISTRACT = 0.0
+PREFIX = "logic"
 
 
 def make(rng, split, k):
@@ -215,9 +217,18 @@ def make(rng, split, k):
     if rng.random() < 0.4:
         sheet = rng.choice([f"{outs[0]}_logic", f"lab_{outs[0]}", f"q{rng.randint(1, 9)}", f"ex{rng.randint(1, 20)}", "logic1", "circuit_a"])
         msg += rng.choice(SHEET_TAILS).format(s=sheet)
-    t = {"id": f"logic-{split}-{k:05d}", "cat": "nl_logic", "split": split, "message": msg, "sheet": sheet,
+    t = {"id": f"{PREFIX}-{split}-{k:05d}", "cat": "nl_logic", "split": split, "message": msg, "sheet": sheet,
          "use_sheet": sheet or f"{outs[0]}_logic", "inputs": used, "formula": "; ".join(eqs), "outputs": outputs}
     t.update({k2: outputs[0][k2] for k2 in ("out", "ones", "readings", "top", "negated")})   # the single-output view
+    if DISTRACT and rng.random() < DISTRACT:             # the project already holds other work (listed in the system prompt)
+        t["setup"] = []
+        for j in range(rng.choice([1, 1, 2])):
+            nm = rng.choice(["lab1", "test", "old_try", "half_adder", "q1", "work", "draft"]) + (str(j) if j else "")
+            if nm == t["use_sheet"]:
+                continue
+            a, b = rng.sample(["a", "b", "c", "x", "y"], 2)
+            f = f"{rng.choice(['o', 'w', 'r'])} = {a} {rng.choice(['&', '|', '^'])} {b}"
+            t["setup"] += [["build_circuit", {"sheet": nm, "formula": f}]]
     if split == "train" and rng.random() < 0.2:          # the first build call has a typical slip; the error teaches the fix
         t["mistake"] = rng.choice(MISTAKES)
     return t
@@ -228,7 +239,11 @@ def main():
     ap.add_argument("--n", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--eval", type=float, default=0.1, help="share of eval tasks")
+    ap.add_argument("--distract", type=float, default=0.0, help="share of tasks whose project already has 1–2 other sheets")
+    ap.add_argument("--prefix", default="logic", help="id prefix (a second batch must not reuse ids)")
     a = ap.parse_args()
+    global DISTRACT, PREFIX
+    DISTRACT, PREFIX = a.distract, a.prefix
     rng = random.Random(a.seed)
     seen, k = set(), 0
     while k < a.n:

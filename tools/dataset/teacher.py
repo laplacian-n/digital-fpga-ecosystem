@@ -273,21 +273,31 @@ def tool_results(msgs):
     return out
 
 
-def after_ask(msgs):
-    """The messages after the user's request (the chat history before it — the editor's greeting —
-    is not this run's)."""
-    for i, m in enumerate(msgs):
+def ask_index(msgs):
+    """Where this run's request is: the LAST user message that is not the app's own note (earlier
+    ones are chat history — a previous request in the same chat)."""
+    for i in range(len(msgs) - 1, -1, -1):
+        m = msgs[i]
         if m.get("role") == "user" and not str(m.get("content")).startswith("(system)"):
-            return msgs[i + 1:]
-    return msgs
+            return i
+    return -1
+
+
+def after_ask(msgs):
+    """The messages after the user's request (the history before it is not this run's)."""
+    return msgs[ask_index(msgs) + 1:]
+
+
+def the_ask(msgs):
+    i = ask_index(msgs)
+    return (msgs[i].get("content") or "") if i >= 0 else ""
 
 
 def respond(req):
     msgs = req.get("messages") or []
     if not req.get("tools"):                   # Q&A / build mode: not ours
         return {"content": "(teacher) no task"}
-    ask = next((m.get("content") or "" for m in msgs if m.get("role") == "user"
-                and not str(m.get("content")).startswith("(system)")), "")
+    ask = the_ask(msgs)
     t = TASKS.get(ask)
     if not t:
         return {"content": "(teacher) unknown task"}
@@ -359,8 +369,7 @@ class H(BaseHTTPRequestHandler):
         if calls:
             msg["tool_calls"] = calls
         # the teacher's own turns, kept per task (the app rewrites the first one's content later)
-        ask = next((m.get("content") or "" for m in msgs if m.get("role") == "user"
-                    and not str(m.get("content")).startswith("(system)")), "")
+        ask = the_ask(msgs)
         t = TASKS.get(ask)
         if t:
             path = os.path.join(DIR, "raw", re.sub(r"[^\w.-]", "_", t["id"]) + ".json")

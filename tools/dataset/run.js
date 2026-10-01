@@ -25,6 +25,7 @@ const TASKS = path.resolve(arg("tasks", "tasks.jsonl")), OUT = path.resolve(arg(
 const EVAL_MODEL = arg("eval-model", null), LLAMA = arg("llama", null);
 const EVAL = !!EVAL_MODEL;
 const LIMIT = +arg("limit", 1e9), SPLIT = arg("split", EVAL ? "eval" : "train"), PER_CAT = +arg("per-cat", 1e9);
+const CHAIN = +arg("chain", 0);       // share of tasks sent as the next message in the same chat (history + earlier sheets)
 const BUDGET = +arg("budget", 300), PY = arg("python", process.platform === "win32" ? "python" : "python3");
 const PORT = 19600 + Math.floor(Math.random() * 200), LPORT = PORT + 300, BASE = `http://127.0.0.1:${PORT}`;
 
@@ -152,9 +153,13 @@ async function main() {
       await page.evaluate(() => document.querySelectorAll(".modal-bg").forEach(m => m.remove()));
     };
     let toolsSaved = false;
+    const chainSheets = new Set();       // sheets already in the project of the current chat
     for (const [k, t] of tasks.entries()) {
       const t0 = Date.now();
-      await fresh();
+      // usually a new, empty project; sometimes the next message in the same chat (not after a setup)
+      const chained = k > 0 && !t.setup && !tasks[k - 1].setup && Math.random() < CHAIN && !chainSheets.has(t.use_sheet);
+      if (!chained) { await fresh(); chainSheets.clear(); }
+      chainSheets.add(t.use_sheet);
       // 1. before the run: the ground truth agrees with the app's own reading, and the app cannot answer
       //    it by itself (then the model never sees the request)
       const pre = await page.evaluate(t => {
@@ -222,7 +227,7 @@ async function main() {
       // 4. the row: what the app sent the model, with the model's own turns as it gave them.
       // Assistant turns after the request are the teacher's (the app rewrites the first one's content as
       // "(my plan) …" in later requests); earlier ones are chat history (the editor's greeting): not trained on
-      const ask = raw.messages.findIndex(m => m.role === "user" && !String(m.content).startsWith("(system)"));
+      let ask = -1; raw.messages.forEach((m, i) => { if (m.role === "user" && !String(m.content).startsWith("(system)")) ask = i; });   // the last request; before it = history
       let ti = 0;
       const messages = raw.messages.map((m, i) => m.role === "assistant" && i > ask ? Object.assign({}, raw.turns[ti++]) : m);
       // a planned mistake is in the conversation (the error and the fix are the lesson) but never a target:
@@ -234,7 +239,7 @@ async function main() {
         if (got.length !== ids.length || got.some((g, j) => g.role !== "tool" || g.tool_call_id !== ids[j])) return "tool results out of order after message " + i; } return ""; })();
       if (order) { reject(t, order); continue; }
       if (!toolsSaved) { fs.writeFileSync(path.join(OUT, "tools.json"), JSON.stringify(raw.tools, null, 1)); toolsSaved = true; }
-      train.write(JSON.stringify({ id: t.id, cat: t.cat, messages, meta: { train_from: ask + 1, formula: t.formula, mistake: t.mistake, sheet: t.use_sheet,
+      train.write(JSON.stringify({ id: t.id, cat: t.cat, messages, meta: { train_from: ask + 1, chained, formula: t.formula, mistake: t.mistake, sheet: t.use_sheet,
         checked: a.verified && a.verified.checked, steps: (a.steps || []).filter(s => s.tool).map(s => s.tool),
         nudges: (a.steps || []).filter(s => s.kind === "nudge").map(s => s.text), request_options: raw.request_options, seconds: (Date.now() - t0) / 1000 } }) + "\n");
       stats.ok++;
