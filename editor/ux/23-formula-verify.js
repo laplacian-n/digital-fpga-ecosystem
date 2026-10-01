@@ -192,7 +192,11 @@ function partFromMessage(msg){
   const named=[...String(msg).matchAll(/(?:อินพุต|เอาต์พุต|เอาท์พุต|inputs?|outputs?)\s*[:：]?\s*([A-Za-z_][\w\s,]*)/gi)].flatMap(m=>m[1].split(/[\s,]+/).filter(Boolean));
   return {kind, args, simple:!more, named};
 }
+/* asks to make something (not only how / how many): "ทำไม…" is not "ทำ" */
+const AIAG_MAKE_RE=/(สร้าง|ออกแบบ|วาด|ทำวงจร|ทำตัว|ช่วยทำ|อยากได้|ขอวงจร|\bbuild\b|\bmake\b|\bdesign\b)/i;
 async function aiagFastPath(msg, run){
+  // a question about a part ("ตัวนับ mod 12 ต้องใช้ flip-flop กี่ตัว") is answered, not built
+  if(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !AIAG_MAKE_RE.test(msg)) return null;
   const fp=partFromMessage(msg); if(!fp) return null;
   const r=await aiagCall("build_part", Object.assign({kind:fp.kind}, fp.args));
   const st={kind:"tool", tool:"build_part", args:Object.assign({kind:fp.kind}, fp.args), ok:r.ok, fast_path:true,

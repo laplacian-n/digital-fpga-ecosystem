@@ -101,7 +101,8 @@ function uxAboutSheet(msg){
   aiLooksLikeQuestion=function(msg){
     if(_q(msg)) return true;
     if(/[=]|minterms?|Σ/i.test(msg)) return false;
-    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|\bwhat\b|\bwhich\b)/i.test(msg);
+    // "ต้องใช้ flip-flop กี่ตัว", "นับถึงเท่าไร": a number is asked for, not a circuit
+    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|กี่|เท่าไร|เท่าไหร่|\bwhat\b|\bwhich\b|how many|how much)/i.test(msg);
   };
   const _ask=aiAsk;
   aiAsk=async function(msg){

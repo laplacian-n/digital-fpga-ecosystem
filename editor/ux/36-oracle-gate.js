@@ -110,6 +110,14 @@ function oracleAttach(sch, o){
     if(r && oracleIsRequestSpec(sch)){ r.independent=true; r.source="request"; delete r.warning;
       if(r.pass){ sheetVerifyStamp(sch, "spec from the request ("+(sch.specWhat||sch.spec.kind)+") — "+r.checked);
         if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดจากคำขอ (${r.checked})`; } }
+    // set from the request BEFORE the circuit, then built from it: the same text is what is expected
+    // (the build follows the spec), not a check written from the circuit afterwards. What is left to
+    // confirm is that the spec reads the request right — the answer shows it to the user.
+    else if(r && r.independent===false && sch && sch.specSource==="spec-first"){
+      r.independent=true; r.source="spec-first"; delete r.warning;
+      r.note="built from the spec you set from the request first — confirm the spec says what the request says";
+      if(r.pass){ sheetVerifyStamp(sch, "spec set from the request before the circuit — "+r.checked);
+        if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดที่ตั้งจากคำขอก่อนสร้าง (${r.checked})`; } }
     return r;
   };
   const _sd=specDescribe;

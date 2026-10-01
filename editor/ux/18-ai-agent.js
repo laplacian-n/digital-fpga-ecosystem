@@ -231,6 +231,9 @@ async function aiAgentRun(msg, opts){
       if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
+        // the app's own notes wait until every call of this turn has its result: a user message between
+        // two tool results breaks the order the chat template expects (assistant → tool, tool, … → user)
+        const after=[];
         for(const tc of calls){
           if(run.cancel) break;
           const tool=tc.function.name; let args={}, bad=null;
@@ -254,7 +257,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
-            messages.push({role:"user", content:passNote}); }
+            after.push({role:"user", content:passNote}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -270,6 +273,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        messages.push(...after);
         // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
         if(aiagFingerprint()===fp0) stall++; else stall=0;
         if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";

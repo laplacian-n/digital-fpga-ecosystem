@@ -16098,7 +16098,8 @@ function uxAboutSheet(msg){
   aiLooksLikeQuestion=function(msg){
     if(_q(msg)) return true;
     if(/[=]|minterms?|Σ/i.test(msg)) return false;
-    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|\bwhat\b|\bwhich\b)/i.test(msg);
+    // "ต้องใช้ flip-flop กี่ตัว", "นับถึงเท่าไร": a number is asked for, not a circuit
+    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|กี่|เท่าไร|เท่าไหร่|\bwhat\b|\bwhich\b|how many|how much)/i.test(msg);
   };
   const _ask=aiAsk;
   aiAsk=async function(msg){
@@ -17525,6 +17526,9 @@ async function aiAgentRun(msg, opts){
       if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
+        // the app's own notes wait until every call of this turn has its result: a user message between
+        // two tool results breaks the order the chat template expects (assistant → tool, tool, … → user)
+        const after=[];
         for(const tc of calls){
           if(run.cancel) break;
           const tool=tc.function.name; let args={}, bad=null;
@@ -17548,7 +17552,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
-            messages.push({role:"user", content:passNote}); }
+            after.push({role:"user", content:passNote}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -17564,6 +17568,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        messages.push(...after);
         // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
         if(aiagFingerprint()===fp0) stall++; else stall=0;
         if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";
@@ -18497,7 +18502,11 @@ function partFromMessage(msg){
   const named=[...String(msg).matchAll(/(?:อินพุต|เอาต์พุต|เอาท์พุต|inputs?|outputs?)\s*[:：]?\s*([A-Za-z_][\w\s,]*)/gi)].flatMap(m=>m[1].split(/[\s,]+/).filter(Boolean));
   return {kind, args, simple:!more, named};
 }
+/* asks to make something (not only how / how many): "ทำไม…" is not "ทำ" */
+const AIAG_MAKE_RE=/(สร้าง|ออกแบบ|วาด|ทำวงจร|ทำตัว|ช่วยทำ|อยากได้|ขอวงจร|\bbuild\b|\bmake\b|\bdesign\b)/i;
 async function aiagFastPath(msg, run){
+  // a question about a part ("ตัวนับ mod 12 ต้องใช้ flip-flop กี่ตัว") is answered, not built
+  if(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !AIAG_MAKE_RE.test(msg)) return null;
   const fp=partFromMessage(msg); if(!fp) return null;
   const r=await aiagCall("build_part", Object.assign({kind:fp.kind}, fp.args));
   const st={kind:"tool", tool:"build_part", args:Object.assign({kind:fp.kind}, fp.args), ok:r.ok, fast_path:true,
@@ -20400,6 +20409,14 @@ function oracleAttach(sch, o){
     if(r && oracleIsRequestSpec(sch)){ r.independent=true; r.source="request"; delete r.warning;
       if(r.pass){ sheetVerifyStamp(sch, "spec from the request ("+(sch.specWhat||sch.spec.kind)+") — "+r.checked);
         if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดจากคำขอ (${r.checked})`; } }
+    // set from the request BEFORE the circuit, then built from it: the same text is what is expected
+    // (the build follows the spec), not a check written from the circuit afterwards. What is left to
+    // confirm is that the spec reads the request right — the answer shows it to the user.
+    else if(r && r.independent===false && sch && sch.specSource==="spec-first"){
+      r.independent=true; r.source="spec-first"; delete r.warning;
+      r.note="built from the spec you set from the request first — confirm the spec says what the request says";
+      if(r.pass){ sheetVerifyStamp(sch, "spec set from the request before the circuit — "+r.checked);
+        if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดที่ตั้งจากคำขอก่อนสร้าง (${r.checked})`; } }
     return r;
   };
   const _sd=specDescribe;
