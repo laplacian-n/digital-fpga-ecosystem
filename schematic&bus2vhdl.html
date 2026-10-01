@@ -18321,6 +18321,9 @@ MCP_OPS.build_part = a=>{
      truth-table check) unless force:true — the user asked for it anyway.
    - aiagFastPath: "full adder บนชีต fa3" → build_part directly, no model round at all. */
 
+/* order of events on sheets (spec set / circuit built): which came first decides whether a check means anything */
+let AIF_TICK=0;
+function aifTick(){ return ++AIF_TICK; }
 /* ---------- equations → truth table ---------- */
 function fxTokens(src){
   const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕⊙¬∧∨]))/y;
@@ -18404,7 +18407,7 @@ function formulaTable(formula, inputsGiven){
     } else if(a.truth_table && a.truth_table.columns) from={via:"truth_table", cols:Object.fromEntries(Object.entries(a.truth_table.columns).map(([k,v])=>[k,String(v).toLowerCase()]))};
     const r=await _build(args);
     const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
-    if(sch && from){ sch.builtFrom=from; delete sch.verified; }
+    if(sch && from){ sch.builtFrom=Object.assign(from, {at:aifTick()}); delete sch.verified; }
     if(from && from.via==="formula") r.truth_table={inputs:args.truth_table.inputs, columns:from.cols, note:"computed from your equations"};
     if(sch){ try{ const j=clientCombSim(sch); if(j.ok){ const rec=uxRecognize(j.truth_table); if(rec) r.recognized=rec; } }catch(_){} }
     return r;
@@ -20412,7 +20415,10 @@ function oracleAttach(sch, o){
     // set from the request BEFORE the circuit, then built from it: the same text is what is expected
     // (the build follows the spec), not a check written from the circuit afterwards. What is left to
     // confirm is that the spec reads the request right — the answer shows it to the user.
-    else if(r && r.independent===false && sch && sch.specSource==="spec-first"){
+    // (also when a wrong circuit was there first: the spec came from the request, then the circuit was
+    // rebuilt from it — what matters is that the spec is older than the build it checks)
+    else if(r && r.independent===false && sch && (sch.specSource==="spec-first"
+            || (sch.specAt && sch.builtFrom && sch.builtFrom.at && sch.specAt < sch.builtFrom.at))){
       r.independent=true; r.source="spec-first"; delete r.warning;
       r.note="built from the spec you set from the request first — confirm the spec says what the request says";
       if(r.pass){ sheetVerifyStamp(sch, "spec set from the request before the circuit — "+r.checked);
@@ -20431,7 +20437,7 @@ function oracleAttach(sch, o){
   MCP_OPS.set_spec=a=>{
     const s0=a.sheet && aifSheetByName(a.sheet), first=!s0 || !s0.components.some(c=>c.type!=="JUNCTION");
     const r=_ss(a), sch=aifSheetByName(r.sheet);
-    if(sch){ sch.specSource=first?"spec-first":"after-build"; delete sch.specSig; }
+    if(sch){ sch.specSource=first?"spec-first":"after-build"; sch.specAt=aifTick(); delete sch.specSig; }
     if(r && r.result && sch) r.result.spec_source=sch.specSource;
     return r;
   };
@@ -21324,6 +21330,45 @@ function ptagInfo(sch){
     let r=_ev(a);
     while(!r.events.length && Date.now()<until){ await new Promise(res=>setTimeout(res, 250)); r=_ev({since}); }
     return r;
+  };
+}
+
+/* ===== 46. "Make Y out of N × X": a composition is built from blocks, not taken from the library ====
+   Found while generating training data: partFromMessage read "เอาตัวบวก 4 บิต 2 ตัวมาต่อเป็นตัวบวก 8 บิต"
+   as a 4-bit adder, "ต่อ mux 2:1 สามตัวเป็น mux 4:1" as a 2:1 mux and "ต่อ full adder แบบ ripple carry
+   2 ตัว" as one full adder — and the agent's fast path / build mode drew that part at once. The user
+   asked for the structure (a lab exercise in cascading blocks), and the size was wrong as well.
+   Now a request that names how many blocks to use is a composition:
+     - the target (the words after "เป็น", "ตัวบวก 8 บิต") is what partFromMessage reads — so the oracle
+       (36) derives the right acceptance test;
+     - nothing is built before the model: the agent wires the blocks with build_hierarchy (the prompt
+       says so), build mode leaves it to the model. */
+const COMPOSE_N = "(?:\\d+|หนึ่ง|สอง|สาม|สี่|ห้า|หก|เจ็ด|แปด)";
+function composeTarget(msg){
+  const t=String(msg||"");
+  const many=new RegExp(COMPOSE_N+"\\s*ตัว").test(t) || /\b(?:two|three|four|eight|\d+)\s+(?:full|half|mux|adders?|blocks?)/i.test(t);
+  const build=/(ต่อ|ใช้|จาก|ประกอบ|cascade|ripple|\bfrom\b|\busing\b)/i.test(t);
+  if(!many || !build) return null;
+  // "… ต่อเป็น Y", "… into Y" — or "ประกอบ / สร้าง Y จาก X N ตัว", "Y from N X"
+  const m=/(?:มา)?(?:ต่อ)?(?:กัน)?เป็น\s*(.+)$/.exec(t) || /\b(?:into|to make|as)\s+(?:an?\s+)?(.+)$/i.exec(t)
+       || /^(?:ช่วย)?(?:ประกอบ|สร้าง|ทำ|ออกแบบ)\s*(.+?)\s*(?:จาก|โดยใช้|ด้วย)/.exec(t) || /^(?:build|make)\s+(?:an?\s+)?(.+?)\s+(?:from|using|out of)\b/i.exec(t);
+  return {target: m ? m[1].trim() : null};
+}
+{
+  const _pfm=partFromMessage;
+  partFromMessage=function(msg){
+    const c=composeTarget(msg);
+    if(!c) return _pfm.apply(this, arguments);
+    if(!c.target) return null;                     // "ต่อ full adder 2 ตัว": no target named — the model decides
+    const r=_pfm.call(this, c.target);
+    return r ? Object.assign({}, r, {simple:false, compose:true}) : null;
+  };
+  const _fast=aiagFastPath;
+  aiagFastPath=async function(msg, run){
+    const c=composeTarget(msg);
+    if(c) return {note:"\n\n(system) This request asks for a structure made of blocks"+(c.target?` (the result: ${c.target})`:"")
+      +": place each block as a library part in ONE build_hierarchy call (blocks + top ports + connections by name) — do not build_part the whole thing."};
+    return _fast.apply(this, arguments);
   };
 }
 

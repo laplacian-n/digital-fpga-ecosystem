@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import random
+import re
 import sys
 
 # ---- clauses: (kind, arity) → Thai phrasings and the expression they mean ------------------------
@@ -73,17 +74,50 @@ VARSETS = [(["a", "b", "c", "d"], ""), (["p", "q", "r", "s"], ""), (["x1", "x2",
 OUTS = ["z", "y", "f", "led", "result", "alarm", "match", "ok", "valid"]
 
 
+BP = {"|": 1, "nor": 1, "^": 2, "xnor": 2, "&": 3, "nand": 3}
+TOK = re.compile(r"\s*(xnor|nand|nor|[A-Za-z_]\w*|[~&|^()])")
+
+
 def ev(expr, env):
-    """Evaluate our operator syntax (the same the app reads) in Python, for the table."""
-    py = expr
-    for a, b in ((" xnor ", " == "), (" nand ", " NAND "), (" nor ", " NOR ")):
-        py = py.replace(a, b)
-    # (u NAND v) / (u NOR v) only ever join two names in the clauses above
-    import re
-    py = re.sub(r"\((\w+) NAND (\w+)\)", r"(not (\1 and \2))", py)
-    py = re.sub(r"\((\w+) NOR (\w+)\)", r"(not (\1 or \2))", py)
-    py = py.replace("~", " not ").replace("&", " and ").replace("|", " or ").replace("^", " != ")
-    return bool(eval(py, {"__builtins__": {}}, {k: bool(v) for k, v in env.items()}))
+    """Evaluate our operator syntax with the app's precedence: | nor < ^ xnor < & nand < ~ (prefix)."""
+    toks, i = [], 0
+    while i < len(expr):
+        m = TOK.match(expr, i)
+        if not m:
+            if expr[i].isspace():
+                i += 1
+                continue
+            raise ValueError(f"bad character {expr[i]!r} in {expr!r}")
+        toks.append(m.group(1))
+        i = m.end()
+    pos = [0]
+
+    def unary():
+        t = toks[pos[0]]
+        pos[0] += 1
+        if t == "~":
+            return 1 - unary()
+        if t == "(":
+            v = expr_(0)
+            if toks[pos[0]] != ")":
+                raise ValueError("missing )")
+            pos[0] += 1
+            return v
+        return int(env[t])
+
+    def expr_(minbp):
+        left = unary()
+        while pos[0] < len(toks) and toks[pos[0]] in BP and BP[toks[pos[0]]] > minbp:
+            op = toks[pos[0]]
+            pos[0] += 1
+            right = expr_(BP[op])
+            left = {"|": left | right, "nor": 1 - (left | right), "^": left ^ right, "xnor": 1 - (left ^ right),
+                    "&": left & right, "nand": 1 - (left & right)}[op]
+        return left
+    v = expr_(0)
+    if pos[0] != len(toks):
+        raise ValueError(f"trailing {toks[pos[0]:]} in {expr!r}")
+    return bool(v)
 
 
 def pick(rng, items, split, flavour="", tag=1):

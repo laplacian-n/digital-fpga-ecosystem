@@ -169,6 +169,73 @@ def pins_answer(t, results):
     return "\n".join(lines)
 
 
+# ---- nl_fix: a wrong circuit on the sheet → spec from the request, read the mismatches, rebuild ------
+def mism_lines(r, k=3):
+    res = r.get("result") if isinstance(r.get("result"), dict) else r
+    out, names = [], res.get("inputs") or []
+    for m in (res.get("mismatches") or [])[:k]:
+        if isinstance(m, dict):
+            bits = str(m.get("inputs", ""))
+            where = " ".join(f"{n}={b}" for n, b in zip(names, bits)) if len(names) == len(bits) else bits
+            out.append(f"- {where} → ควรได้ {m.get('output', '')}={m.get('want')} แต่ได้ {m.get('got')}")
+    return out, res.get("total_mismatches"), res.get("pass")
+
+
+def fix_plan(t):
+    lines = [f"โจทย์บอกว่า {t['out']} เป็น 1 เมื่อไร แปลทีละเงื่อนไข:"]
+    lines += [f"- “{p}” → {e}" for p, e in t["readings"]]
+    lines.append(f"เงื่อนไขเชื่อมด้วย “{JOIN_WORD[t['top']]}” → {'&' if t['top'] == 'and' else '|'}")
+    lines.append("สมการที่ถูก: " + t["formula"])
+    lines.append(f"ตั้งเป็น spec ของแผ่น {t['use_sheet']} ก่อน แล้วดูว่าวงจรที่มีอยู่ผิดกี่แถว แถวไหน")
+    return "\n".join(lines)
+
+
+def fix_then(t, results):
+    r = next((r for n, r in reversed(results) if n == "set_spec" and isinstance(r, dict)), {}) or {}
+    ml, total, ok = mism_lines(r)
+    if ok is not False:
+        return None
+    why = [f"วงจรเดิมไม่ตรงโจทย์ {total} จาก {t['rows']} แถว เช่น", *ml,
+           f"สร้างใหม่จากสมการที่ถูกบนแผ่นเดิม (replace:true) — spec ตั้งไว้แล้วจะตรวจให้เอง"]
+    return {"content": "", "reasoning_content": "\n".join(why),
+            "tool_calls": [("build_circuit", {"sheet": t["use_sheet"], "formula": t["formula"], "replace": True})]}
+
+
+def fix_answer(t, results):
+    r = next((r for n, r in results if n == "set_spec" and isinstance(r, dict)), {}) or {}
+    ml, total, _ = mism_lines(r)
+    b = next((r for n, r in reversed(results) if n == "build_circuit" and isinstance(r, dict)), {}) or {}
+    sc, eqs = b.get("spec_check") or {}, b.get("equations") or {}
+    lines = [f"วงจรเดิมบนแผ่น {t['use_sheet']} ให้ผลผิด {total} จาก {t['rows']} แถว เช่น", *ml,
+             "สมการที่โจทย์ต้องการ: " + t["formula"]]
+    lines += [f"- “{p}” → {e}" for p, e in t["readings"]]
+    lines.append("แก้โดยสร้างวงจรใหม่บนแผ่นเดิมจากสมการนี้" + (f" (ลดรูปแล้ว {t['out']} = {eqs[t['out']]})" if eqs.get(t["out"]) else ""))
+    if sc.get("pass") is True:
+        lines.append(f"ตอนนี้ตรวจกับข้อกำหนดจากโจทย์ผ่านครบ {sc.get('checked') or ''}".rstrip())
+    return "\n".join(lines)
+
+
+# ---- nl_compose: N × part → one build_hierarchy with every wire --------------------------------------
+def compose_plan(t):
+    p = t["plan"]
+    par = lambda b: "(" + ", ".join(f"{k}={v}" for k, v in b["params"].items()) + ")" if b.get("params") else ""
+    lines = list(t["why"]) + ["บล็อก: " + ", ".join(f"{b['name']}={b['part']}{par(b)}" for b in p["blocks"]),
+                              f"ขาบนสุด: เข้า {', '.join(p['inputs'])} · ออก {', '.join(p['outputs'])}"]
+    return "\n".join(lines)
+
+
+def compose_answer(t, results):
+    b = next((r for n, r in reversed(results) if n == "build_hierarchy" and isinstance(r, dict)), {}) or {}
+    sc = b.get("spec_check") or {}
+    p = t["plan"]
+    lines = [f"ต่อเป็นวงจรบนแผ่น {t['use_sheet']} แล้ว ด้วย " + ", ".join(f"{x['name']} ({x['part']}{' n=' + str(x['params']['n']) if x.get('params') else ''})" for x in p["blocks"])]
+    lines += [f"- {w}" for w in t["why"][:2]]
+    lines.append(f"ขาเข้า {', '.join(p['inputs'])} · ขาออก {', '.join(p['outputs'])} · ต่อสายทั้งหมด {len(p['connect'])} จุดในครั้งเดียว")
+    if sc.get("pass") is True:
+        lines.append(f"ตรวจเทียบกับโมเดลอ้างอิงของชิ้นส่วนที่โจทย์ต้องการ: ผ่าน ({sc.get('checked') or ''})".replace(" ()", ""))
+    return "\n".join(lines)
+
+
 CATS = {
     "nl_logic": {"sheet": logic_sheet, "plan": logic_plan, "first": logic_first, "answer": logic_answer,
                  "fix": lambda t: [logic_build(t)]},
@@ -178,6 +245,11 @@ CATS = {
                 "then": lambda t: [("check", {"sheet": t["use_sheet"]}), ("check_spec", {"sheet": t["use_sheet"]}),
                                    ("board_check", {"sheet": t["use_sheet"]})],
                 "answer": pins_answer},
+    "nl_fix": {"sheet": lambda t: t["use_sheet"], "plan": fix_plan,
+               "first": lambda t: [("set_spec", {"sheet": t["use_sheet"], "formula": t["formula"]})],
+               "dynamic": fix_then, "answer": fix_answer},
+    "nl_compose": {"sheet": lambda t: t["use_sheet"], "plan": compose_plan,
+                   "first": lambda t: [("build_hierarchy", t["plan"])], "answer": compose_answer},
     "qa": {"direct": True, "sheet": lambda t: None, "answer": lambda t, r: t["answer"]},
 }
 
@@ -235,6 +307,12 @@ def respond(req):
         return {"content": "", "reasoning_content": f"{err}\n→ {FIX_WHY[t['mistake']]}", "tool_calls": C["fix"](t)}
     if errors and not (t.get("mistake") and len(errors) == 1):
         return {"content": "(teacher) FAILED: a tool returned an error: " + errors[-1][:200], "_fail": True}
+    # a second step that depends on what came back (fix: rebuild after reading the mismatches), once
+    if C.get("dynamic") and turns == 1:
+        d = C["dynamic"](t, done)
+        if d is None:
+            return {"content": "(teacher) FAILED: the circuit was not wrong", "_fail": True}
+        return d
     # a fixed second step (pins: check the sheet after changing it), once
     if C.get("then") and turns == 1:
         return {"content": "", "tool_calls": C["then"](t)}

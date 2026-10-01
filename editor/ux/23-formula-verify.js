@@ -11,6 +11,9 @@
      truth-table check) unless force:true — the user asked for it anyway.
    - aiagFastPath: "full adder บนชีต fa3" → build_part directly, no model round at all. */
 
+/* order of events on sheets (spec set / circuit built): which came first decides whether a check means anything */
+let AIF_TICK=0;
+function aifTick(){ return ++AIF_TICK; }
 /* ---------- equations → truth table ---------- */
 function fxTokens(src){
   const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕⊙¬∧∨]))/y;
@@ -94,7 +97,7 @@ function formulaTable(formula, inputsGiven){
     } else if(a.truth_table && a.truth_table.columns) from={via:"truth_table", cols:Object.fromEntries(Object.entries(a.truth_table.columns).map(([k,v])=>[k,String(v).toLowerCase()]))};
     const r=await _build(args);
     const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
-    if(sch && from){ sch.builtFrom=from; delete sch.verified; }
+    if(sch && from){ sch.builtFrom=Object.assign(from, {at:aifTick()}); delete sch.verified; }
     if(from && from.via==="formula") r.truth_table={inputs:args.truth_table.inputs, columns:from.cols, note:"computed from your equations"};
     if(sch){ try{ const j=clientCombSim(sch); if(j.ok){ const rec=uxRecognize(j.truth_table); if(rec) r.recognized=rec; } }catch(_){} }
     return r;

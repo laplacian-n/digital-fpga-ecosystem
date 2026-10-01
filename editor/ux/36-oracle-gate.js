@@ -113,7 +113,10 @@ function oracleAttach(sch, o){
     // set from the request BEFORE the circuit, then built from it: the same text is what is expected
     // (the build follows the spec), not a check written from the circuit afterwards. What is left to
     // confirm is that the spec reads the request right — the answer shows it to the user.
-    else if(r && r.independent===false && sch && sch.specSource==="spec-first"){
+    // (also when a wrong circuit was there first: the spec came from the request, then the circuit was
+    // rebuilt from it — what matters is that the spec is older than the build it checks)
+    else if(r && r.independent===false && sch && (sch.specSource==="spec-first"
+            || (sch.specAt && sch.builtFrom && sch.builtFrom.at && sch.specAt < sch.builtFrom.at))){
       r.independent=true; r.source="spec-first"; delete r.warning;
       r.note="built from the spec you set from the request first — confirm the spec says what the request says";
       if(r.pass){ sheetVerifyStamp(sch, "spec set from the request before the circuit — "+r.checked);
@@ -132,7 +135,7 @@ function oracleAttach(sch, o){
   MCP_OPS.set_spec=a=>{
     const s0=a.sheet && aifSheetByName(a.sheet), first=!s0 || !s0.components.some(c=>c.type!=="JUNCTION");
     const r=_ss(a), sch=aifSheetByName(r.sheet);
-    if(sch){ sch.specSource=first?"spec-first":"after-build"; delete sch.specSig; }
+    if(sch){ sch.specSource=first?"spec-first":"after-build"; sch.specAt=aifTick(); delete sch.specSig; }
     if(r && r.result && sch) r.result.spec_source=sch.specSource;
     return r;
   };

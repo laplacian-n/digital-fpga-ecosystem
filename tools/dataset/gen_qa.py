@@ -32,6 +32,7 @@ def q_base(rng):
         terms = [f"{int(c)}×2^{len(b) - 1 - i}" for i, c in enumerate(b) if c == "1"]
         q = rng.choice([f"เลขฐานสอง {grp(b)} มีค่าเท่าไรในฐานสิบ", f"{b}₂ เป็นฐานสิบได้เท่าไร", f"แปลง {b} (ฐาน 2) เป็นฐาน 10 หน่อย"])
         a = f"{grp(b)}₂ = {' + '.join(terms)} = {v}"
+        key = str(v)
     elif kind == "d2b":
         q = rng.choice([f"เลข {v} ฐานสิบเขียนเป็นฐานสองยังไง", f"แปลง {v} เป็นเลขฐานสอง 8 บิต", f"{v} ในฐาน 2 คืออะไร"])
         steps, x = [], v
@@ -39,16 +40,20 @@ def q_base(rng):
             steps.append(f"{x} ÷ 2 = {x // 2} เศษ {x % 2}")
             x //= 2
         a = "หารด้วย 2 ไปเรื่อย ๆ แล้วอ่านเศษจากล่างขึ้นบน:\n" + "\n".join(steps) + f"\nได้ {v} = {grp(format(v, '08b'))}₂"
+        key = format(v, "b")
     elif kind == "d2h":
         q = rng.choice([f"{v} ฐานสิบเป็นฐานสิบหกเท่าไร", f"แปลง {v} เป็น hex"])
         a = f"{v} = {v // 16}×16 + {v % 16} → {v:X}₁₆ (0x{v:02X})  ·  ฐานสอง {grp(format(v, '08b'))}"
+        key = f"{v:X}"
     elif kind == "h2b":
         q = rng.choice([f"0x{v:02X} เป็นเลขฐานสองอะไร", f"เลขฐานสิบหก {v:X} แปลงเป็นฐานสองให้หน่อย"])
         a = "แปลงทีละหลัก hex → 4 บิต: " + ", ".join(f"{c} = {int(c, 16):04b}" for c in f"{v:02X}") + f"\nได้ {grp(format(v, '08b'))}₂ (= {v} ฐานสิบ)"
+        key = format(v, "b")
     else:
         q = rng.choice([f"{grp(format(v, '08b'))} ฐานสองเป็นฐานสิบหกเท่าไร", f"แปลง {format(v, '08b')}₂ เป็น hex"])
         a = "แบ่งทีละ 4 บิตจากขวา: " + ", ".join(f"{format(v, '08b')[i:i + 4]} = {int(format(v, '08b')[i:i + 4], 2):X}" for i in (0, 4)) + f"\nได้ 0x{v:02X} (= {v} ฐานสิบ)"
-    return q, a
+        key = f"{v:X}"
+    return q, a, {"key": key}
 
 
 def q_twos(rng):
@@ -61,10 +66,12 @@ def q_twos(rng):
         pos = format(-v, f"0{n}b")
         inv = "".join("1" if c == "0" else "0" for c in pos)
         a = f"เริ่มจาก +{-v} = {grp(pos)} → กลับทุกบิต = {grp(inv)} → บวก 1 = {grp(code)}\nดังนั้น {v} = {grp(code)} ({n} บิต, ช่วงที่แทนได้ {lo} ถึง {hi})"
+        key = code
     else:
         q = rng.choice([f"{grp(code)} ถ้าเป็นเลขมีเครื่องหมาย {n} บิตแบบ 2's complement มีค่าเท่าไร", f"เลข signed {n} บิต {code} คือเท่าไรในฐานสิบ"])
         a = f"บิตซ้ายสุดเป็น 1 จึงเป็นลบ: ค่า = {int(code, 2)} − 2^{n} = {int(code, 2)} − {1 << n} = {v}"
-    return q, a
+        key = str(v)
+    return q, a, {"key": key}
 
 
 def q_codes(rng):
@@ -73,18 +80,21 @@ def q_codes(rng):
         v = rng.randint(10, 99)
         q = rng.choice([f"{v} เขียนเป็นรหัส BCD ยังไง", f"รหัส BCD ของ {v} คืออะไร"])
         a = f"BCD แปลงทีละหลักฐานสิบเป็น 4 บิต: {v // 10} = {v // 10:04b}, {v % 10} = {v % 10:04b}\nได้ {v // 10:04b} {v % 10:04b} (ต่างจากฐานสอง {v} = {grp(format(v, '08b'))})"
+        key = f"{v // 10:04b}{v % 10:04b}"
     elif kind == "gray":
         n = rng.choice([3, 4])
         v = rng.randint(1, (1 << n) - 1)
         g = v ^ (v >> 1)
         q = rng.choice([f"เลข {v} ในรหัสเกรย์ {n} บิตคืออะไร", f"แปลง {v} เป็น Gray code {n} บิต"])
         a = f"{v} = {v:0{n}b}₂ → Gray = b XOR (b >> 1) = {v:0{n}b} XOR {v >> 1:0{n}b} = {g:0{n}b}"
+        key = f"{g:0{n}b}"
     else:
         n = 3
         seq = [format(i ^ (i >> 1), "03b") for i in range(8)]
         q = rng.choice(["รหัสเกรย์ 3 บิตเรียงจาก 0 ถึง 7 มีอะไรบ้าง", "ขอลำดับ Gray code 3 บิตหน่อย"])
         a = "Gray code 3 บิต (ค่าที่อยู่ติดกันต่างกันแค่บิตเดียว): " + " → ".join(seq)
-    return q, a
+        key = " ".join(seq)                      # every code, in any layout
+    return q, a, {"key": key}
 
 
 def q_count(rng):
@@ -93,11 +103,13 @@ def q_count(rng):
         n = rng.randint(2, 8)
         q = rng.choice([f"วงจรที่มีอินพุต {n} ตัว ตารางความจริงมีกี่แถว", f"{n} อินพุตต้องเขียนตารางความจริงกี่แถว"])
         a = f"แต่ละอินพุตเป็นได้ 2 ค่า: 2^{n} = {1 << n} แถว"
+        key = str(1 << n)
     elif kind == "ff":
         m = rng.choice([6, 10, 12, 16, 24, 60, 100, 1000])
         k = math.ceil(math.log2(m))
         q = rng.choice([f"ตัวนับ mod {m} (นับ 0 ถึง {m - 1}) ต้องใช้ flip-flop อย่างน้อยกี่ตัว", f"นับ 0–{m - 1} ใช้ D flip-flop กี่ตัว"])
         a = f"ต้องแทนได้ {m} ค่า: 2^{k - 1} = {1 << (k - 1)} < {m} ≤ 2^{k} = {1 << k} จึงใช้อย่างน้อย {k} ตัว"
+        key = f"{k}ตัว"
     else:
         f = rng.choice([1, 2, 5, 10, 100, 1000])
         n = 50_000_000 // f
@@ -110,7 +122,8 @@ def q_count(rng):
         a = (f"50 MHz ÷ {f} Hz = {n:,} → หารความถี่ด้วย {n:,}\n"
              f"- แบบนับ 0 ถึง {n - 1:,} แล้วเริ่มใหม่ (pulse กว้าง 1 clock): ตัวนับ {bits} บิต\n"
              f"- แบบสลับ 0/1 ทุก {n // 2:,} clock (duty 50 %): นับ 0 ถึง {n // 2 - 1:,} ใช้ {hb} บิต")
-    return q, a
+        key = str(n) if kind == "div" else str(bits)
+    return q, a, {"key": key}
 
 
 def q_seg(rng):
@@ -121,7 +134,7 @@ def q_seg(rng):
     q = rng.choice([f"จะให้ 7-seg บนบอร์ด EDGE แสดงเลข {name} ต้องส่ง a-g เป็นอะไร", f"แสดง {name} บน 7 segment ของบอร์ดต้องให้ขา a ถึง g เป็นค่าอะไร"])
     a = (f"เลข {name} ใช้ส่วน {', '.join(on)} ติด\nบอร์ด EDGE เป็น common anode (active-low: 0 = ติด) จึงส่ง "
          f"a b c d e f g = {' '.join(bits)}\nและเลือกหลักด้วย an ของหลักนั้น = 0 (หลักอื่น = 1)")
-    return q, a
+    return q, a, {"key": bits}
 
 
 def min_sop(ones, n, names):
@@ -157,7 +170,7 @@ def q_kmap(rng):
                     f"หาสมการที่ลดรูปแล้วของ f({','.join(names)}) = Σm({','.join(map(str, ones))})"])
     a = ("จัดกลุ่ม 1 ใน K-map (" + names[0] + " = MSB):\n" + "\n".join(f"- {t}: คลุม m{', m'.join(map(str, cov))}" for t, cov in terms)
          + f"\nf = {' + '.join(t for t, _ in terms)}")
-    return q, a, {"ones": ones, "n": n}
+    return q, a, {"ones": ones, "n": n, "names": names}
 
 
 GENS = [(q_base, 3), (q_twos, 2), (q_codes, 2), (q_count, 3), (q_seg, 1), (q_kmap, 3)]
@@ -180,8 +193,7 @@ def main():
         seen.add(q)
         split = "eval" if rng.random() < a.eval else "train"
         t = {"id": f"qa-{split}-{k:05d}", "cat": "qa", "split": split, "message": q, "answer": ans, "use_sheet": None}
-        if len(r) > 2:
-            t["check"] = r[2]
+        t["check"] = r[2]
         sys.stdout.write(json.dumps(t, ensure_ascii=False) + "\n")
         k += 1
 
