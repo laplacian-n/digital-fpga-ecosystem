@@ -22,8 +22,14 @@ def main():
     ap.add_argument("--tools", default=os.path.join(os.path.dirname(__file__), "data", "tools_app.json"))
     ap.add_argument("--render", default=None, help="a HF model id / path whose chat template renders the text")
     ap.add_argument("--drop-masked", action="store_true")
+    ap.add_argument("--tools-subset", type=int, default=0,
+                    help="keep only the tools a conversation uses + this many others (random) — the app's 40 schemas are "
+                         "~8.3k tokens of every 10k-token row; trimming trains ~3x faster, at the cost of not matching the "
+                         "full list the app sends at inference (default 0 = all, faithful)")
     a = ap.parse_args()
     app_tools = json.load(open(a.tools, encoding="utf-8"))
+    import random
+    rng = random.Random(3)
     tok = None
     if a.render:
         from transformers import AutoTokenizer
@@ -37,6 +43,12 @@ def main():
             if masked and a.drop_masked:
                 continue
             tools = app_tools if r.get("tools_ref") == "app" else r.get("tools")
+            if tools and a.tools_subset:
+                used = {c["function"]["name"] for m in r["messages"] for c in m.get("tool_calls") or []}
+                others = [t for t in tools if t["function"]["name"] not in used]
+                rng.shuffle(others)
+                keep = used | {t["function"]["name"] for t in others[:a.tools_subset]}
+                tools = [t for t in tools if t["function"]["name"] in keep]      # in the app's order
             msgs = []
             for i, m in enumerate(r["messages"]):
                 m = dict(m)
