@@ -134,6 +134,14 @@ def main():
         by[r["cat"]].append(r)
     for v in by.values():
         rng.shuffle(v)
+    if by.get("qa_mode"):        # concept answers first, 3 : 1 with computed ones (those overlap the agent's qa)
+        con = [r for r in by["qa_mode"] if (r.get("meta") or {}).get("kind") != "computed"]
+        com = [r for r in by["qa_mode"] if (r.get("meta") or {}).get("kind") == "computed"]
+        mixed = []
+        while con or com:
+            mixed += con[:3] + com[:1]
+            con, com = con[3:], com[1:]
+        by["qa_mode"] = mixed
     # the mix: the scarcest category (relative to its share) sets the size, unless --total asks for less
     cats = [c for c in MIX if by.get(c)]
     share = sum(MIX[c] for c in cats)
