@@ -15,8 +15,12 @@ function composeTarget(msg){
   const build=/(ต่อ|ใช้|จาก|ประกอบ|cascade|ripple|\bfrom\b|\busing\b)/i.test(t);
   if(!many || !build) return null;
   // "… ต่อเป็น Y", "… into Y" — or "ประกอบ / สร้าง Y จาก X N ตัว", "Y from N X"
-  const m=/(?:มา)?(?:ต่อ)?(?:กัน)?เป็น\s*(.+)$/.exec(t) || /\b(?:into|to make|as)\s+(?:an?\s+)?(.+)$/i.exec(t)
-       || /^(?:ช่วย)?(?:ประกอบ|สร้าง|ทำ|ออกแบบ)\s*(.+?)\s*(?:จาก|โดยใช้|ด้วย)/.exec(t) || /^(?:build|make)\s+(?:an?\s+)?(.+?)\s+(?:from|using|out of)\b/i.exec(t);
+  // "… ต่อเป็น Y", "… N ตัวสร้าง / ทำ Y", "… into Y" — or "ประกอบ / สร้าง Y จาก X N ตัว", "Y from N X";
+  // a sheet named at the end ("ลงแผ่น lab6") is not part of Y
+  const u=t.replace(/\s*(?:ลง|บน|ใส่ใน|ไว้ใน|ใน)?\s*(?:ตั้งชื่อ)?\s*(?:แผ่น|ชีต|ชีท|sheet)\s*(?:ชื่อ|ว่า)?\s*[`"'“]?[A-Za-z_]\w*[`"'”]?\s*$/i, "");
+  const m=/(?:มา)?(?:ต่อ)?(?:กัน)?เป็น\s*(.+)$/.exec(u) || /ตัว\s*(?:มา)?(?:สร้าง|ทำ|ประกอบ)(?:เป็น)?\s*(.+)$/.exec(u)
+       || /\b(?:into|to make|as)\s+(?:an?\s+)?(.+)$/i.exec(u)
+       || /^(?:ช่วย)?(?:ประกอบ|สร้าง|ทำ|ออกแบบ)\s*(.+?)\s*(?:จาก|โดยใช้|ด้วย)/.exec(u) || /^(?:build|make)\s+(?:an?\s+)?(.+?)\s+(?:from|using|out of)\b/i.exec(u);
   return {target: m ? m[1].trim() : null};
 }
 {

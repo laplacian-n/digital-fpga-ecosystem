@@ -76,7 +76,8 @@ const PARTS_SYSTEMS=Object.keys(PARTS).filter(k=>!PARTS_SYS_BEFORE.has(k));
 {
   const _pf=partFromMessage;
   partFromMessage=function(msg){
-    const t=" "+String(msg||"").toLowerCase()+" ";
+    // a sheet NAMED lab6 ("… ตั้งชื่อแผ่น lab6") is not a request for lab 6
+    const t=" "+String(msg||"").toLowerCase().replace(/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?(?:ว่า\s*)?[`"'“]?[a-z_][a-z0-9_]*/g, " ")+" ";
     if(/(lab|แลป|แล็บ|แลบ|ใบงาน(?:ที่)?)\s*-?\s*0?6(?![\d.])|00\s*[-–]\s*yy|digital\s*counter|ตัวนับดิจิ(ทั|ตอ)ล/.test(t)
        && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
       const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
