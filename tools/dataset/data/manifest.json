@@ -1,0 +1,108 @@
+{
+ "train": 3842,
+ "train_extra": 3821,
+ "eval_tasks": 658,
+ "train_by_category": {
+  "nl_fsm": 461,
+  "nl_logic": 1076,
+  "nl_pins": 269,
+  "general_thai": 653,
+  "nl_fix": 384,
+  "qa": 461,
+  "general_tools": 269,
+  "nl_compose": 269
+ },
+ "extra_by_category": {
+  "nl_logic": 2344,
+  "nl_fsm": 64,
+  "nl_pins": 94,
+  "qa": 268,
+  "nl_fix": 73,
+  "general_thai": 847,
+  "general_tools": 131
+ },
+ "eval_by_category": {
+  "nl_logic": 401,
+  "nl_fsm": 75,
+  "nl_pins": 37,
+  "qa": 71,
+  "nl_fix": 43,
+  "nl_compose": 31
+ },
+ "available_by_category": {
+  "nl_logic": 3420,
+  "nl_fsm": 525,
+  "nl_pins": 363,
+  "qa": 729,
+  "nl_fix": 457,
+  "nl_compose": 269,
+  "general_thai": 1500,
+  "general_tools": 400
+ },
+ "mix_target": {
+  "nl_logic": 0.28,
+  "nl_fsm": 0.12,
+  "nl_fix": 0.1,
+  "nl_compose": 0.07,
+  "nl_pins": 0.07,
+  "qa": 0.12,
+  "general_thai": 0.17,
+  "general_tools": 0.07
+ },
+ "dropped": {
+  "duplicate request": 79
+ },
+ "chars_per_conversation": {
+  "median": 6512,
+  "max": 9715
+ },
+ "tokens": {
+  "app_tool_schemas": 8325,
+  "all": {
+   "median": 10363,
+   "p95": 10946,
+   "max": 11187,
+   "total": 31118509
+  },
+  "by_category": {
+   "nl_fsm": {
+    "median": 10930,
+    "max": 11187
+   },
+   "nl_logic": {
+    "median": 10377,
+    "max": 10917
+   },
+   "nl_pins": {
+    "median": 10420,
+    "max": 10604
+   },
+   "general_thai": {
+    "median": 394,
+    "max": 870
+   },
+   "nl_fix": {
+    "median": 10570,
+    "max": 10936
+   },
+   "qa": {
+    "median": 9843,
+    "max": 10023
+   },
+   "general_tools": {
+    "median": 1211,
+    "max": 3386
+   },
+   "nl_compose": {
+    "median": 10657,
+    "max": 10832
+   }
+  }
+ },
+ "with_masked_mistake": 216,
+ "sources": {
+  "program": "tools/dataset/gen_*.py → teacher.py through the app's real agent loop (run.js); every circuit checked against the task's known answer outside the conversation; no model wrote any of it",
+  "general_thai": "airesearch/wangchanx-seed-free-synthetic-instruct-thai-120k (MIT) — filtered by tools/dataset/online.py",
+  "general_tools": "NousResearch/hermes-function-calling-v1 (Apache-2.0) — converted by tools/dataset/online.py"
+ }
+}
