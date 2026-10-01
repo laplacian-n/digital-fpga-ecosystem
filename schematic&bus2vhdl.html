@@ -21417,7 +21417,21 @@ function agrNormIntent(it){
 {
   const _p=fsmParse;
   fsmParse=function(src){
-    if(typeof src==="string" && /^\s*\{/.test(src)){ try{ src=JSON.parse(src); }catch(_){} }
+    if(typeof src==="string" && /^\s*\{/.test(src)){
+      try{ src=JSON.parse(src); }
+      catch(_){ try{ src=JSON.parse(src.replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":')); }catch(_){} }   // {inputs: […]} — keys unquoted
+    }
+    if(src && typeof src==="object" && Array.isArray(src.states)){
+      // a state's output written "out": 1 / "out": "hit=1" — taken for the one output (it used to be dropped,
+      // so a Moore detector could never say 1)
+      const outs=Array.isArray(src.outputs) ? src.outputs : (typeof src.outputs==="string" ? src.outputs.split(/[\s,]+/).filter(Boolean) : []);
+      src=Object.assign({}, src, {states:src.states.map(st=>{
+        if(!st || typeof st!=="object") return st;
+        let o=st.out!=null ? st.out : st.outputs;
+        if(typeof o==="number" || typeof o==="boolean"){ if(outs.length===1) o={[outs[0]]:+o}; }
+        else if(typeof o==="string") o=fsmAssigns(o.replace(/\s*=\s*/g, "="));
+        return Object.assign({}, st, {out:o}); })});
+    }
     if(typeof src==="string") src=src.split(/\n|;/).map(agrFsmLine).join("\n");
     else if(src && typeof src==="object" && Array.isArray(src.transitions))
       src=Object.assign({}, src, {transitions:src.transitions.map(t=>t && typeof t.when==="string" ? Object.assign({}, t, {when:agrFsmCond(t.when)}) : t)});

@@ -13,6 +13,10 @@ test("near-misses from the baseline eval are taken as meant; real errors read as
       transitions: [{ from: "S0", to: "S1", when: "s=1" }, { from: "S0", to: "S0", when: "s=0" }, { from: "S1", to: "S1", when: "s==1" }, { from: "S1", to: "S0", when: "else" }], reset: "S0" };
     out.fsmJson = await err(() => MCP_OPS.build_fsm({ sheet: "f1", fsm: JSON.stringify(fsmObj) }));
     out.fsmText = await err(() => MCP_OPS.build_fsm({ sheet: "f2", fsm: "inputs: a\noutputs: z\nstate S0: z=0\nstate S1: z=1\nS0 -> S1 when a=1\nS0 -> S0 when a=0\nS1 -> S0 when a=0 / z=1\nS1 -> S1 else\nreset S0" }));
+    // Moore outputs as a number / "hit=1", keys unquoted — and the detector must say 1 in S1
+    const loose = '{inputs: ["s"], outputs: ["hit"], states: [{"name": "S0", "out": 0}, {"name": "S1", "out": "hit=1"}], transitions: [{"from": "S0", "to": "S1", "when": "s"}, {"from": "S0", "to": "S0", "when": "~s"}, {"from": "S1", "to": "S0", "when": "else"}], reset: "S0"}';
+    out.fsmLoose = await err(() => MCP_OPS.build_fsm({ sheet: "f3", fsm: loose }));
+    out.fsmLooseOut = JSON.stringify(fsmParse(loose).states.map(x => x.out));
     // intent types in lower case
     out.intent = await err(() => MCP_OPS.build_circuit({ sheet: "i1", intent: { module: "i1", components: [{ id: "a", type: "input" }, { id: "b", type: "Input" }, { id: "g", type: "and" }, { id: "y", type: "OUTPUT" }],
       nets: [{ from: "a", to: "g" }, { from: "b", to: "g" }, { from: "g", to: "y" }] } }));
@@ -36,6 +40,8 @@ test("near-misses from the baseline eval are taken as meant; real errors read as
   });
   expect(r.fsmJson).toBe("ok");
   expect(r.fsmText).toBe("ok");
+  expect(r.fsmLoose).toBe("ok");
+  expect(r.fsmLooseOut).toBe('[{"hit":0},{"hit":1}]');
   expect(r.intent).toBe("ok");
   expect(r.i1).toBe("0,0,0,1");                          // y = a & b
   expect(r.broken).not.toMatch(/object Object/);
