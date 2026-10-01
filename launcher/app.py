@@ -922,7 +922,8 @@ class McpRelay:
                         self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
                         return {"ok": False, "error": f"the editor is still busy with '{b[0]}' ({int(b[1])} s so far) — "
                                                       f"'{op}' was not run",
-                                "hint": "wait a little and call again; a very large sheet takes a while to lay out"}
+                                "hint": "wait a little and call again (ai_chat_status / ai_chat_stop run beside it). "
+                                        "If this lasts minutes, the page itself is stuck in that op"}
                     left = end - now
                     if left <= 0:
                         if queued:      # drop it if the page never picked it up

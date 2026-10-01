@@ -20,6 +20,9 @@
     if(!A||!A.ok||(opts&&opts.noRoute)||ord.in.length+ord.out.length<3) return A;
     const numbered=ord.out.length>1 && ord.out.every(n=>/^[a-z_]+\d+$/i.test(n)) && new Set(ord.out.map(n=>n.replace(/\d+$/,""))).size===1;
     if(numbered) return A;   // q0..qN become a block's pins: keep them in order, no second try
+    // a second full route of a big sheet doubles a wait the page cannot be used in (a 7-input truth
+    // table: 140 gates, seconds per route) — the declared order stays
+    if(A.sch.components.filter(c=>c.type!=="JUNCTION").length>40) return A;
     // a pinned order can cost a lot on a dense sheet — draw it free as well, keep the ordered one
     // unless it is clearly worse (longer wiring / taller / more crossings)
     let B; try{ B=_draw.apply(this, arguments); }catch(_){ B=null; }

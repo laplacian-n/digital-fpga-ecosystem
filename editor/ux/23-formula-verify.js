@@ -13,20 +13,21 @@
 
 /* ---------- equations → truth table ---------- */
 function fxTokens(src){
-  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕¬∧∨]))/y;
+  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕⊙¬∧∨]))/y;
   let m, i=0; src=String(src);
   while(i<src.length){ re.lastIndex=i; m=re.exec(src); if(!m){ if(/\s/.test(src[i])){ i++; continue; } throw new Error(`unexpected '${src[i]}' in "${src}"`); }
     i=re.lastIndex; if(m[1]){ const w=m[1].toLowerCase();
-      if(["and","or","xor","not"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
+      if(["and","or","xor","not","xnor","nand","nor"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
     else if(m[2]) T.push({num:+m[2]}); else T.push({op:m[3]}); }
   return T;
 }
-/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR.
+/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR;
+   xnor ⊙ (= ~(a^b)), nand, nor at the level of xor / and / or.
    arith mode ({x,y} = …): + − * on integers, & | ^ ~ bitwise. */
 function fxParse(tokens, arith){
   let k=0; const peek=()=>tokens[k], next=()=>tokens[k++];
-  const BOOL={"|":1,"+":1,"∨":1,"or":1,"^":2,"⊕":2,"xor":2,"&":3,"*":3,"·":3,"∧":3,"and":3};
-  const ARITH={"|":1,"^":2,"&":3,"+":4,"-":4,"*":5};
+  const BOOL={"|":1,"+":1,"∨":1,"or":1,"nor":1,"^":2,"⊕":2,"xor":2,"xnor":2,"⊙":2,"&":3,"*":3,"·":3,"∧":3,"and":3,"nand":3};
+  const ARITH={"|":1,"or":1,"nor":1,"^":2,"xor":2,"⊕":2,"xnor":2,"⊙":2,"&":3,"and":3,"nand":3,"+":4,"-":4,"*":5};
   const bp=t=>t&&t.op&&(arith?ARITH:BOOL)[t.op]||0;
   const prefix=()=>{ const t=next(); if(!t) throw new Error("the expression ends too early");
     if(t.id) return {id:t.id}; if(t.num!=null) return {num:t.num};
@@ -45,8 +46,10 @@ function fxEval(e, env, arith){
   if(e.not) { const v=fxEval(e.not, env, arith); return arith?~v:(v?0:1); }
   if(e.neg) return -fxEval(e.neg, env, arith);
   const a=fxEval(e.l, env, arith), b=fxEval(e.r, env, arith), o=e.op;
-  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"?a&b : o==="|"?a|b : a^b;
-  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b; return a&b;
+  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"||o==="and"?a&b : o==="|"||o==="or"?a|b
+    : o==="nand"?~(a&b) : o==="nor"?~(a|b) : o==="xnor"||o==="⊙"?~(a^b) : a^b;
+  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b;
+  if(o==="nor") return (a|b)?0:1; if(o==="xnor"||o==="⊙") return (a^b)?0:1; if(o==="nand") return (a&b)?0:1; return a&b;
 }
 /* equations (string with ; or newlines, or a list) → {inputs, outputs, cols:{out:"0110…"}} */
 function formulaTable(formula, inputsGiven){

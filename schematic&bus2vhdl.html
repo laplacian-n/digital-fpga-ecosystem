@@ -5138,14 +5138,15 @@ function globalRoute(sch){
   // 4. reservation + A*  (PathFinder negotiated congestion: usedH/usedV = THIS pass's edge
   // usage count; histH/histV = a penalty that accumulates on edges that stayed congested,
   // so across a few passes overlapping nets are pushed onto their own tracks.)
-  let usedH=new Map(), usedV=new Map();
-  const histH=new Map(), histV=new Map();
+  // edge usage / history per cell index in typed arrays (Map lookups were the inner-loop cost)
+  let usedH=new Int32Array(GW*GH), usedV=new Int32Array(GW*GH);
+  const histH=new Int32Array(GW*GH), histV=new Int32Array(GW*GH);
   const DIRS=[[1,0],[-1,0],[0,1],[0,-1]], BEND=14, OVERLAP_PEN=80;
   const eH=(x,nx,y)=>gi(Math.min(x,nx),y), eV=(x,y,ny)=>gi(x,Math.min(y,ny));
-  const gc0=(m,k)=>m.get(k)||0;
+  const gc0=(m,k)=>m[k];
   const edgePen=(x,y,nx,ny)=> y===ny ? (gc0(usedH,eH(x,nx,y))*OVERLAP_PEN + gc0(histH,eH(x,nx,y)))
                                      : (gc0(usedV,eV(x,y,ny))*OVERLAP_PEN + gc0(histV,eV(x,y,ny)));
-  const reserve=(x,y,nx,ny)=>{ if(y===ny){const k=eH(x,nx,y);usedH.set(k,gc0(usedH,k)+1);} else {const k=eV(x,y,ny);usedV.set(k,gc0(usedV,k)+1);} };
+  const reserve=(x,y,nx,ny)=>{ if(y===ny) usedH[eH(x,nx,y)]++; else usedV[eV(x,y,ny)]++; };
   function passable(ci, ownSet, isTarget){
     if(isTarget) return true;
     if(ownSet.has(ci)) return true;      // own tree / own pins are walkable
@@ -5156,7 +5157,13 @@ function globalRoute(sch){
     return true;
   }
   // multi-source A*: sources = array of gi (cost 0), target cell (tgx,tgy). ownSet = walkable-extra.
+  // A* state in typed arrays reused across calls (a generation stamp marks what belongs to the
+  // current search) — the Map/Set version spent most of a 140-gate sheet's 6 s in hashing.
+  const NK=GW*GH*5, TYPED=NK<=6000000;
+  const gA=TYPED?new Int32Array(NK):null, cfA=TYPED?new Int32Array(NK):null, stA=TYPED?new Uint32Array(NK):null, seenA=TYPED?new Uint32Array(NK):null;
+  let gen=0;
   function astar(sources, tgx,tgy, ownSet){
+    if(TYPED) return astarT(sources, tgx,tgy, ownSet);
     const tgi=gi(tgx,tgy);
     const g=new Map(), cf=new Map(), h=[];
     const hp=n=>{h.push(n);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p].f<=h[i].f)break;const t=h[p];h[p]=h[i];h[i]=t;i=p;}};
@@ -5185,13 +5192,41 @@ function globalRoute(sch){
     const cells=[]; let ck=found; while(ck!==undefined){ const d=(ck%5)-1; const r=(ck-(d+1))/5; cells.push(r); ck=cf.get(ck); }
     cells.reverse(); return cells;   // array of gi from a source to target
   }
+  function astarT(sources, tgx,tgy, ownSet){
+    gen++; const h=[];
+    const hp=n=>{h.push(n);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p].f<=h[i].f)break;const t=h[p];h[p]=h[i];h[i]=t;i=p;}};
+    const pop=()=>{const t=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=2*i+2,s=i;if(a<h.length&&h[a].f<h[s].f)s=a;if(b<h.length&&h[b].f<h[s].f)s=b;if(s===i)break;const q=h[s];h[s]=h[i];h[i]=q;i=s;}}return t;};
+    const K=(x,y,d)=>(y*GW+x)*5+(d+1);
+    const est=(x,y)=>Math.abs(x-tgx)+Math.abs(y-tgy);
+    const has=k=>stA[k]===gen;
+    sources.forEach(si=>{ const sx=si%GW, sy=(si-sx)/GW; const kk=K(sx,sy,-1); if(!has(kk)||gA[kk]>0){ stA[kk]=gen; gA[kk]=0; cfA[kk]=-1; hp({f:est(sx,sy),x:sx,y:sy,d:-1}); } });
+    let found=-1, iter=0;
+    while(h.length){ if(++iter>500000) break; const c=pop(), ck=K(c.x,c.y,c.d); if(seenA[ck]===gen)continue; seenA[ck]=gen;
+      if(c.x===tgx&&c.y===tgy){ found=ck; break; }
+      const gc=has(ck)?gA[ck]:0;
+      for(let nd=0;nd<4;nd++){ if(c.d>=0 && DIRS[nd][0]===-DIRS[c.d][0] && DIRS[nd][1]===-DIRS[c.d][1])continue;
+        const nx=c.x+DIRS[nd][0], ny=c.y+DIRS[nd][1]; if(nx<0||ny<0||nx>=GW||ny>=GH)continue;
+        const ci=gi(nx,ny); const tgt=(nx===tgx&&ny===tgy);
+        if(!passable(ci, ownSet, tgt))continue;
+        const pen=edgePen(c.x,c.y,nx,ny);
+        const ng=gc+1+(c.d>=0&&nd!==c.d?BEND:0)+pen, nk=K(nx,ny,nd);
+        if(has(nk)&&gA[nk]<=ng)continue; stA[nk]=gen; gA[nk]=ng; cfA[nk]=ck; hp({f:ng+est(nx,ny),x:nx,y:ny,d:nd}); }
+    }
+    if(found<0) return null;
+    const cells=[]; let ck=found; while(ck>=0){ const d=(ck%5)-1; const r=(ck-(d+1))/5; cells.push(r); ck=cfA[ck]; }
+    cells.reverse(); return cells;
+  }
   // 5. route ALL nets, a few PathFinder passes: after each pass the SHARED edges get their
   //    history penalty bumped, so next pass the cheaper net re-routes onto a free track. Keep
   //    the pass with the fewest shared edges (fewest overlaps).
   netKeys.sort((a,b)=> nets[a].sinks.length-nets[b].sinks.length);
   let netTrees={}, bestOv=Infinity;
+  // later passes only shave overlaps (the repair passes after this clean most of them): on a big
+  // sheet stop after ~2 s — a 290-gate truth table used to keep the page frozen for minutes
+  const t0=performance.now();
   for(let pass=0; pass<6; pass++){
-   usedH=new Map(); usedV=new Map();
+   if(pass>0 && performance.now()-t0>2000) break;
+   usedH.fill(0); usedV.fill(0);
    const trees={};
    for(const k of netKeys){
     const net=nets[k]; const drvKey=net.drv.cid+" "+net.drv.pid; const dt=termCell[drvKey];
@@ -5212,11 +5247,10 @@ function globalRoute(sch){
     }
     trees[k] = failed ? null : {adj, treeCells};   // a sink unreachable even softly stays unrouted
    }
-   let ov=0; usedH.forEach(c=>{ if(c>1) ov+=c-1; }); usedV.forEach(c=>{ if(c>1) ov+=c-1; });
+   let ov=0; for(let k=0;k<usedH.length;k++){ if(usedH[k]>1) ov+=usedH[k]-1; if(usedV[k]>1) ov+=usedV[k]-1; }
    if(ov<bestOv){ bestOv=ov; netTrees=trees; }
    if(ov===0) break;
-   usedH.forEach((c,k)=>{ if(c>1) histH.set(k, gc0(histH,k)+OVERLAP_PEN); });
-   usedV.forEach((c,k)=>{ if(c>1) histV.set(k, gc0(histV,k)+OVERLAP_PEN); });
+   for(let k=0;k<usedH.length;k++){ if(usedH[k]>1) histH[k]+=OVERLAP_PEN; if(usedV[k]>1) histV[k]+=OVERLAP_PEN; }
   }
   // 6. wipe old wiring, emit wires + junctions from the trees
   sch.wires=[]; sch.components=sch.components.filter(c=>c.type!=="JUNCTION");
@@ -5289,6 +5323,7 @@ function polishLayout(sch, reroute){
 }
 function autoRouteSheet(sch, opts){
   sch = sch || activeSch(); if(!sch) return;
+  const _t0=performance.now();
   autoPlaceSheet(sch);
   // Round-2 polish (straighten + band-compress) re-runs the FULL router hundreds of
   // times (each rebuilds the maze grid). Fine at teaching sizes, but it does not scale —
@@ -5335,7 +5370,7 @@ function autoRouteSheet(sch, opts){
       }
       // min-crossing tidy: flip elbows / slide legs to the lowest-crossing track (each move is
       // validated against body/pin/overlap, so guarantees hold). Skipped on huge sheets (cost).
-      if((sch.wires||[]).length <= 500){
+      if((sch.wires||[]).length <= 500 && performance.now()-_t0 < 8000){
         for(let i=0;i<3;i++){ if(!reduceCrossings(sch)) break; }
         healJunctions(sch);
         if(netCollinearOverlaps(sch).length){ separateWireOverlaps(sch); healJunctions(sch); }
@@ -5350,13 +5385,14 @@ function autoRouteSheet(sch, opts){
     // + settle + re-polish, and KEEP only if total crossings strictly dropped AND no guarantee
     // (self+coll+body+pin) got worse — else restore the snapshot and stop. Strict decrease each
     // pass ⇒ it converges and never regresses. Skipped on huge sheets (per-pass double route).
-    if((sch.wires||[]).length <= 500){
+    if((sch.wires||[]).length <= 500 && performance.now()-_t0 < 4000){
       const guar=()=>netSelfOverlaps(sch).length+netCollinearOverlaps(sch).length+wireBodyCrossings(sch).length+wirePinCrossings(sch).length;
       const settleOverlaps=()=>{ for(let i=0;i<4;i++){ const b=netSelfOverlaps(sch).length+netCollinearOverlaps(sch).length; if(!b) break;
         if(resolveSelfOverlaps(sch)) healJunctions(sch);
         separateWireOverlaps(sch); healJunctions(sch);
         if(netSelfOverlaps(sch).length+netCollinearOverlaps(sch).length>=b) break; } };
       for(let pass=0; pass<5; pass++){
+        if(pass>0 && performance.now()-_t0 > 6000) break;   // each pass re-routes the whole sheet
         const cB=netCrossings(sch).length, gB=guar(), baseSnap=snapshotSheet(sch);
         const sw=uncrossGateInputsByRoute(sch);     // detect + apply on the CURRENT polished geometry
         if(!sw.length) break;                        // no gate's feeds cross → done
@@ -14837,6 +14873,9 @@ function uxRefreshPages(){
     if(!A||!A.ok||(opts&&opts.noRoute)||ord.in.length+ord.out.length<3) return A;
     const numbered=ord.out.length>1 && ord.out.every(n=>/^[a-z_]+\d+$/i.test(n)) && new Set(ord.out.map(n=>n.replace(/\d+$/,""))).size===1;
     if(numbered) return A;   // q0..qN become a block's pins: keep them in order, no second try
+    // a second full route of a big sheet doubles a wait the page cannot be used in (a 7-input truth
+    // table: 140 gates, seconds per route) — the declared order stays
+    if(A.sch.components.filter(c=>c.type!=="JUNCTION").length>40) return A;
     // a pinned order can cost a lot on a dense sheet — draw it free as well, keep the ordered one
     // unless it is clearly worse (longer wiring / taller / more crossings)
     let B; try{ B=_draw.apply(this, arguments); }catch(_){ B=null; }
@@ -15212,6 +15251,15 @@ MCP_OPS.apply = a=>{
   return {steps:results, auto_layout:laidOut, layout:mcpLayoutMetrics(sch0)};
 };
 
+/* a drawing that big is not something to read, and routing it froze the page for minutes (a random
+   10-input table: 261 gates → 1630 parts with the junctions, 7.5 min; 8 inputs / ~70 gates: 9 s) —
+   no MCP call, not even ai_chat_stop, gets through meanwhile */
+const MCP_MAX_DRAW=100;
+function mcpSizeGuard(intent, what){
+  const n=((intent&&intent.components)||[]).filter(c=>c.type!=="JUNCTION").length;
+  if(n>MCP_MAX_DRAW) mcpFail(`${what} needs ${n} parts — too big to draw on one sheet (at most ${MCP_MAX_DRAW})`,
+    "split it into blocks (build_hierarchy), use a library part (list_parts), or fewer inputs per table");
+}
 MCP_OPS.build_circuit = a=>{
   mcpBeforeChange("สร้างวงจร");
   let intent=null, title="";
@@ -15220,6 +15268,7 @@ MCP_OPS.build_circuit = a=>{
       if(col.length!==(1<<t.inputs.length)) mcpFail(`truth_table.columns.${o} has ${col.length} chars, expected ${1<<t.inputs.length} (2^inputs, first input = MSB)`);
       rows[o]=col.toLowerCase().split(""); });
     const r=ttToIntent(t.inputs, t.outputs, rows, a.name||"logic"); if(r.error) mcpFail(r.error); intent=r.intent; title="truth table";
+    mcpSizeGuard(intent, "this truth table");
     if(a.into==="current" && uxCanFillSheet({inputs:t.inputs, outputs:t.outputs})){ uxFillSheet(activeSch(), intent); return {sheet:activeSch().name, into:"current", equations:r.exprs, layout:mcpLayoutMetrics(activeSch())}; }
     const dr=aiDrawIntent(intent); if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"));
     const res={sheet:dr.sch.name, into:"new", equations:r.exprs};
@@ -15240,6 +15289,7 @@ MCP_OPS.build_circuit = a=>{
   }
   if(a.intent){ intent=a.intent; title="intent"; }
   if(!intent) mcpFail("give one of: truth_table, generator, intent");
+  mcpSizeGuard(intent, "this circuit");
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
   if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
@@ -15724,7 +15774,7 @@ async function mcpLoop(){
     await mcpRun(job, true);
   }
 }
-const MCP_WAITING_OPS = new Set(["ai_chat_status", "approval_status", "board_status"]);
+const MCP_WAITING_OPS = new Set(["ai_chat_status", "ai_chat_stop", "approval_status", "board_status", "get_events"]);
 async function mcpRun(job, edits){
   let reply;
   if(edits){ MCPB.busy=true; mcpRevealFlush(); }
@@ -18268,20 +18318,21 @@ MCP_OPS.build_part = a=>{
 
 /* ---------- equations → truth table ---------- */
 function fxTokens(src){
-  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕¬∧∨]))/y;
+  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕⊙¬∧∨]))/y;
   let m, i=0; src=String(src);
   while(i<src.length){ re.lastIndex=i; m=re.exec(src); if(!m){ if(/\s/.test(src[i])){ i++; continue; } throw new Error(`unexpected '${src[i]}' in "${src}"`); }
     i=re.lastIndex; if(m[1]){ const w=m[1].toLowerCase();
-      if(["and","or","xor","not"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
+      if(["and","or","xor","not","xnor","nand","nor"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
     else if(m[2]) T.push({num:+m[2]}); else T.push({op:m[3]}); }
   return T;
 }
-/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR.
+/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR;
+   xnor ⊙ (= ~(a^b)), nand, nor at the level of xor / and / or.
    arith mode ({x,y} = …): + − * on integers, & | ^ ~ bitwise. */
 function fxParse(tokens, arith){
   let k=0; const peek=()=>tokens[k], next=()=>tokens[k++];
-  const BOOL={"|":1,"+":1,"∨":1,"or":1,"^":2,"⊕":2,"xor":2,"&":3,"*":3,"·":3,"∧":3,"and":3};
-  const ARITH={"|":1,"^":2,"&":3,"+":4,"-":4,"*":5};
+  const BOOL={"|":1,"+":1,"∨":1,"or":1,"nor":1,"^":2,"⊕":2,"xor":2,"xnor":2,"⊙":2,"&":3,"*":3,"·":3,"∧":3,"and":3,"nand":3};
+  const ARITH={"|":1,"or":1,"nor":1,"^":2,"xor":2,"⊕":2,"xnor":2,"⊙":2,"&":3,"and":3,"nand":3,"+":4,"-":4,"*":5};
   const bp=t=>t&&t.op&&(arith?ARITH:BOOL)[t.op]||0;
   const prefix=()=>{ const t=next(); if(!t) throw new Error("the expression ends too early");
     if(t.id) return {id:t.id}; if(t.num!=null) return {num:t.num};
@@ -18300,8 +18351,10 @@ function fxEval(e, env, arith){
   if(e.not) { const v=fxEval(e.not, env, arith); return arith?~v:(v?0:1); }
   if(e.neg) return -fxEval(e.neg, env, arith);
   const a=fxEval(e.l, env, arith), b=fxEval(e.r, env, arith), o=e.op;
-  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"?a&b : o==="|"?a|b : a^b;
-  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b; return a&b;
+  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"||o==="and"?a&b : o==="|"||o==="or"?a|b
+    : o==="nand"?~(a&b) : o==="nor"?~(a|b) : o==="xnor"||o==="⊙"?~(a^b) : a^b;
+  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b;
+  if(o==="nor") return (a|b)?0:1; if(o==="xnor"||o==="⊙") return (a^b)?0:1; if(o==="nand") return (a&b)?0:1; return a&b;
 }
 /* equations (string with ; or newlines, or a list) → {inputs, outputs, cols:{out:"0110…"}} */
 function formulaTable(formula, inputsGiven){
@@ -20015,7 +20068,7 @@ function aifInputsOf(sch){ try{ const j=clientCombSim(sch); return j.ok ? j.trut
    Either way the result is simulated against what the code derived, and stamped verified. It runs
    before any model call (agent and build mode); a request that also asks for more (connect it, put
    it on the board…) goes on to the model with the part already built. */
-const AIO_OPS=[[/เอ็กซ์ออร์|เอกซ์ออร์|เอ็กซ์ออ/g," ^ "],[/และ|แอนด์/g," & "],[/หรือ|ออร์/g," | "],[/ไม่|นอต|น็อต/g," ~ "]];
+const AIO_OPS=[[/เอ็กซ์นอร์|เอกซ์นอร์|เอ็กซ์นอ/g," xnor "],[/แนนด์/g," nand "],[/นอร์/g," nor "],[/เอ็กซ์ออร์|เอกซ์ออร์|เอ็กซ์ออ/g," ^ "],[/และ|แอนด์/g," & "],[/หรือ|ออร์/g," | "],[/ไม่|นอต|น็อต/g," ~ "]];
 function aioThaiOps(s){ AIO_OPS.forEach(([re,op])=>{ s=s.replace(re, op); }); return s; }
 /* the equations the message states, or null */
 function aioEquations(msg){
@@ -20039,7 +20092,7 @@ function aioEquations(msg){
   }
   try{ const F=formulaTable(eqs.join("; ")); if(!F.inputs.length || F.inputs.length>8) return null;
     // an equation must have an operator (not "sheet = fx", not "n = 4")
-    if(!eqs.some(e=>/[&|^~'+*!()]|\b(and|or|xor|not)\b/i.test(e.split("=").slice(1).join("=")))) return null;
+    if(!eqs.some(e=>/[&|^~'+*!()⊙]|\b(and|or|xor|not|xnor|nand|nor)\b/i.test(e.split("=").slice(1).join("=")))) return null;
     return {text:eqs.join("; "), F}; }catch(_){ return null; }
 }
 /* "output 1 when the input is prime / even / … " over n bits, or null */

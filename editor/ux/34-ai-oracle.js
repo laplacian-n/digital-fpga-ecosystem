@@ -11,7 +11,7 @@
    Either way the result is simulated against what the code derived, and stamped verified. It runs
    before any model call (agent and build mode); a request that also asks for more (connect it, put
    it on the board…) goes on to the model with the part already built. */
-const AIO_OPS=[[/เอ็กซ์ออร์|เอกซ์ออร์|เอ็กซ์ออ/g," ^ "],[/และ|แอนด์/g," & "],[/หรือ|ออร์/g," | "],[/ไม่|นอต|น็อต/g," ~ "]];
+const AIO_OPS=[[/เอ็กซ์นอร์|เอกซ์นอร์|เอ็กซ์นอ/g," xnor "],[/แนนด์/g," nand "],[/นอร์/g," nor "],[/เอ็กซ์ออร์|เอกซ์ออร์|เอ็กซ์ออ/g," ^ "],[/และ|แอนด์/g," & "],[/หรือ|ออร์/g," | "],[/ไม่|นอต|น็อต/g," ~ "]];
 function aioThaiOps(s){ AIO_OPS.forEach(([re,op])=>{ s=s.replace(re, op); }); return s; }
 /* the equations the message states, or null */
 function aioEquations(msg){
@@ -35,7 +35,7 @@ function aioEquations(msg){
   }
   try{ const F=formulaTable(eqs.join("; ")); if(!F.inputs.length || F.inputs.length>8) return null;
     // an equation must have an operator (not "sheet = fx", not "n = 4")
-    if(!eqs.some(e=>/[&|^~'+*!()]|\b(and|or|xor|not)\b/i.test(e.split("=").slice(1).join("=")))) return null;
+    if(!eqs.some(e=>/[&|^~'+*!()⊙]|\b(and|or|xor|not|xnor|nand|nor)\b/i.test(e.split("=").slice(1).join("=")))) return null;
     return {text:eqs.join("; "), F}; }catch(_){ return null; }
 }
 /* "output 1 when the input is prime / even / … " over n bits, or null */
