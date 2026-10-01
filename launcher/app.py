@@ -244,8 +244,9 @@ def load_backend():
         import chat_server  # noqa: E402  (needs sys.path set above)
         BACKEND = chat_server
         # Q&A mode answers with the course notes (keyword search only: a question must not wait
-        # for the embedding server)
-        chat_server.ASK_NOTES = lambda q: (rag_search(q, k=chat_server.ASK_NOTES_K, semantic=False) or {}).get("hits") or []
+        # for the embedding server; no boost for verified lab solutions — a concept question wants the chapter)
+        chat_server.ASK_NOTES = lambda q: (rag_search(q, k=chat_server.ASK_NOTES_K, semantic=False,
+                                                      prefer_verified=False) or {}).get("hits") or []
         ghdl = detect_ghdl()
         if ghdl:
             try:
@@ -466,12 +467,12 @@ def _rag_index(r, key, cache):
         _EMB["busy"] = False
 
 
-def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True) -> dict:
+def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True, prefer_verified: bool = True) -> dict:
     r = rag_retriever()
     if r is None:
         return {"ok": False, "error": "course notes (RAG) unavailable: " + _RAG["err"]}
     k = max(1, min(12, int(k or 5)))
-    bm = r.search(query or "", k=50, group=group or None, hybrid=False)
+    bm = r.search(query or "", k=50, group=group or None, hybrid=False, prefer_verified=prefer_verified)
     ranks = {}                                  # doc row -> [bm25 rank, cosine rank]
     for i, h in enumerate(bm):
         ranks[r.id2row[h["id"]]] = [i, None]

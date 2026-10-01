@@ -42,9 +42,11 @@ def tokenize(text: str) -> list[str]:
 # records first on the 3-grams of ต่างกัน / ยังไง (Q&A mode retrieves with the student's question).
 _TH_ASK = re.compile(r"(ต่างกัน|แตกต่าง|ยังไง|อย่างไร|ยังงี้|คืออะไร|อะไร|ทำไม|เพราะอะไร|หรือเปล่า|รึเปล่า|ไหม|มั้ย|"
                      r"ได้ไหม|ช่วย|หน่อย|อธิบาย|บอก|ครับ|ค่ะ|คะ|นะ|เหรอ|หรอ|กับ|และ|ของ|ที่|คือ|เป็น|ใช้|ทำ|ให้|"
-                     r"เมื่อไร|เมื่อไหร่|กี่|เท่าไร|เท่าไหร่|แบบไหน|ตัวไหน|อันไหน|ควร|ต้อง|จะ|แล้ว|บ้าง)")
+                     r"เมื่อไร|เมื่อไหร่|กี่|เท่าไร|เท่าไหร่|แบบไหน|ตัวไหน|อันไหน|ควร|ต้อง|จะ|แล้ว|บ้าง|"
+                     r"ขอ|ยกตัวอย่าง|ตัวอย่าง|สั้นๆ|สั้น ๆ|ง่ายๆ|ให้ดู|งงมาก|งง|ทีละขั้น|ขั้นตอน)")
 _EN_ASK = {"what", "why", "how", "is", "are", "the", "a", "an", "of", "and", "or", "vs", "between", "difference",
-           "do", "does", "can", "to", "in", "for", "with", "which", "when"}
+           "do", "does", "can", "to", "in", "for", "with", "which", "when", "step", "by", "example",
+           "please", "explain", "me", "i", "it", "this"}
 
 
 def tokenize_query(text: str) -> list[str]:

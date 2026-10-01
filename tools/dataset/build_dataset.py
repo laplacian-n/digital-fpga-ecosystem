@@ -6,6 +6,7 @@
 Each RUN_DIR is a run.js output (train.jsonl, eval.jsonl, tools.json). Writes into --out:
   train.jsonl.gz   {id, cat, source, messages, tools_ref|tools, meta}  — one conversation per line
   eval_tasks.jsonl.gz  held-out tasks with their answers (never in train) — run.js --eval-model replays them
+  eval_qamode.jsonl.gz held-out Q&A-mode questions + reference answers — eval_qamode.py
   tools_app.json   the app's tool schemas (rows with tools_ref:"app" use these — run export_hf.py to inline)
   manifest.json    counts, the mix, checks run, sources and licences
 A row's assistant message with "train": false is context only (a planned mistake) — mask it from the loss.
@@ -19,8 +20,8 @@ import os
 import random
 
 MIX = {   # share of the final train set per category (taken up to what exists)
-    "nl_logic": 0.28, "nl_fsm": 0.12, "nl_fix": 0.10, "nl_compose": 0.07, "nl_pins": 0.07, "qa": 0.12,
-    "general_thai": 0.17, "general_tools": 0.07,
+    "nl_logic": 0.25, "nl_fsm": 0.11, "nl_fix": 0.09, "nl_compose": 0.06, "nl_pins": 0.06, "qa": 0.10,
+    "qa_mode": 0.12, "general_thai": 0.15, "general_tools": 0.06,
 }
 
 
@@ -59,7 +60,9 @@ def problems(r):
 
 
 def first_user(r):
-    return next((m.get("content") or "" for m in r["messages"] if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+    u = next((m.get("content") or "" for m in r["messages"] if m.get("role") == "user" and not str(m.get("content")).startswith("(system)")), "")
+    # a Q&A-mode row: notes + the editor's wrapping — the request is the question at the end
+    return u.split("[คำถาม/คำสั่งล่าสุด]\n", 1)[1].strip() if "[คำถาม/คำสั่งล่าสุด]\n" in u else u
 
 
 def main():
@@ -83,8 +86,9 @@ def main():
                 for line in open(p, encoding="utf-8"):
                     if line.strip():
                         r = json.loads(line)
-                        r["source"] = "program (tools/dataset, checked by the app)"
-                        r["tools_ref"] = "app"
+                        if "tools_ref" not in r:            # agent runs (run.js); gen_qamode.py rows carry their own
+                            r["source"] = "program (tools/dataset, checked by the app)"
+                            r["tools_ref"] = "app"
                         rows.append(r)
         p = os.path.join(d, "tools.json")
         if os.path.exists(p) and tools is None:
@@ -94,6 +98,10 @@ def main():
             p = os.path.join(a.online, name)
             if os.path.exists(p):
                 rows += [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
+    for d in a.runs:                                # gen_qamode.py: its held-out questions
+        p = os.path.join(d, "eval_qamode.jsonl")
+        if os.path.exists(p):
+            evals += [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
     for p in a.tasks:
         evals += [t for t in (json.loads(l) for l in open(p, encoding="utf-8") if l.strip()) if t.get("split") == "eval"]
     # eval tasks: unique, and never a training conversation
@@ -146,7 +154,13 @@ def main():
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
     with gzip.open(os.path.join(a.out, "eval_tasks.jsonl.gz"), "wt", encoding="utf-8") as f:
         for e in ev:
-            f.write(json.dumps(e, ensure_ascii=False) + "\n")
+            if e["cat"] != "qa_mode":                   # run.js replays these through the agent
+                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+    qm = [e for e in ev if e["cat"] == "qa_mode"]
+    if qm:                                              # Q&A mode: eval_qamode.py (judged answers)
+        with gzip.open(os.path.join(a.out, "eval_qamode.jsonl.gz"), "wt", encoding="utf-8") as f:
+            for e in qm:
+                f.write(json.dumps(e, ensure_ascii=False) + "\n")
     if tools:
         json.dump(tools, open(os.path.join(a.out, "tools_app.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     chars = [sum(len(m.get("content") or "") + len(m.get("reasoning_content") or "") + sum(len(c["function"]["arguments"]) for c in m.get("tool_calls") or [])
@@ -179,6 +193,7 @@ def main():
         "with_masked_mistake": sum(1 for r in pick if any(m.get("train") is False for m in r["messages"])),
         "sources": {
             "program": "tools/dataset/gen_*.py → teacher.py through the app's real agent loop (run.js); every circuit checked against the task's known answer outside the conversation; no model wrote any of it",
+            "qa_mode": "Q&A-mode answers written by an open-weight model (qwen/qwen3.5-397b-a17b, Apache-2.0) via OpenRouter from the app's own Q&A prompt + course notes, scored by a second open model (deepseek/deepseek-v4-pro), kept only when judged fully correct, filtered by code (tools/dataset/gen_qamode.py)",
             "general_thai": "airesearch/wangchanx-seed-free-synthetic-instruct-thai-120k (MIT) — filtered by tools/dataset/online.py",
             "general_tools": "NousResearch/hermes-function-calling-v1 (Apache-2.0) — converted by tools/dataset/online.py",
         },
