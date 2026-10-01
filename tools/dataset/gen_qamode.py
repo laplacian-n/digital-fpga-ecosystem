@@ -201,7 +201,7 @@ def code_check(a):
         return "not mostly Thai"
     if not 60 <= len(a) <= 1600:
         return f"length {len(a)}"
-    if re.search(r"(ตาม|ใน|จาก)(บันทึก|เอกสาร)(ที่แนบ|นี้)?|หน้า(ที่)?\s*\d+", a):
+    if re.search(r"(ตาม|ใน|จาก)(บันทึก|เอกสาร)(ที่แนบ|นี้)?|หน้า(ที่)?\s*\d+|(ด้านบน|ข้างบน|ข้างต้น|ที่แนบมา)", a):
         return "cites the notes"
     for rx, why in BAD:
         if rx.search(a) and "ไม่ใช่" not in a:
@@ -301,6 +301,8 @@ def main():
             dropped["duplicate question"] = dropped.get("duplicate question", 0) + 1
             continue
         seen.add(k)
+        if "drop" not in x and code_check(x["a"]):      # filters added after a note was cached apply too
+            x["drop"] = "code: " + code_check(x["a"])
         if "drop" in x:
             key_ = x["drop"].split(":")[0] + ": " + (x["drop"].split(":", 1)[1].split("[")[0].strip() if x["drop"].startswith("code") else "score < 4 or error")
             dropped[key_] = dropped.get(key_, 0) + 1
