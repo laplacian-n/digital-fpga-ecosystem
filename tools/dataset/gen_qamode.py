@@ -85,6 +85,9 @@ J_PROMPT = """You are checking answers written for Thai university students in a
 QUESTION:
 {q}
 
+SOURCE NOTE the question was written from (course textbook — its definitions are the course's):
+{src}
+
 COURSE NOTES the assistant was given (may be irrelevant or partial):
 {notes}
 
@@ -101,7 +104,7 @@ Score 1-5 each:
 - concise: no padding, no repetition, not missing the key point
 Be strict. In "errors" list every factual error, every over-generalization stated as always true ("always", "เสมอ", \
 "แน่นอน") that is false for common cases, every statement about what to type in the app or what the app can do, and \
-anything that answers a different question (empty list if none). Return only JSON:
+anything that answers a different question, and any definition that contradicts the SOURCE NOTE (empty list if none). Return only JSON:
 {{"correct": n, "relevant": n, "thai": n, "concise": n, "errors": ["..."]}}"""
 
 
@@ -184,7 +187,8 @@ def strip_draw_hint(q, a):
         return a
     parts = re.split(r"(?<=[\n])|(?<=\s)(?=หาก|ถ้า)", a)
     keep = [p for p in parts if "วาดวงจร" not in p]
-    return re.sub(r"\s+$", "", "".join(keep))
+    out = "".join(keep).strip()
+    return re.sub(r"^(อย่างไรก็ตาม|แต่|และ|ส่วน)\s*,?\s*", "", out).strip()
 
 
 def code_check(a):
@@ -192,6 +196,14 @@ def code_check(a):
         return "empty"
     if re.search(r"[一-鿿぀-ヿ]", a):
         return "Chinese/Japanese text"
+    if re.search(r"[\u0400-\u04ff\u0600-\u06ff\u0900-\u097f\uac00-\ud7af]", a):
+        return "another script (Cyrillic / Arabic / Devanagari / Korean)"
+    if re.search(r"([\u0e31\u0e34-\u0e3a\u0e47-\u0e4e])\1|[\u0e48-\u0e4b]{2}", a):
+        return "Thai typo (a mark written twice)"
+    if re.search(r"[\u0e00-\u0e7f][_][A-Za-z]|[\u0e00-\u0e7f]-[A-Za-z]+-[\u0e00-\u0e7f]", a):
+        return "stray _ / - glued to a word"
+    if a[0] in ",.;:)":
+        return "starts mid-sentence"
     if "<think>" in a or re.search(r"^#{1,6}\s", a, flags=re.M) or re.search(r"^\|.*\|$", a, flags=re.M):
         return "think tag / heading / table"
     if "**" in a or "```" in a or re.search(r"\$[^$\n]+\$", a):
@@ -201,7 +213,7 @@ def code_check(a):
         return "not mostly Thai"
     if not 60 <= len(a) <= 1600:
         return f"length {len(a)}"
-    if re.search(r"(ตาม|ใน|จาก)(บันทึก|เอกสาร)(ที่แนบ|นี้)?|หน้า(ที่)?\s*\d+|(ด้านบน|ข้างบน|ข้างต้น|ที่แนบมา)", a):
+    if re.search(r"(ตาม|ใน|จาก)(บันทึก|เอกสาร)(ที่แนบ|นี้)?|หน้า(ที่)?\s*\d+|((?<!ขีด)ด้านบน|(?<!ขีด)ข้างบน|ข้างต้น|ที่แนบมา)", a):
         return "cites the notes"
     for rx, why in BAD:
         if rx.search(a) and "ไม่ใช่" not in a:
@@ -223,7 +235,7 @@ def do_chunk(api, r, rec, n, held):
         msgs = chat_server.ask_messages(payload(q), hits)
         wmsgs = [{"role": "system", "content": chat_server._ASK_SYS + STYLE}, msgs[1]]
         a = api.chat(WRITER, wmsgs, temperature=0.4, max_tokens=700)
-        a = strip_draw_hint(q, (a or "").strip())
+        a = strip_draw_hint(q, (a or "").strip()).strip()
         why = code_check(a)
         row = {"q": q, "kind": x.get("kind", ""), "a": a, "chunk": rec["id"], "hits": [h["source"] + " · " + h["topic"] for h in hits],
                "held": held}
@@ -232,9 +244,10 @@ def do_chunk(api, r, rec, n, held):
             out.append(row)
             continue
         notes = chat_server.ask_notes_block(hits) or "(none)"
+        src = re.sub(r"\s+", " ", rec.get("text") or "")[:2000]
         row["judge"] = {}
         for jm in JUDGES:
-            j = first_json(api.chat(jm, [{"role": "user", "content": J_PROMPT.format(q=q, notes=notes, a=a)}], temperature=0.0, max_tokens=800))
+            j = first_json(api.chat(jm, [{"role": "user", "content": J_PROMPT.format(q=q, notes=notes, a=a, src=src)}], temperature=0.0, max_tokens=800))
             row["judge"][jm] = j
             try:
                 sc = [int(j[k]) for k in ("correct", "relevant", "thai", "concise")]
