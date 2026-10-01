@@ -260,9 +260,10 @@ def main():
     ap.add_argument("--seed", type=int, default=21)
     ap.add_argument("--computed", default=None, help="gen_qa.py tasks: their questions + program answers in the Q&A-mode prompt (no model)")
     ap.add_argument("--computed-only", action="store_true", help="only the --computed rows (no OpenRouter calls)")
+    ap.add_argument("--cached-only", action="store_true", help="write out what the cache holds (no OpenRouter calls)")
     a = ap.parse_args()
     key = os.environ.get("OR_KEY", "").strip()
-    if not key and not a.computed_only:
+    if not key and not (a.computed_only or a.cached_only):
         sys.exit("OR_KEY is not set")
     api, r = OR(key), retriever.Retriever()
     out, cache = Path(a.out), Path(a.out) / "cache"
@@ -274,6 +275,8 @@ def main():
         recs = recs[:a.limit]
     if a.computed_only:
         recs = []
+    if a.cached_only:
+        recs = [d for d in recs if (cache / (hashlib.sha1(d["id"].encode()).hexdigest()[:16] + ".json")).exists()]
 
     def held(rec):  # one note in ten: its questions are eval tasks only
         return int(hashlib.sha1(rec["id"].encode()).hexdigest(), 16) % 10 == 0
