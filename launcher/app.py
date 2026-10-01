@@ -243,6 +243,9 @@ def load_backend():
     try:
         import chat_server  # noqa: E402  (needs sys.path set above)
         BACKEND = chat_server
+        # Q&A mode answers with the course notes (keyword search only: a question must not wait
+        # for the embedding server)
+        chat_server.ASK_NOTES = lambda q: (rag_search(q, k=chat_server.ASK_NOTES_K, semantic=False) or {}).get("hits") or []
         ghdl = detect_ghdl()
         if ghdl:
             try:

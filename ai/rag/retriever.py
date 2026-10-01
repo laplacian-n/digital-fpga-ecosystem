@@ -38,6 +38,25 @@ def tokenize(text: str) -> list[str]:
     return toks
 
 
+# How a question is asked, not what it is about: "latch กับ flip-flop ต่างกันยังไง" used to rank lab
+# records first on the 3-grams of ต่างกัน / ยังไง (Q&A mode retrieves with the student's question).
+_TH_ASK = re.compile(r"(ต่างกัน|แตกต่าง|ยังไง|อย่างไร|ยังงี้|คืออะไร|อะไร|ทำไม|เพราะอะไร|หรือเปล่า|รึเปล่า|ไหม|มั้ย|"
+                     r"ได้ไหม|ช่วย|หน่อย|อธิบาย|บอก|ครับ|ค่ะ|คะ|นะ|เหรอ|หรอ|กับ|และ|ของ|ที่|คือ|เป็น|ใช้|ทำ|ให้|"
+                     r"เมื่อไร|เมื่อไหร่|กี่|เท่าไร|เท่าไหร่|แบบไหน|ตัวไหน|อันไหน|ควร|ต้อง|จะ|แล้ว|บ้าง)")
+_EN_ASK = {"what", "why", "how", "is", "are", "the", "a", "an", "of", "and", "or", "vs", "between", "difference",
+           "do", "does", "can", "to", "in", "for", "with", "which", "when"}
+
+
+def tokenize_query(text: str) -> list[str]:
+    """Query tokens: question words dropped (a query that is only question words keeps them); when the
+    query has technical English words, Thai 3-grams count less — a 10-letter Thai word gives 8 of them."""
+    t = (text or "").lower()
+    words = [w for w in _WORD.findall(t) if w not in _EN_ASK]
+    thai = _TH_ASK.sub(" ", t)
+    toks = tokenize(" ".join(words) + " " + " ".join(_THAI.findall(thai)))
+    return toks or tokenize(text)
+
+
 class Retriever:
     def __init__(self, index_path: Path = INDEX, k1: float = 1.5, b: float = 0.75):
         self.k1, self.b = k1, b
@@ -126,7 +145,7 @@ class Retriever:
         """BM25 always; if embeddings are present and hybrid=True, fuse BM25 + cosine
         ranks via Reciprocal Rank Fusion (recall for paraphrase/Thai) while keeping
         metadata filter + verified-first rerank. BM25 stays the base (no pure vector)."""
-        q = tokenize(query)
+        q = tokenize_query(query)
         qset = set(q)
         # BM25 ranked list
         bm = [(self._bm25(q, i), i) for i, rec in enumerate(self.docs)
