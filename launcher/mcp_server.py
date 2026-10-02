@@ -267,7 +267,8 @@ TOOLS = [
       "• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — "
       "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename); "
       "clock_divider = divide clk_in by ANY n (2..2^31, e.g. 50 MHz → 20 Hz: n=2500000), one sheet, 50 % duty for even n\n"
-      "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]} — a sub-circuit is "
+      "• intent: {module, components:[{id,type,name?,inputs?}], nets:[{from:'id.pin', to:'id.pin'}]} — inputs: 2..8 for AND/OR/NAND/NOR/XOR/XNOR "
+      "(one 4-input OR, not a tree of 2-input ones; a net to a bare gate id takes its next free input); a sub-circuit is "
       "type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]},

@@ -146,3 +146,31 @@ test("build_hierarchy wires a block's BUS pins (whole, slices, single bits); an 
   expect(r.nib.join("\n")).toMatch(/^warning: INPUT 'st0' \(บิตหนึ่งของกลุ่ม st\)/);
   expect(r.nib.join("\n")).not.toMatch(/^error/m);
 });
+
+test("the same part in another build reuses its sheet even after its stamp died; wide formulas compare on sampled rows; intent gates take inputs", async ({ page }) => {
+  test.setTimeout(180000);
+  await openEditor(page);
+  const r = await page.evaluate(async () => {
+    const blk = n => ({ name: n, part: "counter_digit", params: { m: 5 } });
+    await MCP_OPS.build_hierarchy({ sheet: "t1", inputs: ["clk"], blocks: [blk("a"), blk("b")], connect: [] });
+    const sub = Object.values(state.project.schematics).find(s => s.name === "counter_digit_m5");
+    delete sub.verified;                                        // e.g. re-laid out by hand
+    await MCP_OPS.build_hierarchy({ sheet: "t2", inputs: ["clk"], blocks: [blk("c"), blk("d")], connect: [] });
+    const digits = Object.values(state.project.schematics).map(s => s.name).filter(n => /^counter_digit/.test(n));
+    await MCP_OPS.build_circuit({ sheet: "w13", formula: "y = a&b&c&d&e&f&g&h&i&j&k&l&m" });
+    const same = await MCP_OPS.compare_sheets({ sheet: "w13", formula: "y = a&b&c&d&e&f&g&h&i&j&k&l&m" });
+    const diff = await MCP_OPS.compare_sheets({ sheet: "w13", formula: "y = a&b&c&d&e&f&g&h&i&j&k&l&~m" });
+    await MCP_OPS.build_circuit({ sheet: "g4", intent: { module: "g4", components: [...["a", "b", "c", "d"].map(n => ({ id: n, type: "IN", name: n })),
+      { id: "g", type: "OR", inputs: 4 }, { id: "y", type: "OUT", name: "y" }], nets: [..."abcd"].map(n => ({ from: n, to: "g" })).concat([{ from: "g", to: "y" }]) } });
+    const g4 = Object.values(state.project.schematics).find(s => s.name === "g4");
+    return { digits, verified: sheetVerified(sub), same: [same.equivalent, same.method], diff: diff.equivalent,
+      ors: g4.components.filter(c => c.type === "OR").map(c => c.params.inputs), g4: MCP_OPS.probe({ sheet: "g4", inputs: { a: 0, b: 0, c: 1, d: 0 } }).outputs.y };
+  });
+  expect(r.digits).toEqual(["counter_digit_m5"]);
+  expect(r.verified).toBe(true);
+  expect(r.same[0]).toBe(true);
+  expect(r.same[1]).toMatch(/สุ่ม/);
+  expect(r.diff).toBe(false);                                   // all 1s: y=1 vs 0
+  expect(r.ors).toEqual([4]);
+  expect(r.g4).toBe(1);
+});

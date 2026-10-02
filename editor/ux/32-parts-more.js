@@ -36,6 +36,10 @@ function ptSub(kind, a){
   const name=sanId([kind, ...Object.entries(p).map(([k,v])=>typeof v==="boolean"?(v?k:""):k[0]+v)].filter(Boolean).join("_"));
   const have=Object.values(state.project.schematics).find(s=>s.name===name);
   if(have && sheetVerified(have)) return name;
+  // the same part, but its stamp died (re-laid out, a wire tidied, opened and nudged): check it again
+  // against the reference before drawing a second copy (counter_digit_m5_2, _3 … in one build)
+  if(have){ const P=PARTS[kind]; try{ const S=P.seq&&P.seq(p), v=P.seq ? (S&&!S.small ? partVerifySeq(have, P, p) : null) : partVerifyComb(have, P, p);
+    if(v && v.pass){ sheetVerifyStamp(have, `part ${kind} ${JSON.stringify(p)} — ${v.method} (checked again)`); return name; } }catch(_){} }
   const r=partBuild(kind, Object.assign({}, a, {name}));
   r.sch.name=uniqueSchName(name, r.sch.id);
   return r.sch.name;
