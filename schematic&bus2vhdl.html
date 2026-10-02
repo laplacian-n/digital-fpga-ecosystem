@@ -8239,9 +8239,16 @@ function runSynthesis(){
        never wired is not a harmless stub — it is a pin the caller must still drive,
        while every consumer inside falls back to '0'. This is exactly how eight target
        pins of a working-looking sheet came out as '0' in the port map. */
+    /* …except one bit of a numbered group whose other bits are used (st0 of st3..st0: the module
+       reads only some bits of a nibble the caller wires as a whole) — a warning, not an error. */
+    const inWired = c => sch.wires.some(w=>w.from.cid===c.id || w.to.cid===c.id);
+    const inBase = c => { const m=/^(.*?[A-Za-z])_?(\d+)$/.exec(String(c.params.name||"")); return m ? m[1].toLowerCase() : null; };
     sch.components.filter(c=>c.type==="IN").forEach(c=>{
-      const used = sch.wires.some(w=>w.from.cid===c.id || w.to.cid===c.id);
-      if(!used) issues.push({lvl:"err",
+      if(inWired(c)) return;
+      const b = inBase(c), sib = b && sch.components.some(x=>x!==c && x.type==="IN" && inBase(x)===b && inWired(x));
+      issues.push(sib ? {lvl:"warn",
+        msg:`INPUT '${c.params.name}' (บิตหนึ่งของกลุ่ม ${b}) ไม่ได้ใช้ในแผ่นนี้ — ผู้เรียกยังต่อได้ทั้งกลุ่ม ค่าบิตนี้ถูกข้ามไป`,
+        ref:sch.name, schId:sch.id, cid:c.id} : {lvl:"err",
         msg:`INPUT '${c.params.name||"in"}' ไม่ได้ต่อไปไหน — เป็นขาของ entity ที่ไม่มีใครอ่านค่า`,
         ref:sch.name, schId:sch.id, cid:c.id});
     });
@@ -17227,7 +17234,7 @@ function busifyPorts(sch, which){
   catch(e){ const k = JSON.parse(keep); sch.components = k.c; sch.wires = k.w; if(k.o) sch.portOrder = k.o; else delete sch.portOrder; throw e; }
 }
 function busifyPortsRaw(sch, which){
-  const made = [];
+  const made = [], before = new Set(sch.wires.map(w=>w.id)), moved = new Set();
   busGroups(sch, which).forEach(g=>{
     const n = g.bits.length, isIn = g.dir==="IN", taps = [];
     g.bits.forEach(({c, i})=>{
@@ -17239,8 +17246,8 @@ function busifyPortsRaw(sch, which){
       t.x = snap(pin.x - yp.dx); t.y = snap(pin.y - yp.dy);
       sch.components.push(t); taps.push(t);
       sch.wires.forEach(w=>{
-        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; }
-        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; }
+        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; moved.add(w.id); }
+        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; moved.add(w.id); }
       });
     });
     const gone = new Set(g.bits.map(b=>b.c.id));
@@ -17261,11 +17268,16 @@ function busifyPortsRaw(sch, which){
     if(sch.portOrder){ const k = isIn ? "in" : "out", L = sch.portOrder[k];
       if(L){ const low = new Set(g.bits.map(b=>String(b.c.params.name).toLowerCase())), at = L.findIndex(x=>low.has(String(x).toLowerCase()));
         sch.portOrder[k] = L.filter(x=>!low.has(String(x).toLowerCase())); sch.portOrder[k].splice(Math.max(0,at), 0, port.params.name); } }
-    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name)});
+    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name),
+      taps:g.bits.map((b,k)=>[b.c.id, taps[k].id])});      // old port → the tap now in its place
   });
   if(made.length){
     try{ normalizePortFanout(sch); }catch(_){}
-    try{ wtTidySheet(sch); }catch(e){ console.warn("bus ports: tidy", e); }
+    // only what changed is routed: the new bus nets and the wires that now start at a tap (a whole-sheet
+    // tidy took ~10 s of a 21-block top sheet's 21 s)
+    try{ const ids = new Set(sch.wires.filter(w=>!before.has(w.id) || moved.has(w.id)).map(w=>w.id));
+      sch.wires.filter(w=>ids.has(w.id)).forEach(w=>{ try{ netWires(sch, w).forEach(i=>ids.add(i)); }catch(_){} });
+      wtReroute(sch, ids); }catch(e){ console.warn("bus ports: tidy", e); }
     // a merge bus has no driver pin, so the router may start a wire AT the OUTPUT's input or a
     // tap's bus pin; turn those round (a wire always leaves from a dot or an output)
     sch.wires.forEach(w=>{ const c = comp(w.from.cid, sch); if(!c || c.type==="JUNCTION") return;
@@ -20755,7 +20767,9 @@ MCP_OPS.build_hierarchy = async a=>{
     const bk=B[m[1].toLowerCase()]; if(!bk) fail(`no block '${m[1]}'`, "blocks: "+Object.values(B).map(x=>x.name).join(", "));
     const g=bk.pins[m[2].toLowerCase()];
     if(!g) fail(`block ${bk.name} (${bk.sub.name}) has no pin '${m[2]}'`, "its pins: "+Object.values(bk.pins).filter(x=>x.bits).map(x=>x.dir+" "+x.name+(x.width>1?`[${x.width-1}:0]`:"")).join(", "));
-    if(!g.bits) fail(`block ${bk.name}: pin '${g.name}' is a bus port — wire its bits on a sheet with per-bit pins`, `rebuild ${bk.sub.name} without bus:true`);
+    // a block's BUS pin (a module built with bus:true): its bits are wired through bus taps after drawing
+    if(!g.bits) return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>{ const r=`${bk.name}.${g.name}[${i}]`;
+      return g.dir==="in" ? {key:r, blk:bk.name, bus:true} : {ref:r, bus:true}; })};
     return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>g.dir==="in" ? {key:bk.name+"."+g.bits[i], blk:bk.name, pin:g.bits[i]} : {ref:bk.name+"."+g.bits[i]})};
   };
   const drive={}, how={};                       // sink key → source ref (or {c:"GND"})
@@ -20788,10 +20802,13 @@ MCP_OPS.build_hierarchy = async a=>{
   ins.forEach(p=>{ for(let i=0;i<p.width;i++) t.IN(bitName(p,i)); });
   Object.values(B).forEach(bk=>t.components.push({id:bk.name, type:"block:"+bk.sub.name}));
   const srcRef=s=>s.c ? t.X(s.c) : s.ref;
-  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return; t.W(srcRef(s), k); });
+  const viaTaps=[];                             // [from, to] that touch a block's bus pin: connect after drawing
+  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return;
+    if(s.bus || /\[\d+\]$/.test(k)) viaTaps.push([srcRef(s), k]); else t.W(srcRef(s), k); });
   const undriven=[];
   outs.forEach(p=>{ for(let i=0;i<p.width;i++){ const bn=bitName(p,i), s=drive["o:"+bn];
-    if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
+    if(s && s.bus){ t.components.push({id:"o_"+bn, type:"OUT", name:bn}); viaTaps.push([s.ref, "o_"+bn]); }
+    else if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
   const it={module:t.module, components:t.components, nets:t.nets};
   const v=validateIntent(it);
   if(!v.ok) fail("could not assemble: "+v.errors.slice(0,4).map(e=>e.msg).join("; "));
@@ -20800,9 +20817,15 @@ MCP_OPS.build_hierarchy = async a=>{
   let sch=dr.sch;
   sch.components.forEach(c=>{ if(B[String(c.id).toLowerCase()]) c.label=B[String(c.id).toLowerCase()].name; });
   sch.portOrder={in:ins.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i))), out:outs.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i)))};
-  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[];
-  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }
+  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[], tapOf={};
+  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses).forEach(m=>(m.taps||[]).forEach(([c,t])=>tapOf[c]=t)); }
     catch(e){ warnings.push(`bus ports ${buses.join(", ")} stay as single bits (${buses.map(b=>b+"0…").join(", ")}): ${e.message}`); } }
+  // bits of block BUS pins: a merge / split tap per bit (21), joined to the port's own tap when it became a bus
+  if(viaTaps.length){
+    const ref=r=>tapOf[r] ? tapOf[r]+".y" : r;
+    try{ const was=MCPB.inBatch; MCPB.inBatch=true;
+      try{ MCP_OPS.connect({sheet:sch.name, connections:viaTaps.map(([f,t])=>[ref(f), ref(t)])}); } finally{ MCPB.inBatch=was; } }
+    catch(e){ delete P[sch.id]; fail(`could not wire the bus pins: ${e.message}`, e.hint); } }
   // every declared port is on the sheet — as a bus port, or as all its bits — before this says "done"
   const portsOn=new Map(sch.components.filter(c=>c.type==="IN"||c.type==="OUT").map(c=>[String(c.params.name).toLowerCase(), c]));
   const missing=[...ins.map(p=>[p,"IN"]), ...outs.map(p=>[p,"OUT"])].filter(([p,T])=>{
@@ -20817,7 +20840,9 @@ MCP_OPS.build_hierarchy = async a=>{
   if(a.top) state.project.topId=sch.id;
   openSchTab(sch.id); mcpActivity("ประกอบ "+sch.name+" จาก "+blocks.length+" บล็อก"); mcpCommit(sch); try{ zoomFit(); }catch(_){}
   // 5. what is still open
-  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in" && g.bits).forEach(g=>{
+  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in").forEach(g=>{
+    if(!g.bits){ const miss=Array.from({length:g.width},(_,i)=>i).filter(i=>!drive[`${bk.name}.${g.name}[${i}]`]);
+      if(miss.length) open.push(`${bk.name}.${g.name}`+(miss.length<g.width?` (bits ${miss.join(",")})`:"")); return; }
     const miss=g.bits.filter(b=>!drive[bk.name+"."+b]); if(miss.length) open.push(`${bk.name}.${g.name}`+(g.width>1&&miss.length<g.width?` (bits ${miss.map(b=>g.bits.indexOf(b)).join(",")})`:"")); }));
   let chk=null; try{ const c=MCP_OPS.check({sheet:sch.name}); chk={errors:c.errors, warnings:c.warnings}; }catch(_){}
   return {sheet:sch.name, blocks:Object.values(B).map(bk=>({name:bk.name, sheet:bk.sub.name, verified:sheetVerified(bk.sub)})),

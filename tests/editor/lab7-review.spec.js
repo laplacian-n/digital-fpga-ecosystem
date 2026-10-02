@@ -124,3 +124,25 @@ test("lab7_countdown: the whole lab 7 as one verified part, pins from the lab sh
   expect(r.asks).toEqual(["lab7_countdown", "lab7_countdown", "lab7_countdown", "lab6_counter", null]);
   expect(r.bcd).toBe(4);
 });
+
+test("build_hierarchy wires a block's BUS pins (whole, slices, single bits); an unused bit of a nibble is a warning", async ({ page }) => {
+  test.setTimeout(180000);
+  await openEditor(page);
+  const r = await page.evaluate(async () => {
+    await MCP_OPS.build_part({ kind: "adder", n: 4, cin: false, bus: true, sheet: "inc" });       // pins a[3:0] b[3:0] s[3:0] cout
+    const run = async (nm, C) => { const res = await MCP_OPS.build_hierarchy({ sheet: nm, inputs: ["st[3:0]"], outputs: ["q[3:0]", "co"],
+      blocks: [{ name: "u", sheet: "inc" }], connect: [...C, ["u.s", "q"], ["u.cout", "co"]] });
+      return { open: res.unconnected_block_inputs, errs: MCP_OPS.check({ sheet: nm }).errors,
+        q: [3, 5].map(v => { const o = MCP_OPS.probe({ sheet: nm, inputs: { st: v } }).outputs; return o.q.value + 16 * o.co; }) }; };
+    const plain = await run("p1", [["st", "u.a"], ["st", "u.b"]]);
+    const rev = await run("p2", [["st", "u.a"], ["st[0]", "u.b[3]"], ["st[1]", "u.b[2]"], ["st[2]", "u.b[1]"], ["st[3]", "u.b[0]"]]);
+    const half = await MCP_OPS.build_hierarchy({ sheet: "p3", inputs: ["st[3:0]"], outputs: ["q[3:0]"], blocks: [{ name: "u", sheet: "inc" }], connect: [["st", "u.a"], ["u.s", "q"]] });
+    await MCP_OPS.build_circuit({ sheet: "nib", formula: "y = st3 & (st2 | st1)", inputs: ["st3", "st2", "st1", "st0"] });
+    return { plain, rev, half: half.unconnected_block_inputs, nib: MCP_OPS.check({ sheet: "nib" }).issues.map(i => i.level + ": " + i.message) };
+  });
+  expect(r.plain).toEqual({ open: [], errs: 0, q: [6, 10] });          // st + st
+  expect(r.rev).toEqual({ open: [], errs: 0, q: [15, 15] });           // st + (st with its bits reversed)
+  expect(r.half).toEqual(["u.b"]);
+  expect(r.nib.join("\n")).toMatch(/^warning: INPUT 'st0' \(บิตหนึ่งของกลุ่ม st\)/);
+  expect(r.nib.join("\n")).not.toMatch(/^error/m);
+});

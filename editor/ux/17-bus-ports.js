@@ -33,7 +33,7 @@ function busifyPorts(sch, which){
   catch(e){ const k = JSON.parse(keep); sch.components = k.c; sch.wires = k.w; if(k.o) sch.portOrder = k.o; else delete sch.portOrder; throw e; }
 }
 function busifyPortsRaw(sch, which){
-  const made = [];
+  const made = [], before = new Set(sch.wires.map(w=>w.id)), moved = new Set();
   busGroups(sch, which).forEach(g=>{
     const n = g.bits.length, isIn = g.dir==="IN", taps = [];
     g.bits.forEach(({c, i})=>{
@@ -45,8 +45,8 @@ function busifyPortsRaw(sch, which){
       t.x = snap(pin.x - yp.dx); t.y = snap(pin.y - yp.dy);
       sch.components.push(t); taps.push(t);
       sch.wires.forEach(w=>{
-        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; }
-        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; }
+        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; moved.add(w.id); }
+        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; moved.add(w.id); }
       });
     });
     const gone = new Set(g.bits.map(b=>b.c.id));
@@ -67,11 +67,16 @@ function busifyPortsRaw(sch, which){
     if(sch.portOrder){ const k = isIn ? "in" : "out", L = sch.portOrder[k];
       if(L){ const low = new Set(g.bits.map(b=>String(b.c.params.name).toLowerCase())), at = L.findIndex(x=>low.has(String(x).toLowerCase()));
         sch.portOrder[k] = L.filter(x=>!low.has(String(x).toLowerCase())); sch.portOrder[k].splice(Math.max(0,at), 0, port.params.name); } }
-    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name)});
+    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name),
+      taps:g.bits.map((b,k)=>[b.c.id, taps[k].id])});      // old port → the tap now in its place
   });
   if(made.length){
     try{ normalizePortFanout(sch); }catch(_){}
-    try{ wtTidySheet(sch); }catch(e){ console.warn("bus ports: tidy", e); }
+    // only what changed is routed: the new bus nets and the wires that now start at a tap (a whole-sheet
+    // tidy took ~10 s of a 21-block top sheet's 21 s)
+    try{ const ids = new Set(sch.wires.filter(w=>!before.has(w.id) || moved.has(w.id)).map(w=>w.id));
+      sch.wires.filter(w=>ids.has(w.id)).forEach(w=>{ try{ netWires(sch, w).forEach(i=>ids.add(i)); }catch(_){} });
+      wtReroute(sch, ids); }catch(e){ console.warn("bus ports: tidy", e); }
     // a merge bus has no driver pin, so the router may start a wire AT the OUTPUT's input or a
     // tap's bus pin; turn those round (a wire always leaves from a dot or an output)
     sch.wires.forEach(w=>{ const c = comp(w.from.cid, sch); if(!c || c.type==="JUNCTION") return;

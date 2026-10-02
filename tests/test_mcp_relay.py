@@ -71,6 +71,25 @@ class Relay(unittest.TestCase):
             app.RELAY = old
 
 
+class Background(unittest.TestCase):
+    def test_a_long_tool_can_run_as_a_job(self):
+        """A big top sheet takes minutes to lay out: background:true answers at once with the job."""
+        calls = []
+        old = M.APP.call
+        try:
+            M.APP.call = lambda op, args, timeout: calls.append((op, args, timeout)) or {
+                "ok": False, "job": "j7", "error": "'build_hierarchy' is still running"}
+            r = M.call_tool("build_hierarchy", {"blocks": [{"name": "u", "part": "full_adder"}], "background": True})
+        finally:
+            M.APP.call = old
+        self.assertEqual(calls[0][2], 3)
+        self.assertNotIn("background", calls[0][1])
+        self.assertFalse(r.get("isError"))
+        self.assertIn('"job": "j7"', r["content"][0]["text"])
+        self.assertIn("last_result", r["content"][0]["text"])
+        self.assertIn("background", M.TOOL_MAP["auto_layout"]["inputSchema"]["properties"])
+
+
 class Rag(unittest.TestCase):
     def test_course_notes_are_searchable(self):
         """The index is built from what ships with the app when it is missing (it is not in git)."""

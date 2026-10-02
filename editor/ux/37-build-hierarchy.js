@@ -81,7 +81,9 @@ MCP_OPS.build_hierarchy = async a=>{
     const bk=B[m[1].toLowerCase()]; if(!bk) fail(`no block '${m[1]}'`, "blocks: "+Object.values(B).map(x=>x.name).join(", "));
     const g=bk.pins[m[2].toLowerCase()];
     if(!g) fail(`block ${bk.name} (${bk.sub.name}) has no pin '${m[2]}'`, "its pins: "+Object.values(bk.pins).filter(x=>x.bits).map(x=>x.dir+" "+x.name+(x.width>1?`[${x.width-1}:0]`:"")).join(", "));
-    if(!g.bits) fail(`block ${bk.name}: pin '${g.name}' is a bus port — wire its bits on a sheet with per-bit pins`, `rebuild ${bk.sub.name} without bus:true`);
+    // a block's BUS pin (a module built with bus:true): its bits are wired through bus taps after drawing
+    if(!g.bits) return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>{ const r=`${bk.name}.${g.name}[${i}]`;
+      return g.dir==="in" ? {key:r, blk:bk.name, bus:true} : {ref:r, bus:true}; })};
     return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>g.dir==="in" ? {key:bk.name+"."+g.bits[i], blk:bk.name, pin:g.bits[i]} : {ref:bk.name+"."+g.bits[i]})};
   };
   const drive={}, how={};                       // sink key → source ref (or {c:"GND"})
@@ -114,10 +116,13 @@ MCP_OPS.build_hierarchy = async a=>{
   ins.forEach(p=>{ for(let i=0;i<p.width;i++) t.IN(bitName(p,i)); });
   Object.values(B).forEach(bk=>t.components.push({id:bk.name, type:"block:"+bk.sub.name}));
   const srcRef=s=>s.c ? t.X(s.c) : s.ref;
-  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return; t.W(srcRef(s), k); });
+  const viaTaps=[];                             // [from, to] that touch a block's bus pin: connect after drawing
+  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return;
+    if(s.bus || /\[\d+\]$/.test(k)) viaTaps.push([srcRef(s), k]); else t.W(srcRef(s), k); });
   const undriven=[];
   outs.forEach(p=>{ for(let i=0;i<p.width;i++){ const bn=bitName(p,i), s=drive["o:"+bn];
-    if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
+    if(s && s.bus){ t.components.push({id:"o_"+bn, type:"OUT", name:bn}); viaTaps.push([s.ref, "o_"+bn]); }
+    else if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
   const it={module:t.module, components:t.components, nets:t.nets};
   const v=validateIntent(it);
   if(!v.ok) fail("could not assemble: "+v.errors.slice(0,4).map(e=>e.msg).join("; "));
@@ -126,9 +131,15 @@ MCP_OPS.build_hierarchy = async a=>{
   let sch=dr.sch;
   sch.components.forEach(c=>{ if(B[String(c.id).toLowerCase()]) c.label=B[String(c.id).toLowerCase()].name; });
   sch.portOrder={in:ins.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i))), out:outs.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i)))};
-  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[];
-  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }
+  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[], tapOf={};
+  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses).forEach(m=>(m.taps||[]).forEach(([c,t])=>tapOf[c]=t)); }
     catch(e){ warnings.push(`bus ports ${buses.join(", ")} stay as single bits (${buses.map(b=>b+"0…").join(", ")}): ${e.message}`); } }
+  // bits of block BUS pins: a merge / split tap per bit (21), joined to the port's own tap when it became a bus
+  if(viaTaps.length){
+    const ref=r=>tapOf[r] ? tapOf[r]+".y" : r;
+    try{ const was=MCPB.inBatch; MCPB.inBatch=true;
+      try{ MCP_OPS.connect({sheet:sch.name, connections:viaTaps.map(([f,t])=>[ref(f), ref(t)])}); } finally{ MCPB.inBatch=was; } }
+    catch(e){ delete P[sch.id]; fail(`could not wire the bus pins: ${e.message}`, e.hint); } }
   // every declared port is on the sheet — as a bus port, or as all its bits — before this says "done"
   const portsOn=new Map(sch.components.filter(c=>c.type==="IN"||c.type==="OUT").map(c=>[String(c.params.name).toLowerCase(), c]));
   const missing=[...ins.map(p=>[p,"IN"]), ...outs.map(p=>[p,"OUT"])].filter(([p,T])=>{
@@ -143,7 +154,9 @@ MCP_OPS.build_hierarchy = async a=>{
   if(a.top) state.project.topId=sch.id;
   openSchTab(sch.id); mcpActivity("ประกอบ "+sch.name+" จาก "+blocks.length+" บล็อก"); mcpCommit(sch); try{ zoomFit(); }catch(_){}
   // 5. what is still open
-  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in" && g.bits).forEach(g=>{
+  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in").forEach(g=>{
+    if(!g.bits){ const miss=Array.from({length:g.width},(_,i)=>i).filter(i=>!drive[`${bk.name}.${g.name}[${i}]`]);
+      if(miss.length) open.push(`${bk.name}.${g.name}`+(miss.length<g.width?` (bits ${miss.join(",")})`:"")); return; }
     const miss=g.bits.filter(b=>!drive[bk.name+"."+b]); if(miss.length) open.push(`${bk.name}.${g.name}`+(g.width>1&&miss.length<g.width?` (bits ${miss.map(b=>g.bits.indexOf(b)).join(",")})`:"")); }));
   let chk=null; try{ const c=MCP_OPS.check({sheet:sch.name}); chk={errors:c.errors, warnings:c.warnings}; }catch(_){}
   return {sheet:sch.name, blocks:Object.values(B).map(bk=>({name:bk.name, sheet:bk.sub.name, verified:sheetVerified(bk.sub)})),

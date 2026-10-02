@@ -452,6 +452,14 @@ def fields_of(name):
     return ", ".join(f"{k}{'*' if k in req else ''} ({v.get('type', 'any')})" for k, v in sch["properties"].items())
 
 
+# long jobs (a big top sheet's layout takes minutes): background:true answers at once with a job id;
+# last_result {job} gives the answer when it is done — no timeout to lose it in
+BACKGROUND_TOOLS = [t["name"] for t in TOOLS if t["_timeout"] >= 90]
+for _t in TOOLS:
+    if _t["name"] in BACKGROUND_TOOLS:
+        _t["inputSchema"]["properties"]["background"] = {
+            "type": "boolean", "description": "run as a job: answers at once with {job}; then last_result {job} (for a big sheet)"}
+
 # the apply step fields, spelled out (they used to be guessed: delete takes `refs`, not target/components)
 _apply = TOOL_MAP["apply"]
 _apply["description"] += " Step fields (* = required): " + "; ".join(
@@ -708,7 +716,14 @@ def call_tool(name, args):
         args, bad = normalize_args(name, args)
         if bad:
             return {"content": [text(bad)], "isError": True}
-        reply = APP.call(name, args, tool["_timeout"])
+        if args.pop("background", False):
+            reply = APP.call(name, args, 3)
+            if not reply.get("ok") and reply.get("job"):
+                return {"content": [text({"job": reply["job"], "status": "running",
+                                          "next": f"last_result {{\"job\": \"{reply['job']}\"}} — call it in a while; "
+                                                  "the editor is busy with this job meanwhile"})]}
+        else:
+            reply = APP.call(name, args, tool["_timeout"])
     except Exception as e:
         return {"content": [text(f"FPGA Ecosystem is not reachable: {e}")], "isError": True}
     if not reply.get("ok"):
