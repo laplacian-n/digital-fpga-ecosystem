@@ -8,7 +8,9 @@
    {ok:false, fallback:true} = something this engine can't evaluate (bus ports,
    encoder/decoder/comparator blocks) → the caller may still try the backend. */
 const CLIENT_SIM_MAX_IN = 12;
-function clientCombSim(sch){
+/* opt.sample: past CLIENT_SIM_MAX_IN input bits, run all-0, all-1 and that many random rows instead of
+   refusing (a formula / part check on a wide sheet — compare_sheets said "13 บิต … มากเกินไป") */
+function clientCombSim(sch, opt){
   let flat; try{ flat=flattenSchematic(sch); }catch(e){ return {ok:false, fallback:true, reason:"ยกวงจรไม่ได้: "+e.message}; }
   const fs=flat.sch;
   const nm=c=>(c.params&&c.params.name)||c.label||c.id;
@@ -23,12 +25,15 @@ function clientCombSim(sch){
   const cols=cs=>{ const L=[]; cs.forEach(c=>{ const w=probeWidth(c, c.type==="IN"?"o":"i");
     if(w<=1) L.push({c, bit:null, name:nm(c)}); else for(let b=w-1;b>=0;b--) L.push({c, bit:b, name:nm(c)+"["+b+"]"}); }); return L; };
   const inC=cols(ins), outC=cols(outs);
-  if(inC.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุตรวม "+inC.length+" บิต = "+(2**inC.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" บิต)"};
+  const sampled = inC.length>CLIENT_SIM_MAX_IN && opt && opt.sample;
+  if(inC.length>CLIENT_SIM_MAX_IN && !sampled) return {ok:false, reason:"อินพุตรวม "+inC.length+" บิต = "+(2**inC.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" บิต)"};
+  const rowBits = sampled
+    ? [inC.map(()=>0), inC.map(()=>1), ...Array.from({length:opt.sample}, ()=>inC.map(()=>Math.random()<0.5?1:0))]
+    : Array.from({length:1<<inC.length}, (_,r)=>inC.map((x,i)=>(r>>(inC.length-1-i))&1));   // first input = MSB (same as the backend)
   const saved=Object.assign({}, PROBE_VALS);
   const st=probeStruct(fs), rows=[], floating=new Set();
   try{
-    for(let r=0;r<(1<<inC.length);r++){
-      const bits=inC.map((x,i)=>(r>>(inC.length-1-i))&1);          // first input = MSB (same as the backend)
+    for(const bits of rowBits){
       ins.forEach(c=>{ PROBE_VALS[c.id]=0; });
       inC.forEach((x,i)=>{ if(x.bit==null) PROBE_VALS[x.c.id]=bits[i]; else PROBE_VALS[x.c.id]=(PROBE_VALS[x.c.id]|(bits[i]<<x.bit))>>>0; });
       const m=probeModel(fs, st), got=new Map();
@@ -39,7 +44,7 @@ function clientCombSim(sch){
   } finally {
     Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved);
   }
-  return {ok:true, sequential:false, client:true,
+  return {ok:true, sequential:false, client:true, sampled:!!sampled,
     note: floating.size ? ("เอาต์พุตที่ไม่มีอะไรขับ (ถือเป็น 0): "+[...floating].join(", ")+" — ตรวจว่าต่อสายครบ") : "",
     truth_table:{inputs:inC.map(x=>x.name), outputs:outC.map(x=>x.name), rows}};
 }

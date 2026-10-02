@@ -73,8 +73,12 @@ const LAB_PIN_PRESETS={
   "7":{title:"แลป 7 ตัวจับเวลา mm.ss", rules:[
     {re:/min_?hi|min_?tens|m_?hi|^mt$/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/min_?lo|min_?ones|m_?lo|^mo$/i, dir:"in", t:i=>"sw:"+(8+i)},
     {re:/sec_?hi|sec_?tens|s_?hi|^st$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/sec_?lo|sec_?ones|s_?lo|^so$/i, dir:"in", t:i=>"sw:"+i},
-    {re:/start|stop|btn|^ss$|run/i, dir:"in", t:()=>"pb:4"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:1"},
-    {re:/err/i, dir:"out", t:()=>"led:0"}]},
+    // the lab 7 sheet: SET = J14 (pb 2, left), START/STOP = J13 (pb 0, top), RESET = J12 (pb 4, centre),
+    // the start time on SW[15:0], LED error = K12 (led 0), LED time-up = M12 (led 1)
+    {re:/^(set|load|set_?btn|btn_?set)$/i, dir:"in", t:()=>"pb:2"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:4"},
+    {re:/start|stop|btn|^ss$|run|toggle/i, dir:"in", t:()=>"pb:0"},
+    {re:/^(sw|sws|switch(es)?|time_?in|t_?in|preset|din|start_?time)$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/err/i, dir:"out", t:()=>"led:0"}, {re:/time_?up|timeup|t_?up|done|zero|finish/i, dir:"out", t:()=>"led:1"}]},
   "8":{title:"แลป 8 ตัวเลข 4 หลักจาก SW15–0", rules:[
     {re:/thousands|d3|dig3/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/hundreds|d2|dig2/i, dir:"in", t:i=>"sw:"+(8+i)},
     {re:/tens|d1|dig1/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|d0|dig0/i, dir:"in", t:i=>"sw:"+i}]},

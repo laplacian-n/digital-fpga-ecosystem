@@ -11,22 +11,26 @@
      truth-table check) unless force:true — the user asked for it anyway.
    - aiagFastPath: "full adder บนชีต fa3" → build_part directly, no model round at all. */
 
+/* order of events on sheets (spec set / circuit built): which came first decides whether a check means anything */
+let AIF_TICK=0;
+function aifTick(){ return ++AIF_TICK; }
 /* ---------- equations → truth table ---------- */
 function fxTokens(src){
-  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕¬∧∨]))/y;
+  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕⊙¬∧∨]))/y;
   let m, i=0; src=String(src);
   while(i<src.length){ re.lastIndex=i; m=re.exec(src); if(!m){ if(/\s/.test(src[i])){ i++; continue; } throw new Error(`unexpected '${src[i]}' in "${src}"`); }
     i=re.lastIndex; if(m[1]){ const w=m[1].toLowerCase();
-      if(["and","or","xor","not"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
+      if(["and","or","xor","not","xnor","nand","nor"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
     else if(m[2]) T.push({num:+m[2]}); else T.push({op:m[3]}); }
   return T;
 }
-/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR.
+/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR;
+   xnor ⊙ (= ~(a^b)), nand, nor at the level of xor / and / or.
    arith mode ({x,y} = …): + − * on integers, & | ^ ~ bitwise. */
 function fxParse(tokens, arith){
   let k=0; const peek=()=>tokens[k], next=()=>tokens[k++];
-  const BOOL={"|":1,"+":1,"∨":1,"or":1,"^":2,"⊕":2,"xor":2,"&":3,"*":3,"·":3,"∧":3,"and":3};
-  const ARITH={"|":1,"^":2,"&":3,"+":4,"-":4,"*":5};
+  const BOOL={"|":1,"+":1,"∨":1,"or":1,"nor":1,"^":2,"⊕":2,"xor":2,"xnor":2,"⊙":2,"&":3,"*":3,"·":3,"∧":3,"and":3,"nand":3};
+  const ARITH={"|":1,"or":1,"nor":1,"^":2,"xor":2,"⊕":2,"xnor":2,"⊙":2,"&":3,"and":3,"nand":3,"+":4,"-":4,"*":5};
   const bp=t=>t&&t.op&&(arith?ARITH:BOOL)[t.op]||0;
   const prefix=()=>{ const t=next(); if(!t) throw new Error("the expression ends too early");
     if(t.id) return {id:t.id}; if(t.num!=null) return {num:t.num};
@@ -45,8 +49,10 @@ function fxEval(e, env, arith){
   if(e.not) { const v=fxEval(e.not, env, arith); return arith?~v:(v?0:1); }
   if(e.neg) return -fxEval(e.neg, env, arith);
   const a=fxEval(e.l, env, arith), b=fxEval(e.r, env, arith), o=e.op;
-  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"?a&b : o==="|"?a|b : a^b;
-  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b; return a&b;
+  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"||o==="and"?a&b : o==="|"||o==="or"?a|b
+    : o==="nand"?~(a&b) : o==="nor"?~(a|b) : o==="xnor"||o==="⊙"?~(a^b) : a^b;
+  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b;
+  if(o==="nor") return (a|b)?0:1; if(o==="xnor"||o==="⊙") return (a^b)?0:1; if(o==="nand") return (a&b)?0:1; return a&b;
 }
 /* equations (string with ; or newlines, or a list) → {inputs, outputs, cols:{out:"0110…"}} */
 function formulaTable(formula, inputsGiven){
@@ -79,11 +85,75 @@ function formulaTable(formula, inputsGiven){
   return {inputs, outputs, cols, text:parsed.map(p=>p.src.replace(/\s+/g,"")).join(";")};
 }
 
+/* ---------- a formula too wide for a truth table: the expression itself as gates ----------
+   Lab 7: "zero = ~(m3|m2|…|s0)" (16 inputs) and the 12-input error logic were refused ("at most 10
+   for a truth table") and had to be cut into blocks by hand. Past 10 inputs the equations are drawn
+   as written — chains of one operator become one gate of up to 8 inputs, ~(a|b|c) a NOR — and the
+   drawing is then checked against the equations on random rows. Arithmetic ({c,s} = a + b) still
+   goes through the table. */
+const FX_GATE={"&":"AND","*":"AND","·":"AND","∧":"AND","and":"AND","|":"OR","+":"OR","∨":"OR","or":"OR","^":"XOR","⊕":"XOR","xor":"XOR",
+  "nand":"NAND","nor":"NOR","xnor":"XNOR","⊙":"XNOR"};
+function fxWideParse(formula){
+  let eqs=Array.isArray(formula) ? formula : (formula&&formula.equations) ? formula.equations : String(formula||"").split(/[;\n]+/);
+  eqs=eqs.map(x=>String(x).trim()).filter(Boolean);
+  const parsed=[];
+  for(const src of eqs){ const i=src.indexOf("="); if(i<1) return null;
+    const lhs=src.slice(0,i).trim(); if(!/^[A-Za-z_]\w*$/.test(lhs)) return null;      // {…} = arithmetic: not here
+    let ast; try{ ast=fxParse(fxTokens(src.slice(i+1)), false); }catch(_){ return null; }
+    parsed.push({src, out:lhs, ast}); }
+  const ids=[]; const walk=e=>{ if(!e) return; if(e.id!=null){ if(!ids.includes(e.id)) ids.push(e.id); return; } walk(e.not); walk(e.l); walk(e.r); };
+  parsed.forEach(p=>walk(p.ast));
+  const outs=parsed.map(p=>p.out);
+  return {parsed, outputs:outs, inputs:ids.filter(x=>!outs.includes(x)), text:parsed.map(p=>p.src.replace(/\s+/g,"")).join(";")};
+}
+function fxIntent(W, module){
+  const t=ptIntent(sanId(module||"logic")), sig={};
+  W.inputs.forEach(n=>sig[n]=t.IN(n));
+  const gate=(type, ins)=>{                       // one gate of ≤ 8 inputs, a tree past that
+    while(ins.length>8){ const head=ins.splice(0,8); ins.unshift(gate(type==="NAND"?"AND":type==="NOR"?"OR":type==="XNOR"?"XOR":type, head)); }
+    if(ins.length===1 && !/^N/.test(type)) return ins[0];
+    const id=t.X(type, {params:{inputs:Math.max(2, ins.length)}}); ins.forEach(s=>t.W(s, id)); return id; };
+  const flat=(e, op)=>e.op && FX_GATE[e.op]===op && !/^(NAND|NOR|XNOR)$/.test(op) ? [...flat(e.l, op), ...flat(e.r, op)] : [e];
+  const emit=e=>{
+    if(e.id!=null){ if(!sig[e.id]) throw new Error(`'${e.id}' is used before it is defined`); return sig[e.id]; }
+    if(e.num!=null) return t.X(e.num?"VCC":"GND");
+    if(e.not){ const x=e.not;                    // ~(a|b|c) → NOR(a,b,c)
+      if(x.op && /^(AND|OR|XOR)$/.test(FX_GATE[x.op])){ const T=FX_GATE[x.op]; return gate(T==="XOR"?"XNOR":"N"+T, flat(x, T).map(emit)); }
+      return t.G("NOT", [emit(x)]); }
+    const T=FX_GATE[e.op]; if(!T) throw new Error(`'${e.op}' cannot be drawn`);
+    return gate(T, (/^(NAND|NOR|XNOR)$/.test(T) ? [e.l, e.r] : flat(e, T)).map(emit)); };
+  W.parsed.forEach(p=>{ const s=emit(p.ast); sig[p.out]=s; t.OUT(p.out, s); });
+  return {module:t.module, components:t.components, nets:t.nets};
+}
+/* the drawing against the equations on random rows (all rows up to 2^12) */
+function fxWideCheck(sch, W){
+  const fs=flattenSchematic(sch).sch, st=probeStruct(fs), n=W.inputs.length, all=n<=12, N=all?(1<<n):400;
+  for(let r=0;r<N;r++){
+    const env={}; W.inputs.forEach((nm,i)=>env[nm]=all ? (r>>(n-1-i))&1 : (Math.random()<0.5?1:0));
+    if(!all && r<2) W.inputs.forEach(nm=>env[nm]=r);        // all 0s, all 1s
+    const got=mcpEvalOuts(sch, fs, st, env), want={};
+    W.parsed.forEach(p=>{ want[p.out]=fxEval(p.ast, env, false)?1:0; env[p.out]=want[p.out]; });
+    const bad=W.outputs.find(o=>String(got[o])!==String(want[o]));
+    if(bad) return {pass:false, row:Object.fromEntries(W.inputs.map(k=>[k,env[k]])), output:bad, want:want[bad], got:got[bad]};
+  }
+  return {pass:true, rows:N, how:all?`all ${N} rows`:`${N} random rows (incl. all 0 / all 1)`};
+}
+
 /* ---------- build_circuit: formula, and remember what the sheet was built from ---------- */
 {
   const _build=MCP_OPS.build_circuit;
   MCP_OPS.build_circuit=async a=>{
     let from=null, args=a;
+    const W=a.formula!=null && !a.inputs ? fxWideParse(a.formula) : null;
+    if(W && W.inputs.length>10){
+      const r=await _build(Object.assign({}, a, {formula:undefined, inputs:undefined, intent:fxIntent(W, a.name||a.sheet||W.outputs[0])}));
+      const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
+      if(sch){ const chk=fxWideCheck(sch, W);
+        sch.builtFrom={via:"formula", cols:{}, text:W.text, at:aifTick()}; delete sch.verified;
+        r.formula_check=chk;
+        r.note=`${W.inputs.length} inputs — too many for a truth table, so the equations are drawn as written (not minimised) and checked on ${chk.how||"rows"}`+(chk.pass?"":` — MISMATCH at ${JSON.stringify(chk.row)}`); }
+      return r;
+    }
     if(a.formula!=null){
       const F=formulaTable(a.formula, a.inputs);
       args=Object.assign({}, a, {formula:undefined, inputs:undefined, truth_table:{inputs:F.inputs, outputs:F.outputs, columns:F.cols}});
@@ -91,7 +161,7 @@ function formulaTable(formula, inputsGiven){
     } else if(a.truth_table && a.truth_table.columns) from={via:"truth_table", cols:Object.fromEntries(Object.entries(a.truth_table.columns).map(([k,v])=>[k,String(v).toLowerCase()]))};
     const r=await _build(args);
     const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
-    if(sch && from){ sch.builtFrom=from; delete sch.verified; }
+    if(sch && from){ sch.builtFrom=Object.assign(from, {at:aifTick()}); delete sch.verified; }
     if(from && from.via==="formula") r.truth_table={inputs:args.truth_table.inputs, columns:from.cols, note:"computed from your equations"};
     if(sch){ try{ const j=clientCombSim(sch); if(j.ok){ const rec=uxRecognize(j.truth_table); if(rec) r.recognized=rec; } }catch(_){} }
     return r;
@@ -189,7 +259,11 @@ function partFromMessage(msg){
   const named=[...String(msg).matchAll(/(?:อินพุต|เอาต์พุต|เอาท์พุต|inputs?|outputs?)\s*[:：]?\s*([A-Za-z_][\w\s,]*)/gi)].flatMap(m=>m[1].split(/[\s,]+/).filter(Boolean));
   return {kind, args, simple:!more, named};
 }
+/* asks to make something (not only how / how many): "ทำไม…" is not "ทำ" */
+const AIAG_MAKE_RE=/(สร้าง|ออกแบบ|วาด|ทำวงจร|ทำตัว|ช่วยทำ|อยากได้|ขอวงจร|\bbuild\b|\bmake\b|\bdesign\b)/i;
 async function aiagFastPath(msg, run){
+  // a question about a part ("ตัวนับ mod 12 ต้องใช้ flip-flop กี่ตัว") is answered, not built
+  if(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !AIAG_MAKE_RE.test(msg)) return null;
   const fp=partFromMessage(msg); if(!fp) return null;
   const r=await aiagCall("build_part", Object.assign({kind:fp.kind}, fp.args));
   const st={kind:"tool", tool:"build_part", args:Object.assign({kind:fp.kind}, fp.args), ok:r.ok, fast_path:true,

@@ -5138,14 +5138,15 @@ function globalRoute(sch){
   // 4. reservation + A*  (PathFinder negotiated congestion: usedH/usedV = THIS pass's edge
   // usage count; histH/histV = a penalty that accumulates on edges that stayed congested,
   // so across a few passes overlapping nets are pushed onto their own tracks.)
-  let usedH=new Map(), usedV=new Map();
-  const histH=new Map(), histV=new Map();
+  // edge usage / history per cell index in typed arrays (Map lookups were the inner-loop cost)
+  let usedH=new Int32Array(GW*GH), usedV=new Int32Array(GW*GH);
+  const histH=new Int32Array(GW*GH), histV=new Int32Array(GW*GH);
   const DIRS=[[1,0],[-1,0],[0,1],[0,-1]], BEND=14, OVERLAP_PEN=80;
   const eH=(x,nx,y)=>gi(Math.min(x,nx),y), eV=(x,y,ny)=>gi(x,Math.min(y,ny));
-  const gc0=(m,k)=>m.get(k)||0;
+  const gc0=(m,k)=>m[k];
   const edgePen=(x,y,nx,ny)=> y===ny ? (gc0(usedH,eH(x,nx,y))*OVERLAP_PEN + gc0(histH,eH(x,nx,y)))
                                      : (gc0(usedV,eV(x,y,ny))*OVERLAP_PEN + gc0(histV,eV(x,y,ny)));
-  const reserve=(x,y,nx,ny)=>{ if(y===ny){const k=eH(x,nx,y);usedH.set(k,gc0(usedH,k)+1);} else {const k=eV(x,y,ny);usedV.set(k,gc0(usedV,k)+1);} };
+  const reserve=(x,y,nx,ny)=>{ if(y===ny) usedH[eH(x,nx,y)]++; else usedV[eV(x,y,ny)]++; };
   function passable(ci, ownSet, isTarget){
     if(isTarget) return true;
     if(ownSet.has(ci)) return true;      // own tree / own pins are walkable
@@ -5156,7 +5157,13 @@ function globalRoute(sch){
     return true;
   }
   // multi-source A*: sources = array of gi (cost 0), target cell (tgx,tgy). ownSet = walkable-extra.
+  // A* state in typed arrays reused across calls (a generation stamp marks what belongs to the
+  // current search) — the Map/Set version spent most of a 140-gate sheet's 6 s in hashing.
+  const NK=GW*GH*5, TYPED=NK<=6000000;
+  const gA=TYPED?new Int32Array(NK):null, cfA=TYPED?new Int32Array(NK):null, stA=TYPED?new Uint32Array(NK):null, seenA=TYPED?new Uint32Array(NK):null;
+  let gen=0;
   function astar(sources, tgx,tgy, ownSet){
+    if(TYPED) return astarT(sources, tgx,tgy, ownSet);
     const tgi=gi(tgx,tgy);
     const g=new Map(), cf=new Map(), h=[];
     const hp=n=>{h.push(n);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p].f<=h[i].f)break;const t=h[p];h[p]=h[i];h[i]=t;i=p;}};
@@ -5185,13 +5192,41 @@ function globalRoute(sch){
     const cells=[]; let ck=found; while(ck!==undefined){ const d=(ck%5)-1; const r=(ck-(d+1))/5; cells.push(r); ck=cf.get(ck); }
     cells.reverse(); return cells;   // array of gi from a source to target
   }
+  function astarT(sources, tgx,tgy, ownSet){
+    gen++; const h=[];
+    const hp=n=>{h.push(n);let i=h.length-1;while(i>0){const p=(i-1)>>1;if(h[p].f<=h[i].f)break;const t=h[p];h[p]=h[i];h[i]=t;i=p;}};
+    const pop=()=>{const t=h[0],l=h.pop();if(h.length){h[0]=l;let i=0;for(;;){let a=2*i+1,b=2*i+2,s=i;if(a<h.length&&h[a].f<h[s].f)s=a;if(b<h.length&&h[b].f<h[s].f)s=b;if(s===i)break;const q=h[s];h[s]=h[i];h[i]=q;i=s;}}return t;};
+    const K=(x,y,d)=>(y*GW+x)*5+(d+1);
+    const est=(x,y)=>Math.abs(x-tgx)+Math.abs(y-tgy);
+    const has=k=>stA[k]===gen;
+    sources.forEach(si=>{ const sx=si%GW, sy=(si-sx)/GW; const kk=K(sx,sy,-1); if(!has(kk)||gA[kk]>0){ stA[kk]=gen; gA[kk]=0; cfA[kk]=-1; hp({f:est(sx,sy),x:sx,y:sy,d:-1}); } });
+    let found=-1, iter=0;
+    while(h.length){ if(++iter>500000) break; const c=pop(), ck=K(c.x,c.y,c.d); if(seenA[ck]===gen)continue; seenA[ck]=gen;
+      if(c.x===tgx&&c.y===tgy){ found=ck; break; }
+      const gc=has(ck)?gA[ck]:0;
+      for(let nd=0;nd<4;nd++){ if(c.d>=0 && DIRS[nd][0]===-DIRS[c.d][0] && DIRS[nd][1]===-DIRS[c.d][1])continue;
+        const nx=c.x+DIRS[nd][0], ny=c.y+DIRS[nd][1]; if(nx<0||ny<0||nx>=GW||ny>=GH)continue;
+        const ci=gi(nx,ny); const tgt=(nx===tgx&&ny===tgy);
+        if(!passable(ci, ownSet, tgt))continue;
+        const pen=edgePen(c.x,c.y,nx,ny);
+        const ng=gc+1+(c.d>=0&&nd!==c.d?BEND:0)+pen, nk=K(nx,ny,nd);
+        if(has(nk)&&gA[nk]<=ng)continue; stA[nk]=gen; gA[nk]=ng; cfA[nk]=ck; hp({f:ng+est(nx,ny),x:nx,y:ny,d:nd}); }
+    }
+    if(found<0) return null;
+    const cells=[]; let ck=found; while(ck>=0){ const d=(ck%5)-1; const r=(ck-(d+1))/5; cells.push(r); ck=cfA[ck]; }
+    cells.reverse(); return cells;
+  }
   // 5. route ALL nets, a few PathFinder passes: after each pass the SHARED edges get their
   //    history penalty bumped, so next pass the cheaper net re-routes onto a free track. Keep
   //    the pass with the fewest shared edges (fewest overlaps).
   netKeys.sort((a,b)=> nets[a].sinks.length-nets[b].sinks.length);
   let netTrees={}, bestOv=Infinity;
+  // later passes only shave overlaps (the repair passes after this clean most of them): on a big
+  // sheet stop after ~2 s — a 290-gate truth table used to keep the page frozen for minutes
+  const t0=performance.now();
   for(let pass=0; pass<6; pass++){
-   usedH=new Map(); usedV=new Map();
+   if(pass>0 && performance.now()-t0>2000) break;
+   usedH.fill(0); usedV.fill(0);
    const trees={};
    for(const k of netKeys){
     const net=nets[k]; const drvKey=net.drv.cid+" "+net.drv.pid; const dt=termCell[drvKey];
@@ -5212,11 +5247,10 @@ function globalRoute(sch){
     }
     trees[k] = failed ? null : {adj, treeCells};   // a sink unreachable even softly stays unrouted
    }
-   let ov=0; usedH.forEach(c=>{ if(c>1) ov+=c-1; }); usedV.forEach(c=>{ if(c>1) ov+=c-1; });
+   let ov=0; for(let k=0;k<usedH.length;k++){ if(usedH[k]>1) ov+=usedH[k]-1; if(usedV[k]>1) ov+=usedV[k]-1; }
    if(ov<bestOv){ bestOv=ov; netTrees=trees; }
    if(ov===0) break;
-   usedH.forEach((c,k)=>{ if(c>1) histH.set(k, gc0(histH,k)+OVERLAP_PEN); });
-   usedV.forEach((c,k)=>{ if(c>1) histV.set(k, gc0(histV,k)+OVERLAP_PEN); });
+   for(let k=0;k<usedH.length;k++){ if(usedH[k]>1) histH[k]+=OVERLAP_PEN; if(usedV[k]>1) histV[k]+=OVERLAP_PEN; }
   }
   // 6. wipe old wiring, emit wires + junctions from the trees
   sch.wires=[]; sch.components=sch.components.filter(c=>c.type!=="JUNCTION");
@@ -5289,6 +5323,7 @@ function polishLayout(sch, reroute){
 }
 function autoRouteSheet(sch, opts){
   sch = sch || activeSch(); if(!sch) return;
+  const _t0=performance.now();
   autoPlaceSheet(sch);
   // Round-2 polish (straighten + band-compress) re-runs the FULL router hundreds of
   // times (each rebuilds the maze grid). Fine at teaching sizes, but it does not scale —
@@ -5335,7 +5370,7 @@ function autoRouteSheet(sch, opts){
       }
       // min-crossing tidy: flip elbows / slide legs to the lowest-crossing track (each move is
       // validated against body/pin/overlap, so guarantees hold). Skipped on huge sheets (cost).
-      if((sch.wires||[]).length <= 500){
+      if((sch.wires||[]).length <= 500 && performance.now()-_t0 < 8000){
         for(let i=0;i<3;i++){ if(!reduceCrossings(sch)) break; }
         healJunctions(sch);
         if(netCollinearOverlaps(sch).length){ separateWireOverlaps(sch); healJunctions(sch); }
@@ -5350,13 +5385,14 @@ function autoRouteSheet(sch, opts){
     // + settle + re-polish, and KEEP only if total crossings strictly dropped AND no guarantee
     // (self+coll+body+pin) got worse — else restore the snapshot and stop. Strict decrease each
     // pass ⇒ it converges and never regresses. Skipped on huge sheets (per-pass double route).
-    if((sch.wires||[]).length <= 500){
+    if((sch.wires||[]).length <= 500 && performance.now()-_t0 < 4000){
       const guar=()=>netSelfOverlaps(sch).length+netCollinearOverlaps(sch).length+wireBodyCrossings(sch).length+wirePinCrossings(sch).length;
       const settleOverlaps=()=>{ for(let i=0;i<4;i++){ const b=netSelfOverlaps(sch).length+netCollinearOverlaps(sch).length; if(!b) break;
         if(resolveSelfOverlaps(sch)) healJunctions(sch);
         separateWireOverlaps(sch); healJunctions(sch);
         if(netSelfOverlaps(sch).length+netCollinearOverlaps(sch).length>=b) break; } };
       for(let pass=0; pass<5; pass++){
+        if(pass>0 && performance.now()-_t0 > 6000) break;   // each pass re-routes the whole sheet
         const cB=netCrossings(sch).length, gB=guar(), baseSnap=snapshotSheet(sch);
         const sw=uncrossGateInputsByRoute(sch);     // detect + apply on the CURRENT polished geometry
         if(!sw.length) break;                        // no gate's feeds cross → done
@@ -8203,9 +8239,16 @@ function runSynthesis(){
        never wired is not a harmless stub — it is a pin the caller must still drive,
        while every consumer inside falls back to '0'. This is exactly how eight target
        pins of a working-looking sheet came out as '0' in the port map. */
+    /* …except one bit of a numbered group whose other bits are used (st0 of st3..st0: the module
+       reads only some bits of a nibble the caller wires as a whole) — a warning, not an error. */
+    const inWired = c => sch.wires.some(w=>w.from.cid===c.id || w.to.cid===c.id);
+    const inBase = c => { const m=/^(.*?[A-Za-z])_?(\d+)$/.exec(String(c.params.name||"")); return m ? m[1].toLowerCase() : null; };
     sch.components.filter(c=>c.type==="IN").forEach(c=>{
-      const used = sch.wires.some(w=>w.from.cid===c.id || w.to.cid===c.id);
-      if(!used) issues.push({lvl:"err",
+      if(inWired(c)) return;
+      const b = inBase(c), sib = b && sch.components.some(x=>x!==c && x.type==="IN" && inBase(x)===b && inWired(x));
+      issues.push(sib ? {lvl:"warn",
+        msg:`INPUT '${c.params.name}' (บิตหนึ่งของกลุ่ม ${b}) ไม่ได้ใช้ในแผ่นนี้ — ผู้เรียกยังต่อได้ทั้งกลุ่ม ค่าบิตนี้ถูกข้ามไป`,
+        ref:sch.name, schId:sch.id, cid:c.id} : {lvl:"err",
         msg:`INPUT '${c.params.name||"in"}' ไม่ได้ต่อไปไหน — เป็นขาของ entity ที่ไม่มีใครอ่านค่า`,
         ref:sch.name, schId:sch.id, cid:c.id});
     });
@@ -13443,7 +13486,9 @@ tlStart();
    {ok:false, fallback:true} = something this engine can't evaluate (bus ports,
    encoder/decoder/comparator blocks) → the caller may still try the backend. */
 const CLIENT_SIM_MAX_IN = 12;
-function clientCombSim(sch){
+/* opt.sample: past CLIENT_SIM_MAX_IN input bits, run all-0, all-1 and that many random rows instead of
+   refusing (a formula / part check on a wide sheet — compare_sheets said "13 บิต … มากเกินไป") */
+function clientCombSim(sch, opt){
   let flat; try{ flat=flattenSchematic(sch); }catch(e){ return {ok:false, fallback:true, reason:"ยกวงจรไม่ได้: "+e.message}; }
   const fs=flat.sch;
   const nm=c=>(c.params&&c.params.name)||c.label||c.id;
@@ -13458,12 +13503,15 @@ function clientCombSim(sch){
   const cols=cs=>{ const L=[]; cs.forEach(c=>{ const w=probeWidth(c, c.type==="IN"?"o":"i");
     if(w<=1) L.push({c, bit:null, name:nm(c)}); else for(let b=w-1;b>=0;b--) L.push({c, bit:b, name:nm(c)+"["+b+"]"}); }); return L; };
   const inC=cols(ins), outC=cols(outs);
-  if(inC.length>CLIENT_SIM_MAX_IN) return {ok:false, reason:"อินพุตรวม "+inC.length+" บิต = "+(2**inC.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" บิต)"};
+  const sampled = inC.length>CLIENT_SIM_MAX_IN && opt && opt.sample;
+  if(inC.length>CLIENT_SIM_MAX_IN && !sampled) return {ok:false, reason:"อินพุตรวม "+inC.length+" บิต = "+(2**inC.length)+" แถว มากเกินไป (สูงสุด "+CLIENT_SIM_MAX_IN+" บิต)"};
+  const rowBits = sampled
+    ? [inC.map(()=>0), inC.map(()=>1), ...Array.from({length:opt.sample}, ()=>inC.map(()=>Math.random()<0.5?1:0))]
+    : Array.from({length:1<<inC.length}, (_,r)=>inC.map((x,i)=>(r>>(inC.length-1-i))&1));   // first input = MSB (same as the backend)
   const saved=Object.assign({}, PROBE_VALS);
   const st=probeStruct(fs), rows=[], floating=new Set();
   try{
-    for(let r=0;r<(1<<inC.length);r++){
-      const bits=inC.map((x,i)=>(r>>(inC.length-1-i))&1);          // first input = MSB (same as the backend)
+    for(const bits of rowBits){
       ins.forEach(c=>{ PROBE_VALS[c.id]=0; });
       inC.forEach((x,i)=>{ if(x.bit==null) PROBE_VALS[x.c.id]=bits[i]; else PROBE_VALS[x.c.id]=(PROBE_VALS[x.c.id]|(bits[i]<<x.bit))>>>0; });
       const m=probeModel(fs, st), got=new Map();
@@ -13474,7 +13522,7 @@ function clientCombSim(sch){
   } finally {
     Object.keys(PROBE_VALS).forEach(k=>delete PROBE_VALS[k]); Object.assign(PROBE_VALS, saved);
   }
-  return {ok:true, sequential:false, client:true,
+  return {ok:true, sequential:false, client:true, sampled:!!sampled,
     note: floating.size ? ("เอาต์พุตที่ไม่มีอะไรขับ (ถือเป็น 0): "+[...floating].join(", ")+" — ตรวจว่าต่อสายครบ") : "",
     truth_table:{inputs:inC.map(x=>x.name), outputs:outC.map(x=>x.name), rows}};
 }
@@ -14837,6 +14885,9 @@ function uxRefreshPages(){
     if(!A||!A.ok||(opts&&opts.noRoute)||ord.in.length+ord.out.length<3) return A;
     const numbered=ord.out.length>1 && ord.out.every(n=>/^[a-z_]+\d+$/i.test(n)) && new Set(ord.out.map(n=>n.replace(/\d+$/,""))).size===1;
     if(numbered) return A;   // q0..qN become a block's pins: keep them in order, no second try
+    // a second full route of a big sheet doubles a wait the page cannot be used in (a 7-input truth
+    // table: 140 gates, seconds per route) — the declared order stays
+    if(A.sch.components.filter(c=>c.type!=="JUNCTION").length>40) return A;
     // a pinned order can cost a lot on a dense sheet — draw it free as well, keep the ordered one
     // unless it is clearly worse (longer wiring / taller / more crossings)
     let B; try{ B=_draw.apply(this, arguments); }catch(_){ B=null; }
@@ -15212,6 +15263,15 @@ MCP_OPS.apply = a=>{
   return {steps:results, auto_layout:laidOut, layout:mcpLayoutMetrics(sch0)};
 };
 
+/* a drawing that big is not something to read, and routing it froze the page for minutes (a random
+   10-input table: 261 gates → 1630 parts with the junctions, 7.5 min; 8 inputs / ~70 gates: 9 s) —
+   no MCP call, not even ai_chat_stop, gets through meanwhile */
+const MCP_MAX_DRAW=100;
+function mcpSizeGuard(intent, what){
+  const n=((intent&&intent.components)||[]).filter(c=>c.type!=="JUNCTION").length;
+  if(n>MCP_MAX_DRAW) mcpFail(`${what} needs ${n} parts — too big to draw on one sheet (at most ${MCP_MAX_DRAW})`,
+    "split it into blocks (build_hierarchy), use a library part (list_parts), or fewer inputs per table");
+}
 MCP_OPS.build_circuit = a=>{
   mcpBeforeChange("สร้างวงจร");
   let intent=null, title="";
@@ -15220,6 +15280,7 @@ MCP_OPS.build_circuit = a=>{
       if(col.length!==(1<<t.inputs.length)) mcpFail(`truth_table.columns.${o} has ${col.length} chars, expected ${1<<t.inputs.length} (2^inputs, first input = MSB)`);
       rows[o]=col.toLowerCase().split(""); });
     const r=ttToIntent(t.inputs, t.outputs, rows, a.name||"logic"); if(r.error) mcpFail(r.error); intent=r.intent; title="truth table";
+    mcpSizeGuard(intent, "this truth table");
     if(a.into==="current" && uxCanFillSheet({inputs:t.inputs, outputs:t.outputs})){ uxFillSheet(activeSch(), intent); return {sheet:activeSch().name, into:"current", equations:r.exprs, layout:mcpLayoutMetrics(activeSch())}; }
     const dr=aiDrawIntent(intent); if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"));
     const res={sheet:dr.sch.name, into:"new", equations:r.exprs};
@@ -15240,6 +15301,7 @@ MCP_OPS.build_circuit = a=>{
   }
   if(a.intent){ intent=a.intent; title="intent"; }
   if(!intent) mcpFail("give one of: truth_table, generator, intent");
+  mcpSizeGuard(intent, "this circuit");
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
   if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
@@ -15385,7 +15447,10 @@ MCP_OPS.get_pins = a=>{ const sch=mcpSheet(a.sheet); uxNormPinmap(sch);
 MCP_OPS.set_pins = a=>{
   const sch=mcpUse(a.sheet), bits=uxPortBits(sch), keys=new Map(bits.map(b=>[b.key.toLowerCase(), b]));
   mcpBeforeChange("เลือกขา"); sch.pinmap=sch.pinmap||{}; const done=[];
-  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase()); if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
+  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase());
+    // a pin left for a port that is gone (a rebuilt sheet): null / "" removes it
+    if(!b && (t===null||t==="")){ const k=Object.keys(sch.pinmap).find(x=>x.toLowerCase()===String(port).toLowerCase()); if(k){ delete sch.pinmap[k]; done.push(k+" → — (its port is gone)"); return; } }
+    if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
     if(t===null||t===""){ delete sch.pinmap[b.key]; done.push(b.key+" → —"); return; }
     const ok=(b.dir==="in"?PIN_IN_TARGETS:PIN_OUT_TARGETS).includes(t); if(!ok) mcpFail(`'${t}' is not a valid ${b.dir==="in"?"input":"output"} target for ${b.key}`, "call board_pins");
     sch.pinmap[b.key]=t; done.push(b.key+" → "+t); });
@@ -15703,6 +15768,9 @@ function mcpShowChange(pre){
 }
 
 /* ---------- transport: long-poll the launcher ---------- */
+// closing the page says so: the launcher waits for a busy editor (a long build does not poll) but
+// must not wait for one that is gone
+window.addEventListener("pagehide", ()=>{ try{ if(MCPB.on) navigator.sendBeacon("/api/mcp/bye?client="+MCPB.client, ""); }catch(_){} });
 async function mcpLoop(){
   let fails=0;
   while(MCPB.on){
@@ -15721,7 +15789,7 @@ async function mcpLoop(){
     await mcpRun(job, true);
   }
 }
-const MCP_WAITING_OPS = new Set(["ai_chat_status", "approval_status", "board_status"]);
+const MCP_WAITING_OPS = new Set(["ai_chat_status", "ai_chat_stop", "approval_status", "board_status", "get_events"]);
 async function mcpRun(job, edits){
   let reply;
   if(edits){ MCPB.busy=true; mcpRevealFlush(); }
@@ -16045,7 +16113,8 @@ function uxAboutSheet(msg){
   aiLooksLikeQuestion=function(msg){
     if(_q(msg)) return true;
     if(/[=]|minterms?|Σ/i.test(msg)) return false;
-    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|\bwhat\b|\bwhich\b)/i.test(msg);
+    // "ต้องใช้ flip-flop กี่ตัว", "นับถึงเท่าไร": a number is asked for, not a circuit
+    return uxAboutSheet(msg) || /(อะไร|หรือเปล่า|รึเปล่า|กี่|เท่าไร|เท่าไหร่|\bwhat\b|\bwhich\b|how many|how much)/i.test(msg);
   };
   const _ask=aiAsk;
   aiAsk=async function(msg){
@@ -17162,8 +17231,15 @@ function busGroups(sch, which){
     return !sch.components.some(c=>(c.type==="IN"||c.type==="OUT") && String(c.params.name).toLowerCase()===g.name.toLowerCase());
   });
 }
+/* all or nothing: a group half turned into taps (the old ports gone, the bus port not yet there) left a
+   "ghost" bus in lab 7 — undriven, unlisted, its pins still in the pin map */
 function busifyPorts(sch, which){
-  const made = [];
+  const keep = JSON.stringify({c:sch.components, w:sch.wires, o:sch.portOrder||null});
+  try{ return busifyPortsRaw(sch, which); }
+  catch(e){ const k = JSON.parse(keep); sch.components = k.c; sch.wires = k.w; if(k.o) sch.portOrder = k.o; else delete sch.portOrder; throw e; }
+}
+function busifyPortsRaw(sch, which){
+  const made = [], before = new Set(sch.wires.map(w=>w.id)), moved = new Set();
   busGroups(sch, which).forEach(g=>{
     const n = g.bits.length, isIn = g.dir==="IN", taps = [];
     g.bits.forEach(({c, i})=>{
@@ -17175,8 +17251,8 @@ function busifyPorts(sch, which){
       t.x = snap(pin.x - yp.dx); t.y = snap(pin.y - yp.dy);
       sch.components.push(t); taps.push(t);
       sch.wires.forEach(w=>{
-        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; }
-        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; }
+        if(isIn && w.from.cid===c.id){ w.from = {cid:t.id, pid:"y"}; delete w.pts; moved.add(w.id); }
+        if(!isIn && w.to.cid===c.id){ w.to = {cid:t.id, pid:"y"}; delete w.pts; moved.add(w.id); }
       });
     });
     const gone = new Set(g.bits.map(b=>b.c.id));
@@ -17197,11 +17273,16 @@ function busifyPorts(sch, which){
     if(sch.portOrder){ const k = isIn ? "in" : "out", L = sch.portOrder[k];
       if(L){ const low = new Set(g.bits.map(b=>String(b.c.params.name).toLowerCase())), at = L.findIndex(x=>low.has(String(x).toLowerCase()));
         sch.portOrder[k] = L.filter(x=>!low.has(String(x).toLowerCase())); sch.portOrder[k].splice(Math.max(0,at), 0, port.params.name); } }
-    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name)});
+    made.push({port:port.params.name, dir:isIn?"in":"out", width:n, bits:g.bits.map(b=>b.c.params.name),
+      taps:g.bits.map((b,k)=>[b.c.id, taps[k].id])});      // old port → the tap now in its place
   });
   if(made.length){
     try{ normalizePortFanout(sch); }catch(_){}
-    try{ wtTidySheet(sch); }catch(e){ console.warn("bus ports: tidy", e); }
+    // only what changed is routed: the new bus nets and the wires that now start at a tap (a whole-sheet
+    // tidy took ~10 s of a 21-block top sheet's 21 s)
+    try{ const ids = new Set(sch.wires.filter(w=>!before.has(w.id) || moved.has(w.id)).map(w=>w.id));
+      sch.wires.filter(w=>ids.has(w.id)).forEach(w=>{ try{ netWires(sch, w).forEach(i=>ids.add(i)); }catch(_){} });
+      wtReroute(sch, ids); }catch(e){ console.warn("bus ports: tidy", e); }
     // a merge bus has no driver pin, so the router may start a wire AT the OUTPUT's input or a
     // tap's bus pin; turn those round (a wire always leaves from a dot or an output)
     sch.wires.forEach(w=>{ const c = comp(w.from.cid, sch); if(!c || c.type==="JUNCTION") return;
@@ -17472,6 +17553,9 @@ async function aiAgentRun(msg, opts){
       if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
+        // the app's own notes wait until every call of this turn has its result: a user message between
+        // two tool results breaks the order the chat template expects (assistant → tool, tool, … → user)
+        const after=[];
         for(const tc of calls){
           if(run.cancel) break;
           const tool=tc.function.name; let args={}, bad=null;
@@ -17495,7 +17579,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
-            messages.push({role:"user", content:passNote}); }
+            after.push({role:"user", content:passNote}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -17511,6 +17595,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        messages.push(...after);
         // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
         if(aiagFingerprint()===fp0) stall++; else stall=0;
         if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";
@@ -17623,6 +17708,9 @@ MCP_OPS.ai_chat_status = async a=>{
   if(cap.error) out.error=cap.error;
   const run=AIAG.seq>cap.runBefore ? AIAG.runs.find(r=>r.id===cap.runBefore+1) : null;
   if(run) out.agent=aiagRunSummary(run, a.detail==="full");
+  // the latest finished run's answer rides on every status, so a poll that timed out never loses it
+  const last=aiagStored().slice(-1)[0];
+  if(last && (!run || last.id!==run.id)) out.last_finished_run={id:last.id, state:last.state, message:aiagClip(last.message, 120), final:last.final, error:last.error, at:last.at};
   if(run && run.resumable) out.next_resume="ai_chat {resume:true} continues this run from where it stopped";
   if(!cap.done) out.next="still running — call ai_chat_status again";
   return out;
@@ -17650,6 +17738,8 @@ MCP_OPS.ai_model = async a=>{
   return {state:s.state, model:s.model, llama_server:s.server||null, mode:s.mode, running_for_s:s.since,
     catalog:(s.catalog||[]).map(m=>({id:m.id, name:m.name, size_gb:m.size_gb, installed:m.installed, agent:!!m.agent})),
     embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
+    llama_processes:(s.processes||[]).map(p=>({pid:p.pid, mb:p.mb, ours:p.ours, path:p.path})),
+    leftovers_stopped:(s.leftovers_stopped||[]).length||undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
 };
 /* run ids go on across reloads, so a saved run is never overwritten by a new one with the same id */
@@ -18105,8 +18195,19 @@ const PARTS = {
 };
 
 /* ---- params: defaults, ranges ---- */
+/* a part's own settings may also come nested — {kind, params:{format:"mm.ss", down:true}} (lab 7: they
+   were dropped and the default 00-99 counter was drawn without a word) */
+function partArgs(a){ return a && a.params && typeof a.params==="object" ? Object.assign({}, a, a.params) : (a||{}); }
+const PART_GENERIC=new Set(["kind","part","type","module","sheet","name","bus","replace","params","x","y","top","pins","label","id","_check","generator"]);
+/* settings this part does not have are refused, naming the ones it has (MCP entry points) */
+function partCheckArgs(kind, a){
+  const P=PARTS[kind]; if(!P) return;
+  const own=Object.keys(P.params||{}), bad=Object.keys(partArgs(a)).filter(k=>!own.includes(k) && !PART_GENERIC.has(k));
+  if(bad.length) mcpFail(`${kind} has no setting ${bad.map(k=>"'"+k+"'").join(", ")}`,
+    own.length ? `${kind} takes: ${own.map(k=>k+"="+JSON.stringify(P.params[k].def)+(P.params[k].options?" ("+P.params[k].options.join("|")+")":"")).join(", ")}` : `${kind} has no settings`);
+}
 function partParams(kind, a){
-  const P=PARTS[kind]; const out={};
+  const P=PARTS[kind]; const out={}; a=partArgs(a);
   Object.entries(P.params||{}).forEach(([k,s])=>{
     let v=a[k]!=null?a[k]:s.def;
     if(s.bool) v=v===true||v==="true"||v===1;
@@ -18157,6 +18258,7 @@ function partVerifyComb(sch, part, p){
 }
 function partVerifySeq(sch, part, p){
   const S=part.seq(p), ports=part.ports(p), pm=partPortMap(sch);
+  if(S.small) return {pass:false, method:"—", mismatch:{reason:"too many clocks to run one by one — check a copy built at "+JSON.stringify(S.small)}};
   const ins=sch.components.filter(c=>c.type==="IN");
   const byName=n=>ins.find(c=>c.params.name===n);
   const holdAt=i=>{ const v=S.drive(i)||{}, o={};
@@ -18232,8 +18334,9 @@ MCP_OPS.build_part = a=>{
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
   if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet — or delete_sheet it first to rebuild it");
+  if(PARTS[kind]) partCheckArgs(kind, a);
   mcpBeforeChange("สร้าง "+kind);
-  const r=partBuild(kind, a);
+  const r=partBuild(kind, partArgs(a));
   let sch=r.sch;
   if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified","pinmap"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
     delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
@@ -18257,22 +18360,26 @@ MCP_OPS.build_part = a=>{
      truth-table check) unless force:true — the user asked for it anyway.
    - aiagFastPath: "full adder บนชีต fa3" → build_part directly, no model round at all. */
 
+/* order of events on sheets (spec set / circuit built): which came first decides whether a check means anything */
+let AIF_TICK=0;
+function aifTick(){ return ++AIF_TICK; }
 /* ---------- equations → truth table ---------- */
 function fxTokens(src){
-  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕¬∧∨]))/y;
+  const T=[], re=/\s*(?:([A-Za-z_][A-Za-z0-9_]*)|(\d+)|(==|[-+*&|^~!'()=,{}·⊕⊙¬∧∨]))/y;
   let m, i=0; src=String(src);
   while(i<src.length){ re.lastIndex=i; m=re.exec(src); if(!m){ if(/\s/.test(src[i])){ i++; continue; } throw new Error(`unexpected '${src[i]}' in "${src}"`); }
     i=re.lastIndex; if(m[1]){ const w=m[1].toLowerCase();
-      if(["and","or","xor","not"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
+      if(["and","or","xor","not","xnor","nand","nor"].includes(w)) T.push({op:w}); else T.push({id:m[1]}); }
     else if(m[2]) T.push({num:+m[2]}); else T.push({op:m[3]}); }
   return T;
 }
-/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR.
+/* Pratt parser. bool mode: ~ ! ¬ ' NOT, & * · ∧ and AND, ^ ⊕ xor XOR, | + ∨ or OR;
+   xnor ⊙ (= ~(a^b)), nand, nor at the level of xor / and / or.
    arith mode ({x,y} = …): + − * on integers, & | ^ ~ bitwise. */
 function fxParse(tokens, arith){
   let k=0; const peek=()=>tokens[k], next=()=>tokens[k++];
-  const BOOL={"|":1,"+":1,"∨":1,"or":1,"^":2,"⊕":2,"xor":2,"&":3,"*":3,"·":3,"∧":3,"and":3};
-  const ARITH={"|":1,"^":2,"&":3,"+":4,"-":4,"*":5};
+  const BOOL={"|":1,"+":1,"∨":1,"or":1,"nor":1,"^":2,"⊕":2,"xor":2,"xnor":2,"⊙":2,"&":3,"*":3,"·":3,"∧":3,"and":3,"nand":3};
+  const ARITH={"|":1,"or":1,"nor":1,"^":2,"xor":2,"⊕":2,"xnor":2,"⊙":2,"&":3,"and":3,"nand":3,"+":4,"-":4,"*":5};
   const bp=t=>t&&t.op&&(arith?ARITH:BOOL)[t.op]||0;
   const prefix=()=>{ const t=next(); if(!t) throw new Error("the expression ends too early");
     if(t.id) return {id:t.id}; if(t.num!=null) return {num:t.num};
@@ -18291,8 +18398,10 @@ function fxEval(e, env, arith){
   if(e.not) { const v=fxEval(e.not, env, arith); return arith?~v:(v?0:1); }
   if(e.neg) return -fxEval(e.neg, env, arith);
   const a=fxEval(e.l, env, arith), b=fxEval(e.r, env, arith), o=e.op;
-  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"?a&b : o==="|"?a|b : a^b;
-  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b; return a&b;
+  if(arith) return o==="+"?a+b : o==="-"?a-b : o==="*"?a*b : o==="&"||o==="and"?a&b : o==="|"||o==="or"?a|b
+    : o==="nand"?~(a&b) : o==="nor"?~(a|b) : o==="xnor"||o==="⊙"?~(a^b) : a^b;
+  if(["|","+","∨","or"].includes(o)) return a|b; if(["^","⊕","xor"].includes(o)) return a^b;
+  if(o==="nor") return (a|b)?0:1; if(o==="xnor"||o==="⊙") return (a^b)?0:1; if(o==="nand") return (a&b)?0:1; return a&b;
 }
 /* equations (string with ; or newlines, or a list) → {inputs, outputs, cols:{out:"0110…"}} */
 function formulaTable(formula, inputsGiven){
@@ -18325,11 +18434,75 @@ function formulaTable(formula, inputsGiven){
   return {inputs, outputs, cols, text:parsed.map(p=>p.src.replace(/\s+/g,"")).join(";")};
 }
 
+/* ---------- a formula too wide for a truth table: the expression itself as gates ----------
+   Lab 7: "zero = ~(m3|m2|…|s0)" (16 inputs) and the 12-input error logic were refused ("at most 10
+   for a truth table") and had to be cut into blocks by hand. Past 10 inputs the equations are drawn
+   as written — chains of one operator become one gate of up to 8 inputs, ~(a|b|c) a NOR — and the
+   drawing is then checked against the equations on random rows. Arithmetic ({c,s} = a + b) still
+   goes through the table. */
+const FX_GATE={"&":"AND","*":"AND","·":"AND","∧":"AND","and":"AND","|":"OR","+":"OR","∨":"OR","or":"OR","^":"XOR","⊕":"XOR","xor":"XOR",
+  "nand":"NAND","nor":"NOR","xnor":"XNOR","⊙":"XNOR"};
+function fxWideParse(formula){
+  let eqs=Array.isArray(formula) ? formula : (formula&&formula.equations) ? formula.equations : String(formula||"").split(/[;\n]+/);
+  eqs=eqs.map(x=>String(x).trim()).filter(Boolean);
+  const parsed=[];
+  for(const src of eqs){ const i=src.indexOf("="); if(i<1) return null;
+    const lhs=src.slice(0,i).trim(); if(!/^[A-Za-z_]\w*$/.test(lhs)) return null;      // {…} = arithmetic: not here
+    let ast; try{ ast=fxParse(fxTokens(src.slice(i+1)), false); }catch(_){ return null; }
+    parsed.push({src, out:lhs, ast}); }
+  const ids=[]; const walk=e=>{ if(!e) return; if(e.id!=null){ if(!ids.includes(e.id)) ids.push(e.id); return; } walk(e.not); walk(e.l); walk(e.r); };
+  parsed.forEach(p=>walk(p.ast));
+  const outs=parsed.map(p=>p.out);
+  return {parsed, outputs:outs, inputs:ids.filter(x=>!outs.includes(x)), text:parsed.map(p=>p.src.replace(/\s+/g,"")).join(";")};
+}
+function fxIntent(W, module){
+  const t=ptIntent(sanId(module||"logic")), sig={};
+  W.inputs.forEach(n=>sig[n]=t.IN(n));
+  const gate=(type, ins)=>{                       // one gate of ≤ 8 inputs, a tree past that
+    while(ins.length>8){ const head=ins.splice(0,8); ins.unshift(gate(type==="NAND"?"AND":type==="NOR"?"OR":type==="XNOR"?"XOR":type, head)); }
+    if(ins.length===1 && !/^N/.test(type)) return ins[0];
+    const id=t.X(type, {params:{inputs:Math.max(2, ins.length)}}); ins.forEach(s=>t.W(s, id)); return id; };
+  const flat=(e, op)=>e.op && FX_GATE[e.op]===op && !/^(NAND|NOR|XNOR)$/.test(op) ? [...flat(e.l, op), ...flat(e.r, op)] : [e];
+  const emit=e=>{
+    if(e.id!=null){ if(!sig[e.id]) throw new Error(`'${e.id}' is used before it is defined`); return sig[e.id]; }
+    if(e.num!=null) return t.X(e.num?"VCC":"GND");
+    if(e.not){ const x=e.not;                    // ~(a|b|c) → NOR(a,b,c)
+      if(x.op && /^(AND|OR|XOR)$/.test(FX_GATE[x.op])){ const T=FX_GATE[x.op]; return gate(T==="XOR"?"XNOR":"N"+T, flat(x, T).map(emit)); }
+      return t.G("NOT", [emit(x)]); }
+    const T=FX_GATE[e.op]; if(!T) throw new Error(`'${e.op}' cannot be drawn`);
+    return gate(T, (/^(NAND|NOR|XNOR)$/.test(T) ? [e.l, e.r] : flat(e, T)).map(emit)); };
+  W.parsed.forEach(p=>{ const s=emit(p.ast); sig[p.out]=s; t.OUT(p.out, s); });
+  return {module:t.module, components:t.components, nets:t.nets};
+}
+/* the drawing against the equations on random rows (all rows up to 2^12) */
+function fxWideCheck(sch, W){
+  const fs=flattenSchematic(sch).sch, st=probeStruct(fs), n=W.inputs.length, all=n<=12, N=all?(1<<n):400;
+  for(let r=0;r<N;r++){
+    const env={}; W.inputs.forEach((nm,i)=>env[nm]=all ? (r>>(n-1-i))&1 : (Math.random()<0.5?1:0));
+    if(!all && r<2) W.inputs.forEach(nm=>env[nm]=r);        // all 0s, all 1s
+    const got=mcpEvalOuts(sch, fs, st, env), want={};
+    W.parsed.forEach(p=>{ want[p.out]=fxEval(p.ast, env, false)?1:0; env[p.out]=want[p.out]; });
+    const bad=W.outputs.find(o=>String(got[o])!==String(want[o]));
+    if(bad) return {pass:false, row:Object.fromEntries(W.inputs.map(k=>[k,env[k]])), output:bad, want:want[bad], got:got[bad]};
+  }
+  return {pass:true, rows:N, how:all?`all ${N} rows`:`${N} random rows (incl. all 0 / all 1)`};
+}
+
 /* ---------- build_circuit: formula, and remember what the sheet was built from ---------- */
 {
   const _build=MCP_OPS.build_circuit;
   MCP_OPS.build_circuit=async a=>{
     let from=null, args=a;
+    const W=a.formula!=null && !a.inputs ? fxWideParse(a.formula) : null;
+    if(W && W.inputs.length>10){
+      const r=await _build(Object.assign({}, a, {formula:undefined, inputs:undefined, intent:fxIntent(W, a.name||a.sheet||W.outputs[0])}));
+      const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
+      if(sch){ const chk=fxWideCheck(sch, W);
+        sch.builtFrom={via:"formula", cols:{}, text:W.text, at:aifTick()}; delete sch.verified;
+        r.formula_check=chk;
+        r.note=`${W.inputs.length} inputs — too many for a truth table, so the equations are drawn as written (not minimised) and checked on ${chk.how||"rows"}`+(chk.pass?"":` — MISMATCH at ${JSON.stringify(chk.row)}`); }
+      return r;
+    }
     if(a.formula!=null){
       const F=formulaTable(a.formula, a.inputs);
       args=Object.assign({}, a, {formula:undefined, inputs:undefined, truth_table:{inputs:F.inputs, outputs:F.outputs, columns:F.cols}});
@@ -18337,7 +18510,7 @@ function formulaTable(formula, inputsGiven){
     } else if(a.truth_table && a.truth_table.columns) from={via:"truth_table", cols:Object.fromEntries(Object.entries(a.truth_table.columns).map(([k,v])=>[k,String(v).toLowerCase()]))};
     const r=await _build(args);
     const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
-    if(sch && from){ sch.builtFrom=from; delete sch.verified; }
+    if(sch && from){ sch.builtFrom=Object.assign(from, {at:aifTick()}); delete sch.verified; }
     if(from && from.via==="formula") r.truth_table={inputs:args.truth_table.inputs, columns:from.cols, note:"computed from your equations"};
     if(sch){ try{ const j=clientCombSim(sch); if(j.ok){ const rec=uxRecognize(j.truth_table); if(rec) r.recognized=rec; } }catch(_){} }
     return r;
@@ -18435,7 +18608,11 @@ function partFromMessage(msg){
   const named=[...String(msg).matchAll(/(?:อินพุต|เอาต์พุต|เอาท์พุต|inputs?|outputs?)\s*[:：]?\s*([A-Za-z_][\w\s,]*)/gi)].flatMap(m=>m[1].split(/[\s,]+/).filter(Boolean));
   return {kind, args, simple:!more, named};
 }
+/* asks to make something (not only how / how many): "ทำไม…" is not "ทำ" */
+const AIAG_MAKE_RE=/(สร้าง|ออกแบบ|วาด|ทำวงจร|ทำตัว|ช่วยทำ|อยากได้|ขอวงจร|\bbuild\b|\bmake\b|\bdesign\b)/i;
 async function aiagFastPath(msg, run){
+  // a question about a part ("ตัวนับ mod 12 ต้องใช้ flip-flop กี่ตัว") is answered, not built
+  if(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !AIAG_MAKE_RE.test(msg)) return null;
   const fp=partFromMessage(msg); if(!fp) return null;
   const r=await aiagCall("build_part", Object.assign({kind:fp.kind}, fp.args));
   const st={kind:"tool", tool:"build_part", args:Object.assign({kind:fp.kind}, fp.args), ok:r.ok, fast_path:true,
@@ -18561,11 +18738,11 @@ function specCheck(sch){
   const sp=sch && sch.spec; if(!sp) return null;
   try{
     if(sp.kind==="formula" || sp.kind==="table"){
-      const sim=clientCombSim(sch);
+      const sim=clientCombSim(sch, sp.kind==="formula" ? {sample:1000} : null);   // a table needs every row; a formula does not
       if(!sim.ok) return {pass:false, reason:sim.reason||"จำลองไม่ได้"};
       const tt=sim.truth_table;
       if(sp.kind==="formula"){ const bad=specFormulaMismatches(sp.text, tt);
-        return {pass:!bad.length, checked:`${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs}; }
+        return {pass:!bad.length, checked:sim.sampled ? `${tt.rows.length} แถว (สุ่ม — ขาเข้า ${tt.inputs.length} บิต)` : `${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs}; }
       const cols=sp.cols, bad=[];
       Object.entries(cols).forEach(([o,col])=>{ const k=tt.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
         if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้"}); return; }
@@ -19084,7 +19261,7 @@ async function makeReport(opts){
   let saved=null, pdf=null, pdfError=null;
   if(/^https?:/.test(location.protocol)){ try{ saved=await mcpSaveFile(name, name+"_report.html", html); }catch(_){}
     // the PDF, printed by the app's own browser (Edge on Windows) — no print dialog for the student
-    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:name+"/"+name+"_report.html"}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
+    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:saved}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
   return {html, saved, pdf, pdf_error:pdfError||undefined};
 }
 GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแลป", desc:"รูปวงจรทุกชั้น, ตารางความจริง, สมการ, ผลทีละ clock, ขาบอร์ด, VHDL — พิมพ์เป็น PDF หรือเปิดใน Word", run:async()=>{
@@ -19641,6 +19818,10 @@ function ptSub(kind, a){
   const name=sanId([kind, ...Object.entries(p).map(([k,v])=>typeof v==="boolean"?(v?k:""):k[0]+v)].filter(Boolean).join("_"));
   const have=Object.values(state.project.schematics).find(s=>s.name===name);
   if(have && sheetVerified(have)) return name;
+  // the same part, but its stamp died (re-laid out, a wire tidied, opened and nudged): check it again
+  // against the reference before drawing a second copy (counter_digit_m5_2, _3 … in one build)
+  if(have){ const P=PARTS[kind]; try{ const S=P.seq&&P.seq(p), v=P.seq ? (S&&!S.small ? partVerifySeq(have, P, p) : null) : partVerifyComb(have, P, p);
+    if(v && v.pass){ sheetVerifyStamp(have, `part ${kind} ${JSON.stringify(p)} — ${v.method} (checked again)`); return name; } }catch(_){} }
   const r=partBuild(kind, Object.assign({}, a, {name}));
   r.sch.name=uniqueSchName(name, r.sch.id);
   return r.sch.name;
@@ -19654,7 +19835,9 @@ const hexOn=(s,d)=>(SEGHEX[d]>>"abcdefg".indexOf(s))&1;
 /* ---- counters ---- */
 const CNT_FORMATS={ "00-99":{mods:[10,10], names:["ones","tens"]}, "000-999":{mods:[10,10,10], names:["ones","tens","hundreds"]},
   "0000-9999":{mods:[10,10,10,10], names:["ones","tens","hundreds","thousands"]}, "00-59":{mods:[10,6], names:["ones","tens"]},
-  "mm.ss":{mods:[10,6,10,6], names:["sec_lo","sec_hi","min_lo","min_hi"]} };
+  "mm.ss":{mods:[10,6,10,6], names:["sec_lo","sec_hi","min_lo","min_hi"]},
+  // lab 7's timer runs 00.00 … 99.59: minutes up to 99 (mm.ss stops at 59.59)
+  "99.59":{mods:[10,6,10,10], names:["sec_lo","sec_hi","min_lo","min_hi"]} };
 const ptDigitsOf=(s, mods)=>mods.map(M=>{ const d=s%M; s=Math.floor(s/M); return d; });
 const ptValueOf=(ds, mods)=>{ let v=0, k=1; mods.forEach((M,i)=>{ v+=ds[i]*k; k*=M; }); return v; };
 
@@ -19698,7 +19881,7 @@ Object.assign(PARTS, {
         step:(s,v)=>({out:{q:s, tc:v.en&&s===term?1:0},
           state:v.clr?0:(p.load&&v.load)?v.d:v.en?(p.down?(s+p.m-1)%p.m:(s+1)%p.m):s})}; } },
   bcd_counter_multi:{ label:"ตัวนับ BCD หลายหลัก / นาฬิกา mm.ss", group:"ตัวนับ",
-    desc:"format: 00-99, 000-999, 0000-9999, 00-59, mm.ss (นับลงได้ด้วย down → ตัวจับเวลาถอยหลังแลป 7) · en, clr, load + ค่าเริ่มจากสวิตช์ · carry = en ตอนถึงปลาย · ต่อหลักด้วย counter_digit · ใช้ clk 50 MHz + en จากพัลส์ 1 Hz",
+    desc:"format: 00-99, 000-999, 0000-9999, 00-59, mm.ss (ถึง 59.59), 99.59 (นาทีถึง 99 — แลป 7; นับลงได้ด้วย down → ตัวจับเวลาถอยหลัง) · en, clr, load + ค่าเริ่มจากสวิตช์ · carry = en ตอนถึงปลาย · ต่อหลักด้วย counter_digit · ใช้ clk 50 MHz + en จากพัลส์ 1 Hz",
     params:{format:{options:Object.keys(CNT_FORMATS),def:"00-99"}, down:{bool:true,def:false}, load:{bool:true,def:false}},
     ports:p=>{ const F=CNT_FORMATS[p.format], out={}, din={}; F.names.forEach(n=>{ out[n]=4; din[n+"_d"]=4; });
       out.carry=1; return {in:Object.assign({clk:1, en:1, clr:1}, p.load?Object.assign({load:1}, din):{}), out}; },
@@ -20006,7 +20189,7 @@ function aifInputsOf(sch){ try{ const j=clientCombSim(sch); return j.ok ? j.trut
    Either way the result is simulated against what the code derived, and stamped verified. It runs
    before any model call (agent and build mode); a request that also asks for more (connect it, put
    it on the board…) goes on to the model with the part already built. */
-const AIO_OPS=[[/เอ็กซ์ออร์|เอกซ์ออร์|เอ็กซ์ออ/g," ^ "],[/และ|แอนด์/g," & "],[/หรือ|ออร์/g," | "],[/ไม่|นอต|น็อต/g," ~ "]];
+const AIO_OPS=[[/เอ็กซ์นอร์|เอกซ์นอร์|เอ็กซ์นอ/g," xnor "],[/แนนด์/g," nand "],[/นอร์/g," nor "],[/เอ็กซ์ออร์|เอกซ์ออร์|เอ็กซ์ออ/g," ^ "],[/และ|แอนด์/g," & "],[/หรือ|ออร์/g," | "],[/ไม่|นอต|น็อต/g," ~ "]];
 function aioThaiOps(s){ AIO_OPS.forEach(([re,op])=>{ s=s.replace(re, op); }); return s; }
 /* the equations the message states, or null */
 function aioEquations(msg){
@@ -20030,7 +20213,7 @@ function aioEquations(msg){
   }
   try{ const F=formulaTable(eqs.join("; ")); if(!F.inputs.length || F.inputs.length>8) return null;
     // an equation must have an operator (not "sheet = fx", not "n = 4")
-    if(!eqs.some(e=>/[&|^~'+*!()]|\b(and|or|xor|not)\b/i.test(e.split("=").slice(1).join("=")))) return null;
+    if(!eqs.some(e=>/[&|^~'+*!()⊙]|\b(and|or|xor|not|xnor|nand|nor)\b/i.test(e.split("=").slice(1).join("=")))) return null;
     return {text:eqs.join("; "), F}; }catch(_){ return null; }
 }
 /* "output 1 when the input is prime / even / … " over n bits, or null */
@@ -20210,17 +20393,103 @@ Object.assign(PARTS, {
             state:{c:d.c, t:d.t, pT:d.out, s0:tick?v.btn:s.s0, s1:tick?s.s0:s.s1,
               run:s.run^(press && !err ? 1 : 0), cnt:en&&eq ? 0 : en ? (s.cnt+1)%100 : s.cnt}}; }}; } },
 });
+/* lab 7: the countdown timer mm.ss — asked for after it was built by hand over MCP (20 blocks, a lost bus
+   port, an hour of wiring). Same pattern as lab 6: verified library blocks wired by code, the glue
+   checked clock by clock against the lab's rules on small dividers. Rules (the lab sheet):
+     SW15–12 / 11–8 / 7–4 / 3–0 = tens / ones of minutes, tens / ones of seconds (BCD), 00.00 … 99.59;
+     SET loads the switches (and stops), START/STOP toggles counting, RESET clears to 00.00 (and stops);
+     one second per tick, borrowing across minutes; at 00.00 it stops and LED time-up lights;
+     LED error = a digit that is not BCD or seconds' tens > 5 (SET and START are refused meanwhile).
+   Buttons are sampled every `btn` clocks (50 MHz ÷ 1 000 000 = 50 Hz: no bounce gets through). */
+function lab7Model(p){
+  const mods=CNT_FORMATS["99.59"].mods, M=mods.reduce((a,b)=>a*b,1);
+  const dig=sw=>[0,1,2,3].map(k=>(sw>>(4*k))&15);              // sec_lo, sec_hi, min_lo, min_hi
+  const bad=sw=>{ const d=dig(sw); return d[0]>9 || d[1]>5 || d[2]>9 || d[3]>9 ? 1 : 0; };
+  return {mods, M, dig, bad};
+}
+Object.assign(PARTS, {
+  lab7_countdown:{ label:"แลป 7: ตัวจับเวลาถอยหลัง mm.ss ทั้งระบบ (บอร์ด EDGE)", group:"ระบบทั้งแลป",
+    desc:"sw[15:0] = เวลาเริ่ม (BCD: สิบนาที/หน่วยนาที/สิบวินาที/หน่วยวินาที, 00.00–99.59) · set = โหลดค่า (ปุ่มซ้าย J14) · startstop = เริ่ม/หยุด (ปุ่มบน J13) · reset = ล้างเป็น 00.00 (ปุ่มกลาง J12) · นับลงทีละวินาที (50 MHz ÷ tick) ยืมข้ามนาที หยุดที่ 00.00 · led_error = ค่าไม่ใช่ BCD หรือสิบวินาที > 5 · led_timeup = ถึง 00.00 · running · จอ 7-seg 4 หลักมีจุดคั่น mm.ss · จับขาบอร์ดให้แล้ว",
+    params:{tick:{min:2,max:2147483648,def:50000000}, btn:{min:2,max:2147483648,def:1000000}, scan:{min:2,max:2147483648,def:50000},
+      count_out:{bool:true,def:false}},
+    ports:p=>({in:{clk:1, set:1, startstop:1, reset:1, sw:16},
+      out:Object.assign({a:1,b:1,c:1,d:1,e:1,f:1,g:1, dp:1, an:4, led_error:1, led_timeup:1, running:1}, p.count_out?{sec_lo:4, sec_hi:4, min_lo:4, min_hi:4}:{})}),
+    build:p=>{ const t=ptIntent("lab7_countdown"), clk=t.IN("clk"), bset=t.IN("set"), bss=t.IN("startstop"), brst=t.IN("reset");
+      const SW=Array.from({length:16},(_,i)=>t.IN("sw"+i)), dig=k=>SW.slice(4*k, 4*k+4);
+      // a one-clock pulse every n clocks: divider → rising-edge detector
+      const pulse=n=>{ const dv=ptBlock(t, ptSub("clock_divider", {n})); t.W(clk, dv+".clk_in");
+        const ed=ptBlock(t, ptSub("edge_detector")); t.W(clk, ed+".clk"); t.W(dv+".clk_out", ed+".x"); return ed+".pulse"; };
+      const tick=pulse(p.tick), bt=pulse(p.btn);
+      // a button sampled on bt, twice: one press = one pulse
+      const hold=d=>{ const f=t.X("DFF"), m=t.X("MUX",{params:{inputs:2}});
+        t.W(f+".q", m+".d0"); t.W(d, m+".d1"); t.W(bt, m+".s0"); t.W(m+".y", f+".d"); t.W(clk, f+".clk"); return f; };
+      const press=b=>{ const s0=hold(b), s1=hold(s0+".q"); return t.G("AND",[bt, s0+".q", s1+".qn"]); };
+      const setp=press(bset), ssp=press(bss), rstp=press(brst);
+      // error: a digit that is not BCD, or seconds' tens past 5 (sw7, or sw6·sw5)
+      const sv=ptSub("bcd_valid"), inv=[0,2,3].map(k=>{ const b=ptBlock(t, sv); dig(k).forEach((x,i)=>t.W(x, b+".d"+i)); return b+".invalid"; });
+      const err=t.G("OR",[...inv, SW[7], t.G("AND",[SW[6], SW[5]])]), ok=t.G("NOT",[err]);
+      // the counter 00.00 … 99.59, counting down, loaded from the switches
+      const cnt=ptBlock(t, ptSub("bcd_counter_multi", {format:"99.59", down:true, load:true})), N=CNT_FORMATS["99.59"].names;
+      N.forEach((n,k)=>dig(k).forEach((x,i)=>t.W(x, cnt+"."+n+"_d"+i)));
+      const Q=N.flatMap(n=>[0,1,2,3].map(i=>cnt+"."+n+i));
+      const o1=t.X("OR",{params:{inputs:8}}), o2=t.X("OR",{params:{inputs:8}});
+      Q.slice(0,8).forEach(q=>t.W(q, o1)); Q.slice(8).forEach(q=>t.W(q, o2));
+      const zero=t.G("NOR",[o1, o2]), nz=t.G("NOT",[zero]);
+      // running: START/STOP toggles it (not while there is an error or at 00.00); SET, RESET and 00.00 stop it
+      const run=t.X("DFF"); t.W(clk, run+".clk");
+      t.W(t.G("AND",[t.G("XOR",[run+".q", t.G("AND",[ssp, ok, nz])]), t.G("NOT",[setp]), t.G("NOT",[rstp]), nz]), run+".d");
+      t.W(clk, cnt+".clk"); t.W(t.G("AND",[tick, run+".q", nz]), cnt+".en"); t.W(rstp, cnt+".clr"); t.W(t.G("AND",[setp, ok]), cnt+".load");
+      // display: mm.ss with the point after the minutes (the hundreds digit)
+      const sd=ptBlock(t, ptSub("clock_divider", {n:p.scan})); t.W(clk, sd+".clk_in");
+      const disp=ptBlock(t, ptSub("seg7_mux4", {dp:true})); t.W(sd+".clk_out", disp+".clk");
+      ["ones","tens","hundreds","thousands"].forEach((d,k)=>{ for(let i=0;i<4;i++) t.W(cnt+"."+N[k]+i, disp+"."+d+i); });
+      [0,0,1,0].forEach((v,i)=>t.W(t.X(v?"VCC":"GND"), disp+".dots"+i));
+      for(const s of "abcdefg") t.OUT(s, disp+"."+s);
+      t.OUT("dp", disp+".dp"); for(let i=0;i<4;i++) t.OUT("an"+i, disp+".an"+i);
+      t.OUT("led_error", err); t.OUT("led_timeup", zero); t.OUT("running", run+".q");
+      if(p.count_out) N.forEach(n=>{ for(let i=0;i<4;i++) t.OUT(n+i, cnt+"."+n+i); });
+      return t; },
+    // the lab 7 pin table: SET J14, START/STOP J13, RESET J12, SW15–0, LED error K12, LED time-up M12
+    after:sch=>{ const pm={clk:"clk", set:"pb:2", startstop:"pb:0", reset:"pb:4", led_error:"led:0", led_timeup:"led:1", running:"led:2", dp:"seg:dp"};
+      for(let i=0;i<16;i++) pm["sw"+i]="sw:"+i;
+      for(let i=0;i<4;i++) pm["an"+i]="an:"+i;
+      for(const s of "abcdefg") pm[s]="seg:"+s;
+      sch.pinmap=pm; },
+    seq:p=>{ if(p.tick>8 || p.btn>8 || p.scan>8 || !p.count_out) return {small:{tick:6, btn:2, scan:2, count_out:true}};
+      const L=lab7Model(p), cycles=230;
+      const swAt=i=>i<60?0x0101 : i<120?0x0003 : i<140?0x0075 : i<190?0x9959 : 0x000A;
+      const on=(i,a)=>i>=a && i<a+5;
+      const drive=i=>({sw:swAt(i), set:on(i,4)||on(i,62)||on(i,124)||on(i,144)?1:0,
+        startstop:on(i,12)||on(i,50)||on(i,72)||on(i,110)||on(i,152)||on(i,200)?1:0, reset:on(i,175)?1:0});
+      return {cycles, init:{c:0,t:0,pT:0, bc:0,bt:0,pB:0, s0:[0,0,0], s1:[0,0,0], run:0, cnt:0}, drive,
+        step:(s,v)=>{ const d=sysDivStep(p.tick, s), tick=d.out&&!s.pT?1:0;
+          const e=sysDivStep(p.btn, {c:s.bc, t:s.bt}), bt=e.out&&!s.pB?1:0;
+          const B=[v.set, v.startstop, v.reset], pr=B.map((_,k)=>bt && s.s0[k] && !s.s1[k] ? 1 : 0);
+          const err=L.bad(v.sw), zero=s.cnt===0, en=tick && s.run && !zero;
+          const out={led_error:err, led_timeup:zero?1:0, running:s.run};
+          CNT_FORMATS["99.59"].names.forEach((n,k)=>out[n]=ptDigitsOf(s.cnt, L.mods)[k]);
+          const run=((s.run ^ (pr[1] && !err && !zero ? 1 : 0)) && !pr[0] && !pr[2] && !zero) ? 1 : 0;
+          const cnt=pr[2] ? 0 : (pr[0] && !err) ? ptValueOf(L.dig(v.sw), L.mods) : en ? (s.cnt+L.M-1)%L.M : s.cnt;
+          return {out, state:{c:d.c, t:d.t, pT:d.out, bc:e.c, bt:e.t, pB:e.out,
+            s0:bt?B.slice():s.s0, s1:bt?s.s0.slice():s.s1, run, cnt}}; }}; } },
+});
 const PARTS_SYSTEMS=Object.keys(PARTS).filter(k=>!PARTS_SYS_BEFORE.has(k));
 
 /* "ทำแลป 6", "digital counter 00-yy" → the whole system, from the agent and from build mode */
 {
   const _pf=partFromMessage;
   partFromMessage=function(msg){
-    const t=" "+String(msg||"").toLowerCase()+" ";
+    // a sheet NAMED lab6 ("… ตั้งชื่อแผ่น lab6") is not a request for lab 6
+    const t=" "+String(msg||"").toLowerCase().replace(/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?(?:ว่า\s*)?[`"'“]?[a-z_][a-z0-9_]*/g, " ")+" ";
     if(/(lab|แลป|แล็บ|แลบ|ใบงาน(?:ที่)?)\s*-?\s*0?6(?![\d.])|00\s*[-–]\s*yy|digital\s*counter|ตัวนับดิจิ(ทั|ตอ)ล/.test(t)
        && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
       const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
       return {kind:"lab6_counter", args:sm?{sheet:sm[1]}:{}, simple:true, named:[]};
+    }
+    if(/(lab|แลป|แล็บ|แลบ|ใบงาน(?:ที่)?)\s*-?\s*0?7(?![\d.])|count\s*-?\s*down\s*timer|ตัวจับเวลาถอยหลัง|นับเวลาถอยหลัง/.test(t)
+       && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
+      const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
+      return {kind:"lab7_countdown", args:sm?{sheet:sm[1]}:{}, simple:true, named:[]};
     }
     return _pf.apply(this, arguments);
   };
@@ -20302,6 +20571,15 @@ function oracleAttach(sch, o){
         const L=pm[side][b]||[], ok=L.some(x=>x.bit==null && x.width===w) || (w===1&&L.length) || L.filter(x=>x.bit!=null).length===w;
         if(!ok) miss.push(w>1?`${side} ${b}${w-1}..${b}0 (หรือบัส ${b}[${w-1}:0])`:`${side} ${b}`); }));
       if(miss.length) return {pass:false, reason:"ชื่อขาไม่ตรงกับที่ต้องมี: "+miss.join(", "), expected_ports:oraclePartPorts(sp.part, sp.params, false)};
+      // a part too slow to run clock by clock (lab 6: a count every 2 500 000 clocks) is checked on a small
+      // copy when it is built: a sheet still exactly as that generator drew it passes on that check
+      if(P.seq && P.seq(sp.params).small){
+        const how=sch.verified && String(sch.verified.how||"");
+        if(sheetVerified(sch) && how.startsWith(`part ${sp.part} ${JSON.stringify(sp.params)}`))
+          return {pass:true, checked:"drawn by the part's own generator, unchanged since — "+how.replace(/^part \S+ \{[^}]*\} — /,"")};
+        return {pass:null, reason:`${P.label}: ${JSON.stringify(sp.params)} runs too many clocks to compare one by one`,
+          hint:`build both at a small scale and compare those — e.g. build_part {kind:'${sp.part}', ${Object.entries(P.seq(sp.params).small).map(([k,v])=>k+":"+v).join(", ")}} on another sheet, then compare_sheets {with}`};
+      }
       try{ const v=P.seq ? partVerifySeq(sch, P, sp.params) : partVerifyComb(sch, P, sp.params);
         return {pass:v.pass, checked:v.method, mismatches:v.mismatch?[v.mismatch]:[], total_mismatches:v.pass?0:1, reason:v.pass?undefined:"ไม่ตรงกับโมเดลอ้างอิง: "+JSON.stringify(v.mismatch)}; }
       catch(e){ return {pass:false, reason:String(e&&e.message||e)}; }
@@ -20329,6 +20607,17 @@ function oracleAttach(sch, o){
     if(r && oracleIsRequestSpec(sch)){ r.independent=true; r.source="request"; delete r.warning;
       if(r.pass){ sheetVerifyStamp(sch, "spec from the request ("+(sch.specWhat||sch.spec.kind)+") — "+r.checked);
         if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดจากคำขอ (${r.checked})`; } }
+    // set from the request BEFORE the circuit, then built from it: the same text is what is expected
+    // (the build follows the spec), not a check written from the circuit afterwards. What is left to
+    // confirm is that the spec reads the request right — the answer shows it to the user.
+    // (also when a wrong circuit was there first: the spec came from the request, then the circuit was
+    // rebuilt from it — what matters is that the spec is older than the build it checks)
+    else if(r && r.independent===false && sch && (sch.specSource==="spec-first"
+            || (sch.specAt && sch.builtFrom && sch.builtFrom.at && sch.specAt < sch.builtFrom.at))){
+      r.independent=true; r.source="spec-first"; delete r.warning;
+      r.note="built from the spec you set from the request first — confirm the spec says what the request says";
+      if(r.pass){ sheetVerifyStamp(sch, "spec set from the request before the circuit — "+r.checked);
+        if(sch.specResult) sch.specResult.summary=`✓ ผ่านข้อกำหนดที่ตั้งจากคำขอก่อนสร้าง (${r.checked})`; } }
     return r;
   };
   const _sd=specDescribe;
@@ -20343,7 +20632,7 @@ function oracleAttach(sch, o){
   MCP_OPS.set_spec=a=>{
     const s0=a.sheet && aifSheetByName(a.sheet), first=!s0 || !s0.components.some(c=>c.type!=="JUNCTION");
     const r=_ss(a), sch=aifSheetByName(r.sheet);
-    if(sch){ sch.specSource=first?"spec-first":"after-build"; delete sch.specSig; }
+    if(sch){ sch.specSource=first?"spec-first":"after-build"; sch.specAt=aifTick(); delete sch.specSig; }
     if(r && r.result && sch) r.result.spec_source=sch.specSource;
     return r;
   };
@@ -20388,6 +20677,20 @@ function aiagVerdict(run){
   if(run.verified) return `\n\n✓ ตรวจโดยโปรแกรม: แผ่น ${run.verified.sheet} ผ่าน${run.verified.how}${run.verified.checked?" — "+run.verified.checked:""}`;
   if(run.touched && run.touched.size) return `\n\n⚠ โปรแกรมยังไม่ได้ยืนยันแผ่น ${[...run.touched].join(", ")} กับข้อกำหนดที่เป็นอิสระจากวงจร — โปรดเทียบกับใบงาน`;
   return "";
+}
+/* "cout = a + b + cin" on one-bit ports is an OR (the course's notation) — right, but not what someone
+   meaning addition expects: say so wherever such a formula comes in */
+function oraclePlusWarning(text){
+  const t=String(text||"");
+  if(!/\+/.test(t) || /\{[^}]*\}\s*=/.test(t)) return null;
+  return "'+' here is OR (boolean). For addition write the outputs as one number: {cout,s} = a + b + cin (or name the part: 'full adder', '4-bit adder')";
+}
+{
+  const _ds=MCP_OPS.derive_spec;
+  MCP_OPS.derive_spec=a=>{ const r=_ds(a); const w=r.spec&&r.spec.kind==="formula"&&oraclePlusWarning(r.spec.text); if(w) r.warning=w; return r; };
+  const _ss=MCP_OPS.set_spec;
+  MCP_OPS.set_spec=a=>{ const r=_ss(a); const w=a.formula!=null&&oraclePlusWarning(Array.isArray(a.formula)?a.formula.join("; "):a.formula);
+    if(w && !(r.result&&r.result.pass)) r.warning=w; return r; };
 }
 
 /* ===== 37. build_hierarchy: a top sheet from a block list, wired in one go ===========================
@@ -20443,6 +20746,7 @@ MCP_OPS.build_hierarchy = async a=>{
     if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
     let sub=null;
     if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+      try{ partCheckArgs(b.part, b.params||{}); }catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); }
       try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
       catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
     else if(b.sheet || b.module){ const want=String(b.sheet||b.module).toLowerCase(); sub=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
@@ -20472,7 +20776,9 @@ MCP_OPS.build_hierarchy = async a=>{
     const bk=B[m[1].toLowerCase()]; if(!bk) fail(`no block '${m[1]}'`, "blocks: "+Object.values(B).map(x=>x.name).join(", "));
     const g=bk.pins[m[2].toLowerCase()];
     if(!g) fail(`block ${bk.name} (${bk.sub.name}) has no pin '${m[2]}'`, "its pins: "+Object.values(bk.pins).filter(x=>x.bits).map(x=>x.dir+" "+x.name+(x.width>1?`[${x.width-1}:0]`:"")).join(", "));
-    if(!g.bits) fail(`block ${bk.name}: pin '${g.name}' is a bus port — wire its bits on a sheet with per-bit pins`, `rebuild ${bk.sub.name} without bus:true`);
+    // a block's BUS pin (a module built with bus:true): its bits are wired through bus taps after drawing
+    if(!g.bits) return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>{ const r=`${bk.name}.${g.name}[${i}]`;
+      return g.dir==="in" ? {key:r, blk:bk.name, bus:true} : {ref:r, bus:true}; })};
     return {kind:g.dir==="in"?"sink":"src", label:s, bits:slice(g.width, lo, hi, s).map(i=>g.dir==="in" ? {key:bk.name+"."+g.bits[i], blk:bk.name, pin:g.bits[i]} : {ref:bk.name+"."+g.bits[i]})};
   };
   const drive={}, how={};                       // sink key → source ref (or {c:"GND"})
@@ -20505,10 +20811,13 @@ MCP_OPS.build_hierarchy = async a=>{
   ins.forEach(p=>{ for(let i=0;i<p.width;i++) t.IN(bitName(p,i)); });
   Object.values(B).forEach(bk=>t.components.push({id:bk.name, type:"block:"+bk.sub.name}));
   const srcRef=s=>s.c ? t.X(s.c) : s.ref;
-  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return; t.W(srcRef(s), k); });
+  const viaTaps=[];                             // [from, to] that touch a block's bus pin: connect after drawing
+  Object.entries(drive).forEach(([k,s])=>{ if(k.startsWith("o:")) return;
+    if(s.bus || /\[\d+\]$/.test(k)) viaTaps.push([srcRef(s), k]); else t.W(srcRef(s), k); });
   const undriven=[];
   outs.forEach(p=>{ for(let i=0;i<p.width;i++){ const bn=bitName(p,i), s=drive["o:"+bn];
-    if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
+    if(s && s.bus){ t.components.push({id:"o_"+bn, type:"OUT", name:bn}); viaTaps.push([s.ref, "o_"+bn]); }
+    else if(s) t.OUT(bn, srcRef(s)); else { t.components.push({id:"o_"+bn, type:"OUT", name:bn}); undriven.push(bn); } } });
   const it={module:t.module, components:t.components, nets:t.nets};
   const v=validateIntent(it);
   if(!v.ok) fail("could not assemble: "+v.errors.slice(0,4).map(e=>e.msg).join("; "));
@@ -20517,8 +20826,22 @@ MCP_OPS.build_hierarchy = async a=>{
   let sch=dr.sch;
   sch.components.forEach(c=>{ if(B[String(c.id).toLowerCase()]) c.label=B[String(c.id).toLowerCase()].name; });
   sch.portOrder={in:ins.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i))), out:outs.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i)))};
-  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name);
-  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }catch(e){ console.warn("busify", e); } }
+  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[], tapOf={};
+  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses).forEach(m=>(m.taps||[]).forEach(([c,t])=>tapOf[c]=t)); }
+    catch(e){ warnings.push(`bus ports ${buses.join(", ")} stay as single bits (${buses.map(b=>b+"0…").join(", ")}): ${e.message}`); } }
+  // bits of block BUS pins: a merge / split tap per bit (21), joined to the port's own tap when it became a bus
+  if(viaTaps.length){
+    const ref=r=>tapOf[r] ? tapOf[r]+".y" : r;
+    try{ const was=MCPB.inBatch; MCPB.inBatch=true;
+      try{ MCP_OPS.connect({sheet:sch.name, connections:viaTaps.map(([f,t])=>[ref(f), ref(t)])}); } finally{ MCPB.inBatch=was; } }
+    catch(e){ delete P[sch.id]; fail(`could not wire the bus pins: ${e.message}`, e.hint); } }
+  // every declared port is on the sheet — as a bus port, or as all its bits — before this says "done"
+  const portsOn=new Map(sch.components.filter(c=>c.type==="IN"||c.type==="OUT").map(c=>[String(c.params.name).toLowerCase(), c]));
+  const missing=[...ins.map(p=>[p,"IN"]), ...outs.map(p=>[p,"OUT"])].filter(([p,T])=>{
+    const bus=portsOn.get(p.name.toLowerCase());
+    if(bus && bus.type===T && (bus.params.width||1)===p.width) return false;
+    return !Array.from({length:p.width},(_,i)=>portsOn.get(bitName(p,i).toLowerCase())).every(c=>c && c.type===T); }).map(([p])=>p.name);
+  if(missing.length){ delete P[sch.id]; fail(`ports ${missing.join(", ")} did not come out on the sheet — nothing was changed`, "report this; meanwhile declare them as single bits (an0, an1, …)"); }
   if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
     ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
   else sch.name=uniqueSchName(topName, sch.id);
@@ -20526,11 +20849,14 @@ MCP_OPS.build_hierarchy = async a=>{
   if(a.top) state.project.topId=sch.id;
   openSchTab(sch.id); mcpActivity("ประกอบ "+sch.name+" จาก "+blocks.length+" บล็อก"); mcpCommit(sch); try{ zoomFit(); }catch(_){}
   // 5. what is still open
-  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in" && g.bits).forEach(g=>{
+  const open=[]; Object.values(B).forEach(bk=>Object.values(bk.pins).filter(g=>g.dir==="in").forEach(g=>{
+    if(!g.bits){ const miss=Array.from({length:g.width},(_,i)=>i).filter(i=>!drive[`${bk.name}.${g.name}[${i}]`]);
+      if(miss.length) open.push(`${bk.name}.${g.name}`+(miss.length<g.width?` (bits ${miss.join(",")})`:"")); return; }
     const miss=g.bits.filter(b=>!drive[bk.name+"."+b]); if(miss.length) open.push(`${bk.name}.${g.name}`+(g.width>1&&miss.length<g.width?` (bits ${miss.map(b=>g.bits.indexOf(b)).join(",")})`:"")); }));
   let chk=null; try{ const c=MCP_OPS.check({sheet:sch.name}); chk={errors:c.errors, warnings:c.warnings}; }catch(_){}
   return {sheet:sch.name, blocks:Object.values(B).map(bk=>({name:bk.name, sheet:bk.sub.name, verified:sheetVerified(bk.sub)})),
     connected_bits:Object.keys(drive).length, auto_connected:auto, unconnected_block_inputs:open, undriven_outputs:undriven, check:chk,
+    ...(warnings.length?{warnings}:{}),
     note:open.length||undriven.length ? "draw the rest with another build_hierarchy {replace:true} (whole plan) or connect" : "every block input and output is wired"};
 };
 
@@ -20687,6 +21013,33 @@ function drcSheet(sch){
   Object.entries(into).forEach(([k,S])=>{ if(S.size<2) return; const [cid,pid]=k.split("|"), c=comp(cid,sch);
     if(!c || c.type==="JUNCTION" || c.type==="BUSTAP") return;
     add("err", `${name(c)} ขา '${pid}' รับสายจาก ${S.size} เส้นที่ต่างกัน (multi-driver)`, cid); });
+  // a net something reads but nothing drives — e.g. an OUTPUT fed by bus taps whose bit side is open
+  // (lab 7: "an" looked wired and check said 0/0, yet the VHDL had no driver for it)
+  try{
+    const netOf=new Map();                      // "cid|pid" → net key
+    sch.wires.forEach(w=>{ const k=netKey(sch, w); [w.from, w.to].forEach(ep=>netOf.set(ep.cid+"|"+ep.pid, k)); });
+    const ends=new Map();                       // net key → [{c, p}]
+    sch.wires.forEach(w=>{ const k=netKey(sch, w); [w.from, w.to].forEach(ep=>{ const c=comp(ep.cid,sch); if(!c||c.type==="JUNCTION") return;
+      const p=getPorts(c).find(q=>q.id===ep.pid); if(!p) return; const L=ends.get(k)||[]; if(!L.some(e=>e.c===c&&e.p.id===p.id)) L.push({c,p}); ends.set(k,L); }); });
+    const memo=new Map();
+    const driven=(k, seen)=>{ if(memo.has(k)) return memo.get(k); if(seen.has(k)) return false; seen.add(k);
+      const ok=(ends.get(k)||[]).some(({c,p})=>{
+        if(c.type==="BUSTAP"){                    // a tap passes on what reaches its other side: split d → y, merge y → d
+          const merge=(c.params||{}).mode==="merge", outPin=merge?"d":"y", inPin=merge?"y":"d";
+          if(p.id!==outPin) return false;
+          const k2=netOf.get(c.id+"|"+inPin); return k2!=null && driven(k2, seen); }
+        return p.dir==="out"; });
+      memo.set(k, ok); return ok; };
+    ends.forEach((L, k)=>{ if(driven(k, new Set())) return;
+      L.filter(({c,p})=>p.dir==="in" && c.type!=="BUSTAP").forEach(({c,p})=>
+        add("err", c.type==="OUT" ? `${name(c)} ต่อสายแล้ว แต่สายนั้นไม่มีอะไรขับ (ไม่มีต้นทาง) — ค่าจะเป็น 0 ตลอด`
+                                  : `${name(c)} ขา '${p.id}' ต่อสายแล้ว แต่สายนั้นไม่มีอะไรขับ (ไม่มีต้นทาง)`, c.id)); });
+  }catch(e){ console.warn("drc undriven", e); }
+  // a pin kept for a port that is no longer on the sheet: it holds a board pin another port may need
+  try{ const live=new Set(uxPortBits(sch).map(b=>b.key.toLowerCase()));
+    const stale=Object.keys(sch.pinmap||{}).filter(k=>!live.has(k.toLowerCase()));
+    if(stale.length) add("warn", `ขาบอร์ดของพอร์ตที่ไม่มีแล้ว: ${stale.map(k=>k+" → "+sch.pinmap[k]).join(", ")} — ลบด้วย set_pins {map:{"${stale[0]}": null}} หรือหน้า ลงบอร์ด`, null);
+  }catch(_){}
   // logic that goes nowhere, INPUTs nothing reads
   sch.components.forEach(c=>{
     if(DRC_SKIP.has(c.type)) return;
@@ -20706,12 +21059,14 @@ function netKey(sch, w){ try{ return [...netWires(sch, w)].sort()[0]; }catch(_){
     const base=_q.apply(this, arguments)||[];
     const extra=[]; Object.values(state.project.schematics).forEach(s=>{ try{ extra.push(...drcSheet(s)); }catch(_){} });
     // what the editor already says stays as it is: no second message for the same pin / part
-    const dup=i=>base.some(b=>b.schId===i.schId && b.cid && b.cid===i.cid && (/multi-driver|สายเข้าซ้อน/.test(b.msg)===/multi-driver/.test(i.msg)));
+    const dup=i=>base.some(b=>b.schId===i.schId && b.cid && b.cid===i.cid && (/ไม่มีต้นทาง/.test(i.msg) ? /ลอย|ไม่มีต้นทาง|ยังไม่ได้ต่อ/.test(b.msg)
+      : /multi-driver|สายเข้าซ้อน/.test(b.msg)===/multi-driver/.test(i.msg)));
     return base.concat(extra.filter(i=>!dup(i)));
   };
   const _fix=issueFix;
   issueFix=function(m){
     if(/ต้นทาง \d+ ตัว|รับสายจาก \d+ เส้น/.test(m)) return _fix("multi-driver");
+    if(/ไม่มีอะไรขับ/.test(m)) return "หาว่าสายเส้นนี้ควรมาจากเอาต์พุตไหน แล้วต่อจากขานั้น — ถ้าเป็นบัส ดูว่า bus tap ทุกบิตมีสายเข้า";
     if(/INPUT .* ไม่ได้ต่อไปไหน/.test(m)) return "ต่อ INPUT นี้เข้ากับเกตที่ควรใช้ค่านี้ หรือลบทิ้งถ้าไม่ได้ใช้";
     if(/ไม่ได้ต่อไปไหน/.test(m)) return "ต่อเอาต์พุตนี้ไปยังที่ที่ต้องใช้ (เกตถัดไปหรือ OUTPUT) หรือลบเกตนี้ถ้าไม่ต้องการ";
     return _fix.apply(this, arguments);
@@ -20780,7 +21135,8 @@ function eqSheets(A, B, opts){
 function eqAgainst(sch, spec){
   const keep={spec:sch.spec, specResult:sch.specResult, verified:sch.verified, specSource:sch.specSource, specSig:sch.specSig};
   try{ sch.spec=spec; delete sch.specResult; const r=specCheck(sch) || {pass:false, reason:"ตรวจไม่ได้"};
-    return {equivalent:r.pass===true, method:r.checked, reason:r.reason, differences:(r.mismatches||[]).length?r.mismatches:undefined, total_differences:r.total_mismatches||undefined}; }
+    return {equivalent:r.pass===true ? true : r.pass===null ? null : false, method:r.checked, reason:r.reason, hint:r.hint,
+      differences:(r.mismatches||[]).length?r.mismatches:undefined, total_differences:r.total_mismatches||undefined}; }
   finally{ Object.entries(keep).forEach(([k,v])=>{ if(v===undefined) delete sch[k]; else sch[k]=v; }); }
 }
 MCP_OPS.compare_sheets = a=>{
@@ -20893,8 +21249,12 @@ const LAB_PIN_PRESETS={
   "7":{title:"แลป 7 ตัวจับเวลา mm.ss", rules:[
     {re:/min_?hi|min_?tens|m_?hi|^mt$/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/min_?lo|min_?ones|m_?lo|^mo$/i, dir:"in", t:i=>"sw:"+(8+i)},
     {re:/sec_?hi|sec_?tens|s_?hi|^st$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/sec_?lo|sec_?ones|s_?lo|^so$/i, dir:"in", t:i=>"sw:"+i},
-    {re:/start|stop|btn|^ss$|run/i, dir:"in", t:()=>"pb:4"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:1"},
-    {re:/err/i, dir:"out", t:()=>"led:0"}]},
+    // the lab 7 sheet: SET = J14 (pb 2, left), START/STOP = J13 (pb 0, top), RESET = J12 (pb 4, centre),
+    // the start time on SW[15:0], LED error = K12 (led 0), LED time-up = M12 (led 1)
+    {re:/^(set|load|set_?btn|btn_?set)$/i, dir:"in", t:()=>"pb:2"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:4"},
+    {re:/start|stop|btn|^ss$|run|toggle/i, dir:"in", t:()=>"pb:0"},
+    {re:/^(sw|sws|switch(es)?|time_?in|t_?in|preset|din|start_?time)$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/err/i, dir:"out", t:()=>"led:0"}, {re:/time_?up|timeup|t_?up|done|zero|finish/i, dir:"out", t:()=>"led:1"}]},
   "8":{title:"แลป 8 ตัวเลข 4 หลักจาก SW15–0", rules:[
     {re:/thousands|d3|dig3/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/hundreds|d2|dig2/i, dir:"in", t:i=>"sw:"+(8+i)},
     {re:/tens|d1|dig1/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|d0|dig0/i, dir:"in", t:i=>"sw:"+i}]},
@@ -21101,6 +21461,7 @@ MCP_OPS.update_module = a=>{
   const _use=MCP_OPS.use_module;
   MCP_OPS.use_module=a=>{
     if(!moduleFind(a.module) && PARTS[a.module]){
+      partCheckArgs(a.module, a.params||{});
       const target=mcpUse(a.sheet); mcpBeforeChange("วาง "+a.module);
       const sn=ptSub(a.module, a.params||{}), sub=Object.values(state.project.schematics).find(s=>s.name===sn);
       const why=subBlockBlockedWhy(sub.id, target.id); if(why) mcpFail(why);
@@ -21221,6 +21582,178 @@ function ptagInfo(sch){
     let r=_ev(a);
     while(!r.events.length && Date.now()<until){ await new Promise(res=>setTimeout(res, 250)); r=_ev({since}); }
     return r;
+  };
+}
+
+/* ===== 46. "Make Y out of N × X": a composition is built from blocks, not taken from the library ====
+   Found while generating training data: partFromMessage read "เอาตัวบวก 4 บิต 2 ตัวมาต่อเป็นตัวบวก 8 บิต"
+   as a 4-bit adder, "ต่อ mux 2:1 สามตัวเป็น mux 4:1" as a 2:1 mux and "ต่อ full adder แบบ ripple carry
+   2 ตัว" as one full adder — and the agent's fast path / build mode drew that part at once. The user
+   asked for the structure (a lab exercise in cascading blocks), and the size was wrong as well.
+   Now a request that names how many blocks to use is a composition:
+     - the target (the words after "เป็น", "ตัวบวก 8 บิต") is what partFromMessage reads — so the oracle
+       (36) derives the right acceptance test;
+     - nothing is built before the model: the agent wires the blocks with build_hierarchy (the prompt
+       says so), build mode leaves it to the model. */
+const COMPOSE_N = "(?:\\d+|หนึ่ง|สอง|สาม|สี่|ห้า|หก|เจ็ด|แปด)";
+function composeTarget(msg){
+  const t=String(msg||"");
+  const many=new RegExp(COMPOSE_N+"\\s*ตัว").test(t) || /\b(?:two|three|four|eight|\d+)\s+(?:full|half|mux|adders?|blocks?)/i.test(t);
+  const build=/(ต่อ|ใช้|จาก|ประกอบ|cascade|ripple|\bfrom\b|\busing\b)/i.test(t);
+  if(!many || !build) return null;
+  // "… ต่อเป็น Y", "… into Y" — or "ประกอบ / สร้าง Y จาก X N ตัว", "Y from N X"
+  // "… ต่อเป็น Y", "… N ตัวสร้าง / ทำ Y", "… into Y" — or "ประกอบ / สร้าง Y จาก X N ตัว", "Y from N X";
+  // a sheet named at the end ("ลงแผ่น lab6") is not part of Y
+  const u=t.replace(/\s*(?:ลง|บน|ใส่ใน|ไว้ใน|ใน)?\s*(?:ตั้งชื่อ)?\s*(?:แผ่น|ชีต|ชีท|sheet)\s*(?:ชื่อ|ว่า)?\s*[`"'“]?[A-Za-z_]\w*[`"'”]?\s*$/i, "");
+  const m=/(?:มา)?(?:ต่อ)?(?:กัน)?เป็น\s*(.+)$/.exec(u) || /ตัว\s*(?:มา)?(?:สร้าง|ทำ|ประกอบ)(?:เป็น)?\s*(.+)$/.exec(u)
+       || /\b(?:into|to make|as)\s+(?:an?\s+)?(.+)$/i.exec(u)
+       || /^(?:ช่วย)?(?:ประกอบ|สร้าง|ทำ|ออกแบบ)\s*(.+?)\s*(?:จาก|โดยใช้|ด้วย)/.exec(u) || /^(?:build|make)\s+(?:an?\s+)?(.+?)\s+(?:from|using|out of)\b/i.exec(u);
+  return {target: m ? m[1].trim() : null};
+}
+{
+  const _pfm=partFromMessage;
+  partFromMessage=function(msg){
+    const c=composeTarget(msg);
+    if(!c) return _pfm.apply(this, arguments);
+    if(!c.target) return null;                     // "ต่อ full adder 2 ตัว": no target named — the model decides
+    const r=_pfm.call(this, c.target);
+    return r ? Object.assign({}, r, {simple:false, compose:true}) : null;
+  };
+  const _fast=aiagFastPath;
+  aiagFastPath=async function(msg, run){
+    const c=composeTarget(msg);
+    if(c) return {note:"\n\n(system) This request asks for a structure made of blocks"+(c.target?` (the result: ${c.target})`:"")
+      +": place each block as a library part in ONE build_hierarchy call (blocks + top ports + connections by name) — do not build_part the whole thing."};
+    return _fast.apply(this, arguments);
+  };
+}
+
+/* ===== 47. What a small model gets almost right is taken as meant ==================================
+   From the baseline eval of Qwen3.5-4B (60 held-out tasks, 45 % passed): a quarter of its tool calls
+   failed, mostly on details the app can read without guessing —
+     - build_circuit / build_part answered "could not draw: [object Object]" (the error objects were
+       never turned into text, so the model could not see what was wrong — 30 calls);
+     - build_fsm got the diagram object as a JSON *string* (every FSM task failed from there), and
+       conditions written "a=0" / "a=1";
+     - intent component types "input" / "OUTPUT" / "Input" for IN / OUT;
+     - set_pins targets "LED:14", "led[3]", "SW3", "led 3" for led:14 / sw:3 — and the hint pointed at a
+       tool (board_pins) the agent does not have;
+     - truth_table / set_spec `ones` as a bare list when there is one output;
+     - generator {kind:"adder"} and add_component type "adder" for a library part.
+   Each is read as what it plainly means; anything else still fails with a hint the agent can act on. */
+
+/* ---- error objects → readable text ---- */
+{
+  const _d=aiDrawIntent;
+  aiDrawIntent=function(intent, opts){
+    intent=agrNormIntent(intent);
+    const r=_d.call(this, intent, opts);
+    if(r && !r.ok && Array.isArray(r.errors)) r.errors=r.errors.map(e=>e && typeof e==="object" ? [e.msg||e.message||e.code, e.hint].filter(Boolean).join(" — ") : e);
+    return r;
+  };
+}
+/* "input" / "Output" / "INPUT" / "and" → IN / OUT / AND; IN / OUT without a name are named by their id */
+function agrNormIntent(it){
+  if(!it || typeof it!=="object" || !Array.isArray(it.components)) return it;
+  const ALIAS={INPUT:"IN", INPUTS:"IN", OUTPUT:"OUT", OUTPUTS:"OUT", INPORT:"IN", OUTPORT:"OUT", INV:"NOT", INVERTER:"NOT", BUFFER:"BUF"};
+  return Object.assign({}, it, {components:it.components.map(c=>{
+    if(!c || typeof c.type!=="string" || /^block:/i.test(c.type)) return c;
+    let T=c.type.trim().toUpperCase(); T=ALIAS[T]||T;
+    const o=Object.assign({}, c, {type:(typeof TYPES!=="undefined" && TYPES[T]) ? T : c.type});
+    if((o.type==="IN"||o.type==="OUT") && !o.name) o.name=o.id;
+    return o; })});
+}
+
+/* ---- build_fsm: a JSON string of the diagram object; "x=1" / "x=0" / "x==1" in a condition ---- */
+{
+  const _p=fsmParse;
+  fsmParse=function(src){
+    if(typeof src==="string" && /^\s*\{/.test(src)){
+      try{ src=JSON.parse(src); }
+      catch(_){ try{ src=JSON.parse(src.replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":')); }catch(_){} }   // {inputs: […]} — keys unquoted
+    }
+    if(src && typeof src==="object" && Array.isArray(src.states)){
+      // a state's output written "out": 1 / "out": "hit=1" — taken for the one output (it used to be dropped,
+      // so a Moore detector could never say 1)
+      const outs=Array.isArray(src.outputs) ? src.outputs : (typeof src.outputs==="string" ? src.outputs.split(/[\s,]+/).filter(Boolean) : []);
+      src=Object.assign({}, src, {states:src.states.map(st=>{
+        if(!st || typeof st!=="object") return st;
+        let o=st.out!=null ? st.out : st.outputs;
+        if(typeof o==="number" || typeof o==="boolean"){ if(outs.length===1) o={[outs[0]]:+o}; }
+        else if(typeof o==="string") o=fsmAssigns(o.replace(/\s*=\s*/g, "="));
+        return Object.assign({}, st, {out:o}); })});
+    }
+    if(typeof src==="string") src=src.split(/\n|;/).map(agrFsmLine).join("\n");
+    else if(src && typeof src==="object" && Array.isArray(src.transitions))
+      src=Object.assign({}, src, {transitions:src.transitions.map(t=>t && typeof t.when==="string" ? Object.assign({}, t, {when:agrFsmCond(t.when)}) : t)});
+    return _p.call(this, src);
+  };
+}
+function agrFsmCond(c){ return String(c).replace(/\b([A-Za-z_]\w*)\s*==?\s*1\b/g, "$1").replace(/\b([A-Za-z_]\w*)\s*==?\s*0\b/g, "~$1"); }
+function agrFsmLine(l){
+  const m=/^(\s*\w+\s*-+>\s*\w+\s*(?:when|if|on|:)\s*)([^/]*)(\/.*)?$/i.exec(l);   // only the condition, never "/ z=1"
+  return m ? m[1]+agrFsmCond(m[2])+(m[3]||"") : l;
+}
+
+/* ---- set_pins: the target spellings people and models use ---- */
+function agrPinTarget(t){
+  if(typeof t!=="string") return t;
+  const s=t.trim().toLowerCase().replace(/\s+/g, "");
+  if(/^(clk|clock|clk50|clk_50m|50mhz)$/.test(s)) return "clk";
+  let m=/^(sw|switch|สวิตช์|led|pb|btn|button|ปุ่ม|an|digit|หลัก)[:_\-\[(]?(\d+)[\])]?$/.exec(s);
+  if(m) return ({switch:"sw", "สวิตช์":"sw", btn:"pb", button:"pb", "ปุ่ม":"pb", digit:"an", "หลัก":"an"}[m[1]]||m[1])+":"+(+m[2]);
+  m=/^(?:seg|7seg|segment)[:_\-\[(]?([a-g]|dp)[\])]?$/.exec(s);
+  if(m) return "seg:"+m[1];
+  return t;
+}
+{
+  const _sp=MCP_OPS.set_pins;
+  MCP_OPS.set_pins=a=>{
+    const map={}; Object.entries((a&&a.map)||{}).forEach(([k,v])=>{ map[k]=agrPinTarget(v); });
+    try{ return _sp(Object.assign({}, a, {map})); }
+    catch(e){
+      if(/is not a valid (input|output) target/.test(String(e.message)))
+        mcpFail(e.message, "targets: inputs sw:0–sw:15, pb:0–pb:4 (top bottom left right center), clk · outputs led:0–led:15, seg:a–seg:g, seg:dp, an:0–an:3 — e.g. {\"a\":\"sw:0\", \"y\":\"led:3\"}");
+      throw e;
+    }
+  };
+}
+
+/* ---- ones as a bare list (one output); a library part asked for as a generator / component type ---- */
+function agrOnes(t, outs){
+  if(!t || !Array.isArray(t.ones)) return t;
+  const o=(Array.isArray(t.outputs) && t.outputs.length===1) ? t.outputs[0] : (outs && outs.length===1 ? outs[0] : null);
+  if(!o) mcpFail("ones as a list needs the one output's name", 'write ones:{y:[1,5,9]} (the rows where y is 1), or add outputs:["y"]');
+  return Object.assign({}, t, {ones:{[o]:t.ones}, outputs:t.outputs||[o]});
+}
+{
+  const _bc=MCP_OPS.build_circuit;
+  MCP_OPS.build_circuit=async a=>{
+    a=Object.assign({}, a);
+    if(a.truth_table) a.truth_table=agrOnes(a.truth_table);
+    const g=a.generator, kind=g && String(g.kind||"");
+    if(kind && typeof PARTS==="object" && PARTS[kind] && !["clock_divider","jk_counter","mod_counter","shift_register","register"].includes(kind)){
+      const args=Object.assign({}, g, {kind}); if(a.sheet||a.name) args.sheet=a.sheet||a.name; if(a.replace) args.replace=true;
+      const r=await MCP_OPS.build_part(args);
+      return Object.assign({}, r, {note:(r.note?r.note+" · ":"")+`'${kind}' is a library part — built with build_part (next time call build_part {kind:'${kind}'} directly)`});
+    }
+    return _bc(a);
+  };
+  const _ss=MCP_OPS.set_spec;
+  MCP_OPS.set_spec=a=>{
+    a=Object.assign({}, a);
+    if(a.table && Array.isArray(a.table.ones)){
+      let outs=null; try{ const s=a.sheet && aifSheetByName(a.sheet); if(s) outs=s.components.filter(c=>c.type==="OUT").map(c=>c.params.name); }catch(_){}
+      a.table=agrOnes(a.table, outs);
+    }
+    return _ss(a);
+  };
+  const _ac=MCP_OPS.add_component;
+  MCP_OPS.add_component=a=>{
+    const k=a && String(a.type||"").toLowerCase();
+    if(k && typeof PARTS==="object" && PARTS[k])
+      mcpFail(`'${a.type}' is a library part, not a gate`, `build_part {kind:'${k}', sheet:'<new sheet>'} makes it (checked), then add_component {type:'block:<that sheet>'} places it — or use build_hierarchy with blocks:[{name, part:'${k}'}]`);
+    return _ac(a);
   };
 }
 

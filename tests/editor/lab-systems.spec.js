@@ -47,3 +47,22 @@ test("chat routing: 'ทำแลป 6' is the lab 6 part; a question about an i
   expect(r.asked).toEqual(["ทำไมตัวนับต้องมีตัวหารความถี่?", "JK กับ D flip-flop เลือกตัวไหนทำตัวนับ"]);
   expect(r.diag).toBe(1);
 });
+
+test("compare_sheets on the lab 6 system: the generator's own sheet passes, an edited one is answered, not a crash", async ({ page }) => {
+  test.setTimeout(200000);
+  await openEditor(page);
+  const r = await page.evaluate(() => {
+    MCP_OPS.build_part({ kind: "lab6_counter", sheet: "l6top" });
+    const same = MCP_OPS.compare_sheets({ sheet: "l6top", part: "lab6_counter" });
+    const s = Object.values(state.project.schematics).find(x => x.name === "l6top");
+    s.wires.pop();                                            // a real edit: no longer the generator's circuit
+    const edited = MCP_OPS.compare_sheets({ sheet: "l6top", part: "lab6_counter" });
+    const plus = MCP_OPS.derive_spec({ request: "cout = a + b + cin" });
+    return { same, edited, plus: plus.warning };
+  });
+  expect(r.same.equivalent, JSON.stringify(r.same)).toBe(true);
+  expect(r.edited.equivalent).toBe(null);
+  expect(r.edited.reason).toMatch(/too many clocks/);
+  expect(r.edited.hint).toMatch(/tick:4/);
+  expect(r.plus).toMatch(/\{cout,s\}/);
+});

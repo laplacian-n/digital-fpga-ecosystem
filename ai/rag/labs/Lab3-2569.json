@@ -22,10 +22,10 @@
       ],
       "topic": "kmap|boolean-simplification|truth-table",
       "solution": {
-        "steps": "วางลง K-map 4 ตัวแปร (a=MSB..d=LSB), ใส่ 1 ที่ minterm, X ที่ don't-care {0,1,5,6,7}, จับกลุ่มใหญ่สุดโดยใช้ X ช่วย:\n- a'=1 ครอบ 0..7 (minterm 2,3,4 + dc 0,1,5,6,7 ทั้งหมดอยู่ครึ่ง a=0) -> พจน์ a'\n- กลุ่ม b·d ครอบ 13,15 (+dc)\n- กลุ่ม b·c' ครอบ 12,13\n- กลุ่ม b'·c'·d' ครอบ 10 (กับ 2 ใน a')\nได้ SOP ต่ำสุด",
+        "steps": "วางลง K-map 4 ตัวแปร (a=MSB..d=LSB), ใส่ 1 ที่ minterm, X ที่ don't-care {0,1,5,6,7}, จับกลุ่มใหญ่สุดโดยใช้ X ช่วย:\n- a'=1 ครอบ 0..7 (minterm 2,3,4 + dc 0,1,5,6,7 ทั้งหมดอยู่ครึ่ง a=0) -> พจน์ a'\n- กลุ่ม b·d ครอบ 13,15 (+dc)\n- กลุ่ม b·c' ครอบ 12,13\n- กลุ่ม b'·c·d' ครอบ 2,10 (10 = 1010 มี c = 1)\nได้ SOP ต่ำสุด",
         "truth_table": "16 แถว: f=1 ที่ {2,3,4,10,12,13,15}; X ที่ {0,1,5,6,7}; f=0 ที่ {8,9,11,14}",
         "kmap": "ใช้ don't-care {0,1,5,6,7} ช่วยขยายกลุ่ม -> พจน์ a' คลุมทั้งครึ่งบน",
-        "final_expression": "f = a' + b*d + b*c' + b'*c'*d'",
+        "final_expression": "f = a' + b*d + b*c' + b'*c*d'",
         "intent_json": {
           "module": "lab3_f",
           "components": [
@@ -125,7 +125,7 @@
               "to": "t4"
             },
             {
-              "from": "nc",
+              "from": "c",
               "to": "t4"
             },
             {

@@ -54,3 +54,28 @@ test("a formula spec on per-bit ports: a0..a3 is the number a, s0..s3 the number
   expect(r.badN).toBeGreaterThan(0);
   expect(r.bit).toBe(true);
 });
+
+test("xnor / nand / nor in equations (also Thai เอ็กซ์นอร์), and a table too big to draw is refused at once", async ({ page }) => {
+  test.setTimeout(120000);
+  await openEditor(page);
+  const r = await page.evaluate(async () => {
+    const F = formulaTable("z = (a xnor b) & (c & ~d); n = a nand b; o = c nor d; q = a ⊙ b");
+    const o = oracleDerive("สร้าง z = (a เอ็กซ์นอร์ b) และ (c และ ไม่ d)");
+    await MCP_OPS.build_circuit({ name: "xn", formula: "z = (a XNOR b) & (c & ~d)" });
+    const chk = MCP_OPS.derive_spec({ request: "z = (a XNOR b) & (c & ~d)", sheet: "xn" }).result;
+    let col = "", s = 7; for (let i = 0; i < 1024; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; col += (s >> 16) & 1; }
+    const t0 = performance.now(); let err = "";
+    try { await MCP_OPS.build_circuit({ name: "big", truth_table: { inputs: "abcdefghij".split(""), outputs: ["y"], columns: { y: col } } }); } catch (e) { err = e.message; }
+    return { z: F.cols.z, n: F.cols.n, o: F.cols.o, q: F.cols.q, derived: o.ok && o.spec.text, pass: chk.pass, err, ms: performance.now() - t0,
+      waiting: [...MCP_WAITING_OPS] };
+  });
+  expect(r.z).toBe("0000000000100010".replace(/./g, (c, i) => { const a = i >> 3 & 1, b = i >> 2 & 1, c2 = i >> 1 & 1, d = i & 1; return String(+(a === b && c2 && !d)); }));
+  expect(r.n).toBe("1111111111110000");
+  expect(r.o).toBe("1000100010001000");
+  expect(r.q).toBe("1111000000001111");
+  expect(r.derived).toMatch(/xnor/i);
+  expect(r.pass).toBe(true);
+  expect(r.err).toMatch(/too big to draw/);
+  expect(r.ms).toBeLessThan(5000);
+  expect(r.waiting).toContain("ai_chat_stop");
+});

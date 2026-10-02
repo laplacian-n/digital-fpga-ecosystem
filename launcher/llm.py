@@ -276,6 +276,105 @@ STARTED = {"model": "", "port": 0, "t": 0.0}
 EPROC = None
 
 
+# ---- no orphaned model servers ------------------------------------------------------------------
+# A llama-server outlived the app whenever the app was closed hard (the updater installing a new
+# version, a crash, Task Manager): the next start could not see it and started another, and each one
+# kept its model + context in RAM — a 24 GB laptop filled up. Now (1) on Windows every server is put
+# in a Job Object that kills it when the app goes, and (2) before a start, any llama-server running
+# from our own llama folder that is not ours is stopped.
+_JOB = {"h": None}
+
+
+def _bind_to_app(proc) -> None:
+    """Windows: the process dies with the app (a Job Object with KILL_ON_JOB_CLOSE)"""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        if _JOB["h"] is None:
+            class IOC(ctypes.Structure):
+                _fields_ = [(n, ctypes.c_ulonglong) for n in ("r", "w", "o", "rt", "wt", "ot")]
+
+            class BASIC(ctypes.Structure):
+                _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                            ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                            ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                            ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+            class EXT(ctypes.Structure):
+                _fields_ = [("Basic", BASIC), ("Io", IOC), ("ProcessMemoryLimit", ctypes.c_size_t),
+                            ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                            ("PeakJobMemoryUsed", ctypes.c_size_t)]
+            k32.CreateJobObjectW.restype = wintypes.HANDLE
+            h = k32.CreateJobObjectW(None, None)
+            info = EXT()
+            info.Basic.LimitFlags = 0x2000                       # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            k32.SetInformationJobObject(wintypes.HANDLE(h), 9, ctypes.byref(info), ctypes.sizeof(info))
+            _JOB["h"] = h
+        k32.AssignProcessToJobObject(wintypes.HANDLE(_JOB["h"]), wintypes.HANDLE(int(proc._handle)))
+    except Exception:
+        pass
+
+
+_PCACHE = {"t": 0.0, "v": []}
+
+
+def llama_processes(fresh: bool = False) -> list:
+    """every llama-server running on this machine: [{pid, mb, path, ours}] (ours = started by this app now);
+    cached 15 s — Home polls the status often and a process scan on Windows takes about a second"""
+    if not fresh and time.time() - _PCACHE["t"] < 15:
+        return _PCACHE["v"]
+    mine = {p.pid for p in (PROC, EPROC) if p is not None and p.poll() is None}
+    out = []
+    if os.name == "nt":
+        try:
+            ps = ("Get-CimInstance Win32_Process -Filter \"name='llama-server.exe'\" | "
+                  "Select-Object ProcessId,ExecutablePath,WorkingSetSize | ConvertTo-Json -Compress")
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, timeout=15, creationflags=_NO_WINDOW)
+            data = json.loads(r.stdout.decode("utf-8", "replace") or "[]")
+            for d in ([data] if isinstance(data, dict) else data or []):
+                out.append({"pid": int(d.get("ProcessId") or 0), "path": d.get("ExecutablePath") or "",
+                            "mb": round(int(d.get("WorkingSetSize") or 0) / 2**20)})
+        except Exception:
+            pass
+    else:
+        for d in Path("/proc").glob("[0-9]*"):
+            try:
+                args = (d / "cmdline").read_bytes().split(b"\0")
+                prog = next((a.decode("utf-8", "replace") for a in args[:2] if Path(a.decode("utf-8", "replace")).name.startswith("llama-server")), None)
+                if not prog:
+                    continue
+                rss = next((int(x.split()[1]) for x in (d / "status").read_text().splitlines() if x.startswith("VmRSS:")), 0)
+                out.append({"pid": int(d.name), "path": prog, "mb": round(rss / 1024)})
+            except Exception:
+                continue
+    for p in out:
+        p["ours"] = p["pid"] in mine
+    _PCACHE.update(t=time.time(), v=out)
+    return out
+
+
+def stop_strays() -> list:
+    """stop every llama-server from OUR llama folder that this app did not start (left by an earlier run)"""
+    base = str(llama_dir().resolve()).lower()
+    gone = []
+    for p in llama_processes(fresh=True):
+        if p["ours"] or not p["path"] or not str(Path(p["path"]).resolve()).lower().startswith(base):
+            continue
+        try:
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/F", "/PID", str(p["pid"])], capture_output=True, timeout=10, creationflags=_NO_WINDOW)
+            else:
+                os.kill(p["pid"], 9)
+            gone.append(p)
+        except Exception:
+            pass
+    _PCACHE["t"] = 0                                     # the list changed
+    return gone
+
+
 def embed_running() -> bool:
     return EPROC is not None and EPROC.poll() is None
 
@@ -301,6 +400,7 @@ def start_embed(server: str) -> dict:
     EPROC = subprocess.Popen([server, "-m", str(embed_path()), "--host", "127.0.0.1", "--port", str(EMBED_PORT["port"])]
                              + EMBED_ARGS.split(), stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                              cwd=str(Path(server).parent), creationflags=_NO_WINDOW)
+    _bind_to_app(EPROC)
     return {"ok": True}
 
 
@@ -335,6 +435,9 @@ def embed(texts: list, timeout: float = 120) -> list:
     return out
 
 
+STRAYS = {"stopped": []}
+
+
 def running() -> bool:
     return PROC is not None and PROC.poll() is None
 
@@ -357,10 +460,13 @@ def start(server: str, model: str, endpoint: str, args: str) -> dict:
             ctypes.windll.kernel32.SetDllDirectoryW(None)
         except Exception:
             pass
+    STRAYS["stopped"] = stop_strays()            # left behind by an earlier run of the app: they hold RAM / VRAM
     PROC = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
                             cwd=str(Path(server).parent), creationflags=_NO_WINDOW)
+    _bind_to_app(PROC)
+    _PCACHE["t"] = 0
     STARTED.update(model=model, port=port, t=time.time())
-    return {"ok": True}
+    return {"ok": True, "stopped_leftovers": len(STRAYS["stopped"])}
 
 
 def stop() -> dict:
@@ -420,4 +526,5 @@ def status(endpoint: str, server: str, model: str) -> dict:
                              path=str(models_dir() / m["file"])) for m in CATALOG],
             "download": DL.snapshot(), "log": log_tail(), "data_dir": str(data_dir()),
             "embed": dict(EMBED, installed=embed_path().is_file(), path=str(embed_path()), running=embed_running()),
-            "since": round(time.time() - STARTED["t"]) if running() else 0}
+            "since": round(time.time() - STARTED["t"]) if running() else 0,
+            "processes": llama_processes(), "leftovers_stopped": STRAYS["stopped"]}

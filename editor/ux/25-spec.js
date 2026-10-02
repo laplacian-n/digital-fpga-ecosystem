@@ -11,11 +11,11 @@ function specCheck(sch){
   const sp=sch && sch.spec; if(!sp) return null;
   try{
     if(sp.kind==="formula" || sp.kind==="table"){
-      const sim=clientCombSim(sch);
+      const sim=clientCombSim(sch, sp.kind==="formula" ? {sample:1000} : null);   // a table needs every row; a formula does not
       if(!sim.ok) return {pass:false, reason:sim.reason||"จำลองไม่ได้"};
       const tt=sim.truth_table;
       if(sp.kind==="formula"){ const bad=specFormulaMismatches(sp.text, tt);
-        return {pass:!bad.length, checked:`${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs}; }
+        return {pass:!bad.length, checked:sim.sampled ? `${tt.rows.length} แถว (สุ่ม — ขาเข้า ${tt.inputs.length} บิต)` : `${tt.rows.length} แถว`, mismatches:bad.slice(0,16), total_mismatches:bad.length, inputs:tt.inputs}; }
       const cols=sp.cols, bad=[];
       Object.entries(cols).forEach(([o,col])=>{ const k=tt.outputs.findIndex(x=>x.toLowerCase()===o.toLowerCase());
         if(k<0){ bad.push({output:o, reason:"ไม่มีขาออกนี้"}); return; }

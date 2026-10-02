@@ -43,6 +43,52 @@ class Relay(unittest.TestCase):
         R.result({"id": "j99", "ok": True})
         self.assertEqual(R.replies, {})
 
+    def test_a_call_that_timed_out_can_fetch_its_answer(self):
+        """Lab 7: build_hierarchy of a big top sheet ran past 120 s; the build finished but its
+        report (unconnected / undriven) was lost, and the call was sent again."""
+        R = app.McpRelay()
+        R.seen["pg"] = time.time()
+
+        def page():
+            job = R.poll("pg", wait=5)
+            time.sleep(1.5)
+            R.result({"id": job["id"], "ok": True, "result": {"sheet": "top", "undriven_outputs": []}})
+
+        threading.Thread(target=page, daemon=True).start()
+        r = R.call("build_hierarchy", {}, timeout=0.5)
+        self.assertFalse(r["ok"])
+        self.assertIn("last_result", r["hint"])
+        self.assertFalse(R.last_result(job=r["job"])["ok"])          # not done yet
+        time.sleep(1.5)
+        got = R.last_result(job=r["job"])
+        self.assertTrue(got["ok"])
+        self.assertEqual(got["reply"]["result"]["sheet"], "top")
+        self.assertEqual(R.last_result(op="build_hierarchy")["job"], r["job"])
+        old, app.RELAY = app.RELAY, R                     # the MCP tool goes through the app's /api/mcp/app
+        try:
+            self.assertEqual(app.mcp_app("last_result", {"job": r["job"]})["op"], "build_hierarchy")
+        finally:
+            app.RELAY = old
+
+
+class Background(unittest.TestCase):
+    def test_a_long_tool_can_run_as_a_job(self):
+        """A big top sheet takes minutes to lay out: background:true answers at once with the job."""
+        calls = []
+        old = M.APP.call
+        try:
+            M.APP.call = lambda op, args, timeout: calls.append((op, args, timeout)) or {
+                "ok": False, "job": "j7", "error": "'build_hierarchy' is still running"}
+            r = M.call_tool("build_hierarchy", {"blocks": [{"name": "u", "part": "full_adder"}], "background": True})
+        finally:
+            M.APP.call = old
+        self.assertEqual(calls[0][2], 3)
+        self.assertNotIn("background", calls[0][1])
+        self.assertFalse(r.get("isError"))
+        self.assertIn('"job": "j7"', r["content"][0]["text"])
+        self.assertIn("last_result", r["content"][0]["text"])
+        self.assertIn("background", M.TOOL_MAP["auto_layout"]["inputSchema"]["properties"])
+
 
 class Rag(unittest.TestCase):
     def test_course_notes_are_searchable(self):
@@ -69,6 +115,18 @@ class Args(unittest.TestCase):
         self.assertIn("refs* (array)", e)
         _, e = M.normalize_args("connect", {"from": "a", "to": "b", "color": "red"})
         self.assertIn("connect takes:", e)
+
+    def test_arrays_and_objects_sent_as_json_text(self):
+        """Lab 7: delete {refs:'["an[3]","an[2]"]'} looked for ONE component named '["an[3]",…]'."""
+        a, e = M.normalize_args("delete", {"refs": '["an[3]", "an[2]"]'})
+        self.assertIsNone(e)
+        self.assertEqual(a["refs"], ["an[3]", "an[2]"])
+        a, _ = M.normalize_args("set_pins", {"map": '{"an[3]": null}'})
+        self.assertEqual(a["map"], {"an[3]": None})
+        a, _ = M.normalize_args("delete", {"refs": "g1"})
+        self.assertEqual(a["refs"], ["g1"])
+        a, _ = M.normalize_args("build_part", {"kind": "bcd_counter_multi", "params": '{"format": "mm.ss"}'})
+        self.assertEqual(a["params"], {"format": "mm.ss"})
 
     def test_apply_steps_are_checked_and_normalised(self):
         a, e = M.normalize_args("apply", {"steps": [{"op": "delete", "target": "el"}, {"op": "connect", "from": "x", "to": "y"}]})

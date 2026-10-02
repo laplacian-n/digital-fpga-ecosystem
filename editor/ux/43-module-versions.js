@@ -64,6 +64,7 @@ MCP_OPS.update_module = a=>{
   const _use=MCP_OPS.use_module;
   MCP_OPS.use_module=a=>{
     if(!moduleFind(a.module) && PARTS[a.module]){
+      partCheckArgs(a.module, a.params||{});
       const target=mcpUse(a.sheet); mcpBeforeChange("วาง "+a.module);
       const sn=ptSub(a.module, a.params||{}), sub=Object.values(state.project.schematics).find(s=>s.name===sn);
       const why=subBlockBlockedWhy(sub.id, target.id); if(why) mcpFail(why);

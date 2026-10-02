@@ -338,6 +338,15 @@ MCP_OPS.apply = a=>{
   return {steps:results, auto_layout:laidOut, layout:mcpLayoutMetrics(sch0)};
 };
 
+/* a drawing that big is not something to read, and routing it froze the page for minutes (a random
+   10-input table: 261 gates → 1630 parts with the junctions, 7.5 min; 8 inputs / ~70 gates: 9 s) —
+   no MCP call, not even ai_chat_stop, gets through meanwhile */
+const MCP_MAX_DRAW=100;
+function mcpSizeGuard(intent, what){
+  const n=((intent&&intent.components)||[]).filter(c=>c.type!=="JUNCTION").length;
+  if(n>MCP_MAX_DRAW) mcpFail(`${what} needs ${n} parts — too big to draw on one sheet (at most ${MCP_MAX_DRAW})`,
+    "split it into blocks (build_hierarchy), use a library part (list_parts), or fewer inputs per table");
+}
 MCP_OPS.build_circuit = a=>{
   mcpBeforeChange("สร้างวงจร");
   let intent=null, title="";
@@ -346,6 +355,7 @@ MCP_OPS.build_circuit = a=>{
       if(col.length!==(1<<t.inputs.length)) mcpFail(`truth_table.columns.${o} has ${col.length} chars, expected ${1<<t.inputs.length} (2^inputs, first input = MSB)`);
       rows[o]=col.toLowerCase().split(""); });
     const r=ttToIntent(t.inputs, t.outputs, rows, a.name||"logic"); if(r.error) mcpFail(r.error); intent=r.intent; title="truth table";
+    mcpSizeGuard(intent, "this truth table");
     if(a.into==="current" && uxCanFillSheet({inputs:t.inputs, outputs:t.outputs})){ uxFillSheet(activeSch(), intent); return {sheet:activeSch().name, into:"current", equations:r.exprs, layout:mcpLayoutMetrics(activeSch())}; }
     const dr=aiDrawIntent(intent); if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"));
     const res={sheet:dr.sch.name, into:"new", equations:r.exprs};
@@ -366,6 +376,7 @@ MCP_OPS.build_circuit = a=>{
   }
   if(a.intent){ intent=a.intent; title="intent"; }
   if(!intent) mcpFail("give one of: truth_table, generator, intent");
+  mcpSizeGuard(intent, "this circuit");
   const dr=aiDrawIntent(intent);
   if(!dr||!dr.ok) mcpFail("could not draw: "+((dr&&(dr.error||(dr.errors||[]).join("; ")))||"?"), "intent = {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]}");
   if(a.generator && a.generator.kind==="jk_counter" && typeof jkLayout==="function"){ jkLayout(dr.sch, intent.bits); snapshot(); renderAll(); }
@@ -511,7 +522,10 @@ MCP_OPS.get_pins = a=>{ const sch=mcpSheet(a.sheet); uxNormPinmap(sch);
 MCP_OPS.set_pins = a=>{
   const sch=mcpUse(a.sheet), bits=uxPortBits(sch), keys=new Map(bits.map(b=>[b.key.toLowerCase(), b]));
   mcpBeforeChange("เลือกขา"); sch.pinmap=sch.pinmap||{}; const done=[];
-  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase()); if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
+  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase());
+    // a pin left for a port that is gone (a rebuilt sheet): null / "" removes it
+    if(!b && (t===null||t==="")){ const k=Object.keys(sch.pinmap).find(x=>x.toLowerCase()===String(port).toLowerCase()); if(k){ delete sch.pinmap[k]; done.push(k+" → — (its port is gone)"); return; } }
+    if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
     if(t===null||t===""){ delete sch.pinmap[b.key]; done.push(b.key+" → —"); return; }
     const ok=(b.dir==="in"?PIN_IN_TARGETS:PIN_OUT_TARGETS).includes(t); if(!ok) mcpFail(`'${t}' is not a valid ${b.dir==="in"?"input":"output"} target for ${b.key}`, "call board_pins");
     sch.pinmap[b.key]=t; done.push(b.key+" → "+t); });
@@ -829,6 +843,9 @@ function mcpShowChange(pre){
 }
 
 /* ---------- transport: long-poll the launcher ---------- */
+// closing the page says so: the launcher waits for a busy editor (a long build does not poll) but
+// must not wait for one that is gone
+window.addEventListener("pagehide", ()=>{ try{ if(MCPB.on) navigator.sendBeacon("/api/mcp/bye?client="+MCPB.client, ""); }catch(_){} });
 async function mcpLoop(){
   let fails=0;
   while(MCPB.on){
@@ -847,7 +864,7 @@ async function mcpLoop(){
     await mcpRun(job, true);
   }
 }
-const MCP_WAITING_OPS = new Set(["ai_chat_status", "approval_status", "board_status"]);
+const MCP_WAITING_OPS = new Set(["ai_chat_status", "ai_chat_stop", "approval_status", "board_status", "get_events"]);
 async function mcpRun(job, edits){
   let reply;
   if(edits){ MCPB.busy=true; mcpRevealFlush(); }

@@ -1,0 +1,119 @@
+{
+ "train": 4771,
+ "train_extra": 5125,
+ "eval_tasks": 930,
+ "train_by_category": {
+  "general_thai": 716,
+  "nl_fix": 429,
+  "qa_mode": 573,
+  "qa": 477,
+  "nl_fsm": 525,
+  "nl_pins": 286,
+  "general_tools": 286,
+  "nl_logic": 1193,
+  "nl_compose": 286
+ },
+ "extra_by_category": {
+  "nl_compose": 83,
+  "nl_fix": 28,
+  "nl_logic": 2227,
+  "nl_pins": 77,
+  "qa": 220,
+  "qa_mode": 1592,
+  "general_thai": 784,
+  "general_tools": 114
+ },
+ "eval_by_category": {
+  "qa_mode": 247,
+  "nl_compose": 59,
+  "nl_fix": 43,
+  "nl_fsm": 75,
+  "nl_logic": 401,
+  "nl_pins": 37,
+  "qa": 68
+ },
+ "available_by_category": {
+  "nl_compose": 369,
+  "nl_fix": 457,
+  "nl_fsm": 525,
+  "nl_logic": 3420,
+  "nl_pins": 363,
+  "qa": 697,
+  "qa_mode": 2165,
+  "general_thai": 1500,
+  "general_tools": 400
+ },
+ "mix_target": {
+  "nl_logic": 0.25,
+  "nl_fsm": 0.11,
+  "nl_fix": 0.09,
+  "nl_compose": 0.06,
+  "nl_pins": 0.06,
+  "qa": 0.1,
+  "qa_mode": 0.12,
+  "general_thai": 0.15,
+  "general_tools": 0.06
+ },
+ "dropped": {
+  "same request as an eval task": 83,
+  "duplicate request": 219
+ },
+ "chars_per_conversation": {
+  "median": 6417,
+  "max": 10393
+ },
+ "tokens": {
+  "app_tool_schemas": 8325,
+  "all": {
+   "median": 10328,
+   "p95": 10945,
+   "max": 11228,
+   "total": 34812487
+  },
+  "by_category": {
+   "general_thai": {
+    "median": 380,
+    "max": 952
+   },
+   "nl_fix": {
+    "median": 10577,
+    "max": 10961
+   },
+   "qa_mode": {
+    "median": 1241,
+    "max": 1686
+   },
+   "qa": {
+    "median": 9842,
+    "max": 10026
+   },
+   "nl_fsm": {
+    "median": 10927,
+    "max": 11197
+   },
+   "nl_pins": {
+    "median": 10421,
+    "max": 10604
+   },
+   "general_tools": {
+    "median": 1306,
+    "max": 3063
+   },
+   "nl_logic": {
+    "median": 10380,
+    "max": 10954
+   },
+   "nl_compose": {
+    "median": 10667,
+    "max": 11228
+   }
+  }
+ },
+ "with_masked_mistake": 270,
+ "sources": {
+  "program": "tools/dataset/gen_*.py → teacher.py through the app's real agent loop (run.js); every circuit checked against the task's known answer outside the conversation; no model wrote any of it",
+  "qa_mode": "Q&A-mode answers written by an open-weight model (qwen/qwen3.5-397b-a17b, Apache-2.0) via OpenRouter from the app's own Q&A prompt + course notes, scored by a second open model (deepseek/deepseek-v4-pro), kept only when judged fully correct, filtered by code (tools/dataset/gen_qamode.py)",
+  "general_thai": "airesearch/wangchanx-seed-free-synthetic-instruct-thai-120k (MIT) — filtered by tools/dataset/online.py",
+  "general_tools": "NousResearch/hermes-function-calling-v1 (Apache-2.0) — converted by tools/dataset/online.py"
+ }
+}

@@ -1,0 +1,1241 @@
+[
+ {
+  "type": "function",
+  "function": {
+   "name": "status",
+   "description": "Project, sheets (with part/wire counts), active and top sheet, unsaved changes. Start here.",
+   "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "get_sheet",
+   "description": "A sheet as data: ports, components (type, name, position, size, params, pins with x/y and whether connected) and nets (driver → sinks, with problems such as 'no driver' or 'multiple drivers').",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "detail": {
+      "type": "string",
+      "enum": [
+       "full",
+       "brief"
+      ],
+      "description": "brief = no positions/pins."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "get_netlist",
+   "description": "Only the connectivity of a sheet: each net's driver pin, sink pins, name and problems.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "list_component_types",
+   "description": "Every placeable component type with its default params and pin names.",
+   "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "open_sheet",
+   "description": "Make a sheet the active tab (the user sees it).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "sheet"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "new_sheet",
+   "description": "Create an empty sheet (a new sub-circuit or top level).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "make_top": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "set_top_sheet",
+   "description": "Choose which sheet is the top entity (what goes to the board).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "sheet"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "add_component",
+   "description": "Place one component. type: a type from list_component_types (AND, OR, NOT, XOR, NAND, NOR, XNOR, BUF, IN, OUT, VCC, GND, CONST, MUX, DFF, JKFF, TFF, SRFF, …) or 'block:<sheet name>' for a sub-circuit. Without x/y it goes to a free spot right of the drawing. Returns the part with its pins.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "type": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string",
+      "description": "INPUT/OUTPUT port name, or a label for other parts."
+     },
+     "width": {
+      "type": "integer",
+      "description": "Bus width for IN/OUT (default 1)."
+     },
+     "params": {
+      "type": "object",
+      "description": "Type params, e.g. {\"inputs\":3} for a 3-input gate, {\"reset\":true} for a DFF with reset."
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     },
+     "rot": {
+      "type": "integer",
+      "enum": [
+       0,
+       90,
+       180,
+       270
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "type"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "connect",
+   "description": "Wire an output pin to an input pin (fan-out is fine; an input takes one driver). Give from/to, or `connections` [[from,to],…] for several. The new wires are routed. One bit of a bus pin takes an index — 'a', 'y.i[2]' or 's.o[3]', 'z' — and the bus tap is placed for you.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "from": {
+      "type": "string",
+      "description": "Pin reference 'component.pin' (e.g. 'U1.i0', 'ff0.q') or a bare component."
+     },
+     "to": {
+      "type": "string",
+      "description": "Pin reference 'component.pin' (e.g. 'U1.i0', 'ff0.q') or a bare component."
+     },
+     "connections": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "minItems": 2,
+       "maxItems": 2
+      }
+     },
+     "net_name": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "disconnect",
+   "description": "Remove wiring: `pin` drops every wire on that pin; `from`+`to` removes one connection.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "pin": {
+      "type": "string",
+      "description": "Pin reference 'component.pin' (e.g. 'U1.i0', 'ff0.q') or a bare component."
+     },
+     "from": {
+      "type": "string",
+      "description": "Pin reference 'component.pin' (e.g. 'U1.i0', 'ff0.q') or a bare component."
+     },
+     "to": {
+      "type": "string",
+      "description": "Pin reference 'component.pin' (e.g. 'U1.i0', 'ff0.q') or a bare component."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "delete",
+   "description": "Delete components (and their wires). A net a deleted part drove is removed with it (no leftover wiring still 'driving' its sinks); the inputs it fed come back as now_unconnected.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "refs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "refs"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "update_component",
+   "description": "Rename, change params, change a basic gate's type, move (x/y) or rotate a component.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "ref": {
+      "type": "string",
+      "description": "Component: id, INPUT/OUTPUT name, or label."
+     },
+     "name": {
+      "type": "string"
+     },
+     "params": {
+      "type": "object"
+     },
+     "type": {
+      "type": "string"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     },
+     "rot": {
+      "type": "integer",
+      "enum": [
+       0,
+       90,
+       180,
+       270
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "ref"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "apply",
+   "description": "Run several edit steps as one transaction — if a step fails nothing changes (unless keep_going). Each step is {\"op\": \"add_component\"|\"connect\"|\"disconnect\"|\"delete\"|\"update_component\"|\"set_pins\", …that tool's args}. Step fields (* = required): add_component: type* (string), name (string), width (integer), params (object), x (number), y (number), rot (integer); connect: from (string), to (string), connections (array), net_name (string); disconnect: pin (string), from (string), to (string); delete: refs* (array); update_component: ref* (string), name (string), params (object), type (string), x (number), y (number), rot (integer); set_pins: map* (object). Steps run in order and each sees the ones before it (delete then connect to the freed pin works).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "steps": {
+      "type": "array",
+      "items": {
+       "type": "object"
+      }
+     },
+     "keep_going": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "steps"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "build_part",
+   "description": "Build a standard circuit from the part library on a sheet — generated by code and CHECKED against a reference model before it is drawn (every row, or 300 vectors / a clock-by-clock run), so it is right by construction and marked verified. Prefer this over drawing gates or typing truth tables. Place it on other sheets as block:<sheet>.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "a kind from list_parts, e.g. full_adder, adder, mux, bcd_7seg, mod_counter, clock_divider; lab parts: bcd_valid, one_pulse, counter_digit, bcd_counter_multi, bcd2_compare, add3, bin2bcd, hex_7seg, seg7_mux4, addsub, alu_slice, alu, register_en, mux_bus, bcd_ascii; a whole lab: lab6_counter (lab 6, counter 00-yy on the EDGE board: every block wired, pins mapped)"
+     },
+     "n": {
+      "type": "integer",
+      "description": "size: bits / inputs / modulus / divisor, per kind"
+     },
+     "bus": {
+      "type": "boolean",
+      "description": "a0..a3 → one bus port a[3:0]"
+     },
+     "cin": {
+      "type": "boolean"
+     },
+     "en": {
+      "type": "boolean"
+     },
+     "odd": {
+      "type": "boolean"
+     },
+     "active_low": {
+      "type": "boolean"
+     },
+     "output": {
+      "type": "string",
+      "enum": [
+       "clk_out",
+       "q"
+      ]
+     },
+     "m": {
+      "type": "integer",
+      "description": "counter_digit: modulus 2..16"
+     },
+     "down": {
+      "type": "boolean",
+      "description": "counters: count down"
+     },
+     "load": {
+      "type": "boolean",
+      "description": "counters: parallel load input"
+     },
+     "format": {
+      "type": "string",
+      "enum": [
+       "00-99",
+       "000-999",
+       "0000-9999",
+       "00-59",
+       "mm.ss"
+      ],
+      "description": "bcd_counter_multi"
+     },
+     "ops": {
+      "type": "string",
+      "enum": [
+       "4",
+       "8"
+      ],
+      "description": "alu: '4' = ADD SUB XOR SHL (lab 9), '8' = NOP ADD SUB XOR SHL AND OR MOV (lab 10)"
+     },
+     "k": {
+      "type": "integer",
+      "description": "mux_bus: number of buses (2, 4, 8)"
+     },
+     "hex": {
+      "type": "boolean",
+      "description": "seg7_mux4: show 0–F"
+     },
+     "dp": {
+      "type": "boolean",
+      "description": "seg7_mux4: decimal points"
+     },
+     "async": {
+      "type": "boolean",
+      "description": "register_en: clear without waiting for the clock"
+     },
+     "tick": {
+      "type": "integer",
+      "description": "lab6_counter: 50 MHz clocks per count (default 2500000 = 20 Hz)"
+     },
+     "scan": {
+      "type": "integer",
+      "description": "lab6_counter: display scan divider (default 50000 = 1 kHz)"
+     },
+     "sheet": {
+      "type": "string",
+      "description": "sheet to build on (created, or an empty one filled)"
+     },
+     "replace": {
+      "type": "boolean",
+      "description": "rebuild a sheet that already has parts (one undo brings it back)"
+     },
+     "name": {
+      "type": "string",
+      "description": "entity name when no sheet is given"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "kind"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "list_parts",
+   "description": "The part library: standard circuits (adders, subtractors, comparator, mux/demux, decoder, encoder, BCD→7-seg, parity, majority, counters, clock divider, shift register, register, toggle, edge detector, debounce) with their parameters and ports. `query` filters.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "build_fsm",
+   "description": "Build a state machine from its state diagram: binary encoding (reset state = 0), minimised next-state and output logic, D flip-flops — then run clock by clock against the diagram before it is handed over (verified). fsm as text: 'inputs: x\\noutputs: z\\nstate S0: z=0\\nstate S1: z=1\\nS0 -> S1 when x\\nS0 -> S0 else\\nS1 -> S0 when ~x\\nreset S0' (Mealy: 'S0 -> S1 when x / z=1'; conditions & | ^ ~ ( ) else) or an object {inputs, outputs, states:[{name,out}], transitions:[{from,to,when,out?}], reset}. Ports: clk, the inputs, the outputs, state bits (state_out:false drops them).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "fsm": {
+      "type": [
+       "string",
+       "object"
+      ]
+     },
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "name": {
+      "type": "string"
+     },
+     "state_out": {
+      "type": "boolean"
+     },
+     "replace": {
+      "type": "boolean",
+      "description": "rebuild a sheet that already has parts (one undo brings it back)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "fsm"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "build_hierarchy",
+   "description": "Build a whole top sheet from a block list in ONE call: the blocks (an existing sheet or a library part), the top inputs / outputs, and the connections by name — buses expand to bits (cnt.ones = ones0..ones3, sw[3:0], x[2]), 0 / 1 drive a pin low / high. Widths, directions and double drivers are checked before anything is drawn; pins named like a top port join it (auto: a block's clk ← INPUT clk, OUTPUT err ← the one block output err). Drawn, routed, declared buses become bus ports; one undo step; nothing is left behind on an error. Answers what is still unconnected. Use it instead of many connect calls for any design made of blocks.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "the top sheet (made, an empty one filled; one with parts needs replace:true)"
+     },
+     "blocks": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "sheet": {
+         "type": "string",
+         "description": "an existing sheet"
+        },
+        "part": {
+         "type": "string",
+         "description": "a list_parts kind, drawn once and verified"
+        },
+        "params": {
+         "type": "object",
+         "description": "the part's parameters"
+        }
+       },
+       "required": [
+        "name"
+       ]
+      }
+     },
+     "inputs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "top inputs: 'clk', 'sw[7:0]'"
+     },
+     "outputs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "top outputs: 'err', 'seg[6:0]'"
+     },
+     "connect": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "description": "[driver, receiver, …]: ['clk','cnt.clk'], ['cnt.ones','cmp.a_lo'], ['sw[3:0]','cmp.b_lo'], ['1','cnt.en']"
+     },
+     "auto": {
+      "type": "boolean",
+      "description": "join same-named pins and ports (default true)"
+     },
+     "bus": {
+      "type": "boolean",
+      "description": "declared buses as bus ports (default true)"
+     },
+     "pins": {
+      "type": "object",
+      "description": "board pins for the top ports, e.g. {'btn':'pb:4','sw[0]':'sw:0'}"
+     },
+     "top": {
+      "type": "boolean",
+      "description": "also make it the project's top sheet"
+     },
+     "replace": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "blocks"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "derive_spec",
+   "description": "Derive a sheet's acceptance test from the user's REQUEST by code — independent of any circuit: equations in it, a minterm list (f(a,b,c) = Σm(1,2,4,7)), 'output 1 when the n-bit input is prime / even / > k …', or a standard part it names (4-bit adder, BCD→7-seg, mod-6 counter → checked against that part's reference model). With `sheet` it is set as that sheet's spec (the sheet is made if missing); a circuit that passes it is right, unlike a check against the table the circuit was built from. Answers derived:false when the request gives nothing to read.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "request": {
+      "type": "string",
+      "description": "the user's words, as written"
+     },
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "apply": {
+      "type": "boolean",
+      "description": "false = only return the spec (default: set it on `sheet`)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "request"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "set_spec",
+   "description": "Say what a sheet MUST do — its acceptance test, written from the requirement (never from the circuit): formula (\"sum = a^b^cin; cout = …\"), table ({out:\"0110…\"}, first input = MSB) or sequence ({expect:{q:[0,1,2,…]}, inputs:[{name:value} per clock], cycles}). The app re-checks it after every change (✓/✗ on the sheet) and a pass marks the sheet verified. Set it FIRST, then build until check_spec passes.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "formula": {
+      "type": [
+       "string",
+       "array"
+      ],
+      "items": {
+       "type": "string"
+      }
+     },
+     "table": {
+      "type": "object"
+     },
+     "sequence": {
+      "type": "object"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "check_spec",
+   "description": "Run a sheet's acceptance test (or every sheet's with all_sheets) and get pass / the mismatches.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "all_sheets": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "compare_sheets",
+   "description": "Are two circuits the same? Drive `sheet` and `with` (another sheet) with the same inputs, port by port by name, and compare every output: all rows up to 12 input bits (else corners + 1000 random vectors); with flip-flops, clock by clock from reset on the same random stimulus. Or compare `sheet` with a formula, a table (columns or ones), a library part (+ params) or the request's words — e.g. a student's gates against the reference. No AI involved.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "with": {
+      "type": "string",
+      "description": "the other sheet"
+     },
+     "formula": {
+      "type": "string"
+     },
+     "table": {
+      "type": "object"
+     },
+     "part": {
+      "type": "string"
+     },
+     "params": {
+      "type": "object"
+     },
+     "request": {
+      "type": "string"
+     },
+     "cycles": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 512
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "build_circuit",
+   "description": "Create a whole circuit, minimised and laid out by the editor, on a new sheet. One of:\n• formula: equations — \"sum = a ^ b ^ cin; cout = a&b | cin&(a^b)\" or \"{cout,sum} = a + b + cin\" (& | ^ ~ ' and/or/xor/not; {…} on the left = arithmetic, MSB first). The truth table is computed for you — prefer this to typing columns.\n• truth_table: {inputs:[...], ones:{out:[rows that are 1]}} — e.g. a 3-bit prime detector {inputs:['x2','x1','x0'], ones:{p:[2,3,5,7]}}; or {inputs:[...], outputs:[...], columns:{out:\"0110…\"}} (one char per row, 0/1/x, first input = MSB; into:\"current\" fills a sheet that has exactly those ports, e.g. a lab template)\n• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename); clock_divider = divide clk_in by ANY n (2..2^31, e.g. 50 MHz → 20 Hz: n=2500000), one sheet, 50 % duty for even n\n• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]} — a sub-circuit is type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "truth_table": {
+      "type": "object"
+     },
+     "generator": {
+      "type": "object"
+     },
+     "intent": {
+      "type": "object"
+     },
+     "into": {
+      "type": "string",
+      "enum": [
+       "new",
+       "current"
+      ]
+     },
+     "formula": {
+      "type": [
+       "string",
+       "array",
+       "object"
+      ],
+      "items": {
+       "type": "string"
+      }
+     },
+     "inputs": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "formula: input order (first = MSB); default: order of appearance"
+     },
+     "replace": {
+      "type": "boolean",
+      "description": "rebuild a sheet that already has parts (one undo brings it back)"
+     },
+     "sheet": {
+      "type": "string",
+      "description": "Sheet to build on: a new name creates that sheet, an existing EMPTY sheet is filled (one with parts is refused). Default: a new sheet named after `name`."
+     },
+     "bus": {
+      "type": [
+       "boolean",
+       "array"
+      ],
+      "items": {
+       "type": "string"
+      },
+      "description": "Numbered ports become one bus port: true = every group (q0..q3 → q[3:0], yu0..yu3 → yu[3:0]), or a list of group names ['q']. Bit i = the number in the name; bus taps are drawn for you."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "make_bus_ports",
+   "description": "Turn numbered INPUT/OUTPUT ports of a sheet (q0..q3) into one bus port each (q, 4 bits) with bus taps, keeping the drawing. Only for a sheet no other sheet uses as a block yet (their wiring would come loose).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "ports": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "group names, e.g. ['q','yu']; default: all"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "check",
+   "description": "Design-rule check (what Vivado would reject + common mistakes): errors and warnings with the component and a suggested fix.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "all_sheets": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "simulate",
+   "description": "Simulate a sheet — ports as numbers too (`table` / `values`: a bus or a numbered group q0..q3 is one value), and for flip-flops a text `waveform`. Combinational: full truth table (rows 'inputs → outputs', and per-output columns) up to 10 input bits; for more, or to check chosen rows, give `vectors` [{input: value, …}, …] (≤256, inputs left out are 0, bus values as in probe). Sequential: `cycles` clock pulses on every INPUT that drives a flip-flop clock, other inputs held at `inputs` (default 0), or `vectors` = the inputs during each clock ([{x:1},{x:1},{x:0},…]; the last one stays).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "cycles": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+     },
+     "inputs": {
+      "type": "object",
+      "description": "INPUT name → 0/1.",
+      "additionalProperties": {
+       "type": "integer",
+       "enum": [
+        0,
+        1
+       ]
+      }
+     },
+     "vectors": {
+      "type": "array",
+      "items": {
+       "type": "object"
+      },
+      "maxItems": 256
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "verify_truth_table",
+   "description": "Compare a combinational sheet against what it MUST do: expected output columns ({out:\"0110…\"}, x = don't care) or a formula written from the requirement (\"sum = a^b^cin; cout = …\"). Returns pass, the mismatching rows, `recognized` (the standard circuit it is, if any) and `independent` — an expectation identical to what the sheet was built from proves nothing and does not count as verified.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "expected": {
+      "type": "object"
+     },
+     "formula": {
+      "type": [
+       "string",
+       "array"
+      ],
+      "items": {
+       "type": "string"
+      }
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "probe",
+   "description": "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong. A bus INPUT takes its whole value: 5, \"0101\" (binary as wide as the bus), \"0b0101\" or \"0x5\"; a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated. inside:'u' (or a path 'u/v') gives the nets and ports INSIDE that block instead, with its inputs from the whole circuit.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "inputs": {
+      "type": "object",
+      "description": "INPUT name → 0/1.",
+      "additionalProperties": {
+       "type": "integer",
+       "enum": [
+        0,
+        1
+       ]
+      }
+     },
+     "inside": {
+      "type": "string",
+      "description": "a block on the sheet (label / name), or a path u/v"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "explain_simulation",
+   "description": "Likely reasons a simulation doesn't behave as expected (clock not reaching FFs, reset stuck, gated clock, floating pins, multi-driver, constant outputs, unused inputs, divider chains).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "get_pins",
+   "description": "Current pin assignment of a sheet's ports (bus bits as name[i]), unassigned ports and conflicts.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "set_pins",
+   "description": "Assign ports/bits to board targets, e.g. {\"a\":\"sw:0\", \"seg[6]\":\"seg:a\", \"clk\":\"clk\"}; null clears.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "map": {
+      "type": "object"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "map"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "auto_pins",
+   "description": "Fill pin assignments automatically (mode 'missing' keeps existing ones, 'all' redoes them).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "mode": {
+      "type": "string",
+      "enum": [
+       "missing",
+       "all"
+      ]
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "pin_preset",
+   "description": "Board pins as the lab sheet wires them, by each port's role: lab 6 (SW7–4 = tens of yy, SW3–0 = ones, centre button = start/stop, LED0 = error), lab 7 (SW15–0 = mm.ss digits, start/stop, clear), lab 8 (SW15–0 = four BCD digits); a–g, dp, an, clk on any lab. Answers what it could not place (auto_pins guesses those).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "lab": {
+      "type": "string",
+      "enum": [
+       "6",
+       "7",
+       "8"
+      ]
+     },
+     "apply": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "lab"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "board_check",
+   "description": "Before building the .bit: what will go wrong on the real EDGE board — ports without a pin, two ports on one pin, an input on an LED, 7-seg segments written active-high for this common-anode display, no digit enabled (an), a clock from a bouncing push button, a counter on the raw 50 MHz clock. Default sheet: the one the ลงบอร์ด page builds. fix:true repairs what it can (a NOT before each active-high a–g OUTPUT, an OUTPUT an0 = 0 on digit 0, pins guessed for ports without one) — one undo step each; `fixable` lists them otherwise.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "fix": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "board_troubleshoot",
+   "description": "The real board does not do what the simulation did: give the symptom (load, darkx, map, segpol, segan, segmap, fast, stuck, bounce, btninv; none = list them) and get the causes checked on this design (pins, polarity, clock source, reset, stale .bit) plus what to try.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "symptom": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "suggest_wires",
+   "description": "Wiring hints for the unconnected pins of a sheet: blocks of one kind in a row chain carry-like pins (cout→cin, x_out→x_in), a block input named like a sheet INPUT takes it (clk, rst, en; a2 or bit 2 of bus a for the block labelled …2), a sheet OUTPUT named like a block output takes it. Each hint has a reason; apply:true wires them all (one undo step).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "apply": {
+      "type": "boolean"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "undo",
+   "description": "Undo the last change (yours or the user's).",
+   "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "list_modules",
+   "description": "Modules in the user's library (the Modules tab, shared across projects): name, description, ports, part count, the sub-blocks each carries. `query` filters by name / description / port names.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "use_module",
+   "description": "Place a library module on a sheet as a block (its sheet is brought into the project once, then reused). A part kind from list_parts works too (+ params): the standard lab modules need no saving first. Returns the block with its pins — connect them like any part.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "module": {
+      "type": "string",
+      "description": "module name or id, or a part kind"
+     },
+     "params": {
+      "type": "object"
+     },
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "name": {
+      "type": "string",
+      "description": "label for the block"
+     },
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "module"
+    ]
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "save_module",
+   "description": "Save a sheet (with every sheet it uses as a block) into the module library, so it can be reused in any project. Default: the active sheet, named after it.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "sheet": {
+      "type": "string",
+      "description": "Sheet name or id. Default: the active sheet."
+     },
+     "name": {
+      "type": "string"
+     },
+     "description": {
+      "type": "string"
+     },
+     "replace": {
+      "type": "boolean",
+      "description": "overwrite a module with the same name"
+     },
+     "force": {
+      "type": "boolean",
+      "description": "save a sheet that is not verified (only when the user asks for it)"
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "search_course",
+   "description": "Search the course material that ships with the app: textbook chapters, the lab sheets (with worked solutions), the EDGE board's pins and peripherals, and checked VHDL examples. Use it to follow how the course does something (a lab's requirements, a design method, a board connection).",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "query": {
+      "type": "string"
+     },
+     "k": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 12
+     },
+     "group": {
+      "type": "string",
+      "enum": [
+       "content",
+       "lab",
+       "board",
+       "vhdl_ref"
+      ],
+      "description": "content = chapters, lab = lab sheets, board = pins/peripherals, vhdl_ref = VHDL"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "query"
+    ]
+   }
+  }
+ }
+]

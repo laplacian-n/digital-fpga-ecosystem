@@ -141,6 +141,10 @@ TOOLS = [
        "net_name": {"type": "string"}}),
     T("disconnect", "Remove wiring: `pin` drops every wire on that pin; `from`+`to` removes one connection.",
       {"sheet": SHEET, "pin": PIN, "from": PIN, "to": PIN}),
+    T("last_result", "The answer of a call that ran past its timeout (the error said 'still running … job jN'): the "
+      "editor finishes it on its own — do NOT send the call again, ask for its answer here.",
+      {"job": {"type": "string", "description": "the job id from the timeout error, e.g. j12"},
+       "op": {"type": "string", "description": "or the newest late answer of this tool"}}, timeout=10),
     T("delete", "Delete components (and their wires). A net a deleted part drove is removed with it (no leftover "
       "wiring still 'driving' its sinks); the inputs it fed come back as now_unconnected.", {"sheet": SHEET, "refs": {"type": "array", "items": {"type": "string"}}}, ["refs"]),
     T("update_component", "Rename, change params, change a basic gate's type, move (x/y) or rotate a component.",
@@ -205,7 +209,7 @@ TOOLS = [
        "bus": {"type": "boolean", "description": "declared buses as bus ports (default true)"},
        "pins": {"type": "object", "description": "board pins for the top ports, e.g. {'btn':'pb:4','sw[0]':'sw:0'}"},
        "top": {"type": "boolean", "description": "also make it the project's top sheet"},
-       "replace": {"type": "boolean"}}, ["blocks"], timeout=120),
+       "replace": {"type": "boolean"}}, ["blocks"], timeout=300),
     T("compare_sheets", "Are two circuits the same? Drive `sheet` and `with` (another sheet) with the same inputs, port by port "
       "by name, and compare every output: all rows up to 12 input bits (else corners + 1000 random vectors); with flip-flops, "
       "clock by clock from reset on the same random stimulus. Or compare `sheet` with a formula, a table (columns or ones), "
@@ -231,21 +235,27 @@ TOOLS = [
       {"kind": {"type": "string", "description": "a kind from list_parts, e.g. full_adder, adder, mux, bcd_7seg, mod_counter, clock_divider; "
                "lab parts: bcd_valid, one_pulse, counter_digit, bcd_counter_multi, bcd2_compare, add3, bin2bcd, hex_7seg, seg7_mux4, "
                "addsub, alu_slice, alu, register_en, mux_bus, bcd_ascii; "
-               "a whole lab: lab6_counter (lab 6, counter 00-yy on the EDGE board: every block wired, pins mapped)"},
+               "a whole lab: lab6_counter (lab 6, counter 00-yy on the EDGE board: every block wired, pins mapped), "
+               "lab7_countdown (lab 7, countdown timer mm.ss 00.00–99.59: SET/START-STOP/RESET, error + time-up LEDs, pins mapped)"},
        "n": {"type": "integer", "description": "size: bits / inputs / modulus / divisor, per kind"},
        "bus": {"type": "boolean", "description": "a0..a3 → one bus port a[3:0]"},
        "cin": {"type": "boolean"}, "en": {"type": "boolean"}, "odd": {"type": "boolean"}, "active_low": {"type": "boolean"},
        "output": {"type": "string", "enum": ["clk_out", "q"]},
        "m": {"type": "integer", "description": "counter_digit: modulus 2..16"},
        "down": {"type": "boolean", "description": "counters: count down"}, "load": {"type": "boolean", "description": "counters: parallel load input"},
-       "format": {"type": "string", "enum": ["00-99", "000-999", "0000-9999", "00-59", "mm.ss"], "description": "bcd_counter_multi"},
+       "format": {"type": "string", "enum": ["00-99", "000-999", "0000-9999", "00-59", "mm.ss", "99.59"],
+                  "description": "bcd_counter_multi (mm.ss stops at 59.59; 99.59 = lab 7's 00.00–99.59)"},
        "ops": {"type": "string", "enum": ["4", "8"], "description": "alu: '4' = ADD SUB XOR SHL (lab 9), '8' = NOP ADD SUB XOR SHL AND OR MOV (lab 10)"},
        "k": {"type": "integer", "description": "mux_bus: number of buses (2, 4, 8)"},
        "hex": {"type": "boolean", "description": "seg7_mux4: show 0–F"}, "dp": {"type": "boolean", "description": "seg7_mux4: decimal points"},
        "async": {"type": "boolean", "description": "register_en: clear without waiting for the clock"},
-       "tick": {"type": "integer", "description": "lab6_counter: 50 MHz clocks per count (default 2500000 = 20 Hz)"},
-       "scan": {"type": "integer", "description": "lab6_counter: display scan divider (default 50000 = 1 kHz)"},
+       "tick": {"type": "integer", "description": "lab6_counter: 50 MHz clocks per count (default 2500000 = 20 Hz); lab7_countdown: per second (default 50000000)"},
+       "scan": {"type": "integer", "description": "lab6_counter / lab7_countdown: display scan divider (default 50000 = 1 kHz)"},
+       "btn": {"type": "integer", "description": "lab7_countdown: button sampling divider (default 1000000 = 50 Hz)"},
+       "count_out": {"type": "boolean", "description": "lab7_countdown: also bring the count (sec_lo … min_hi) out as ports"},
        "sheet": {"type": "string", "description": "sheet to build on (created, or an empty one filled)"},
+       "params": {"type": "object", "description": "the part's settings may also go here, e.g. {format:'mm.ss', down:true, load:true}; "
+                  "a setting the part does not have is refused (list_parts shows each part's)"},
        "replace": {"type": "boolean", "description": "rebuild a sheet that already has parts (one undo brings it back)"},
        "name": {"type": "string", "description": "entity name when no sheet is given"}}, ["kind"], timeout=90),
     T("build_circuit", "Create a whole circuit, minimised and laid out by the editor, on a new sheet. One of:\n"
@@ -257,7 +267,8 @@ TOOLS = [
       "• generator: {kind: mod_counter|jk_counter|sequence_counter|ripple_counter|shift_register|register|bcd_7seg, n, sequence, active_low} — "
       "jk_counter = synchronous JK-FF counter / clock divider like the lab's (clk_in → clk_out = MSB; output:'q' gives q0..qN; clk / output rename); "
       "clock_divider = divide clk_in by ANY n (2..2^31, e.g. 50 MHz → 20 Hz: n=2500000), one sheet, 50 % duty for even n\n"
-      "• intent: {module, components:[{id,type,name?}], nets:[{from:'id.pin', to:'id.pin'}]} — a sub-circuit is "
+      "• intent: {module, components:[{id,type,name?,inputs?}], nets:[{from:'id.pin', to:'id.pin'}]} — inputs: 2..8 for AND/OR/NAND/NOR/XOR/XNOR "
+      "(one 4-input OR, not a tree of 2-input ones; a net to a bare gate id takes its next free input); a sub-circuit is "
       "type 'block:<sheet name>', its pins are that sheet's port names and must be spelled ('cnt.en', 'cnt.q')",
       {"name": {"type": "string"}, "truth_table": {"type": "object"}, "generator": {"type": "object"},
        "intent": {"type": "object"}, "into": {"type": "string", "enum": ["new", "current"]},
@@ -442,6 +453,14 @@ def fields_of(name):
     return ", ".join(f"{k}{'*' if k in req else ''} ({v.get('type', 'any')})" for k, v in sch["properties"].items())
 
 
+# long jobs (a big top sheet's layout takes minutes): background:true answers at once with a job id;
+# last_result {job} gives the answer when it is done — no timeout to lose it in
+BACKGROUND_TOOLS = [t["name"] for t in TOOLS if t["_timeout"] >= 90]
+for _t in TOOLS:
+    if _t["name"] in BACKGROUND_TOOLS:
+        _t["inputSchema"]["properties"]["background"] = {
+            "type": "boolean", "description": "run as a job: answers at once with {job}; then last_result {job} (for a big sheet)"}
+
 # the apply step fields, spelled out (they used to be guessed: delete takes `refs`, not target/components)
 _apply = TOOL_MAP["apply"]
 _apply["description"] += " Step fields (* = required): " + "; ".join(
@@ -503,6 +522,15 @@ def normalize_args(name, args):
                     v = [v]
                 args[field] = v
                 break
+    for k, v in list(args.items()):       # an array / object sent as JSON text (some clients do): read it
+        want = (props.get(k) or {}).get("type")
+        if want in ("array", "object") and isinstance(v, str) and v.strip()[:1] in "[{":
+            try:
+                args[k] = json.loads(v)
+            except ValueError:
+                pass
+        if want == "array" and isinstance(args.get(k), str):
+            args[k] = [args[k]]
     unknown = [k for k in args if k not in props]
     if unknown:
         return args, (f"{name}: unknown field{'s' if len(unknown) > 1 else ''} {', '.join(repr(k) for k in unknown)}"
@@ -524,7 +552,7 @@ def normalize_args(name, args):
             fixed.append(dict(body, op=st["op"]))
         args["steps"] = fixed
     return args, None
-LOCAL_TOOLS = {"list_projects", "about", "check_update", "open_home"}   # answered by the app itself, no editor needed
+LOCAL_TOOLS = {"list_projects", "about", "check_update", "open_home", "last_result"}   # answered by the app itself, no editor needed
 
 RESOURCES = [
     {"uri": "fpga://guide", "name": "How to work with Schematic Studio", "mimeType": "text/markdown"},
@@ -689,7 +717,14 @@ def call_tool(name, args):
         args, bad = normalize_args(name, args)
         if bad:
             return {"content": [text(bad)], "isError": True}
-        reply = APP.call(name, args, tool["_timeout"])
+        if args.pop("background", False):
+            reply = APP.call(name, args, 3)
+            if not reply.get("ok") and reply.get("job"):
+                return {"content": [text({"job": reply["job"], "status": "running",
+                                          "next": f"last_result {{\"job\": \"{reply['job']}\"}} — call it in a while; "
+                                                  "the editor is busy with this job meanwhile"})]}
+        else:
+            reply = APP.call(name, args, tool["_timeout"])
     except Exception as e:
         return {"content": [text(f"FPGA Ecosystem is not reachable: {e}")], "isError": True}
     if not reply.get("ok"):

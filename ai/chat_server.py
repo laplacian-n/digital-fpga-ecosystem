@@ -64,17 +64,62 @@ _ASK_SYS = ("คุณเป็นผู้ช่วยในโปรแกร�
             "(full adder, 2:1 mux…), สมการ (sum = a xor b) หรือมินเทอม (y = minterms(1,2,4,7)). "
             "ข้อเท็จจริงของบอร์ด EDGE Spartan-7 (XC7S15) ที่ใช้ในวิชา: I/O ทำงานที่ 3.3 V (ไม่ใช่ 5 V), "
             "clock 50 MHz ที่ขา H11, จอ 7-segment 4 หลักแบบ common anode — ขา a..g, dp และ an[3:0] เป็น active-low "
-            "(ให้ 0 = ติด), ปุ่มกดบนบอร์ด กด = 1 (active-high), สวิตช์เลื่อน 16 ตัว และ LED 16 ดวง (1 = ติด). "
+            "(ให้ 0 = ติด), ปุ่มกดบนบอร์ด กด = 1 (active-high) — pb[0]..pb[4] = ปุ่มบน ล่าง ซ้าย ขวา กลาง, สวิตช์เลื่อน 16 ตัว และ LED 16 ดวง (1 = ติด). "
+            "ถ้ามีบันทึกจากเนื้อหาวิชาแนบมา ใช้ส่วนที่ตรงกับคำถาม ถ้าไม่ตรงให้ตอบจากความรู้ที่ถูกต้อง อย่าแต่งข้อเท็จจริงขึ้นเอง. "
+            "ตอบเป็นข้อความธรรมดา (หน้าแชตไม่แสดง markdown: ไม่ใช้ ** # ตาราง หรือ ```), "
             "ตอบคำถามให้จบในตัว ไม่ต้องปิดท้ายด้วยการแนะนำคำสั่ง /help หรือเมนูอื่นถ้าผู้ใช้ไม่ได้ถาม")
 
 
+# Course notes for Q&A mode: the launcher sets this to its rag_search (BM25 + optional embeddings) —
+# a callable(query) -> [{"title","group","source","topic","text"}]. Standalone chat_server: no notes.
+ASK_NOTES = None
+ASK_NOTES_K = 3
+ASK_NOTE_CHARS = 700
+
+
+def ask_query(message: str) -> str:
+    """The question itself: the editor wraps it with the sheet and the conversation
+    ("[คำถาม/คำสั่งล่าสุด]\n…"); notes are looked up for the question only."""
+    m = re.search(r"\[คำถาม/คำสั่งล่าสุด\]\s*(.+)$", message or "", flags=re.S)
+    return (m.group(1) if m else (message or "")).strip()
+
+
+def ask_notes_block(hits) -> str:
+    """Retrieved notes as the model sees them — ONE format, shared with tools/dataset (gen_qamode.py)."""
+    rows = []
+    for i, h in enumerate(hits or [], 1):
+        head = " · ".join(x for x in (h.get("topic") or h.get("title") or "", h.get("source") or "") if x)
+        txt = re.sub(r"\s+", " ", h.get("text") or "").strip()
+        if len(txt) > ASK_NOTE_CHARS:
+            txt = txt[:ASK_NOTE_CHARS].rsplit(" ", 1)[0] + " …"
+        rows.append(f"{i}. {head}\n{txt}")
+    if not rows:
+        return ""
+    return ("[บันทึกจากเนื้อหาวิชา — ใช้เฉพาะส่วนที่เกี่ยวกับคำถาม อาจไม่ครบหรือไม่ตรงคำถาม]\n"
+            + "\n\n".join(rows))
+
+
+def ask_messages(message: str, hits=None) -> list:
+    notes = ask_notes_block(hits)
+    return [{"role": "system", "content": _ASK_SYS},
+            {"role": "user", "content": (notes + "\n\n" if notes else "") + message}]
+
+
+def _ask_hits(message: str) -> list:
+    if not ASK_NOTES:
+        return []
+    try:
+        return list(ASK_NOTES(ask_query(message)) or [])[:ASK_NOTES_K]
+    except Exception:
+        return []
+
+
 def _ask_llm(message: str) -> str:
-    """Plain Q&A via the LLM (no circuit generation). Returns the answer text."""
+    """Plain Q&A via the LLM (no circuit generation), with course notes when the launcher gives them."""
     import urllib.request
     ic = __import__("intent_client")
     body = json.dumps({"model": ic.DEFAULT_MODEL,
-                       "messages": [{"role": "system", "content": _ASK_SYS},
-                                    {"role": "user", "content": message}],
+                       "messages": ask_messages(message, _ask_hits(message)),
                        "temperature": 0.3, "max_tokens": 512,
                        "chat_template_kwargs": {"enable_thinking": False}}).encode("utf-8")
     req = urllib.request.Request(ic.DEFAULT_ENDPOINT, data=body,

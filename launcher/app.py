@@ -40,7 +40,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 APP_NAME = "FPGA Ecosystem"
 APP_ID = "fpga-ecosystem"
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 
 FROZEN = getattr(sys, "frozen", False)
 # ROOT = where the bundled content lives (repo root in dev, _MEIPASS when frozen)
@@ -243,6 +243,10 @@ def load_backend():
     try:
         import chat_server  # noqa: E402  (needs sys.path set above)
         BACKEND = chat_server
+        # Q&A mode answers with the course notes (keyword search only: a question must not wait
+        # for the embedding server; no boost for verified lab solutions — a concept question wants the chapter)
+        chat_server.ASK_NOTES = lambda q: (rag_search(q, k=chat_server.ASK_NOTES_K, semantic=False,
+                                                      prefer_verified=False) or {}).get("hits") or []
         ghdl = detect_ghdl()
         if ghdl:
             try:
@@ -373,9 +377,17 @@ def rag_retriever():
                 if str(rag) not in sys.path:
                     sys.path.insert(0, str(rag))
                 import retriever as _rtv
-                if not _rtv.INDEX.exists():
+                # also when a source is newer than the index (a corrected lab solution must not keep
+                # reaching the agent from an old index)
+                newest = max((f.stat().st_mtime for f in rag.rglob("*") if f.is_file() and f.suffix in (".json", ".md", ".txt", ".vhd")
+                              and f.name != _rtv.INDEX.name and "emb" not in f.name), default=0)
+                if not _rtv.INDEX.exists() or newest > _rtv.INDEX.stat().st_mtime:
                     import build_index as _bi
-                    _bi.main()
+                    try:
+                        _bi.main()
+                    except Exception:
+                        if not _rtv.INDEX.exists():     # a read-only install keeps the index it shipped with
+                            raise
                 _RAG["r"] = _rtv.Retriever()
             except Exception as e:
                 _RAG["err"] = f"{type(e).__name__}: {e}"
@@ -455,12 +467,12 @@ def _rag_index(r, key, cache):
         _EMB["busy"] = False
 
 
-def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True) -> dict:
+def rag_search(query: str, k: int = 5, group: str = "", semantic: bool = True, prefer_verified: bool = True) -> dict:
     r = rag_retriever()
     if r is None:
         return {"ok": False, "error": "course notes (RAG) unavailable: " + _RAG["err"]}
     k = max(1, min(12, int(k or 5)))
-    bm = r.search(query or "", k=50, group=group or None, hybrid=False)
+    bm = r.search(query or "", k=50, group=group or None, hybrid=False, prefer_verified=prefer_verified)
     ranks = {}                                  # doc row -> [bm25 rank, cosine rank]
     for i, h in enumerate(bm):
         ranks[r.id2row[h["id"]]] = [i, None]
@@ -606,32 +618,70 @@ def list_projects() -> list:
     return out
 
 
+def _pdf_browsers() -> list:
+    """Edge first (every Windows has it), then Chrome, then whatever find_browser gives"""
+    out = [find_browser()]
+    if IS_WIN:
+        pf = [os.environ.get(k) for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+        for rel in (r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"):
+            out += [str(Path(b) / rel) for b in pf if b and (Path(b) / rel).is_file()]
+    seen, res = set(), []
+    for b in out:
+        if b and b.lower() not in seen and Path(b).is_file():
+            seen.add(b.lower())
+            res.append(b)
+    return res
+
+
 def html_to_pdf(html: Path) -> dict:
-    """print a report page to PDF with the browser the app already uses (headless Edge / Chrome)"""
-    br = find_browser()
-    if not br:
+    """print a report page to PDF with the browser the app already uses (headless Edge / Chrome).
+    It prints in a plain temp folder and copies the result: the project folder can be under OneDrive
+    with a Thai name (C:\\Users\\…\\OneDrive\\เอกสาร), and the Edge launcher may hand the job to another
+    process and return before the file is written — so the file is waited for, not assumed."""
+    browsers = _pdf_browsers()
+    if not browsers:
         return {"ok": False, "error": "ไม่พบ Edge / Chrome สำหรับพิมพ์ PDF — เปิดรายงาน .html แล้วกดพิมพ์เป็น PDF เองได้"}
-    pdf = html.with_suffix(".pdf")
-    try:
-        pdf.unlink()
-    except OSError:
-        pass
     import tempfile
-    with tempfile.TemporaryDirectory() as prof:            # its own profile: an open Edge window does not block it
-        args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer", f"--user-data-dir={prof}",
-                f"--print-to-pdf={pdf}", html.resolve().as_uri()]
-        # Linux: as root, or where the distro blocks its sandbox (Ubuntu 23.10+), Chromium exits at once
-        # without this — it only renders our own report file
-        if not IS_WIN and sys.platform != "darwin":
-            args.insert(1, "--no-sandbox")
-        try:
-            p = subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
-        except Exception as e:
-            return {"ok": False, "error": f"พิมพ์ PDF ไม่ได้: {e}"}
-    if not pdf.is_file() or pdf.stat().st_size < 500:
-        tail = (p.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
-        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF" + (": " + " | ".join(tail) if tail else ""), "browser": br}
-    return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size}
+    pdf = html.with_suffix(".pdf")
+    work = Path(tempfile.mkdtemp(prefix="fe_pdf_"))
+    errors = []
+    try:
+        src = work / "report.html"
+        shutil.copyfile(html, src)                        # the report is one self-contained file
+        for n, br in enumerate(browsers):
+            out = work / f"report{n}.pdf"
+            args = [br, "--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
+                    "--no-pdf-header-footer", f"--user-data-dir={work / f'prof{n}'}", f"--print-to-pdf={out}", src.as_uri()]
+            # Linux: as root, or where the distro blocks its sandbox (Ubuntu 23.10+), Chromium exits at once
+            # without this — it only renders our own report file
+            if not IS_WIN and sys.platform != "darwin":
+                args.insert(1, "--no-sandbox")
+            try:
+                p = subprocess.run(args, timeout=120, capture_output=True, **({"creationflags": 0x08000000} if IS_WIN else {}))
+            except Exception as e:
+                errors.append(f"{Path(br).name}: {e}")
+                continue
+            # wait for the file to appear and stop growing
+            last, stable, end = -1, 0, time.time() + 60
+            while time.time() < end:
+                size = out.stat().st_size if out.is_file() else -1
+                stable = stable + 1 if size == last and size > 500 else 0
+                if stable >= 3:
+                    break
+                last = size
+                time.sleep(0.5)
+            if out.is_file() and out.stat().st_size > 500:
+                try:
+                    pdf.unlink()
+                except OSError:
+                    pass
+                shutil.copyfile(out, pdf)
+                return {"ok": True, "path": str(pdf), "size": pdf.stat().st_size, "browser": Path(br).name}
+            tail = (p.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-2:]
+            errors.append(f"{Path(br).name} (exit {p.returncode})" + (": " + " | ".join(tail) if tail else ""))
+        return {"ok": False, "error": "เบราว์เซอร์ไม่ได้สร้างไฟล์ PDF — " + " ; ".join(errors)}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def delete_project(name: str) -> dict:
@@ -785,10 +835,15 @@ class McpRelay:
         self.running = {}       # client -> (job id, op, started)
         self.waiting = set()    # job ids a caller is still waiting for
         self.replies = {}       # job id -> reply
+        self.late = {}          # job id -> op, for a call that gave up while the editor still ran it
+        self.finished = []      # [(time, job id, op, reply)] — late answers kept for last_result
         self.n = 0
         self.opened_at = 0.0
 
-    def live_client(self, within=35.0):
+    # an editor busy with a long synchronous job (drawing a whole lab: ~30 s) does not poll meanwhile —
+    # it is busy, not gone: taking it for closed opened a SECOND Studio window, which answered with an
+    # empty history (ai_chat_status "none") and doubled the memory in use
+    def live_client(self, within=150.0):
         now = time.time()
         live = [(t, c) for c, t in self.seen.items() if now - t < within or c in self.running]
         return max(live)[1] if live else None
@@ -820,6 +875,14 @@ class McpRelay:
                     del self.running[c]
             if jid in self.waiting:             # nobody waits for a late answer any more: drop it
                 self.replies[jid] = reply
+            elif jid in self.late:              # …unless the caller gave up on a long job: keep it for last_result
+                self.finished = (self.finished + [(time.time(), jid, self.late.pop(jid), reply)])[-10:]
+            self.cv.notify_all()
+
+    def forget(self, client):
+        with self.cv:
+            self.seen.pop(client, None)
+            self.running.pop(client, None)
             self.cv.notify_all()
 
     def busy(self, client):
@@ -830,8 +893,20 @@ class McpRelay:
         with self.cv:
             client = self.live_client()
         if client is None:
-            # nobody has the editor open: open it (once in a while) and wait for it to connect
-            if time.time() - self.opened_at > 20:
+            # nobody has the editor open: open it (once in a while) and wait for it to connect —
+            # unless one was there in the last 5 minutes (then it is only busy: wait for it)
+            with self.cv:
+                recent = any(time.time() - t < 300 for t in self.seen.values())
+            if recent:
+                end = time.time() + 45
+                with self.cv:
+                    while client is None and time.time() < end:
+                        self.cv.wait(1.0)
+                        client = self.live_client(within=330)
+                if client is None:
+                    return {"ok": False, "error": "the editor has not answered for a while — it is busy with a long job",
+                            "hint": "wait a little and call again (a whole lab takes ~30 s to draw)"}
+            elif time.time() - self.opened_at > 20:
                 self.opened_at = time.time()
                 try:
                     open_window("studio")
@@ -863,20 +938,36 @@ class McpRelay:
                         self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
                         return {"ok": False, "error": f"the editor is still busy with '{b[0]}' ({int(b[1])} s so far) — "
                                                       f"'{op}' was not run",
-                                "hint": "wait a little and call again; a very large sheet takes a while to lay out"}
+                                "hint": "wait a little and call again (ai_chat_status / ai_chat_stop run beside it). "
+                                        "If this lasts minutes, the page itself is stuck in that op"}
                     left = end - now
                     if left <= 0:
                         if queued:      # drop it if the page never picked it up
                             self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
                             return {"ok": False, "error": f"the editor did not pick up '{op}' within {int(timeout)} s",
                                     "hint": "is the Schematic Studio window frozen or showing a dialog?"}
+                        self.late[jid] = op
                         return {"ok": False, "error": f"'{op}' is still running in the editor after {int(timeout)} s",
-                                "hint": "it finishes on its own — call status in a moment to see the result"}
+                                "job": jid,
+                                "hint": f"it finishes on its own — do NOT send it again; call last_result {{\"job\": \"{jid}\"}} "
+                                        "in a minute for its answer"}
                     self.cv.wait(min(left, 1.0))
                 return self.replies.pop(jid)
             finally:
                 self.waiting.discard(jid)
                 self.replies.pop(jid, None)
+
+
+    def last_result(self, job=None, op=None):
+        """The answer of a call that ran past its caller's timeout (newest first)."""
+        with self.cv:
+            for t, jid, o, reply in reversed(self.finished):
+                if (job and jid == job) or (not job and (not op or o == op)):
+                    return {"ok": True, "job": jid, "op": o, "finished_s_ago": int(time.time() - t), "reply": reply}
+            running = [{"job": j, "op": o} for j, o in self.late.items()]
+        return {"ok": False, "error": "no late answer yet" + (f" for {job or op}" if (job or op) else ""),
+                "hint": "still running: " + ", ".join(f"{r['op']} ({r['job']})" for r in running) if running
+                        else "nothing ran past its timeout — the last call answered normally"}
 
 
 RELAY = McpRelay()
@@ -929,6 +1020,8 @@ def install_claude_desktop() -> dict:
 def mcp_app(action: str, args: dict) -> dict:
     """What Claude can ask the app itself (no editor window needed): who/what/which version
     this is, whether an update is out, whether the board toolchain is ready; and open Home."""
+    if action == "last_result":
+        return RELAY.last_result(args.get("job") or None, args.get("op") or None)
     if action in ("about", "check_update"):
         up = update_check(force=(action == "check_update"))
         upd = {"current": VERSION, "checked": bool(up.get("ok"))}
@@ -1098,6 +1191,9 @@ def make_handler():
                     return self._api_post(path, q)
             except ValueError as e:
                 return self._out(403, {"ok": False, "error": str(e)})
+            except Exception as e:      # an answer, not a dropped connection ("Failed to fetch" in the page)
+                traceback.print_exc()
+                return self._out(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
             feat = _BACKEND_ROUTES.get(path)
             if feat and not CFG["features"].get(feat):
                 return self._out(200, {"ok": False, "status": "REJECTED", "evidence": [],
@@ -1210,6 +1306,9 @@ def make_handler():
             if path == "/api/mcp/result":
                 RELAY.result(json.loads(self._body() or b"{}"))
                 return self._out(200, {"ok": True})
+            if path == "/api/mcp/bye":                   # the editor page is closing: forget it now
+                RELAY.forget((q.get("client") or [""])[0])
+                return self._out(200, {"ok": True})
             if path == "/api/mcp/install_desktop":
                 return self._out(200, install_claude_desktop())
             if path == "/api/mcp/remove_legacy":
@@ -1304,7 +1403,10 @@ def make_handler():
                 reveal(inside(projects_dir(), rel) if rel else projects_dir())
                 return self._out(200, {"ok": True})
             if path == "/api/report/pdf":
-                return self._out(200, html_to_pdf(inside(projects_dir(), str(data.get("path") or ""))))
+                f = inside(projects_dir(), str(data.get("path") or ""))
+                if not f.is_file():
+                    return self._out(200, {"ok": False, "error": f"no report at {f}"})
+                return self._out(200, html_to_pdf(f))
             if path == "/api/projects/delete":
                 return self._out(200, delete_project(str(data.get("name") or "")))
             if path == "/api/projects/rename":
@@ -1435,7 +1537,10 @@ def main(argv=None):
         HTTPD = _bind(0)
     SERVER_PORT = HTTPD.server_address[1]
     write_runtime()
-    start_llama()
+    # a model server from our llama folder running now was left by an earlier run (closed by the updater,
+    # a crash): it holds RAM / VRAM for nothing — stop it before anything else
+    if not start_llama().get("ok"):                  # (a start stops them itself)
+        threading.Thread(target=llm.stop_strays, daemon=True).start()
     LAST_PING = time.time()
     threading.Thread(target=_watchdog, daemon=True).start()
     print(f"{APP_NAME} {VERSION} on {base_url()}  (backend: "

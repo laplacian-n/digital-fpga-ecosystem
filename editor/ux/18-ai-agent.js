@@ -231,6 +231,9 @@ async function aiAgentRun(msg, opts){
       if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
+        // the app's own notes wait until every call of this turn has its result: a user message between
+        // two tool results breaks the order the chat template expects (assistant → tool, tool, … → user)
+        const after=[];
         for(const tc of calls){
           if(run.cancel) break;
           const tool=tc.function.name; let args={}, bad=null;
@@ -254,7 +257,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
           if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
-            messages.push({role:"user", content:passNote}); }
+            after.push({role:"user", content:passNote}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -270,6 +273,7 @@ async function aiAgentRun(msg, opts){
           if(r.ok && tool!=="check" && AIAG_VERIFY_OPS.has(tool) && !circular) needSim.delete(on);
           if(!r.ok) think=true;                // an error: let it reason about the fix
         }
+        messages.push(...after);
         // rounds that change nothing (failed connects, the same look again): point at the tools that do it, then stop
         if(aiagFingerprint()===fp0) stall++; else stall=0;
         if(stall===AIAG_STALL && stopAt===Infinity){ stopAt=i+3; stopWhy="stall";
@@ -382,6 +386,9 @@ MCP_OPS.ai_chat_status = async a=>{
   if(cap.error) out.error=cap.error;
   const run=AIAG.seq>cap.runBefore ? AIAG.runs.find(r=>r.id===cap.runBefore+1) : null;
   if(run) out.agent=aiagRunSummary(run, a.detail==="full");
+  // the latest finished run's answer rides on every status, so a poll that timed out never loses it
+  const last=aiagStored().slice(-1)[0];
+  if(last && (!run || last.id!==run.id)) out.last_finished_run={id:last.id, state:last.state, message:aiagClip(last.message, 120), final:last.final, error:last.error, at:last.at};
   if(run && run.resumable) out.next_resume="ai_chat {resume:true} continues this run from where it stopped";
   if(!cap.done) out.next="still running — call ai_chat_status again";
   return out;
@@ -409,6 +416,8 @@ MCP_OPS.ai_model = async a=>{
   return {state:s.state, model:s.model, llama_server:s.server||null, mode:s.mode, running_for_s:s.since,
     catalog:(s.catalog||[]).map(m=>({id:m.id, name:m.name, size_gb:m.size_gb, installed:m.installed, agent:!!m.agent})),
     embedding_model:s.embed?{id:s.embed.id, installed:s.embed.installed, running:s.embed.running, note:"semantic search for search_course (download with action:'download', model:'"+s.embed.id+"')"}:undefined,
+    llama_processes:(s.processes||[]).map(p=>({pid:p.pid, mb:p.mb, ours:p.ours, path:p.path})),
+    leftovers_stopped:(s.leftovers_stopped||[]).length||undefined,
     download:s.download, log_tail:aiagClip(s.log, 2500), agent_runs_logged:"launcher config folder ▸ agent-runs/*.jsonl"};
 };
 /* run ids go on across reloads, so a saved run is never overwritten by a new one with the same id */

@@ -60,7 +60,8 @@ function eqSheets(A, B, opts){
 function eqAgainst(sch, spec){
   const keep={spec:sch.spec, specResult:sch.specResult, verified:sch.verified, specSource:sch.specSource, specSig:sch.specSig};
   try{ sch.spec=spec; delete sch.specResult; const r=specCheck(sch) || {pass:false, reason:"ตรวจไม่ได้"};
-    return {equivalent:r.pass===true, method:r.checked, reason:r.reason, differences:(r.mismatches||[]).length?r.mismatches:undefined, total_differences:r.total_mismatches||undefined}; }
+    return {equivalent:r.pass===true ? true : r.pass===null ? null : false, method:r.checked, reason:r.reason, hint:r.hint,
+      differences:(r.mismatches||[]).length?r.mismatches:undefined, total_differences:r.total_mismatches||undefined}; }
   finally{ Object.entries(keep).forEach(([k,v])=>{ if(v===undefined) delete sch[k]; else sch[k]=v; }); }
 }
 MCP_OPS.compare_sheets = a=>{
