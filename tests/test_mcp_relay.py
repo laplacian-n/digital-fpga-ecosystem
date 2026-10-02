@@ -43,6 +43,33 @@ class Relay(unittest.TestCase):
         R.result({"id": "j99", "ok": True})
         self.assertEqual(R.replies, {})
 
+    def test_a_call_that_timed_out_can_fetch_its_answer(self):
+        """Lab 7: build_hierarchy of a big top sheet ran past 120 s; the build finished but its
+        report (unconnected / undriven) was lost, and the call was sent again."""
+        R = app.McpRelay()
+        R.seen["pg"] = time.time()
+
+        def page():
+            job = R.poll("pg", wait=5)
+            time.sleep(1.5)
+            R.result({"id": job["id"], "ok": True, "result": {"sheet": "top", "undriven_outputs": []}})
+
+        threading.Thread(target=page, daemon=True).start()
+        r = R.call("build_hierarchy", {}, timeout=0.5)
+        self.assertFalse(r["ok"])
+        self.assertIn("last_result", r["hint"])
+        self.assertFalse(R.last_result(job=r["job"])["ok"])          # not done yet
+        time.sleep(1.5)
+        got = R.last_result(job=r["job"])
+        self.assertTrue(got["ok"])
+        self.assertEqual(got["reply"]["result"]["sheet"], "top")
+        self.assertEqual(R.last_result(op="build_hierarchy")["job"], r["job"])
+        old, app.RELAY = app.RELAY, R                     # the MCP tool goes through the app's /api/mcp/app
+        try:
+            self.assertEqual(app.mcp_app("last_result", {"job": r["job"]})["op"], "build_hierarchy")
+        finally:
+            app.RELAY = old
+
 
 class Rag(unittest.TestCase):
     def test_course_notes_are_searchable(self):
@@ -69,6 +96,18 @@ class Args(unittest.TestCase):
         self.assertIn("refs* (array)", e)
         _, e = M.normalize_args("connect", {"from": "a", "to": "b", "color": "red"})
         self.assertIn("connect takes:", e)
+
+    def test_arrays_and_objects_sent_as_json_text(self):
+        """Lab 7: delete {refs:'["an[3]","an[2]"]'} looked for ONE component named '["an[3]",…]'."""
+        a, e = M.normalize_args("delete", {"refs": '["an[3]", "an[2]"]'})
+        self.assertIsNone(e)
+        self.assertEqual(a["refs"], ["an[3]", "an[2]"])
+        a, _ = M.normalize_args("set_pins", {"map": '{"an[3]": null}'})
+        self.assertEqual(a["map"], {"an[3]": None})
+        a, _ = M.normalize_args("delete", {"refs": "g1"})
+        self.assertEqual(a["refs"], ["g1"])
+        a, _ = M.normalize_args("build_part", {"kind": "bcd_counter_multi", "params": '{"format": "mm.ss"}'})
+        self.assertEqual(a["params"], {"format": "mm.ss"})
 
     def test_apply_steps_are_checked_and_normalised(self):
         a, e = M.normalize_args("apply", {"steps": [{"op": "delete", "target": "el"}, {"op": "connect", "from": "x", "to": "y"}]})

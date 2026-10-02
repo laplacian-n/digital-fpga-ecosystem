@@ -15435,7 +15435,10 @@ MCP_OPS.get_pins = a=>{ const sch=mcpSheet(a.sheet); uxNormPinmap(sch);
 MCP_OPS.set_pins = a=>{
   const sch=mcpUse(a.sheet), bits=uxPortBits(sch), keys=new Map(bits.map(b=>[b.key.toLowerCase(), b]));
   mcpBeforeChange("เลือกขา"); sch.pinmap=sch.pinmap||{}; const done=[];
-  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase()); if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
+  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase());
+    // a pin left for a port that is gone (a rebuilt sheet): null / "" removes it
+    if(!b && (t===null||t==="")){ const k=Object.keys(sch.pinmap).find(x=>x.toLowerCase()===String(port).toLowerCase()); if(k){ delete sch.pinmap[k]; done.push(k+" → — (its port is gone)"); return; } }
+    if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
     if(t===null||t===""){ delete sch.pinmap[b.key]; done.push(b.key+" → —"); return; }
     const ok=(b.dir==="in"?PIN_IN_TARGETS:PIN_OUT_TARGETS).includes(t); if(!ok) mcpFail(`'${t}' is not a valid ${b.dir==="in"?"input":"output"} target for ${b.key}`, "call board_pins");
     sch.pinmap[b.key]=t; done.push(b.key+" → "+t); });
@@ -17216,7 +17219,14 @@ function busGroups(sch, which){
     return !sch.components.some(c=>(c.type==="IN"||c.type==="OUT") && String(c.params.name).toLowerCase()===g.name.toLowerCase());
   });
 }
+/* all or nothing: a group half turned into taps (the old ports gone, the bus port not yet there) left a
+   "ghost" bus in lab 7 — undriven, unlisted, its pins still in the pin map */
 function busifyPorts(sch, which){
+  const keep = JSON.stringify({c:sch.components, w:sch.wires, o:sch.portOrder||null});
+  try{ return busifyPortsRaw(sch, which); }
+  catch(e){ const k = JSON.parse(keep); sch.components = k.c; sch.wires = k.w; if(k.o) sch.portOrder = k.o; else delete sch.portOrder; throw e; }
+}
+function busifyPortsRaw(sch, which){
   const made = [];
   busGroups(sch, which).forEach(g=>{
     const n = g.bits.length, isIn = g.dir==="IN", taps = [];
@@ -18168,8 +18178,19 @@ const PARTS = {
 };
 
 /* ---- params: defaults, ranges ---- */
+/* a part's own settings may also come nested — {kind, params:{format:"mm.ss", down:true}} (lab 7: they
+   were dropped and the default 00-99 counter was drawn without a word) */
+function partArgs(a){ return a && a.params && typeof a.params==="object" ? Object.assign({}, a, a.params) : (a||{}); }
+const PART_GENERIC=new Set(["kind","part","type","module","sheet","name","bus","replace","params","x","y","top","pins","label","id","_check","generator"]);
+/* settings this part does not have are refused, naming the ones it has (MCP entry points) */
+function partCheckArgs(kind, a){
+  const P=PARTS[kind]; if(!P) return;
+  const own=Object.keys(P.params||{}), bad=Object.keys(partArgs(a)).filter(k=>!own.includes(k) && !PART_GENERIC.has(k));
+  if(bad.length) mcpFail(`${kind} has no setting ${bad.map(k=>"'"+k+"'").join(", ")}`,
+    own.length ? `${kind} takes: ${own.map(k=>k+"="+JSON.stringify(P.params[k].def)+(P.params[k].options?" ("+P.params[k].options.join("|")+")":"")).join(", ")}` : `${kind} has no settings`);
+}
 function partParams(kind, a){
-  const P=PARTS[kind]; const out={};
+  const P=PARTS[kind]; const out={}; a=partArgs(a);
   Object.entries(P.params||{}).forEach(([k,s])=>{
     let v=a[k]!=null?a[k]:s.def;
     if(s.bool) v=v===true||v==="true"||v===1;
@@ -18296,8 +18317,9 @@ MCP_OPS.build_part = a=>{
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
   if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet — or delete_sheet it first to rebuild it");
+  if(PARTS[kind]) partCheckArgs(kind, a);
   mcpBeforeChange("สร้าง "+kind);
-  const r=partBuild(kind, a);
+  const r=partBuild(kind, partArgs(a));
   let sch=r.sch;
   if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified","pinmap"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
     delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
@@ -18395,11 +18417,75 @@ function formulaTable(formula, inputsGiven){
   return {inputs, outputs, cols, text:parsed.map(p=>p.src.replace(/\s+/g,"")).join(";")};
 }
 
+/* ---------- a formula too wide for a truth table: the expression itself as gates ----------
+   Lab 7: "zero = ~(m3|m2|…|s0)" (16 inputs) and the 12-input error logic were refused ("at most 10
+   for a truth table") and had to be cut into blocks by hand. Past 10 inputs the equations are drawn
+   as written — chains of one operator become one gate of up to 8 inputs, ~(a|b|c) a NOR — and the
+   drawing is then checked against the equations on random rows. Arithmetic ({c,s} = a + b) still
+   goes through the table. */
+const FX_GATE={"&":"AND","*":"AND","·":"AND","∧":"AND","and":"AND","|":"OR","+":"OR","∨":"OR","or":"OR","^":"XOR","⊕":"XOR","xor":"XOR",
+  "nand":"NAND","nor":"NOR","xnor":"XNOR","⊙":"XNOR"};
+function fxWideParse(formula){
+  let eqs=Array.isArray(formula) ? formula : (formula&&formula.equations) ? formula.equations : String(formula||"").split(/[;\n]+/);
+  eqs=eqs.map(x=>String(x).trim()).filter(Boolean);
+  const parsed=[];
+  for(const src of eqs){ const i=src.indexOf("="); if(i<1) return null;
+    const lhs=src.slice(0,i).trim(); if(!/^[A-Za-z_]\w*$/.test(lhs)) return null;      // {…} = arithmetic: not here
+    let ast; try{ ast=fxParse(fxTokens(src.slice(i+1)), false); }catch(_){ return null; }
+    parsed.push({src, out:lhs, ast}); }
+  const ids=[]; const walk=e=>{ if(!e) return; if(e.id!=null){ if(!ids.includes(e.id)) ids.push(e.id); return; } walk(e.not); walk(e.l); walk(e.r); };
+  parsed.forEach(p=>walk(p.ast));
+  const outs=parsed.map(p=>p.out);
+  return {parsed, outputs:outs, inputs:ids.filter(x=>!outs.includes(x)), text:parsed.map(p=>p.src.replace(/\s+/g,"")).join(";")};
+}
+function fxIntent(W, module){
+  const t=ptIntent(sanId(module||"logic")), sig={};
+  W.inputs.forEach(n=>sig[n]=t.IN(n));
+  const gate=(type, ins)=>{                       // one gate of ≤ 8 inputs, a tree past that
+    while(ins.length>8){ const head=ins.splice(0,8); ins.unshift(gate(type==="NAND"?"AND":type==="NOR"?"OR":type==="XNOR"?"XOR":type, head)); }
+    if(ins.length===1 && !/^N/.test(type)) return ins[0];
+    const id=t.X(type, {params:{inputs:Math.max(2, ins.length)}}); ins.forEach(s=>t.W(s, id)); return id; };
+  const flat=(e, op)=>e.op && FX_GATE[e.op]===op && !/^(NAND|NOR|XNOR)$/.test(op) ? [...flat(e.l, op), ...flat(e.r, op)] : [e];
+  const emit=e=>{
+    if(e.id!=null){ if(!sig[e.id]) throw new Error(`'${e.id}' is used before it is defined`); return sig[e.id]; }
+    if(e.num!=null) return t.X(e.num?"VCC":"GND");
+    if(e.not){ const x=e.not;                    // ~(a|b|c) → NOR(a,b,c)
+      if(x.op && /^(AND|OR|XOR)$/.test(FX_GATE[x.op])){ const T=FX_GATE[x.op]; return gate(T==="XOR"?"XNOR":"N"+T, flat(x, T).map(emit)); }
+      return t.G("NOT", [emit(x)]); }
+    const T=FX_GATE[e.op]; if(!T) throw new Error(`'${e.op}' cannot be drawn`);
+    return gate(T, (/^(NAND|NOR|XNOR)$/.test(T) ? [e.l, e.r] : flat(e, T)).map(emit)); };
+  W.parsed.forEach(p=>{ const s=emit(p.ast); sig[p.out]=s; t.OUT(p.out, s); });
+  return {module:t.module, components:t.components, nets:t.nets};
+}
+/* the drawing against the equations on random rows (all rows up to 2^12) */
+function fxWideCheck(sch, W){
+  const fs=flattenSchematic(sch).sch, st=probeStruct(fs), n=W.inputs.length, all=n<=12, N=all?(1<<n):400;
+  for(let r=0;r<N;r++){
+    const env={}; W.inputs.forEach((nm,i)=>env[nm]=all ? (r>>(n-1-i))&1 : (Math.random()<0.5?1:0));
+    if(!all && r<2) W.inputs.forEach(nm=>env[nm]=r);        // all 0s, all 1s
+    const got=mcpEvalOuts(sch, fs, st, env), want={};
+    W.parsed.forEach(p=>{ want[p.out]=fxEval(p.ast, env, false)?1:0; env[p.out]=want[p.out]; });
+    const bad=W.outputs.find(o=>String(got[o])!==String(want[o]));
+    if(bad) return {pass:false, row:Object.fromEntries(W.inputs.map(k=>[k,env[k]])), output:bad, want:want[bad], got:got[bad]};
+  }
+  return {pass:true, rows:N, how:all?`all ${N} rows`:`${N} random rows (incl. all 0 / all 1)`};
+}
+
 /* ---------- build_circuit: formula, and remember what the sheet was built from ---------- */
 {
   const _build=MCP_OPS.build_circuit;
   MCP_OPS.build_circuit=async a=>{
     let from=null, args=a;
+    const W=a.formula!=null && !a.inputs ? fxWideParse(a.formula) : null;
+    if(W && W.inputs.length>10){
+      const r=await _build(Object.assign({}, a, {formula:undefined, inputs:undefined, intent:fxIntent(W, a.name||a.sheet||W.outputs[0])}));
+      const sch=r && r.sheet ? Object.values(state.project.schematics).find(s=>s.name===r.sheet) : null;
+      if(sch){ const chk=fxWideCheck(sch, W);
+        sch.builtFrom={via:"formula", cols:{}, text:W.text, at:aifTick()}; delete sch.verified;
+        r.formula_check=chk;
+        r.note=`${W.inputs.length} inputs — too many for a truth table, so the equations are drawn as written (not minimised) and checked on ${chk.how||"rows"}`+(chk.pass?"":` — MISMATCH at ${JSON.stringify(chk.row)}`); }
+      return r;
+    }
     if(a.formula!=null){
       const F=formulaTable(a.formula, a.inputs);
       args=Object.assign({}, a, {formula:undefined, inputs:undefined, truth_table:{inputs:F.inputs, outputs:F.outputs, columns:F.cols}});
@@ -19158,7 +19244,7 @@ async function makeReport(opts){
   let saved=null, pdf=null, pdfError=null;
   if(/^https?:/.test(location.protocol)){ try{ saved=await mcpSaveFile(name, name+"_report.html", html); }catch(_){}
     // the PDF, printed by the app's own browser (Edge on Windows) — no print dialog for the student
-    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:name+"/"+name+"_report.html"}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
+    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:saved}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
   return {html, saved, pdf, pdf_error:pdfError||undefined};
 }
 GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแลป", desc:"รูปวงจรทุกชั้น, ตารางความจริง, สมการ, ผลทีละ clock, ขาบอร์ด, VHDL — พิมพ์เป็น PDF หรือเปิดใน Word", run:async()=>{
@@ -19728,7 +19814,9 @@ const hexOn=(s,d)=>(SEGHEX[d]>>"abcdefg".indexOf(s))&1;
 /* ---- counters ---- */
 const CNT_FORMATS={ "00-99":{mods:[10,10], names:["ones","tens"]}, "000-999":{mods:[10,10,10], names:["ones","tens","hundreds"]},
   "0000-9999":{mods:[10,10,10,10], names:["ones","tens","hundreds","thousands"]}, "00-59":{mods:[10,6], names:["ones","tens"]},
-  "mm.ss":{mods:[10,6,10,6], names:["sec_lo","sec_hi","min_lo","min_hi"]} };
+  "mm.ss":{mods:[10,6,10,6], names:["sec_lo","sec_hi","min_lo","min_hi"]},
+  // lab 7's timer runs 00.00 … 99.59: minutes up to 99 (mm.ss stops at 59.59)
+  "99.59":{mods:[10,6,10,10], names:["sec_lo","sec_hi","min_lo","min_hi"]} };
 const ptDigitsOf=(s, mods)=>mods.map(M=>{ const d=s%M; s=Math.floor(s/M); return d; });
 const ptValueOf=(ds, mods)=>{ let v=0, k=1; mods.forEach((M,i)=>{ v+=ds[i]*k; k*=M; }); return v; };
 
@@ -19772,7 +19860,7 @@ Object.assign(PARTS, {
         step:(s,v)=>({out:{q:s, tc:v.en&&s===term?1:0},
           state:v.clr?0:(p.load&&v.load)?v.d:v.en?(p.down?(s+p.m-1)%p.m:(s+1)%p.m):s})}; } },
   bcd_counter_multi:{ label:"ตัวนับ BCD หลายหลัก / นาฬิกา mm.ss", group:"ตัวนับ",
-    desc:"format: 00-99, 000-999, 0000-9999, 00-59, mm.ss (นับลงได้ด้วย down → ตัวจับเวลาถอยหลังแลป 7) · en, clr, load + ค่าเริ่มจากสวิตช์ · carry = en ตอนถึงปลาย · ต่อหลักด้วย counter_digit · ใช้ clk 50 MHz + en จากพัลส์ 1 Hz",
+    desc:"format: 00-99, 000-999, 0000-9999, 00-59, mm.ss (ถึง 59.59), 99.59 (นาทีถึง 99 — แลป 7; นับลงได้ด้วย down → ตัวจับเวลาถอยหลัง) · en, clr, load + ค่าเริ่มจากสวิตช์ · carry = en ตอนถึงปลาย · ต่อหลักด้วย counter_digit · ใช้ clk 50 MHz + en จากพัลส์ 1 Hz",
     params:{format:{options:Object.keys(CNT_FORMATS),def:"00-99"}, down:{bool:true,def:false}, load:{bool:true,def:false}},
     ports:p=>{ const F=CNT_FORMATS[p.format], out={}, din={}; F.names.forEach(n=>{ out[n]=4; din[n+"_d"]=4; });
       out.carry=1; return {in:Object.assign({clk:1, en:1, clr:1}, p.load?Object.assign({load:1}, din):{}), out}; },
@@ -20284,6 +20372,86 @@ Object.assign(PARTS, {
             state:{c:d.c, t:d.t, pT:d.out, s0:tick?v.btn:s.s0, s1:tick?s.s0:s.s1,
               run:s.run^(press && !err ? 1 : 0), cnt:en&&eq ? 0 : en ? (s.cnt+1)%100 : s.cnt}}; }}; } },
 });
+/* lab 7: the countdown timer mm.ss — asked for after it was built by hand over MCP (20 blocks, a lost bus
+   port, an hour of wiring). Same pattern as lab 6: verified library blocks wired by code, the glue
+   checked clock by clock against the lab's rules on small dividers. Rules (the lab sheet):
+     SW15–12 / 11–8 / 7–4 / 3–0 = tens / ones of minutes, tens / ones of seconds (BCD), 00.00 … 99.59;
+     SET loads the switches (and stops), START/STOP toggles counting, RESET clears to 00.00 (and stops);
+     one second per tick, borrowing across minutes; at 00.00 it stops and LED time-up lights;
+     LED error = a digit that is not BCD or seconds' tens > 5 (SET and START are refused meanwhile).
+   Buttons are sampled every `btn` clocks (50 MHz ÷ 1 000 000 = 50 Hz: no bounce gets through). */
+function lab7Model(p){
+  const mods=CNT_FORMATS["99.59"].mods, M=mods.reduce((a,b)=>a*b,1);
+  const dig=sw=>[0,1,2,3].map(k=>(sw>>(4*k))&15);              // sec_lo, sec_hi, min_lo, min_hi
+  const bad=sw=>{ const d=dig(sw); return d[0]>9 || d[1]>5 || d[2]>9 || d[3]>9 ? 1 : 0; };
+  return {mods, M, dig, bad};
+}
+Object.assign(PARTS, {
+  lab7_countdown:{ label:"แลป 7: ตัวจับเวลาถอยหลัง mm.ss ทั้งระบบ (บอร์ด EDGE)", group:"ระบบทั้งแลป",
+    desc:"sw[15:0] = เวลาเริ่ม (BCD: สิบนาที/หน่วยนาที/สิบวินาที/หน่วยวินาที, 00.00–99.59) · set = โหลดค่า (ปุ่มซ้าย J14) · startstop = เริ่ม/หยุด (ปุ่มบน J13) · reset = ล้างเป็น 00.00 (ปุ่มกลาง J12) · นับลงทีละวินาที (50 MHz ÷ tick) ยืมข้ามนาที หยุดที่ 00.00 · led_error = ค่าไม่ใช่ BCD หรือสิบวินาที > 5 · led_timeup = ถึง 00.00 · running · จอ 7-seg 4 หลักมีจุดคั่น mm.ss · จับขาบอร์ดให้แล้ว",
+    params:{tick:{min:2,max:2147483648,def:50000000}, btn:{min:2,max:2147483648,def:1000000}, scan:{min:2,max:2147483648,def:50000},
+      count_out:{bool:true,def:false}},
+    ports:p=>({in:{clk:1, set:1, startstop:1, reset:1, sw:16},
+      out:Object.assign({a:1,b:1,c:1,d:1,e:1,f:1,g:1, dp:1, an:4, led_error:1, led_timeup:1, running:1}, p.count_out?{sec_lo:4, sec_hi:4, min_lo:4, min_hi:4}:{})}),
+    build:p=>{ const t=ptIntent("lab7_countdown"), clk=t.IN("clk"), bset=t.IN("set"), bss=t.IN("startstop"), brst=t.IN("reset");
+      const SW=Array.from({length:16},(_,i)=>t.IN("sw"+i)), dig=k=>SW.slice(4*k, 4*k+4);
+      // a one-clock pulse every n clocks: divider → rising-edge detector
+      const pulse=n=>{ const dv=ptBlock(t, ptSub("clock_divider", {n})); t.W(clk, dv+".clk_in");
+        const ed=ptBlock(t, ptSub("edge_detector")); t.W(clk, ed+".clk"); t.W(dv+".clk_out", ed+".x"); return ed+".pulse"; };
+      const tick=pulse(p.tick), bt=pulse(p.btn);
+      // a button sampled on bt, twice: one press = one pulse
+      const hold=d=>{ const f=t.X("DFF"), m=t.X("MUX",{params:{inputs:2}});
+        t.W(f+".q", m+".d0"); t.W(d, m+".d1"); t.W(bt, m+".s0"); t.W(m+".y", f+".d"); t.W(clk, f+".clk"); return f; };
+      const press=b=>{ const s0=hold(b), s1=hold(s0+".q"); return t.G("AND",[bt, s0+".q", s1+".qn"]); };
+      const setp=press(bset), ssp=press(bss), rstp=press(brst);
+      // error: a digit that is not BCD, or seconds' tens past 5 (sw7, or sw6·sw5)
+      const sv=ptSub("bcd_valid"), inv=[0,2,3].map(k=>{ const b=ptBlock(t, sv); dig(k).forEach((x,i)=>t.W(x, b+".d"+i)); return b+".invalid"; });
+      const err=t.G("OR",[...inv, SW[7], t.G("AND",[SW[6], SW[5]])]), ok=t.G("NOT",[err]);
+      // the counter 00.00 … 99.59, counting down, loaded from the switches
+      const cnt=ptBlock(t, ptSub("bcd_counter_multi", {format:"99.59", down:true, load:true})), N=CNT_FORMATS["99.59"].names;
+      N.forEach((n,k)=>dig(k).forEach((x,i)=>t.W(x, cnt+"."+n+"_d"+i)));
+      const Q=N.flatMap(n=>[0,1,2,3].map(i=>cnt+"."+n+i));
+      const o1=t.X("OR",{params:{inputs:8}}), o2=t.X("OR",{params:{inputs:8}});
+      Q.slice(0,8).forEach(q=>t.W(q, o1)); Q.slice(8).forEach(q=>t.W(q, o2));
+      const zero=t.G("NOR",[o1, o2]), nz=t.G("NOT",[zero]);
+      // running: START/STOP toggles it (not while there is an error or at 00.00); SET, RESET and 00.00 stop it
+      const run=t.X("DFF"); t.W(clk, run+".clk");
+      t.W(t.G("AND",[t.G("XOR",[run+".q", t.G("AND",[ssp, ok, nz])]), t.G("NOT",[setp]), t.G("NOT",[rstp]), nz]), run+".d");
+      t.W(clk, cnt+".clk"); t.W(t.G("AND",[tick, run+".q", nz]), cnt+".en"); t.W(rstp, cnt+".clr"); t.W(t.G("AND",[setp, ok]), cnt+".load");
+      // display: mm.ss with the point after the minutes (the hundreds digit)
+      const sd=ptBlock(t, ptSub("clock_divider", {n:p.scan})); t.W(clk, sd+".clk_in");
+      const disp=ptBlock(t, ptSub("seg7_mux4", {dp:true})); t.W(sd+".clk_out", disp+".clk");
+      ["ones","tens","hundreds","thousands"].forEach((d,k)=>{ for(let i=0;i<4;i++) t.W(cnt+"."+N[k]+i, disp+"."+d+i); });
+      [0,0,1,0].forEach((v,i)=>t.W(t.X(v?"VCC":"GND"), disp+".dots"+i));
+      for(const s of "abcdefg") t.OUT(s, disp+"."+s);
+      t.OUT("dp", disp+".dp"); for(let i=0;i<4;i++) t.OUT("an"+i, disp+".an"+i);
+      t.OUT("led_error", err); t.OUT("led_timeup", zero); t.OUT("running", run+".q");
+      if(p.count_out) N.forEach(n=>{ for(let i=0;i<4;i++) t.OUT(n+i, cnt+"."+n+i); });
+      return t; },
+    // the lab 7 pin table: SET J14, START/STOP J13, RESET J12, SW15–0, LED error K12, LED time-up M12
+    after:sch=>{ const pm={clk:"clk", set:"pb:2", startstop:"pb:0", reset:"pb:4", led_error:"led:0", led_timeup:"led:1", running:"led:2", dp:"seg:dp"};
+      for(let i=0;i<16;i++) pm["sw"+i]="sw:"+i;
+      for(let i=0;i<4;i++) pm["an"+i]="an:"+i;
+      for(const s of "abcdefg") pm[s]="seg:"+s;
+      sch.pinmap=pm; },
+    seq:p=>{ if(p.tick>8 || p.btn>8 || p.scan>8 || !p.count_out) return {small:{tick:6, btn:2, scan:2, count_out:true}};
+      const L=lab7Model(p), cycles=230;
+      const swAt=i=>i<60?0x0101 : i<120?0x0003 : i<140?0x0075 : i<190?0x9959 : 0x000A;
+      const on=(i,a)=>i>=a && i<a+5;
+      const drive=i=>({sw:swAt(i), set:on(i,4)||on(i,62)||on(i,124)||on(i,144)?1:0,
+        startstop:on(i,12)||on(i,50)||on(i,72)||on(i,110)||on(i,152)||on(i,200)?1:0, reset:on(i,175)?1:0});
+      return {cycles, init:{c:0,t:0,pT:0, bc:0,bt:0,pB:0, s0:[0,0,0], s1:[0,0,0], run:0, cnt:0}, drive,
+        step:(s,v)=>{ const d=sysDivStep(p.tick, s), tick=d.out&&!s.pT?1:0;
+          const e=sysDivStep(p.btn, {c:s.bc, t:s.bt}), bt=e.out&&!s.pB?1:0;
+          const B=[v.set, v.startstop, v.reset], pr=B.map((_,k)=>bt && s.s0[k] && !s.s1[k] ? 1 : 0);
+          const err=L.bad(v.sw), zero=s.cnt===0, en=tick && s.run && !zero;
+          const out={led_error:err, led_timeup:zero?1:0, running:s.run};
+          CNT_FORMATS["99.59"].names.forEach((n,k)=>out[n]=ptDigitsOf(s.cnt, L.mods)[k]);
+          const run=((s.run ^ (pr[1] && !err && !zero ? 1 : 0)) && !pr[0] && !pr[2] && !zero) ? 1 : 0;
+          const cnt=pr[2] ? 0 : (pr[0] && !err) ? ptValueOf(L.dig(v.sw), L.mods) : en ? (s.cnt+L.M-1)%L.M : s.cnt;
+          return {out, state:{c:d.c, t:d.t, pT:d.out, bc:e.c, bt:e.t, pB:e.out,
+            s0:bt?B.slice():s.s0, s1:bt?s.s0.slice():s.s1, run, cnt}}; }}; } },
+});
 const PARTS_SYSTEMS=Object.keys(PARTS).filter(k=>!PARTS_SYS_BEFORE.has(k));
 
 /* "ทำแลป 6", "digital counter 00-yy" → the whole system, from the agent and from build mode */
@@ -20296,6 +20464,11 @@ const PARTS_SYSTEMS=Object.keys(PARTS).filter(k=>!PARTS_SYS_BEFORE.has(k));
        && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
       const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
       return {kind:"lab6_counter", args:sm?{sheet:sm[1]}:{}, simple:true, named:[]};
+    }
+    if(/(lab|แลป|แล็บ|แลบ|ใบงาน(?:ที่)?)\s*-?\s*0?7(?![\d.])|count\s*-?\s*down\s*timer|ตัวจับเวลาถอยหลัง|นับเวลาถอยหลัง/.test(t)
+       && !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(msg) && !/(ทำ|สร้าง|ต่อ|ประกอบ|build|make)/.test(t))){
+      const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/.exec(msg);
+      return {kind:"lab7_countdown", args:sm?{sheet:sm[1]}:{}, simple:true, named:[]};
     }
     return _pf.apply(this, arguments);
   };
@@ -20552,6 +20725,7 @@ MCP_OPS.build_hierarchy = async a=>{
     if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
     let sub=null;
     if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+      try{ partCheckArgs(b.part, b.params||{}); }catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); }
       try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
       catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
     else if(b.sheet || b.module){ const want=String(b.sheet||b.module).toLowerCase(); sub=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
@@ -20626,8 +20800,16 @@ MCP_OPS.build_hierarchy = async a=>{
   let sch=dr.sch;
   sch.components.forEach(c=>{ if(B[String(c.id).toLowerCase()]) c.label=B[String(c.id).toLowerCase()].name; });
   sch.portOrder={in:ins.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i))), out:outs.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i)))};
-  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name);
-  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }catch(e){ console.warn("busify", e); } }
+  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[];
+  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }
+    catch(e){ warnings.push(`bus ports ${buses.join(", ")} stay as single bits (${buses.map(b=>b+"0…").join(", ")}): ${e.message}`); } }
+  // every declared port is on the sheet — as a bus port, or as all its bits — before this says "done"
+  const portsOn=new Map(sch.components.filter(c=>c.type==="IN"||c.type==="OUT").map(c=>[String(c.params.name).toLowerCase(), c]));
+  const missing=[...ins.map(p=>[p,"IN"]), ...outs.map(p=>[p,"OUT"])].filter(([p,T])=>{
+    const bus=portsOn.get(p.name.toLowerCase());
+    if(bus && bus.type===T && (bus.params.width||1)===p.width) return false;
+    return !Array.from({length:p.width},(_,i)=>portsOn.get(bitName(p,i).toLowerCase())).every(c=>c && c.type===T); }).map(([p])=>p.name);
+  if(missing.length){ delete P[sch.id]; fail(`ports ${missing.join(", ")} did not come out on the sheet — nothing was changed`, "report this; meanwhile declare them as single bits (an0, an1, …)"); }
   if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
     ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
   else sch.name=uniqueSchName(topName, sch.id);
@@ -20640,6 +20822,7 @@ MCP_OPS.build_hierarchy = async a=>{
   let chk=null; try{ const c=MCP_OPS.check({sheet:sch.name}); chk={errors:c.errors, warnings:c.warnings}; }catch(_){}
   return {sheet:sch.name, blocks:Object.values(B).map(bk=>({name:bk.name, sheet:bk.sub.name, verified:sheetVerified(bk.sub)})),
     connected_bits:Object.keys(drive).length, auto_connected:auto, unconnected_block_inputs:open, undriven_outputs:undriven, check:chk,
+    ...(warnings.length?{warnings}:{}),
     note:open.length||undriven.length ? "draw the rest with another build_hierarchy {replace:true} (whole plan) or connect" : "every block input and output is wired"};
 };
 
@@ -20796,6 +20979,33 @@ function drcSheet(sch){
   Object.entries(into).forEach(([k,S])=>{ if(S.size<2) return; const [cid,pid]=k.split("|"), c=comp(cid,sch);
     if(!c || c.type==="JUNCTION" || c.type==="BUSTAP") return;
     add("err", `${name(c)} ขา '${pid}' รับสายจาก ${S.size} เส้นที่ต่างกัน (multi-driver)`, cid); });
+  // a net something reads but nothing drives — e.g. an OUTPUT fed by bus taps whose bit side is open
+  // (lab 7: "an" looked wired and check said 0/0, yet the VHDL had no driver for it)
+  try{
+    const netOf=new Map();                      // "cid|pid" → net key
+    sch.wires.forEach(w=>{ const k=netKey(sch, w); [w.from, w.to].forEach(ep=>netOf.set(ep.cid+"|"+ep.pid, k)); });
+    const ends=new Map();                       // net key → [{c, p}]
+    sch.wires.forEach(w=>{ const k=netKey(sch, w); [w.from, w.to].forEach(ep=>{ const c=comp(ep.cid,sch); if(!c||c.type==="JUNCTION") return;
+      const p=getPorts(c).find(q=>q.id===ep.pid); if(!p) return; const L=ends.get(k)||[]; if(!L.some(e=>e.c===c&&e.p.id===p.id)) L.push({c,p}); ends.set(k,L); }); });
+    const memo=new Map();
+    const driven=(k, seen)=>{ if(memo.has(k)) return memo.get(k); if(seen.has(k)) return false; seen.add(k);
+      const ok=(ends.get(k)||[]).some(({c,p})=>{
+        if(c.type==="BUSTAP"){                    // a tap passes on what reaches its other side: split d → y, merge y → d
+          const merge=(c.params||{}).mode==="merge", outPin=merge?"d":"y", inPin=merge?"y":"d";
+          if(p.id!==outPin) return false;
+          const k2=netOf.get(c.id+"|"+inPin); return k2!=null && driven(k2, seen); }
+        return p.dir==="out"; });
+      memo.set(k, ok); return ok; };
+    ends.forEach((L, k)=>{ if(driven(k, new Set())) return;
+      L.filter(({c,p})=>p.dir==="in" && c.type!=="BUSTAP").forEach(({c,p})=>
+        add("err", c.type==="OUT" ? `${name(c)} ต่อสายแล้ว แต่สายนั้นไม่มีอะไรขับ (ไม่มีต้นทาง) — ค่าจะเป็น 0 ตลอด`
+                                  : `${name(c)} ขา '${p.id}' ต่อสายแล้ว แต่สายนั้นไม่มีอะไรขับ (ไม่มีต้นทาง)`, c.id)); });
+  }catch(e){ console.warn("drc undriven", e); }
+  // a pin kept for a port that is no longer on the sheet: it holds a board pin another port may need
+  try{ const live=new Set(uxPortBits(sch).map(b=>b.key.toLowerCase()));
+    const stale=Object.keys(sch.pinmap||{}).filter(k=>!live.has(k.toLowerCase()));
+    if(stale.length) add("warn", `ขาบอร์ดของพอร์ตที่ไม่มีแล้ว: ${stale.map(k=>k+" → "+sch.pinmap[k]).join(", ")} — ลบด้วย set_pins {map:{"${stale[0]}": null}} หรือหน้า ลงบอร์ด`, null);
+  }catch(_){}
   // logic that goes nowhere, INPUTs nothing reads
   sch.components.forEach(c=>{
     if(DRC_SKIP.has(c.type)) return;
@@ -20815,12 +21025,14 @@ function netKey(sch, w){ try{ return [...netWires(sch, w)].sort()[0]; }catch(_){
     const base=_q.apply(this, arguments)||[];
     const extra=[]; Object.values(state.project.schematics).forEach(s=>{ try{ extra.push(...drcSheet(s)); }catch(_){} });
     // what the editor already says stays as it is: no second message for the same pin / part
-    const dup=i=>base.some(b=>b.schId===i.schId && b.cid && b.cid===i.cid && (/multi-driver|สายเข้าซ้อน/.test(b.msg)===/multi-driver/.test(i.msg)));
+    const dup=i=>base.some(b=>b.schId===i.schId && b.cid && b.cid===i.cid && (/ไม่มีต้นทาง/.test(i.msg) ? /ลอย|ไม่มีต้นทาง|ยังไม่ได้ต่อ/.test(b.msg)
+      : /multi-driver|สายเข้าซ้อน/.test(b.msg)===/multi-driver/.test(i.msg)));
     return base.concat(extra.filter(i=>!dup(i)));
   };
   const _fix=issueFix;
   issueFix=function(m){
     if(/ต้นทาง \d+ ตัว|รับสายจาก \d+ เส้น/.test(m)) return _fix("multi-driver");
+    if(/ไม่มีอะไรขับ/.test(m)) return "หาว่าสายเส้นนี้ควรมาจากเอาต์พุตไหน แล้วต่อจากขานั้น — ถ้าเป็นบัส ดูว่า bus tap ทุกบิตมีสายเข้า";
     if(/INPUT .* ไม่ได้ต่อไปไหน/.test(m)) return "ต่อ INPUT นี้เข้ากับเกตที่ควรใช้ค่านี้ หรือลบทิ้งถ้าไม่ได้ใช้";
     if(/ไม่ได้ต่อไปไหน/.test(m)) return "ต่อเอาต์พุตนี้ไปยังที่ที่ต้องใช้ (เกตถัดไปหรือ OUTPUT) หรือลบเกตนี้ถ้าไม่ต้องการ";
     return _fix.apply(this, arguments);
@@ -21003,8 +21215,12 @@ const LAB_PIN_PRESETS={
   "7":{title:"แลป 7 ตัวจับเวลา mm.ss", rules:[
     {re:/min_?hi|min_?tens|m_?hi|^mt$/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/min_?lo|min_?ones|m_?lo|^mo$/i, dir:"in", t:i=>"sw:"+(8+i)},
     {re:/sec_?hi|sec_?tens|s_?hi|^st$/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/sec_?lo|sec_?ones|s_?lo|^so$/i, dir:"in", t:i=>"sw:"+i},
-    {re:/start|stop|btn|^ss$|run/i, dir:"in", t:()=>"pb:4"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:1"},
-    {re:/err/i, dir:"out", t:()=>"led:0"}]},
+    // the lab 7 sheet: SET = J14 (pb 2, left), START/STOP = J13 (pb 0, top), RESET = J12 (pb 4, centre),
+    // the start time on SW[15:0], LED error = K12 (led 0), LED time-up = M12 (led 1)
+    {re:/^(set|load|set_?btn|btn_?set)$/i, dir:"in", t:()=>"pb:2"}, {re:/clr|clear|reset|rst/i, dir:"in", t:()=>"pb:4"},
+    {re:/start|stop|btn|^ss$|run|toggle/i, dir:"in", t:()=>"pb:0"},
+    {re:/^(sw|sws|switch(es)?|time_?in|t_?in|preset|din|start_?time)$/i, dir:"in", t:i=>"sw:"+i},
+    {re:/err/i, dir:"out", t:()=>"led:0"}, {re:/time_?up|timeup|t_?up|done|zero|finish/i, dir:"out", t:()=>"led:1"}]},
   "8":{title:"แลป 8 ตัวเลข 4 หลักจาก SW15–0", rules:[
     {re:/thousands|d3|dig3/i, dir:"in", t:i=>"sw:"+(12+i)}, {re:/hundreds|d2|dig2/i, dir:"in", t:i=>"sw:"+(8+i)},
     {re:/tens|d1|dig1/i, dir:"in", t:i=>"sw:"+(4+i)}, {re:/ones|units?|d0|dig0/i, dir:"in", t:i=>"sw:"+i}]},
@@ -21211,6 +21427,7 @@ MCP_OPS.update_module = a=>{
   const _use=MCP_OPS.use_module;
   MCP_OPS.use_module=a=>{
     if(!moduleFind(a.module) && PARTS[a.module]){
+      partCheckArgs(a.module, a.params||{});
       const target=mcpUse(a.sheet); mcpBeforeChange("วาง "+a.module);
       const sn=ptSub(a.module, a.params||{}), sub=Object.values(state.project.schematics).find(s=>s.name===sn);
       const why=subBlockBlockedWhy(sub.id, target.id); if(why) mcpFail(why);

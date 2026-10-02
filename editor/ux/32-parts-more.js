@@ -49,7 +49,9 @@ const hexOn=(s,d)=>(SEGHEX[d]>>"abcdefg".indexOf(s))&1;
 /* ---- counters ---- */
 const CNT_FORMATS={ "00-99":{mods:[10,10], names:["ones","tens"]}, "000-999":{mods:[10,10,10], names:["ones","tens","hundreds"]},
   "0000-9999":{mods:[10,10,10,10], names:["ones","tens","hundreds","thousands"]}, "00-59":{mods:[10,6], names:["ones","tens"]},
-  "mm.ss":{mods:[10,6,10,6], names:["sec_lo","sec_hi","min_lo","min_hi"]} };
+  "mm.ss":{mods:[10,6,10,6], names:["sec_lo","sec_hi","min_lo","min_hi"]},
+  // lab 7's timer runs 00.00 … 99.59: minutes up to 99 (mm.ss stops at 59.59)
+  "99.59":{mods:[10,6,10,10], names:["sec_lo","sec_hi","min_lo","min_hi"]} };
 const ptDigitsOf=(s, mods)=>mods.map(M=>{ const d=s%M; s=Math.floor(s/M); return d; });
 const ptValueOf=(ds, mods)=>{ let v=0, k=1; mods.forEach((M,i)=>{ v+=ds[i]*k; k*=M; }); return v; };
 
@@ -93,7 +95,7 @@ Object.assign(PARTS, {
         step:(s,v)=>({out:{q:s, tc:v.en&&s===term?1:0},
           state:v.clr?0:(p.load&&v.load)?v.d:v.en?(p.down?(s+p.m-1)%p.m:(s+1)%p.m):s})}; } },
   bcd_counter_multi:{ label:"ตัวนับ BCD หลายหลัก / นาฬิกา mm.ss", group:"ตัวนับ",
-    desc:"format: 00-99, 000-999, 0000-9999, 00-59, mm.ss (นับลงได้ด้วย down → ตัวจับเวลาถอยหลังแลป 7) · en, clr, load + ค่าเริ่มจากสวิตช์ · carry = en ตอนถึงปลาย · ต่อหลักด้วย counter_digit · ใช้ clk 50 MHz + en จากพัลส์ 1 Hz",
+    desc:"format: 00-99, 000-999, 0000-9999, 00-59, mm.ss (ถึง 59.59), 99.59 (นาทีถึง 99 — แลป 7; นับลงได้ด้วย down → ตัวจับเวลาถอยหลัง) · en, clr, load + ค่าเริ่มจากสวิตช์ · carry = en ตอนถึงปลาย · ต่อหลักด้วย counter_digit · ใช้ clk 50 MHz + en จากพัลส์ 1 Hz",
     params:{format:{options:Object.keys(CNT_FORMATS),def:"00-99"}, down:{bool:true,def:false}, load:{bool:true,def:false}},
     ports:p=>{ const F=CNT_FORMATS[p.format], out={}, din={}; F.names.forEach(n=>{ out[n]=4; din[n+"_d"]=4; });
       out.carry=1; return {in:Object.assign({clk:1, en:1, clr:1}, p.load?Object.assign({load:1}, din):{}), out}; },

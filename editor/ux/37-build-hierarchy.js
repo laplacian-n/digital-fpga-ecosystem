@@ -51,6 +51,7 @@ MCP_OPS.build_hierarchy = async a=>{
     if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
     let sub=null;
     if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+      try{ partCheckArgs(b.part, b.params||{}); }catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); }
       try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
       catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
     else if(b.sheet || b.module){ const want=String(b.sheet||b.module).toLowerCase(); sub=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
@@ -125,8 +126,16 @@ MCP_OPS.build_hierarchy = async a=>{
   let sch=dr.sch;
   sch.components.forEach(c=>{ if(B[String(c.id).toLowerCase()]) c.label=B[String(c.id).toLowerCase()].name; });
   sch.portOrder={in:ins.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i))), out:outs.flatMap(p=>Array.from({length:p.width},(_,i)=>bitName(p,p.width-1-i)))};
-  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name);
-  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }catch(e){ console.warn("busify", e); } }
+  const buses=[...ins, ...outs].filter(p=>p.width>1).map(p=>p.name), warnings=[];
+  if(buses.length && a.bus!==false){ try{ busifyPorts(sch, buses); }
+    catch(e){ warnings.push(`bus ports ${buses.join(", ")} stay as single bits (${buses.map(b=>b+"0…").join(", ")}): ${e.message}`); } }
+  // every declared port is on the sheet — as a bus port, or as all its bits — before this says "done"
+  const portsOn=new Map(sch.components.filter(c=>c.type==="IN"||c.type==="OUT").map(c=>[String(c.params.name).toLowerCase(), c]));
+  const missing=[...ins.map(p=>[p,"IN"]), ...outs.map(p=>[p,"OUT"])].filter(([p,T])=>{
+    const bus=portsOn.get(p.name.toLowerCase());
+    if(bus && bus.type===T && (bus.params.width||1)===p.width) return false;
+    return !Array.from({length:p.width},(_,i)=>portsOn.get(bitName(p,i).toLowerCase())).every(c=>c && c.type===T); }).map(([p])=>p.name);
+  if(missing.length){ delete P[sch.id]; fail(`ports ${missing.join(", ")} did not come out on the sheet — nothing was changed`, "report this; meanwhile declare them as single bits (an0, an1, …)"); }
   if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
     ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
   else sch.name=uniqueSchName(topName, sch.id);
@@ -139,5 +148,6 @@ MCP_OPS.build_hierarchy = async a=>{
   let chk=null; try{ const c=MCP_OPS.check({sheet:sch.name}); chk={errors:c.errors, warnings:c.warnings}; }catch(_){}
   return {sheet:sch.name, blocks:Object.values(B).map(bk=>({name:bk.name, sheet:bk.sub.name, verified:sheetVerified(bk.sub)})),
     connected_bits:Object.keys(drive).length, auto_connected:auto, unconnected_block_inputs:open, undriven_outputs:undriven, check:chk,
+    ...(warnings.length?{warnings}:{}),
     note:open.length||undriven.length ? "draw the rest with another build_hierarchy {replace:true} (whole plan) or connect" : "every block input and output is wired"};
 };

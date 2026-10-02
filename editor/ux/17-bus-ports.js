@@ -25,7 +25,14 @@ function busGroups(sch, which){
     return !sch.components.some(c=>(c.type==="IN"||c.type==="OUT") && String(c.params.name).toLowerCase()===g.name.toLowerCase());
   });
 }
+/* all or nothing: a group half turned into taps (the old ports gone, the bus port not yet there) left a
+   "ghost" bus in lab 7 — undriven, unlisted, its pins still in the pin map */
 function busifyPorts(sch, which){
+  const keep = JSON.stringify({c:sch.components, w:sch.wires, o:sch.portOrder||null});
+  try{ return busifyPortsRaw(sch, which); }
+  catch(e){ const k = JSON.parse(keep); sch.components = k.c; sch.wires = k.w; if(k.o) sch.portOrder = k.o; else delete sch.portOrder; throw e; }
+}
+function busifyPortsRaw(sch, which){
   const made = [];
   busGroups(sch, which).forEach(g=>{
     const n = g.bits.length, isIn = g.dir==="IN", taps = [];

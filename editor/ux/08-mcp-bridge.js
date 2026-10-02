@@ -522,7 +522,10 @@ MCP_OPS.get_pins = a=>{ const sch=mcpSheet(a.sheet); uxNormPinmap(sch);
 MCP_OPS.set_pins = a=>{
   const sch=mcpUse(a.sheet), bits=uxPortBits(sch), keys=new Map(bits.map(b=>[b.key.toLowerCase(), b]));
   mcpBeforeChange("เลือกขา"); sch.pinmap=sch.pinmap||{}; const done=[];
-  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase()); if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
+  Object.entries(a.map||{}).forEach(([port,t])=>{ const b=keys.get(String(port).toLowerCase());
+    // a pin left for a port that is gone (a rebuilt sheet): null / "" removes it
+    if(!b && (t===null||t==="")){ const k=Object.keys(sch.pinmap).find(x=>x.toLowerCase()===String(port).toLowerCase()); if(k){ delete sch.pinmap[k]; done.push(k+" → — (its port is gone)"); return; } }
+    if(!b) mcpFail(`no port bit '${port}'`, "ports: "+bits.map(x=>x.key).join(", "));
     if(t===null||t===""){ delete sch.pinmap[b.key]; done.push(b.key+" → —"); return; }
     const ok=(b.dir==="in"?PIN_IN_TARGETS:PIN_OUT_TARGETS).includes(t); if(!ok) mcpFail(`'${t}' is not a valid ${b.dir==="in"?"input":"output"} target for ${b.key}`, "call board_pins");
     sch.pinmap[b.key]=t; done.push(b.key+" → "+t); });

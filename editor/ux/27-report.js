@@ -93,7 +93,7 @@ async function makeReport(opts){
   let saved=null, pdf=null, pdfError=null;
   if(/^https?:/.test(location.protocol)){ try{ saved=await mcpSaveFile(name, name+"_report.html", html); }catch(_){}
     // the PDF, printed by the app's own browser (Edge on Windows) — no print dialog for the student
-    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:name+"/"+name+"_report.html"}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
+    if(saved && opts.pdf!==false){ try{ const r=await aiagPost("/api/report/pdf", {path:saved}); if(r.ok) pdf=r.path; else pdfError=r.error; }catch(e){ pdfError=e.message; } } }
   return {html, saved, pdf, pdf_error:pdfError||undefined};
 }
 GENERATORS.push({id:"report", icon:"📄", name:"ทำรายงานแลป", desc:"รูปวงจรทุกชั้น, ตารางความจริง, สมการ, ผลทีละ clock, ขาบอร์ด, VHDL — พิมพ์เป็น PDF หรือเปิดใน Word", run:async()=>{

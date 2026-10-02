@@ -835,6 +835,8 @@ class McpRelay:
         self.running = {}       # client -> (job id, op, started)
         self.waiting = set()    # job ids a caller is still waiting for
         self.replies = {}       # job id -> reply
+        self.late = {}          # job id -> op, for a call that gave up while the editor still ran it
+        self.finished = []      # [(time, job id, op, reply)] — late answers kept for last_result
         self.n = 0
         self.opened_at = 0.0
 
@@ -873,6 +875,8 @@ class McpRelay:
                     del self.running[c]
             if jid in self.waiting:             # nobody waits for a late answer any more: drop it
                 self.replies[jid] = reply
+            elif jid in self.late:              # …unless the caller gave up on a long job: keep it for last_result
+                self.finished = (self.finished + [(time.time(), jid, self.late.pop(jid), reply)])[-10:]
             self.cv.notify_all()
 
     def forget(self, client):
@@ -942,13 +946,28 @@ class McpRelay:
                             self.jobs[client] = [j for j in self.jobs.get(client, []) if j["id"] != jid]
                             return {"ok": False, "error": f"the editor did not pick up '{op}' within {int(timeout)} s",
                                     "hint": "is the Schematic Studio window frozen or showing a dialog?"}
+                        self.late[jid] = op
                         return {"ok": False, "error": f"'{op}' is still running in the editor after {int(timeout)} s",
-                                "hint": "it finishes on its own — call status in a moment to see the result"}
+                                "job": jid,
+                                "hint": f"it finishes on its own — do NOT send it again; call last_result {{\"job\": \"{jid}\"}} "
+                                        "in a minute for its answer"}
                     self.cv.wait(min(left, 1.0))
                 return self.replies.pop(jid)
             finally:
                 self.waiting.discard(jid)
                 self.replies.pop(jid, None)
+
+
+    def last_result(self, job=None, op=None):
+        """The answer of a call that ran past its caller's timeout (newest first)."""
+        with self.cv:
+            for t, jid, o, reply in reversed(self.finished):
+                if (job and jid == job) or (not job and (not op or o == op)):
+                    return {"ok": True, "job": jid, "op": o, "finished_s_ago": int(time.time() - t), "reply": reply}
+            running = [{"job": j, "op": o} for j, o in self.late.items()]
+        return {"ok": False, "error": "no late answer yet" + (f" for {job or op}" if (job or op) else ""),
+                "hint": "still running: " + ", ".join(f"{r['op']} ({r['job']})" for r in running) if running
+                        else "nothing ran past its timeout — the last call answered normally"}
 
 
 RELAY = McpRelay()
@@ -1001,6 +1020,8 @@ def install_claude_desktop() -> dict:
 def mcp_app(action: str, args: dict) -> dict:
     """What Claude can ask the app itself (no editor window needed): who/what/which version
     this is, whether an update is out, whether the board toolchain is ready; and open Home."""
+    if action == "last_result":
+        return RELAY.last_result(args.get("job") or None, args.get("op") or None)
     if action in ("about", "check_update"):
         up = update_check(force=(action == "check_update"))
         upd = {"current": VERSION, "checked": bool(up.get("ok"))}
@@ -1170,6 +1191,9 @@ def make_handler():
                     return self._api_post(path, q)
             except ValueError as e:
                 return self._out(403, {"ok": False, "error": str(e)})
+            except Exception as e:      # an answer, not a dropped connection ("Failed to fetch" in the page)
+                traceback.print_exc()
+                return self._out(500, {"ok": False, "error": f"{type(e).__name__}: {e}"})
             feat = _BACKEND_ROUTES.get(path)
             if feat and not CFG["features"].get(feat):
                 return self._out(200, {"ok": False, "status": "REJECTED", "evidence": [],
@@ -1379,7 +1403,10 @@ def make_handler():
                 reveal(inside(projects_dir(), rel) if rel else projects_dir())
                 return self._out(200, {"ok": True})
             if path == "/api/report/pdf":
-                return self._out(200, html_to_pdf(inside(projects_dir(), str(data.get("path") or ""))))
+                f = inside(projects_dir(), str(data.get("path") or ""))
+                if not f.is_file():
+                    return self._out(200, {"ok": False, "error": f"no report at {f}"})
+                return self._out(200, html_to_pdf(f))
             if path == "/api/projects/delete":
                 return self._out(200, delete_project(str(data.get("name") or "")))
             if path == "/api/projects/rename":

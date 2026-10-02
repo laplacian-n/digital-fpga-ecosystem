@@ -201,8 +201,19 @@ const PARTS = {
 };
 
 /* ---- params: defaults, ranges ---- */
+/* a part's own settings may also come nested — {kind, params:{format:"mm.ss", down:true}} (lab 7: they
+   were dropped and the default 00-99 counter was drawn without a word) */
+function partArgs(a){ return a && a.params && typeof a.params==="object" ? Object.assign({}, a, a.params) : (a||{}); }
+const PART_GENERIC=new Set(["kind","part","type","module","sheet","name","bus","replace","params","x","y","top","pins","label","id","_check","generator"]);
+/* settings this part does not have are refused, naming the ones it has (MCP entry points) */
+function partCheckArgs(kind, a){
+  const P=PARTS[kind]; if(!P) return;
+  const own=Object.keys(P.params||{}), bad=Object.keys(partArgs(a)).filter(k=>!own.includes(k) && !PART_GENERIC.has(k));
+  if(bad.length) mcpFail(`${kind} has no setting ${bad.map(k=>"'"+k+"'").join(", ")}`,
+    own.length ? `${kind} takes: ${own.map(k=>k+"="+JSON.stringify(P.params[k].def)+(P.params[k].options?" ("+P.params[k].options.join("|")+")":"")).join(", ")}` : `${kind} has no settings`);
+}
 function partParams(kind, a){
-  const P=PARTS[kind]; const out={};
+  const P=PARTS[kind]; const out={}; a=partArgs(a);
   Object.entries(P.params||{}).forEach(([k,s])=>{
     let v=a[k]!=null?a[k]:s.def;
     if(s.bool) v=v===true||v==="true"||v===1;
@@ -329,8 +340,9 @@ MCP_OPS.build_part = a=>{
   const P=state.project.schematics, want=a.sheet?String(a.sheet).trim():"";
   const tgt=want?Object.values(P).find(s=>String(s.name).toLowerCase()===want.toLowerCase()):null;
   if(tgt && tgt.components.some(c=>c.type!=="JUNCTION")) mcpFail(`sheet '${tgt.name}' already has parts`, "give a new sheet name (it is created), or an empty sheet — or delete_sheet it first to rebuild it");
+  if(PARTS[kind]) partCheckArgs(kind, a);
   mcpBeforeChange("สร้าง "+kind);
-  const r=partBuild(kind, a);
+  const r=partBuild(kind, partArgs(a));
   let sch=r.sch;
   if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; ["portOrder","locked","verified","pinmap"].forEach(k=>{ if(sch[k]!=null) tgt[k]=sch[k]; });
     delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; sheetVerifyStamp(sch, sch.verified.how); }
