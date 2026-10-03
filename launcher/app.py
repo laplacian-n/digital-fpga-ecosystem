@@ -197,7 +197,7 @@ def detect_llama() -> tuple[str, str]:
     if not Path(model).is_file():
         ggufs = (llm.installed_models() + sorted(glob.glob(str(ROOT / "ai" / "models" / "*.gguf"))
                  + glob.glob(str(INSTALL_DIR / "models" / "*.gguf"))))
-        model = ggufs[0] if ggufs else ""
+        model = llm.preferred_model(ggufs)
     return server, model
 
 
@@ -1335,6 +1335,8 @@ def make_handler():
                     if data.get("what") == "llama":
                         return self._out(200, llm.download_llama(data.get("variant") or "gpu"))
                     return self._out(200, llm.download_model(str(data.get("id") or "")))
+                if path == "/api/llm/import":
+                    return self._out(200, llm.import_model(str(data.get("path") or "")))
                 if path == "/api/llm/cancel":
                     return self._out(200, llm.cancel_download())
                 if path == "/api/llm/stop":

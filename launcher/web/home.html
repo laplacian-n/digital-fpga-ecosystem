@@ -166,7 +166,8 @@ nav .badge:empty{display:none}
     <h3>โมเดล AI ในเครื่อง <span id="llmState"></span></h3>
     <p>ให้แชตตอบคำถามอิสระและวาดวงจรจากคำบรรยาย — ดาวน์โหลดครั้งเดียว แล้วใช้แบบออฟไลน์ได้ ไม่ต้องรันคำสั่งเอง</p>
     <div class="step"><b>1</b><div class="grow"><div class="st-h">โปรแกรมรันโมเดล (llama.cpp)</div><div class="bar" id="llmServer"></div></div></div>
-    <div class="step"><b>2</b><div class="grow"><div class="st-h">เลือกโมเดล</div><div id="llmModels" class="models"></div></div></div>
+    <div class="step"><b>2</b><div class="grow"><div class="st-h">เลือกโมเดล</div><div id="llmModels" class="models"></div>
+      <div class="bar" style="margin-top:6px"><input type="text" id="llmImportPath" style="flex:1;min-width:0" placeholder="นำเข้าไฟล์ .gguf ที่มีอยู่ เช่น C:\Users\…\Downloads\qwen3.5-4B-SFT1.gguf"><button class="btn" id="llmImport">นำเข้าไฟล์ .gguf</button></div></div></div>
     <div class="step"><b>3</b><div class="grow"><div class="st-h">เริ่มใช้งาน</div>
       <div class="bar"><button class="btn primary" id="llmStart">เริ่มโมเดล</button><button class="btn" id="llmStop">หยุด</button><span class="muted" id="llmMsg"></span></div></div></div>
     <div class="prog" id="llmProg" hidden><div class="prog-bar"><i></i></div><span class="muted"></span><button class="btn" id="llmCancel">ยกเลิก</button></div>
@@ -374,7 +375,7 @@ async function loadLlm(){
   if(LLM_SEL===null) LLM_SEL = LLM.model || (LLM.catalog.find(m=>m.installed)||{}).path || "";
   const rows = LLM.catalog.map(m => `<label class="mdl ${LLM_SEL===m.path?"sel":""}"><input type="radio" name="mdl" value="${esc(m.path)}" ${LLM_SEL===m.path?"checked":""} ${m.installed?"":"disabled"}>
       <div class="grow"><b>${esc(m.name)}</b> <span class="muted">${m.size_gb} GB</span><small>${esc(m.note)}</small></div>
-      ${m.installed?chip("ok","มีแล้ว"):`<button class="btn" data-getmodel="${esc(m.id)}" ${busy?"disabled":""}>ดาวน์โหลด</button>`}</label>`)
+      ${m.installed?chip("ok","มีแล้ว"):m.url?`<button class="btn" data-getmodel="${esc(m.id)}" ${busy?"disabled":""}>ดาวน์โหลด</button>`:chip("warn","นำเข้าไฟล์ด้านล่าง")}</label>`)
     .concat(LLM.models.filter(p=>!inCat.has(p)).map(p => `<label class="mdl ${LLM_SEL===p?"sel":""}"><input type="radio" name="mdl" value="${esc(p)}" ${LLM_SEL===p?"checked":""}>
       <div class="grow"><b>${esc(p.split(/[\\/]/).pop())}</b><small>ไฟล์ที่มีอยู่แล้ว</small></div></label>`));
   if(LLM.model && !inCat.has(LLM.model) && !LLM.models.includes(LLM.model))
@@ -407,6 +408,8 @@ $("#llmCard").addEventListener("click", async e => {
   let r = null;
   if(b.id==="llmGetServer") r = await api("/api/llm/download", {what:"llama", variant:$("#llmVariant").value});
   else if(b.dataset.getmodel) r = await api("/api/llm/download", {what:"model", id:b.dataset.getmodel});
+  else if(b.id==="llmImport"){ r = await api("/api/llm/import", {path:$("#llmImportPath").value});
+    if(r.ok){ LLM_SEL = r.path; $("#llmImportPath").value = ""; toast(r.already ? "มีไฟล์นี้อยู่แล้ว — เลือกไว้ให้แล้ว" : "กำลังคัดลอกโมเดลเข้าโปรแกรม…"); } }
   else if(b.id==="llmCancel") r = await api("/api/llm/cancel", {});
   else if(b.id==="llmStop") r = await api("/api/llm/stop", {});
   else if(b.id==="llmStart"){ r = await api("/api/llm/start", {model:LLM_SEL});
