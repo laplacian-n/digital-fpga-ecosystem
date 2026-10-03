@@ -85,7 +85,7 @@ function gradeAnswer(t, text) {
   if (c.key != null) return String(c.key).split(" ").every(k => norm(text).includes(norm(k))) ? "" : "the answer does not contain " + c.key;
   if (c.ones) {
     const m = [...String(text).matchAll(/f\s*=\s*([^\n=]+)/g)].pop(); if (!m) return "no f = … in the answer";
-    const expr = m[1].replace(/[·*]/g, "").trim(), names = c.names;
+    const expr = m[1].replace(/[·*]/g, "").trim(), names = c.names || "abcd".slice(0, c.n).split("");   // gen_qa keeps a..d
     for (let r = 0; r < 1 << c.n; r++) {
       const val = n => (r >> (c.n - 1 - names.indexOf(n))) & 1;
       const v = expr.split("+").some(term => { const lits = [...term.replace(/\s+/g, "").matchAll(/([a-d])('?)/g)]; if (!lits.length) return term.trim() === "1";
@@ -203,7 +203,8 @@ async function main() {
       let chk = { ok: false, why: "nothing built" };
       if (t.cat === "qa") {
         const tools = (a.steps || []).filter(x => x.tool && !x.fast_path);
-        const why = EVAL ? gradeAnswer(t, a.final) : (tools.length ? "a question took tool calls" : "");
+        let why; try { why = EVAL ? gradeAnswer(t, a.final) : (tools.length ? "a question took tool calls" : ""); }
+        catch (e) { why = "grading failed: " + e.message; }        // one bad grade must not end the whole run
         chk = { ok: !why, why };
       } else {
         const cands = EVAL && !t.sheet && t.cat !== "nl_pins" && t.cat !== "nl_fix" ? [t.use_sheet, ...sheets.filter(n => n !== t.use_sheet)] : [t.use_sheet];
