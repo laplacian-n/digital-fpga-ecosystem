@@ -69,3 +69,24 @@ function aiagBoardVerdict(run){
   const _v=aiagVerdict;
   aiagVerdict=function(run){ let s=_v.apply(this, arguments); try{ s+=aiagBoardVerdict(run); }catch(e){ console.warn("board verdict", e); } return s; };
 }
+
+/* ---- run the model the way it was trained ----
+   SFT1 was fine-tuned with enable_thinking=False (tools/dataset/train_lora.py), but the agent asked it to
+   think on the first call and after every error / nudge — the slow part of a 40–50 s call, in a mode the
+   training never showed it. A fine-tuned model (catalog `trained`, or "sft" in the file name) now runs
+   without thinking and at a lower temperature; others as before. ai_chat {think, temperature} or
+   localStorage schstudio.agentThink ("0"/"1") / schstudio.agentTemp override. */
+async function aiagProfile(opts){
+  const out={};
+  let st=null; try{ st=typeof aiagModelStatus==="function" ? await aiagModelStatus() : null; }catch(_){}
+  const base=p=>String(p||"").split(/[\\/]/).pop().toLowerCase();
+  const cur=st && st.model ? base(st.model) : "";
+  const cat=st && st.catalog ? st.catalog.find(m=>base(m.path)===cur) : null;
+  if((cat && cat.trained) || /sft|lora|finetune|ft\d/.test(cur)){ out.think=false; out.temperature=0.3; out.trained=true; }
+  try{ const t=localStorage.getItem("schstudio.agentThink"); if(t==="0"||t==="1") out.think=t==="1";
+    const k=parseFloat(localStorage.getItem("schstudio.agentTemp")); if(k>=0 && k<=2) out.temperature=k; }catch(_){}
+  if(opts && typeof opts.think==="boolean") out.think=opts.think;
+  if(opts && opts.temperature!=null && +opts.temperature>=0 && +opts.temperature<=2) out.temperature=+opts.temperature;
+  if(cur) out.model=cur;
+  return out;
+}

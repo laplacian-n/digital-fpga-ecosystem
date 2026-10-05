@@ -136,6 +136,7 @@ function aiagStop(why){
 function aiagRunSummary(run, full){
   return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
     model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
+    profile:run.profile, calls:run.calls,
     resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
     steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
       : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
@@ -171,6 +172,10 @@ async function aiAgentRun(msg, opts){
   const sb=status&&status.querySelector(".ag-stop"); if(sb) sb.onclick=()=>aiagStop("ผู้ใช้กดหยุด");
   try{
     await aiagTools();
+    // how this model is run: a model fine-tuned on this app's conversations (trained without thinking) runs
+    // the way it was trained (49-agent-checks: aiagProfile); ai_chat {think, temperature} overrides
+    run.profile={think:true, temperature:0.6};
+    if(typeof aiagProfile==="function") try{ run.profile=Object.assign(run.profile, await aiagProfile(opts)); }catch(e){ console.warn("agent profile", e); }
     if(prev) run.steps.push({kind:"resume", text:`continuing run ${prev.id} (${prev.steps.filter(x=>x.kind==="tool").length} tool steps so far)`});
     // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
     // alone that answers the request with no model round; otherwise the model gets told it exists
@@ -215,8 +220,9 @@ async function aiAgentRun(msg, opts){
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
       run.ctl=new AbortController();
-      let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
-        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}}, run.ctl.signal); }
+      const t0=Date.now(), thinkNow=think && run.profile.think!==false;
+      let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:run.profile.temperature, top_p:0.95, top_k:20,
+        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:thinkNow}}, run.ctl.signal); }
       catch(e){ if(run.cancel) break; throw e; }
       if(run.cancel) break;
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
@@ -224,6 +230,10 @@ async function aiAgentRun(msg, opts){
         aiagLine('<div class="ag-step bad"><span class="ag-tool">↻ โมเดลหยุดทำงาน</span><div class="ag-res">เริ่มใหม่ให้แล้ว ทำต่อจากเดิม</div></div>', "step"); }
       run.model_calls++; run.model_seconds+=j.elapsed_s||0;
       if(j.usage){ run.tokens.prompt=j.usage.prompt_tokens||run.tokens.prompt; run.tokens.completion+=j.usage.completion_tokens||0; }
+      // where the time goes, per call (ai_chat_status → calls): reading the prompt vs writing (incl. reasoning)
+      (run.calls=run.calls||[]).push({s:Math.round((j.elapsed_s||(Date.now()-t0)/1000)*10)/10, think:thinkNow,
+        prompt_tokens:j.usage&&j.usage.prompt_tokens, completion_tokens:j.usage&&j.usage.completion_tokens,
+        prompt_ms:j.timings&&Math.round(j.timings.prompt_ms), gen_ms:j.timings&&Math.round(j.timings.predicted_ms), cached:j.timings&&j.timings.cache_n});
       const m=((j.choices||[])[0]||{}).message||{};
       const thought=String(m.reasoning_content||"");
       const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
@@ -363,7 +373,7 @@ MCP_OPS.ai_chat = a=>{
     if(!prev || !prev.resumable) mcpFail("no run to resume"+(prev?` — run ${prev.id} ended with an answer or cannot be continued`:""), "resume works on a run stopped by ai_chat_stop, the step limit or the time budget, in this page (not after a reload)");
     a=Object.assign({}, a, {message:"(ทำต่อ) "+prev.message, mode:"agent"}); }
   const msg=String(a.message||"").trim(); if(!msg) mcpFail("message is required — what the user would type in the chat");
-  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev, noEscalate:a.escalate===false};
+  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev, noEscalate:a.escalate===false, think:a.think, temperature:a.temperature};
   if(!AICHAT.open) toggleAiChat();
   if(a.mode){ if(!["build","qa","agent"].includes(a.mode)) mcpFail("mode is build | qa | agent"); aiSetMode(a.mode); }
   const t=$("#acInput"); t.value=msg;

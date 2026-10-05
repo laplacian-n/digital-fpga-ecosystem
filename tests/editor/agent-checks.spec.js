@@ -28,3 +28,20 @@ test("check_spec with no spec says so; probe takes sw0..sw3 as one number; a boa
   expect(r.v1).toContain("ยังไม่พร้อม");          // no pins on t1
   expect(r.v2).not.toContain("🩺");
 });
+
+test("a fine-tuned model runs the way it was trained: no thinking, lower temperature; ai_chat options override", async ({ page }) => {
+  await openEditor(page);
+  const r = await page.evaluate(async () => {
+    const as = st => { aiagModelStatus = async () => st; };
+    as({ model: "C:/m/qwen3.5-4B-SFT1.gguf", catalog: [{ path: "C:/m/qwen3.5-4B-SFT1.gguf", trained: true }] });
+    const sft = await aiagProfile({}), over = await aiagProfile({ think: true, temperature: 0.7 });
+    as({ model: "/m/Qwen3.5-4B-Q6_K.gguf", catalog: [{ path: "/m/Qwen3.5-4B-Q6_K.gguf" }] });
+    const base = await aiagProfile({});
+    as(null); const none = await aiagProfile({});
+    return { sft, over, base, none };
+  });
+  expect(r.sft).toMatchObject({ think: false, temperature: 0.3, trained: true });
+  expect(r.over).toMatchObject({ think: true, temperature: 0.7 });
+  expect(r.base.think).toBeUndefined();
+  expect(r.none).toEqual({});
+});
