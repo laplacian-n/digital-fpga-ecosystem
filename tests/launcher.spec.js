@@ -120,3 +120,21 @@ test("Tools ▸ ผู้ช่วยทำแลป: the lab sheet as a checkli
   await page.locator('.lh-card[data-item="lab4-2"] [data-lh="agent"]').click();
   await expect(page.locator("#acInput")).toHaveValue(/ทำข้อ lab4-2/);
 });
+
+test("Settings ▸ โมเดล AI: a fine-tuned .gguf is imported by path and shows as installed", async ({ page }) => {
+  const src = path.join(home, "Downloads", "qwen3.5-4B-SFT1.gguf");
+  fs.mkdirSync(path.dirname(src), { recursive: true });
+  fs.writeFileSync(src, Buffer.concat([Buffer.from("GGUF"), Buffer.alloc(300000, 7)]));
+  await page.goto(BASE + "/");
+  await page.click('[data-tab="settings"]');
+  const row = page.locator("#llmModels .mdl", { hasText: "SFT1" });
+  await expect(row).toContainText("นำเข้าไฟล์ด้านล่าง");
+  await page.fill("#llmImportPath", `"${src}"`);
+  await page.click("#llmImport");
+  await expect(row).toContainText("มีแล้ว", { timeout: 15000 });
+  await expect(row.locator("input")).toBeChecked();
+  const st = await (await page.request.get(BASE + "/api/llm/status")).json();
+  const m = st.catalog.find(x => x.id === "qwen3.5-4b-sft1");
+  expect(m.installed).toBe(true);
+  expect(fs.statSync(m.path).size).toBe(300004);
+});

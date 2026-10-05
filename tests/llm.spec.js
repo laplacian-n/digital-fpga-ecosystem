@@ -119,7 +119,7 @@ test("start the model from Settings, then the chat answers with it", async ({ pa
   await page.goto(BASE + "/");
   await page.click('nav button[data-tab="settings"]');
   await expect(page.locator("#llmServer")).toContainText("พร้อม");            // found under the data folder
-  await expect(page.locator("#llmModels .mdl").first()).toContainText("มีแล้ว");
+  await expect(page.locator("#llmModels .mdl", { hasText: "มีแล้ว" }).first()).toBeVisible();   // (the SFT1 entry above it is import-only)
   await expect(page.locator("#llmState")).toContainText("ยังไม่ได้เริ่ม");
   await page.locator("#llmCard").screenshot({ path: test.info().outputPath("llm-card.png") });
   // a model server left running by an earlier run of the app (closed by the updater): stopped on start
@@ -175,7 +175,7 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     const st = await tool("ai_model", { action: "status" });
     expect(st.data, st.text).not.toBe(null);
     expect(st.data.state).toBe("ready");
-    expect(st.data.catalog[0].id).toBe("qwen3.5-9b");
+    expect(st.data.catalog.find(m => m.installed).id).toBe("qwen3.5-9b");
     expect(fs.readFileSync(bin + ".args", "utf-8")).toBe(`-m ${path.join(home, ".local", "share", "fpga-ecosystem", "models", "Qwen3.5-9B-Q4_K_M.gguf")} --host 127.0.0.1 --port ${LPORT} -c 65536 --jinja -fa on -ctk q8_0 -ctv q8_0 -np 1 --cache-ram 1024`);
     const go = await tool("ai_chat", { message: "ทำวงจร sum กับ carry ของ a และ b ให้หน่อย", mode: "agent" });
     expect(go.error, go.text).toBe(false);

@@ -34,6 +34,11 @@ LLAMA_PINNED = "b11016"     # used when the GitHub API can't be reached (rate li
 
 HF = "https://huggingface.co"
 CATALOG = [
+    # fine-tuned on this app's own agent / Q&A conversations (tools/dataset, train_lora.py): same tools, same
+    # system prompt. Not hosted yet ("url" empty): the file is added with "นำเข้าไฟล์ .gguf" (import_model)
+    {"id": "qwen3.5-4b-sft1", "name": "Qwen3.5 4B · ฝึกกับแอปนี้ (SFT1)", "size_gb": 3.5, "agent": True, "trained": True,
+     "note": "ฝึกต่อจาก Qwen3.5 4B ด้วยบทสนทนาของเอเจนต์และถาม-ตอบในแอปนี้ · การ์ดจอ 4–6 GB",
+     "file": "qwen3.5-4B-SFT1.gguf", "url": ""},
     # Qwen3.5: 3 of every 4 layers are Gated DeltaNet (fixed-size state), so a long context costs
     # a quarter of the usual KV cache; thinks before answering and calls tools (the agent mode)
     {"id": "qwen3.5-9b", "name": "Qwen3.5 9B", "size_gb": 5.7, "agent": True,
@@ -251,6 +256,8 @@ def download_model(model_id: str) -> dict:
     m = next((x for x in CATALOG + [EMBED] if x["id"] == model_id), None)
     if not m:
         return {"ok": False, "error": "ไม่รู้จักโมเดลนี้"}
+    if not m.get("url"):
+        return {"ok": False, "error": "โมเดลนี้ไม่มีให้ดาวน์โหลด — ใช้ “นำเข้าไฟล์ .gguf” กับไฟล์ที่มีอยู่"}
 
     def job():
         dst = embed_path() if m is EMBED else models_dir() / m["file"]
@@ -259,6 +266,54 @@ def download_model(model_id: str) -> dict:
             _fetch(m["url"], dst)
         DL.s["path"] = str(dst)
     return _run(m["id"], job)
+
+
+def import_model(src: str) -> dict:
+    """Copy a .gguf the user already has (e.g. a fine-tuned model) into models/, with the download's progress
+    bar. A file named like a catalog entry (any case) takes that entry's name, so it shows as installed."""
+    src = str(src or "").strip().strip('"').strip("'")
+    p = Path(os.path.expandvars(os.path.expanduser(src))) if src else None
+    if not p or not p.is_file():
+        return {"ok": False, "error": "ไม่พบไฟล์: " + (src or "(ว่าง)")}
+    if p.suffix.lower() != ".gguf":
+        return {"ok": False, "error": "ต้องเป็นไฟล์ .gguf"}
+    with open(p, "rb") as f:
+        if f.read(4) != b"GGUF":
+            return {"ok": False, "error": "ไฟล์นี้ไม่ใช่ GGUF (หัวไฟล์ไม่ตรง)"}
+    m = next((x for x in CATALOG if x["file"].lower() == p.name.lower()), None)
+    dst = models_dir() / (m["file"] if m else p.name)
+    try:
+        if dst.resolve() == p.resolve():
+            return {"ok": True, "path": str(dst), "already": True}
+    except OSError:
+        pass
+    size = p.stat().st_size
+    if dst.is_file() and dst.stat().st_size == size:
+        return {"ok": True, "path": str(dst), "already": True}
+
+    def job():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        part = dst.with_name(dst.name + ".part")
+        DL.s.update(total=size, done=0)
+        with open(p, "rb") as fi, open(part, "wb") as fo:
+            while True:
+                if DL.cancel:
+                    raise RuntimeError("ยกเลิกแล้ว")
+                b = fi.read(8 << 20)
+                if not b:
+                    break
+                fo.write(b)
+                DL.s["done"] += len(b)
+        part.replace(dst)
+        DL.s["path"] = str(dst)
+    r = _run((m or {}).get("id") or p.name, job)
+    return dict(r, path=str(dst)) if r.get("ok") else r
+
+
+def preferred_model(paths: list) -> str:
+    """The model to use when none is set: catalog order (the fine-tuned one first), then anything else."""
+    order = {m["file"].lower(): i for i, m in enumerate(CATALOG)}
+    return min(paths, key=lambda q: (order.get(Path(q).name.lower(), len(order)), q)) if paths else ""
 
 
 def cancel_download() -> dict:

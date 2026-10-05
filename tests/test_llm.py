@@ -83,6 +83,25 @@ class LlmDownloads(unittest.TestCase):
         finally:
             llm.CATALOG.pop()
 
+    def test_import_a_local_gguf_takes_the_catalog_name(self):
+        src = Path(self.tmp) / "dl" / "QWEN3.5-4b-sft1.gguf"
+        src.parent.mkdir()
+        src.write_bytes(b"GGUF" + os.urandom(20000))
+        r = llm.import_model('"%s"' % src)                     # pasted from Explorer, with quotes
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(wait()["phase"], "done")
+        dst = Path(self.tmp) / "models" / "qwen3.5-4B-SFT1.gguf"
+        self.assertEqual(dst.read_bytes(), src.read_bytes())
+        self.assertTrue(llm.import_model(str(src)).get("already"))
+        self.assertFalse(llm.download_model("qwen3.5-4b-sft1")["ok"])          # no url: import only
+        self.assertEqual(llm.preferred_model([str(Path(self.tmp) / "models" / "a.gguf"), str(dst)]), str(dst))
+
+    def test_import_refuses_what_is_not_gguf(self):
+        bad = Path(self.tmp) / "x.gguf"
+        bad.write_bytes(b"MZ\x90\x00 not a model")
+        self.assertFalse(llm.import_model(str(bad))["ok"])
+        self.assertFalse(llm.import_model(str(Path(self.tmp) / "none.gguf"))["ok"])
+
     def test_start_refuses_without_files(self):
         self.assertFalse(llm.start("", "", "http://127.0.0.1:8080/v1", "")["ok"])
         self.assertEqual(llm.state("http://127.0.0.1:9/v1"), "stopped")
