@@ -21769,7 +21769,7 @@ function agrOnes(t, outs){
 const SQD_WORD=/ตรวจจับ|จับลำดับ|ลำดับบิต|ลำดับ|รหัส|sequence|detector|detect|pattern/i;
 const SQD_NOT=/ตัวนับ|counter|นับขึ้น|นับลง|หารความถี่|divider|shift|เลื่อนบิต|รีจิสเตอร์|register/i;
 const SQD_KEYWORDS=new Set(["moore","mealy","fsm","state","machine","sequence","detector","overlap","overlapping","non",
-  "nonoverlap","non_overlap","pattern","bit","bits","input","output","sheet","lab","clk","clock","rst","reset","the","a","an","when","on","in","with","and","to"]);
+  "nonoverlap","non_overlap","pattern","bit","bits","input","output","sheet","lab","clk","clock","rst","reset","the","when","on","in","with","and","to"]);
 function sqdNext(p, k, b, overlap){
   const n=p.length;
   if(k===n) k = overlap ? sqdBorder(p) : 0;
@@ -21810,7 +21810,9 @@ function sqdParse(msg){
   if(isMealy && isMoore) return null;
   const non=/ไม่ซ้อน|ไม่ทับ|non[-_ ]?overlap|ห้ามใช้บิตซ้ำ|ไม่ใช้บิตซ้ำ|เริ่มนับใหม่|เริ่มใหม่/i.test(t);
   const ov=!non && /ซ้อน|ทับ|overlap/i.test(t);
-  const sheet=aioSheetName(t);
+  // only a sheet the request names as one ("ชื่อ s" after อินพุต is a signal, not a sheet)
+  const sm=/(?:ชีต|ชีท|แผ่น|sheet)\s*(?:ใหม่\s*)?(?:ว่า\s*|ชื่อ\s*|named\s*|called\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/i.exec(t);
+  const sheet=sm ? sm[1] : null;
   // names: words the request uses as signals (not keywords, not the sheet)
   const id="([A-Za-z_][A-Za-z0-9_]*)";
   const after=res=>{ for(const re of res) for(const m of t.matchAll(re))

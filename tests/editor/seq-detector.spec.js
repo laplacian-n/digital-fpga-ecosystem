@@ -34,6 +34,8 @@ test("built through the agent's fast path with no model: matches an independent 
   await openEditor(page);
   const tasks = require("../fixtures/fsm_requests.json").filter((t, i) => i % 5 === 0).slice(0, 8);
   const r = await page.evaluate(async tasks => {
+    // from disk there is no launcher (tool list / argument check): the tools are called directly
+    aiagCall = async (tool, args) => { try { return { ok: true, result: await MCP_OPS[tool](args) }; } catch (e) { return { ok: false, error: e.message }; } };
     const out = [];
     for (const t of tasks) {
       const run = { steps: [] }, f = await aiagFastPath(t.message, run);
