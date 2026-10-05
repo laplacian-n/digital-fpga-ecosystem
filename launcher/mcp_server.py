@@ -307,7 +307,8 @@ TOOLS = [
       "was built from proves nothing and does not count as verified.",
       {"sheet": SHEET, "expected": {"type": "object"}, "formula": {"type": ["string", "array"], "items": {"type": "string"}}}),
     T("probe", "Set inputs and read every net's value (combinational evaluation) — find where a signal goes wrong. "
-      "A bus INPUT takes its whole value: 5, \"0101\" (binary as wide as the bus), \"0b0101\" or \"0x5\"; "
+      "A bus INPUT takes its whole value: 5, \"0101\" (binary as wide as the bus), \"0b0101\" or \"0x5\" — so does a numbered "
+      "group of 1-bit INPUTs (sw0..sw15 → sw: \"0x1260\"); "
       "a bus OUTPUT comes back as {value, bin}. Comparators, encoders, decoders, (de)muxes, bus taps are all evaluated. "
       "inside:'u' (or a path 'u/v') gives the nets and ports INSIDE that block instead, with its inputs from the whole circuit.",
       {"sheet": SHEET, "inputs": INPUTS, "inside": {"type": "string", "description": "a block on the sheet (label / name), or a path u/v"}}),
