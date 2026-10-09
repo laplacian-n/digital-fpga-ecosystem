@@ -44,6 +44,17 @@ class H(BaseHTTPRequestHandler):
             with open(sys.argv[0] + ".kw", "a") as f: f.write(json.dumps(req.get("chat_template_kwargs")) + "\\n")
             if os.path.exists(sys.argv[0] + ".crash"):      # die mid-request, like WinError 10054
                 os.remove(sys.argv[0] + ".crash"); os._exit(1)
+        rf = req.get("response_format")
+        if rf:                   # constrained decoding: answer in the schema llama-server would force
+            with open(sys.argv[0] + ".rf", "a") as f: f.write(json.dumps(rf) + "\\n")
+            name = rf["json_schema"]["name"]
+            plan = " ".join(str(m.get("content")) for m in msgs)
+            if name == "pick":
+                return self._j({"choices": [{"message": {"content": json.dumps({"tool": "build_hierarchy"})}}]})
+            assert "d5.clk_out" in plan, plan[-400:]      # the plan it wrote is what it fills the call from
+            return self._j({"choices": [{"message": {"content": json.dumps({"sheet": "div25p", "inputs": ["clk_in"], "outputs": ["clk_out"],
+                "blocks": [{"name": "d5", "part": "clock_divider", "params": {"n": 5}}, {"name": "d5b", "part": "clock_divider", "params": {"n": 5}}],
+                "connect": ["clk_in -> d5.clk_in", "d5.clk_out -> d5b.clk_in", "d5b.clk_out -> clk_out"]})}}]})
         if not req.get("tools"):
             return self._j({"choices": [{"message": {"content": "latch ไวต่อระดับสัญญาณ ส่วน flip-flop ไวต่อขอบ clock"}}]})
         # a scripted agent: the tool results so far decide the next step (like a model reading them)
@@ -66,6 +77,10 @@ class H(BaseHTTPRequestHandler):
                 assert '"spec_check"' in last and '"pass":false' in last, last
                 return call("build_circuit", dict(tt("01101001"), sheet="og", replace=True), "add 7")
             return self._j({"choices": [{"message": {"content": "สร้าง f แล้ว"}}]})
+        if "PROSE" in ask:       # div25: the right plan in words, no call
+            if not done:
+                return self._j({"choices": [{"message": {"content": "วาง d5 กับ d5b แล้วต่อ clk_in → d5.clk_in, d5.clk_out → d5b.clk_in, d5b.clk_out → clk_out"}}]})
+            return self._j({"choices": [{"message": {"content": "ต่อ d5 กับ d5b ลงแผ่น div25p แล้ว"}}]})
         if "LIAR" in ask:        # div50 session: no tool call, then "done and checked" — never believed
             return self._j({"choices": [{"message": {"content": "สร้างใหม่แล้ว ตรวจผ่านครบ 256 ขั้น"}}]})
         if "TEXTCALL" in ask:    # the call written as text, not as a tool call
@@ -262,6 +277,14 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "nudge" && /asked to make the calls/.test(x.text))).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBe(0);
     expect(s.data.agent.final.startsWith("⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย")).toBe(true);
+    // a plan in words, no call: the call is written again under the tool's JSON schema (constrained decoding) and runs
+    await tool("ai_chat", { message: "แก้แผ่น div25p ให้เป็น clock_divider n=5 สองตัวต่อกัน PROSE", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 60 });
+    expect(s.data.agent.steps.some(x => x.kind === "nudge" && /constrained decoding/.test(x.text))).toBe(true);
+    const bh = s.data.agent.steps.find(x => x.tool === "build_hierarchy");
+    expect(bh && bh.ok, JSON.stringify(s.data.agent.steps).slice(0, 1500)).toBe(true);
+    expect(s.data.agent.final).not.toContain("ไม่ได้เรียกเครื่องมือเลย");
+    expect(fs.readFileSync(path.join(home, ".local", "share", "fpga-ecosystem", "llama", "llama-test-bin", "llama-server.rf"), "utf-8")).toContain('"json_schema"');
     // a call written as text is run as a call
     await tool("ai_chat", { message: "สร้าง TEXTCALL ลงแผ่น tc", mode: "agent" });
     s = await tool("ai_chat_status", { wait: 40 });

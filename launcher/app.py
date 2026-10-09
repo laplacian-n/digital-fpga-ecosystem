@@ -306,7 +306,7 @@ def llm_chat(req: dict) -> dict:
     ep = os.environ.get("AI_ENDPOINT") or CFG["features"]["llm_endpoint"]
     body = {k: v for k, v in req.items() if k in ("messages", "tools", "tool_choice", "temperature", "top_p",
                                                     "top_k", "max_tokens", "stop", "chat_template_kwargs",
-                                                    "parallel_tool_calls")}
+                                                    "parallel_tool_calls", "response_format")}
     body.setdefault("temperature", 0.6)
     if isinstance(body.get("messages"), list):      # one system message, first (Qwen3.5's template)
         sysm = [m for m in body["messages"] if m.get("role") == "system"]

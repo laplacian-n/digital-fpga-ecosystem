@@ -161,7 +161,7 @@ async function aiAgentRun(msg, opts){
   opts=opts||{};
   const prev=opts.resume||null;
   // earlier turns (not this message, which the caller already put in the log)
-  const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
+  const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).filter(h=>!/^⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย/.test(String(h.text||""))).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
   const maxSteps=Math.max(1, Math.min(60, +opts.maxSteps||AIAG_MAX_STEPS)), budgetS=Math.max(10, +opts.budgetS||AIAG_BUDGET_S);
   const run={id:++AIAG.seq, message:prev?prev.message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
              model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0, max_steps:maxSteps, budget_s:budgetS,
@@ -243,6 +243,13 @@ async function aiAgentRun(msg, opts){
       let calls=(m.tool_calls||[]).filter(c=>c&&c.function);
       if(!calls.length && typeof aiagTextCalls==="function"){ const tc=aiagTextCalls(m.content, thought);
         if(tc.length){ calls=tc; m.content=""; run.steps.push({kind:"nudge", text:`${tc.length} tool call(s) written as text — run as calls`}); } }
+      // a plan in words but no call: the same model writes the call again under a JSON-schema grammar (49)
+      if(!calls.length && typeof aiagStructuredCall==="function" && (run.structTries||0)<2 && stopAt===Infinity){
+        const plan=[m.content, thought].filter(Boolean).join("\n").trim(), done=run.steps.some(x=>x.kind==="tool" && x.ok && !x.fast_path);
+        if(plan && aiagWantsChange(run.message) && (!done || /→|->|ต่อ|connect|แล้ว(ต่อ|ให้|วาง)|ต่อไป|next/i.test(plan))){
+          run.structTries=(run.structTries||0)+1; live("แปลงแผนเป็นคำสั่ง…");
+          const sc=await aiagStructuredCall(run, messages, plan);
+          if(sc){ calls=[sc]; run.steps.push({kind:"nudge", text:`no call in the reply — ${sc.function.name} written under the tool's schema (constrained decoding)`}); } } }
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
       // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server

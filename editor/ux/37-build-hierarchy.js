@@ -95,7 +95,10 @@ MCP_OPS.build_hierarchy = async a=>{
   const join=(src, sink, why)=>{ sink.bits.forEach((k,i)=>{ const s=src.kind==="const" ? {c:src.type} : src.bits[i];
       if(drive[k.key]) fail(`${sink.label}${sink.bits.length>1?` bit ${i}`:""} is driven twice (${how[k.key]} and ${why})`);
       drive[k.key]=s; how[k.key]=why; }); };
-  (a.connect||a.connections||[]).forEach((c,ci)=>{
+  // also written as text: "clk_in -> d5.clk_in", "d5.clk_out → d10.clk_in, d10.en", several split by ; or new lines
+  const conns=[].concat(a.connect||a.connections||[]).flatMap(c=>typeof c!=="string" ? [c] :
+    c.split(/[;\n]+/).map(x=>x.trim()).filter(Boolean).map(x=>x.split(/\s*(?:->|=>|→|>)\s*/).flatMap(y=>y.split(/\s*,\s*/)).filter(Boolean)));
+  conns.forEach((c,ci)=>{
     const list=Array.isArray(c) ? c : (c && c.from!=null ? [c.from].concat(c.to) : null);
     if(!list || list.length<2) fail(`connect[${ci}] must be [from, to, …]`);
     const E=list.map(expand), srcs=E.filter(e=>e.kind==="src"||e.kind==="const"), sinks=E.filter(e=>e.kind==="sink");
