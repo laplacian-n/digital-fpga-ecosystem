@@ -137,6 +137,7 @@ function aiagRunSummary(run, full){
   return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
     model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
     profile:run.profile, calls:run.calls,
+    in_model_call:run.inCall ? {round:run.inCall.round, seconds:Math.round((Date.now()-run.inCall.since)/1000)} : undefined,
     resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
     steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
       : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
@@ -175,6 +176,7 @@ async function aiAgentRun(msg, opts){
     // how this model is run: a model fine-tuned on this app's conversations (trained without thinking) runs
     // the way it was trained (49-agent-checks: aiagProfile); ai_chat {think, temperature} overrides
     run.profile={think:true, temperature:0.6};
+    run.multiGoal=typeof aiagMultiGoal==="function" && aiagMultiGoal(run.message);
     if(typeof aiagProfile==="function") try{ run.profile=Object.assign(run.profile, await aiagProfile(opts)); }catch(e){ console.warn("agent profile", e); }
     if(prev) run.steps.push({kind:"resume", text:`continuing run ${prev.id} (${prev.steps.filter(x=>x.kind==="tool").length} tool steps so far)`});
     // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
@@ -221,9 +223,11 @@ async function aiAgentRun(msg, opts){
       // routine next call (the plan from the first turn stays in the system prompt instead)
       run.ctl=new AbortController();
       const t0=Date.now(), thinkNow=think && run.profile.think!==false;
+      run.inCall={round:i+1, since:t0};
       let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:run.profile.temperature, top_p:0.95, top_k:20,
         parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:thinkNow}}, run.ctl.signal); }
       catch(e){ if(run.cancel) break; throw e; }
+      run.inCall=null;
       if(run.cancel) break;
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
       if(j.restarted){ run.steps.push({kind:"restart", text:"the model server had stopped — restarted it and repeated the call"});
@@ -236,7 +240,9 @@ async function aiAgentRun(msg, opts){
         prompt_ms:j.timings&&Math.round(j.timings.prompt_ms), gen_ms:j.timings&&Math.round(j.timings.predicted_ms), cached:j.timings&&j.timings.cache_n});
       const m=((j.choices||[])[0]||{}).message||{};
       const thought=String(m.reasoning_content||"");
-      const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
+      let calls=(m.tool_calls||[]).filter(c=>c&&c.function);
+      if(!calls.length && typeof aiagTextCalls==="function"){ const tc=aiagTextCalls(m.content, thought);
+        if(tc.length){ calls=tc; m.content=""; run.steps.push({kind:"nudge", text:`${tc.length} tool call(s) written as text — run as calls`}); } }
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
       // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server
@@ -269,8 +275,11 @@ async function aiAgentRun(msg, opts){
             built.add(key); }
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
-          if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
+          if(passNote && stopAt===Infinity && !run.multiGoal){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
             after.push({role:"user", content:passNote}); }
+          else if(passNote && run.multiGoal && !run.partNoted){ run.partNoted=true;
+            run.steps.push({kind:"nudge", text:"one part passed — the request asks for more"});
+            after.push({role:"user", content:passNote.replace(/It is done:.*$/, "")+" That is only part of what the user asked — carry on with the rest now. They already asked for all of it: do not ask for permission."}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -316,7 +325,16 @@ async function aiAgentRun(msg, opts){
         messages.push({role:"user", content:`(system) Nothing has checked '${sh}' against the REQUEST yet. Call derive_spec {request:<the user's words>, sheet} — or set_spec with what the request says (formula / table.ones), not your circuit's table — then check_spec. If the request gives nothing to check against, answer and say it is unchecked.`});
         continue;
       }
-      run.final=(String(m.content||"").trim() || "(ไม่มีคำตอบ)");
+      const didWork=run.steps.some(x=>x.kind==="tool" && x.ok && !x.fast_path);
+      const wantsChange=typeof aiagWantsChange==="function" ? aiagWantsChange(run.message) : false;
+      if(!didWork && wantsChange && !run.noToolNudged && stopAt===Infinity){
+        run.noToolNudged=true;
+        run.steps.push({kind:"nudge", text:String(m.content||"").trim() ? "answered without calling any tool — asked to make the calls" : "empty answer, no tool call — asked to make the calls"});
+        messages.push({role:"user", content:"(system) You have not called any tool in this run — nothing has been changed or checked yet. "
+          +"The user already asked for this change: make the tool calls now (follow your plan). If you cannot do it, say so plainly in Thai — never say it is done or checked."});
+        continue; }
+      run.final=String(m.content||"").trim() || (didWork ? "(เอเจนต์ไม่ได้เขียนสรุป — ดูขั้นตอนด้านบน)" : "เอเจนต์ไม่ได้ทำอะไรในรอบนี้ (ไม่ได้เรียกเครื่องมือเลย) — ลองสั่งใหม่ให้ชัดขึ้น หรือแบ่งเป็นขั้นตอนเล็กลง");
+      if(typeof aiagNoWorkGuard==="function") run.final=aiagNoWorkGuard(run, run.final, didWork, wantsChange);
       break;
     }
     if(run.cancel && !run.final){ run.error="หยุดแล้ว ("+(run.cancelWhy||"สั่งหยุด")+")"; run.stopped=true; }

@@ -141,3 +141,26 @@ class Args(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FieldNames(unittest.TestCase):
+    """Names guessed in the div50 session: each is read as meant, or refused naming the real fields."""
+
+    def test_batch_ops_are_checked_one_by_one(self):
+        import mcp_server as M
+        a, e = M.normalize_args("batch", {"calls": [{"tool": "delete", "args": {"components": ["ff0", "ff1"]}},
+                                                    {"name": "get_sheet", "arguments": '{"what": "brief"}'}]})
+        self.assertIsNone(e)
+        self.assertEqual(a["ops"], [{"tool": "delete", "args": {"refs": ["ff0", "ff1"]}},
+                                    {"tool": "get_sheet", "args": {"detail": "brief"}}])
+        _, e = M.normalize_args("batch", {"ops": [{"tool": "delete", "args": {"bogus": 1, "refs": ["a"]}}]})
+        self.assertIn("unknown field 'bogus'", e)
+        _, e = M.normalize_args("batch", {"ops": [{"tool": "nope"}]})
+        self.assertIn("unknown tool", e)
+
+    def test_aliases_and_refusals(self):
+        import mcp_server as M
+        self.assertEqual(M.normalize_args("checkpoint", {"name": "x"}), ({"label": "x"}, None))
+        self.assertEqual(M.normalize_args("get_sheet", {"what": "brief"})[0], {"detail": "brief"})
+        _, e = M.normalize_args("simulate", {"clock": "clk"})
+        self.assertIn("simulate takes: sheet", e)

@@ -15216,6 +15216,7 @@ MCP_OPS.disconnect = a=>{
 MCP_OPS.delete = a=>{
   const sch=mcpUse(a.sheet); let refs=a.refs||a.ref||a.components||a.ids||a.targets||a.target||a.names;
   if(refs==null) mcpFail("give refs: [\"id or name\", …]", "delete {refs:[\"U1\",\"g3\"]}");
+  if(typeof refs==="string" && /^\s*\[/.test(refs)){ try{ refs=JSON.parse(refs); }catch(_){} }   // a list sent as JSON text
   if(!Array.isArray(refs)) refs=[refs];
   const cs=refs.map(r=>mcpComp(sch,r)); mcpBeforeChange("ลบ");
   const ids=new Set(cs.map(c=>c.id));
@@ -17459,6 +17460,7 @@ function aiagRunSummary(run, full){
   return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
     model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
     profile:run.profile, calls:run.calls,
+    in_model_call:run.inCall ? {round:run.inCall.round, seconds:Math.round((Date.now()-run.inCall.since)/1000)} : undefined,
     resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
     steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
       : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
@@ -17497,6 +17499,7 @@ async function aiAgentRun(msg, opts){
     // how this model is run: a model fine-tuned on this app's conversations (trained without thinking) runs
     // the way it was trained (49-agent-checks: aiagProfile); ai_chat {think, temperature} overrides
     run.profile={think:true, temperature:0.6};
+    run.multiGoal=typeof aiagMultiGoal==="function" && aiagMultiGoal(run.message);
     if(typeof aiagProfile==="function") try{ run.profile=Object.assign(run.profile, await aiagProfile(opts)); }catch(e){ console.warn("agent profile", e); }
     if(prev) run.steps.push({kind:"resume", text:`continuing run ${prev.id} (${prev.steps.filter(x=>x.kind==="tool").length} tool steps so far)`});
     // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
@@ -17543,9 +17546,11 @@ async function aiAgentRun(msg, opts){
       // routine next call (the plan from the first turn stays in the system prompt instead)
       run.ctl=new AbortController();
       const t0=Date.now(), thinkNow=think && run.profile.think!==false;
+      run.inCall={round:i+1, since:t0};
       let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:run.profile.temperature, top_p:0.95, top_k:20,
         parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:thinkNow}}, run.ctl.signal); }
       catch(e){ if(run.cancel) break; throw e; }
+      run.inCall=null;
       if(run.cancel) break;
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
       if(j.restarted){ run.steps.push({kind:"restart", text:"the model server had stopped — restarted it and repeated the call"});
@@ -17558,7 +17563,9 @@ async function aiAgentRun(msg, opts){
         prompt_ms:j.timings&&Math.round(j.timings.prompt_ms), gen_ms:j.timings&&Math.round(j.timings.predicted_ms), cached:j.timings&&j.timings.cache_n});
       const m=((j.choices||[])[0]||{}).message||{};
       const thought=String(m.reasoning_content||"");
-      const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
+      let calls=(m.tool_calls||[]).filter(c=>c&&c.function);
+      if(!calls.length && typeof aiagTextCalls==="function"){ const tc=aiagTextCalls(m.content, thought);
+        if(tc.length){ calls=tc; m.content=""; run.steps.push({kind:"nudge", text:`${tc.length} tool call(s) written as text — run as calls`}); } }
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
       // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server
@@ -17591,8 +17598,11 @@ async function aiAgentRun(msg, opts){
             built.add(key); }
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
-          if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
+          if(passNote && stopAt===Infinity && !run.multiGoal){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
             after.push({role:"user", content:passNote}); }
+          else if(passNote && run.multiGoal && !run.partNoted){ run.partNoted=true;
+            run.steps.push({kind:"nudge", text:"one part passed — the request asks for more"});
+            after.push({role:"user", content:passNote.replace(/It is done:.*$/, "")+" That is only part of what the user asked — carry on with the rest now. They already asked for all of it: do not ask for permission."}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -17638,7 +17648,16 @@ async function aiAgentRun(msg, opts){
         messages.push({role:"user", content:`(system) Nothing has checked '${sh}' against the REQUEST yet. Call derive_spec {request:<the user's words>, sheet} — or set_spec with what the request says (formula / table.ones), not your circuit's table — then check_spec. If the request gives nothing to check against, answer and say it is unchecked.`});
         continue;
       }
-      run.final=(String(m.content||"").trim() || "(ไม่มีคำตอบ)");
+      const didWork=run.steps.some(x=>x.kind==="tool" && x.ok && !x.fast_path);
+      const wantsChange=typeof aiagWantsChange==="function" ? aiagWantsChange(run.message) : false;
+      if(!didWork && wantsChange && !run.noToolNudged && stopAt===Infinity){
+        run.noToolNudged=true;
+        run.steps.push({kind:"nudge", text:String(m.content||"").trim() ? "answered without calling any tool — asked to make the calls" : "empty answer, no tool call — asked to make the calls"});
+        messages.push({role:"user", content:"(system) You have not called any tool in this run — nothing has been changed or checked yet. "
+          +"The user already asked for this change: make the tool calls now (follow your plan). If you cannot do it, say so plainly in Thai — never say it is done or checked."});
+        continue; }
+      run.final=String(m.content||"").trim() || (didWork ? "(เอเจนต์ไม่ได้เขียนสรุป — ดูขั้นตอนด้านบน)" : "เอเจนต์ไม่ได้ทำอะไรในรอบนี้ (ไม่ได้เรียกเครื่องมือเลย) — ลองสั่งใหม่ให้ชัดขึ้น หรือแบ่งเป็นขั้นตอนเล็กลง");
+      if(typeof aiagNoWorkGuard==="function") run.final=aiagNoWorkGuard(run, run.final, didWork, wantsChange);
       break;
     }
     if(run.cancel && !run.final){ run.error="หยุดแล้ว ("+(run.cancelWhy||"สั่งหยุด")+")"; run.stopped=true; }
@@ -20754,11 +20773,16 @@ MCP_OPS.build_hierarchy = async a=>{
   mcpBeforeChange("ประกอบแผ่น "+topName);
   // 1. the blocks: an existing sheet, or a verified part drawn once for the project
   const B={};
-  for(const b of blocks){
+  for(let b of blocks){
+    // an existing sheet given where a part goes (part:"div5", part:"sheet:div5", block:"div5") is that sheet
+    const strip=v=>String(v).replace(/^\s*(sheet|block|sch|module)\s*:\s*/i,"").trim();
+    if(!b.sheet && !b.part && b.block) b=Object.assign({}, b, {sheet:strip(b.block)});
+    if(b.part && !PARTS[b.part]){ const want=strip(b.part).toLowerCase(), ex=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
+      if(ex){ b=Object.assign({}, b, {sheet:ex.name}); delete b.part; } }
     const nm=sanId(String(b.name||b.id||"").trim()); if(!nm) fail("every block needs a name", 'e.g. {name:"cnt", part:"bcd_counter_multi"}');
     if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
     let sub=null;
-    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them — an existing sheet goes in sheet:'<name>' (sheets: "+Object.values(P).map(s=>s.name).join(", ")+")");
       try{ partCheckArgs(b.part, b.params||{}); }catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); }
       try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
       catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
@@ -20855,7 +20879,13 @@ MCP_OPS.build_hierarchy = async a=>{
     if(bus && bus.type===T && (bus.params.width||1)===p.width) return false;
     return !Array.from({length:p.width},(_,i)=>portsOn.get(bitName(p,i).toLowerCase())).every(c=>c && c.type===T); }).map(([p])=>p.name);
   if(missing.length){ delete P[sch.id]; fail(`ports ${missing.join(", ")} did not come out on the sheet — nothing was changed`, "report this; meanwhile declare them as single bits (an0, an1, …)"); }
-  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
+  if(tgt){
+    // a sheet other sheets use as a block keeps its ports, or their wires would come loose
+    const par=typeof busParents==="function" ? busParents(tgt) : [];
+    if(par.length){ const sig=x=>schPortList(x).map(p=>p.dir+":"+String(p.id).toLowerCase()+":"+(p.width||1)).sort().join(" ");
+      if(sig(tgt)!==sig(sch)){ delete P[sch.id]; fail(`'${tgt.name}' is used as a block in ${par.join(", ")} — its ports would change (now ${schPortList(tgt).map(p=>p.id).join(", ")}; the plan gives ${schPortList(sch).map(p=>p.id).join(", ")}) — nothing was changed`,
+        "declare exactly the same inputs / outputs (names and widths) so the sheets using it stay wired"); } }
+    tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
     ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
   else sch.name=uniqueSchName(topName, sch.id);
   if(a.pins && typeof a.pins==="object") sch.pinmap=Object.assign({}, sch.pinmap||{}, a.pins);
@@ -21980,6 +22010,45 @@ async function aiagProfile(opts){
   if(opts && opts.temperature!=null && +opts.temperature>=0 && +opts.temperature<=2) out.temperature=+opts.temperature;
   if(cur) out.model=cur;
   return out;
+}
+
+/* ---- from the div50 → div5 + div10 session (SFT1): ----
+   a run planned everything in its reasoning, called no tool and ended "(ไม่มีคำตอบ)"; the next one called
+   no tool and answered "สร้างใหม่แล้ว … ตรวจผ่าน 256 ขั้น" with the sheet untouched; and a request with
+   two goals stopped after the first because that one passed its acceptance test. */
+/* tool calls the model wrote as text instead of as calls: <tool_call>{json}</tool_call>, or the
+   <function=name><parameter=x>…</parameter></function> form — only names of the agent's tools */
+function aiagTextCalls(content, thought){
+  const known=new Set(((AIAG&&AIAG.tools)||[]).map(t=>t.function.name)), out=[];
+  const scan=txt=>{ const t=String(txt||""); if(!/<tool_call>|<function=/.test(t)) return;
+    for(const m of t.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g)){
+      const body=m[1].trim(); let name=null, args=null;
+      if(body[0]==="{"){ try{ const j=JSON.parse(body); name=j.name; args=j.arguments||j.args||{}; }catch(_){ continue; } }
+      else { const f=/<function=([\w.-]+)>([\s\S]*?)(?:<\/function>|$)/.exec(body); if(!f) continue; name=f[1]; args={};
+        for(const q of f[2].matchAll(/<parameter=([\w.-]+)>\s*([\s\S]*?)\s*<\/parameter>/g)){ let v=q[2]; try{ v=JSON.parse(v); }catch(_){} args[q[1]]=v; } }
+      if(name && known.has(name)) out.push({id:"text"+out.length, type:"function", function:{name, arguments:typeof args==="string"?args:JSON.stringify(args||{})}}); } };
+  scan(content); if(!out.length) scan(thought);
+  return out;
+}
+/* the request asks for a change to the circuit (not only a question) */
+function aiagWantsChange(msg){
+  const t=String(msg||"");
+  const act=/(สร้าง|ทำ|แก้|ลบ|ต่อ|แตก|แยก|เปลี่ยน|แทน|ย้าย|วาง|ใส่|จัด|รวม|ประกอบ|เอาเลย|\b(build|make|create|delete|remove|replace|connect|fix|change|add|split)\b)/i.test(t);
+  if(!act) return false;
+  return !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(t) && !(typeof AIAG_MAKE_RE!=="undefined" && AIAG_MAKE_RE.test(t)) && !/(แก้|ลบ|แตก|แทน|เอาเลย|จัดไป)/.test(t));
+}
+/* more than one thing to do: several sheets named, or "… instead of the old one / then …" */
+function aiagMultiGoal(msg){
+  const t=String(msg||""), names=new Set();
+  for(const m of t.matchAll(/(?:แผ่น|ชีต|ชีท|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/gi)) names.add(m[1].toLowerCase());
+  return names.size>=2 || /(แทน|ของเดิม|อันเดิม|แตก|แยกเป็น|ต่อกับ|ต่อเข้า|แล้วให้|แล้วต่อ|แล้วเอา|แล้วก็|\breplace\b|\binstead\b|\bthen\b)/i.test(t);
+}
+/* an answer from a run that called no tool says so at the top — it can never claim work it did not do */
+function aiagNoWorkGuard(run, final, didWork, wantsChange){
+  if(didWork) return final;
+  const claims=/(แล้ว|เสร็จ|เรียบร้อย|ผ่าน|ตรวจ|ยืนยัน|\b(done|passed|created|built|verified|finished)\b)/i.test(final);
+  if(!wantsChange && !claims) return final;
+  return "⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย — ไม่มีอะไรถูกสร้าง แก้ หรือตรวจจริง"+(claims?" ข้อความด้านล่างจากโมเดลจึงเชื่อไม่ได้":"")+"\n\n"+final;
 }
 
 /* ===== 50. Synchronous counters / dividers drawn like the lab sheet =============================

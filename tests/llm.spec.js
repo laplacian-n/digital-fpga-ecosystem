@@ -66,6 +66,12 @@ class H(BaseHTTPRequestHandler):
                 assert '"spec_check"' in last and '"pass":false' in last, last
                 return call("build_circuit", dict(tt("01101001"), sheet="og", replace=True), "add 7")
             return self._j({"choices": [{"message": {"content": "สร้าง f แล้ว"}}]})
+        if "LIAR" in ask:        # div50 session: no tool call, then "done and checked" — never believed
+            return self._j({"choices": [{"message": {"content": "สร้างใหม่แล้ว ตรวจผ่านครบ 256 ขั้น"}}]})
+        if "TEXTCALL" in ask:    # the call written as text, not as a tool call
+            if len(done) == 0:
+                return self._j({"choices": [{"message": {"content": '<tool_call>\\n{"name": "build_circuit", "arguments": {"name": "tc", "formula": "y = a & b"}}\\n</tool_call>'}}]})
+            return self._j({"choices": [{"message": {"content": "สร้าง y = a & b แล้ว"}}]})
         if "STALL" in ask:       # a model that keeps wiring pins that do not exist (lab 6: 10 min, 0 wires)
             return call("connect", {"connections": [["cnt%d.q" % len(done), "disp.d"]], "sheet": "top"}, "")
         if "LOOP" in ask:        # a model that only ever checks against itself: it must be stopped
@@ -250,6 +256,17 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "oracle")).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBe(2);
     expect(s.data.agent.final).toContain("✓ ตรวจโดยโปรแกรม");
+    // no tool call at all: asked once to make the calls; its "done and checked" is flagged, never passed on as true
+    await tool("ai_chat", { message: "แก้แผ่น LIAR ให้เป็นบล็อก แล้วต่อใหม่", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.kind === "nudge" && /asked to make the calls/.test(x.text))).toBe(true);
+    expect(s.data.agent.steps.filter(x => x.tool).length).toBe(0);
+    expect(s.data.agent.final.startsWith("⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย")).toBe(true);
+    // a call written as text is run as a call
+    await tool("ai_chat", { message: "สร้าง TEXTCALL ลงแผ่น tc", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.some(x => x.tool === "build_circuit" && x.ok)).toBe(true);
+    expect(s.data.agent.final).not.toContain("⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย");
     // rounds that change nothing: told once (suggest_wires), then the app answers for it
     await tool("ai_chat", { message: "ต่อสาย STALL ให้ครบ", mode: "agent" });
     s = await tool("ai_chat_status", { wait: 40 });

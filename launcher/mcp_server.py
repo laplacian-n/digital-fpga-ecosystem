@@ -196,10 +196,11 @@ TOOLS = [
       "like a top port join it (auto: a block's clk ← INPUT clk, OUTPUT err ← the one block output err). Drawn, routed, declared "
       "buses become bus ports; one undo step; nothing is left behind on an error. Answers what is still unconnected. "
       "Use it instead of many connect calls for any design made of blocks.",
-      {"sheet": {"type": "string", "description": "the top sheet (made, an empty one filled; one with parts needs replace:true)"},
+      {"sheet": {"type": "string", "description": "the top sheet (made, an empty one filled; one with parts needs replace:true — "
+                  "rebuilding a sheet other sheets use as a block keeps them wired when its ports stay the same)"},
        "blocks": {"type": "array", "items": {"type": "object", "properties": {
            "name": {"type": "string"}, "sheet": {"type": "string", "description": "an existing sheet"},
-           "part": {"type": "string", "description": "a list_parts kind, drawn once and verified"},
+           "part": {"type": "string", "description": "a list_parts kind, drawn once and verified (a sheet of this project: use sheet)"},
            "params": {"type": "object", "description": "the part's parameters"}}, "required": ["name"]}},
        "inputs": {"type": "array", "items": {"type": "string"}, "description": "top inputs: 'clk', 'sw[7:0]'"},
        "outputs": {"type": "array", "items": {"type": "string"}, "description": "top outputs: 'err', 'seg[6:0]'"},
@@ -502,9 +503,16 @@ ALIASES = {
     "use_module": {"module": ["name", "id", "ref"]},
     "open_module": {"module": ["name", "id", "ref"]},
     "delete_module": {"module": ["name", "id", "ref"]},
-    "simulate": {"inputs": ["hold"]},
     "search_course": {"query": ["q", "text", "question"]},
     "build_part": {"kind": ["part", "type"], "n": ["bits", "size", "width", "inputs", "modulus", "divisor", "N"]},
+    # names people (and the model) guessed for these, from a lab 7 / div50 session
+    "get_sheet": {"detail": ["what", "level", "view", "mode"]},
+    "checkpoint": {"label": ["name", "title", "message", "note"]},
+    "simulate": {"inputs": ["hold"], "cycles": ["clocks", "steps", "n", "count"]},
+    "batch": {"ops": ["calls", "steps", "operations", "actions"]},
+    "compare_sheets": {"with": ["other", "sheet2", "against", "compare_to"]},
+    "probe": {"inputs": ["values", "set", "hold"]},
+    "check": {"all_sheets": ["all"]},
 }
 
 
@@ -541,6 +549,31 @@ def normalize_args(name, args):
     missing = [k for k in tool["inputSchema"].get("required", []) if k not in args]
     if missing:
         return args, f"{name}: missing {', '.join(repr(k) for k in missing)} — {name} takes: {fields_of(name)}"
+    if name == "batch":                   # each op is checked like a call of its own (fields, aliases, JSON text)
+        fixed = []
+        for i, op in enumerate(args.get("ops") or []):
+            if not isinstance(op, dict):
+                return args, f"batch ops[{i}]: give {{tool, args}}"
+            op = dict(op)
+            tool = op.pop("tool", None) or op.pop("name", None) or op.pop("op", None)
+            if tool not in TOOL_MAP:
+                return args, f"batch ops[{i}]: unknown tool {tool!r} — each op is {{tool:'<a tool name>', args:{{…}}}}"
+            body = op.pop("args", None)
+            if body is None:
+                body = op.pop("arguments", None)
+            if body is None:
+                body = op.pop("params", None) if "params" not in TOOL_MAP[tool]["inputSchema"]["properties"] else None
+            if isinstance(body, str):
+                try:
+                    body = json.loads(body)
+                except ValueError:
+                    return args, f"batch ops[{i}]: args is not JSON"
+            body = dict(body or {}, **op)       # fields put next to tool count too
+            body, e = normalize_args(tool, body)
+            if e:
+                return args, f"batch ops[{i}] ({tool}): {e}"
+            fixed.append({"tool": tool, "args": body})
+        args["ops"] = fixed
     if name == "apply":
         steps = args.get("steps")
         if not isinstance(steps, list):

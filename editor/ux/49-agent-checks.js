@@ -90,3 +90,42 @@ async function aiagProfile(opts){
   if(cur) out.model=cur;
   return out;
 }
+
+/* ---- from the div50 → div5 + div10 session (SFT1): ----
+   a run planned everything in its reasoning, called no tool and ended "(ไม่มีคำตอบ)"; the next one called
+   no tool and answered "สร้างใหม่แล้ว … ตรวจผ่าน 256 ขั้น" with the sheet untouched; and a request with
+   two goals stopped after the first because that one passed its acceptance test. */
+/* tool calls the model wrote as text instead of as calls: <tool_call>{json}</tool_call>, or the
+   <function=name><parameter=x>…</parameter></function> form — only names of the agent's tools */
+function aiagTextCalls(content, thought){
+  const known=new Set(((AIAG&&AIAG.tools)||[]).map(t=>t.function.name)), out=[];
+  const scan=txt=>{ const t=String(txt||""); if(!/<tool_call>|<function=/.test(t)) return;
+    for(const m of t.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g)){
+      const body=m[1].trim(); let name=null, args=null;
+      if(body[0]==="{"){ try{ const j=JSON.parse(body); name=j.name; args=j.arguments||j.args||{}; }catch(_){ continue; } }
+      else { const f=/<function=([\w.-]+)>([\s\S]*?)(?:<\/function>|$)/.exec(body); if(!f) continue; name=f[1]; args={};
+        for(const q of f[2].matchAll(/<parameter=([\w.-]+)>\s*([\s\S]*?)\s*<\/parameter>/g)){ let v=q[2]; try{ v=JSON.parse(v); }catch(_){} args[q[1]]=v; } }
+      if(name && known.has(name)) out.push({id:"text"+out.length, type:"function", function:{name, arguments:typeof args==="string"?args:JSON.stringify(args||{})}}); } };
+  scan(content); if(!out.length) scan(thought);
+  return out;
+}
+/* the request asks for a change to the circuit (not only a question) */
+function aiagWantsChange(msg){
+  const t=String(msg||"");
+  const act=/(สร้าง|ทำ|แก้|ลบ|ต่อ|แตก|แยก|เปลี่ยน|แทน|ย้าย|วาง|ใส่|จัด|รวม|ประกอบ|เอาเลย|\b(build|make|create|delete|remove|replace|connect|fix|change|add|split)\b)/i.test(t);
+  if(!act) return false;
+  return !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(t) && !(typeof AIAG_MAKE_RE!=="undefined" && AIAG_MAKE_RE.test(t)) && !/(แก้|ลบ|แตก|แทน|เอาเลย|จัดไป)/.test(t));
+}
+/* more than one thing to do: several sheets named, or "… instead of the old one / then …" */
+function aiagMultiGoal(msg){
+  const t=String(msg||""), names=new Set();
+  for(const m of t.matchAll(/(?:แผ่น|ชีต|ชีท|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/gi)) names.add(m[1].toLowerCase());
+  return names.size>=2 || /(แทน|ของเดิม|อันเดิม|แตก|แยกเป็น|ต่อกับ|ต่อเข้า|แล้วให้|แล้วต่อ|แล้วเอา|แล้วก็|\breplace\b|\binstead\b|\bthen\b)/i.test(t);
+}
+/* an answer from a run that called no tool says so at the top — it can never claim work it did not do */
+function aiagNoWorkGuard(run, final, didWork, wantsChange){
+  if(didWork) return final;
+  const claims=/(แล้ว|เสร็จ|เรียบร้อย|ผ่าน|ตรวจ|ยืนยัน|\b(done|passed|created|built|verified|finished)\b)/i.test(final);
+  if(!wantsChange && !claims) return final;
+  return "⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย — ไม่มีอะไรถูกสร้าง แก้ หรือตรวจจริง"+(claims?" ข้อความด้านล่างจากโมเดลจึงเชื่อไม่ได้":"")+"\n\n"+final;
+}
