@@ -205,7 +205,7 @@ TOOLS = [
        "inputs": {"type": "array", "items": {"type": "string"}, "description": "top inputs: 'clk', 'sw[7:0]'"},
        "outputs": {"type": "array", "items": {"type": "string"}, "description": "top outputs: 'err', 'seg[6:0]'"},
        "connect": {"type": "array", "items": {"type": "array", "items": {"type": "string"}},
-                   "description": "[driver, receiver, …]: ['clk','cnt.clk'], ['cnt.ones','cmp.a_lo'], ['sw[3:0]','cmp.b_lo'], ['1','cnt.en']"},
+                   "description": "[driver, receiver, …]: ['clk','cnt.clk'], ['cnt.ones','cmp.a_lo'], ['sw[3:0]','cmp.b_lo'], ['1','cnt.en'] — or as text: 'clk -> cnt.clk'"},
        "auto": {"type": "boolean", "description": "join same-named pins and ports (default true)"},
        "bus": {"type": "boolean", "description": "declared buses as bus ports (default true)"},
        "pins": {"type": "object", "description": "board pins for the top ports, e.g. {'btn':'pb:4','sw[0]':'sw:0'}"},

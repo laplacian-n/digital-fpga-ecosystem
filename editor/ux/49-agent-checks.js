@@ -129,3 +129,32 @@ function aiagNoWorkGuard(run, final, didWork, wantsChange){
   if(!wantsChange && !claims) return final;
   return "⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย — ไม่มีอะไรถูกสร้าง แก้ หรือตรวจจริง"+(claims?" ข้อความด้านล่างจากโมเดลจึงเชื่อไม่ได้":"")+"\n\n"+final;
 }
+
+/* ---- a plan in words → the call, by constrained decoding ----
+   Seen with SFT1 (div25 / div50): asked to rewire a sheet, it wrote the right plan in words ("clk_in → div5.clk_in,
+   div5.clk_out → div10.clk_in, …") and made no call. The model knows WHAT to do; it fails at the FORMAT. So the same
+   model is asked again under a grammar llama-server builds from a JSON schema (response_format): first which tool
+   (an enum of the agent's tools), then that tool's arguments (the tool's own schema). It cannot produce anything
+   else; what it produces then goes through the normal argument checks and the tool's own validation. */
+async function aiagStructuredCall(run, messages, plan){
+  const tools=(AIAG&&AIAG.tools)||[]; if(!tools.length) return null;
+  const names=tools.map(t=>t.function.name);
+  const opt={temperature:0, top_p:1, chat_template_kwargs:{enable_thinking:false}};
+  const ask=async (msgs, schema, name, max)=>{
+    let j; try{ j=await aiagPost("/api/llm/chat", Object.assign({messages:msgs, max_tokens:max,
+      response_format:{type:"json_schema", json_schema:{name, schema}}}, opt), run.ctl&&run.ctl.signal); }catch(_){ return null; }
+    if(!j || !j.ok) return null;
+    run.model_calls++; run.model_seconds+=j.elapsed_s||0;
+    try{ return JSON.parse(String((((j.choices||[])[0]||{}).message||{}).content||"").trim()); }catch(_){ return null; } };
+  const base=messages.concat([{role:"assistant", content:aiagClip(plan, 3000)},
+    {role:"user", content:"(system) You wrote the plan but made no tool call, so nothing happened. Which ONE tool does the next step of that plan? "
+      +"Tools: "+tools.map(t=>`${t.function.name} — ${String(t.function.description).split(/(?<=\.)\s/)[0]}`).join(" | ")}]);
+  const pick=await ask(base, {type:"object", properties:{tool:{type:"string", enum:names}}, required:["tool"]}, "pick", 40);
+  const tool=pick && names.includes(pick.tool) ? pick.tool : null; if(!tool) return null;
+  const def=tools.find(t=>t.function.name===tool).function;
+  const args=await ask(base.concat([{role:"assistant", content:JSON.stringify({tool})},
+    {role:"user", content:`(system) Now the arguments of ${tool}, filled from your plan and the user's request (sheet names, blocks, every connection). ${def.description}`}]),
+    def.parameters, tool, 2000);
+  if(!args || typeof args!=="object") return null;
+  return {id:"sc"+(run.structTries||0), type:"function", function:{name:tool, arguments:JSON.stringify(args)}};
+}

@@ -17484,7 +17484,7 @@ async function aiAgentRun(msg, opts){
   opts=opts||{};
   const prev=opts.resume||null;
   // earlier turns (not this message, which the caller already put in the log)
-  const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
+  const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).filter(h=>!/^⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย/.test(String(h.text||""))).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
   const maxSteps=Math.max(1, Math.min(60, +opts.maxSteps||AIAG_MAX_STEPS)), budgetS=Math.max(10, +opts.budgetS||AIAG_BUDGET_S);
   const run={id:++AIAG.seq, message:prev?prev.message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
              model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0, max_steps:maxSteps, budget_s:budgetS,
@@ -17566,6 +17566,13 @@ async function aiAgentRun(msg, opts){
       let calls=(m.tool_calls||[]).filter(c=>c&&c.function);
       if(!calls.length && typeof aiagTextCalls==="function"){ const tc=aiagTextCalls(m.content, thought);
         if(tc.length){ calls=tc; m.content=""; run.steps.push({kind:"nudge", text:`${tc.length} tool call(s) written as text — run as calls`}); } }
+      // a plan in words but no call: the same model writes the call again under a JSON-schema grammar (49)
+      if(!calls.length && typeof aiagStructuredCall==="function" && (run.structTries||0)<2 && stopAt===Infinity){
+        const plan=[m.content, thought].filter(Boolean).join("\n").trim(), done=run.steps.some(x=>x.kind==="tool" && x.ok && !x.fast_path);
+        if(plan && aiagWantsChange(run.message) && (!done || /→|->|ต่อ|connect|แล้ว(ต่อ|ให้|วาง)|ต่อไป|next/i.test(plan))){
+          run.structTries=(run.structTries||0)+1; live("แปลงแผนเป็นคำสั่ง…");
+          const sc=await aiagStructuredCall(run, messages, plan);
+          if(sc){ calls=[sc]; run.steps.push({kind:"nudge", text:`no call in the reply — ${sc.function.name} written under the tool's schema (constrained decoding)`}); } } }
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
       // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server
@@ -20822,7 +20829,10 @@ MCP_OPS.build_hierarchy = async a=>{
   const join=(src, sink, why)=>{ sink.bits.forEach((k,i)=>{ const s=src.kind==="const" ? {c:src.type} : src.bits[i];
       if(drive[k.key]) fail(`${sink.label}${sink.bits.length>1?` bit ${i}`:""} is driven twice (${how[k.key]} and ${why})`);
       drive[k.key]=s; how[k.key]=why; }); };
-  (a.connect||a.connections||[]).forEach((c,ci)=>{
+  // also written as text: "clk_in -> d5.clk_in", "d5.clk_out → d10.clk_in, d10.en", several split by ; or new lines
+  const conns=[].concat(a.connect||a.connections||[]).flatMap(c=>typeof c!=="string" ? [c] :
+    c.split(/[;\n]+/).map(x=>x.trim()).filter(Boolean).map(x=>x.split(/\s*(?:->|=>|→|>)\s*/).flatMap(y=>y.split(/\s*,\s*/)).filter(Boolean)));
+  conns.forEach((c,ci)=>{
     const list=Array.isArray(c) ? c : (c && c.from!=null ? [c.from].concat(c.to) : null);
     if(!list || list.length<2) fail(`connect[${ci}] must be [from, to, …]`);
     const E=list.map(expand), srcs=E.filter(e=>e.kind==="src"||e.kind==="const"), sinks=E.filter(e=>e.kind==="sink");
@@ -22049,6 +22059,35 @@ function aiagNoWorkGuard(run, final, didWork, wantsChange){
   const claims=/(แล้ว|เสร็จ|เรียบร้อย|ผ่าน|ตรวจ|ยืนยัน|\b(done|passed|created|built|verified|finished)\b)/i.test(final);
   if(!wantsChange && !claims) return final;
   return "⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย — ไม่มีอะไรถูกสร้าง แก้ หรือตรวจจริง"+(claims?" ข้อความด้านล่างจากโมเดลจึงเชื่อไม่ได้":"")+"\n\n"+final;
+}
+
+/* ---- a plan in words → the call, by constrained decoding ----
+   Seen with SFT1 (div25 / div50): asked to rewire a sheet, it wrote the right plan in words ("clk_in → div5.clk_in,
+   div5.clk_out → div10.clk_in, …") and made no call. The model knows WHAT to do; it fails at the FORMAT. So the same
+   model is asked again under a grammar llama-server builds from a JSON schema (response_format): first which tool
+   (an enum of the agent's tools), then that tool's arguments (the tool's own schema). It cannot produce anything
+   else; what it produces then goes through the normal argument checks and the tool's own validation. */
+async function aiagStructuredCall(run, messages, plan){
+  const tools=(AIAG&&AIAG.tools)||[]; if(!tools.length) return null;
+  const names=tools.map(t=>t.function.name);
+  const opt={temperature:0, top_p:1, chat_template_kwargs:{enable_thinking:false}};
+  const ask=async (msgs, schema, name, max)=>{
+    let j; try{ j=await aiagPost("/api/llm/chat", Object.assign({messages:msgs, max_tokens:max,
+      response_format:{type:"json_schema", json_schema:{name, schema}}}, opt), run.ctl&&run.ctl.signal); }catch(_){ return null; }
+    if(!j || !j.ok) return null;
+    run.model_calls++; run.model_seconds+=j.elapsed_s||0;
+    try{ return JSON.parse(String((((j.choices||[])[0]||{}).message||{}).content||"").trim()); }catch(_){ return null; } };
+  const base=messages.concat([{role:"assistant", content:aiagClip(plan, 3000)},
+    {role:"user", content:"(system) You wrote the plan but made no tool call, so nothing happened. Which ONE tool does the next step of that plan? "
+      +"Tools: "+tools.map(t=>`${t.function.name} — ${String(t.function.description).split(/(?<=\.)\s/)[0]}`).join(" | ")}]);
+  const pick=await ask(base, {type:"object", properties:{tool:{type:"string", enum:names}}, required:["tool"]}, "pick", 40);
+  const tool=pick && names.includes(pick.tool) ? pick.tool : null; if(!tool) return null;
+  const def=tools.find(t=>t.function.name===tool).function;
+  const args=await ask(base.concat([{role:"assistant", content:JSON.stringify({tool})},
+    {role:"user", content:`(system) Now the arguments of ${tool}, filled from your plan and the user's request (sheet names, blocks, every connection). ${def.description}`}]),
+    def.parameters, tool, 2000);
+  if(!args || typeof args!=="object") return null;
+  return {id:"sc"+(run.structTries||0), type:"function", function:{name:tool, arguments:JSON.stringify(args)}};
 }
 
 /* ===== 50. Synchronous counters / dividers drawn like the lab sheet =============================
