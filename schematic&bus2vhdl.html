@@ -15216,6 +15216,7 @@ MCP_OPS.disconnect = a=>{
 MCP_OPS.delete = a=>{
   const sch=mcpUse(a.sheet); let refs=a.refs||a.ref||a.components||a.ids||a.targets||a.target||a.names;
   if(refs==null) mcpFail("give refs: [\"id or name\", …]", "delete {refs:[\"U1\",\"g3\"]}");
+  if(typeof refs==="string" && /^\s*\[/.test(refs)){ try{ refs=JSON.parse(refs); }catch(_){} }   // a list sent as JSON text
   if(!Array.isArray(refs)) refs=[refs];
   const cs=refs.map(r=>mcpComp(sch,r)); mcpBeforeChange("ลบ");
   const ids=new Set(cs.map(c=>c.id));
@@ -16899,7 +16900,7 @@ function dividerIntent(N, opts){
       const q="ff"+i+".q";
       const x = i===0 ? "ff0.qn" : gate("XOR",[q, carry]);
       nets.push({from:gate("AND",[x, ntc]), to:"ff"+i+".d"});
-      carry = i===0 ? q : gate("AND",[carry, q]);
+      if(i<n-1) carry = i===0 ? q : gate("AND",[carry, q]);     // (none after the last bit: it would drive nothing)
     }
   }
   if(even){
@@ -17363,6 +17364,9 @@ function aiagSystemPrompt(){
 "   A wrong circuit: rebuild it ON THE SAME SHEET (same sheet name, replace:true) — never a new sheet per try.",
 "   verify / check_spec answering pass:null or independent:false checked nothing: check against the request instead —",
 "   and if there is nothing else to check against, STOP and answer, saying it is checked only against your own table.",
+"   A question \"if the inputs are X, does Y happen?\": probe with exactly those inputs and answer from the outputs",
+"   (a numbered group like sw0..sw15 takes one number: sw:'0x1260'). check_spec only checks a spec someone set.",
+"   Before saying a design is ready for the board, run board_check.",
 "5. Finish with a short answer IN THAI: what you did and what the check / simulation showed.",
 "",
 "Be quick: call SEVERAL tools in one turn when they do not depend on each other (e.g. every add_component at once),",
@@ -17455,6 +17459,8 @@ function aiagStop(why){
 function aiagRunSummary(run, full){
   return {id:run.id, message:run.message, state:run.state, final:run.final, error:run.error||undefined, seconds:run.seconds,
     model_calls:run.model_calls, model_seconds:Math.round((run.model_seconds||0)*10)/10, tokens:run.tokens,
+    profile:run.profile, calls:run.calls,
+    in_model_call:run.inCall ? {round:run.inCall.round, seconds:Math.round((Date.now()-run.inCall.since)/1000)} : undefined,
     resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
     steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
       : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
@@ -17490,6 +17496,11 @@ async function aiAgentRun(msg, opts){
   const sb=status&&status.querySelector(".ag-stop"); if(sb) sb.onclick=()=>aiagStop("ผู้ใช้กดหยุด");
   try{
     await aiagTools();
+    // how this model is run: a model fine-tuned on this app's conversations (trained without thinking) runs
+    // the way it was trained (49-agent-checks: aiagProfile); ai_chat {think, temperature} overrides
+    run.profile={think:true, temperature:0.6};
+    run.multiGoal=typeof aiagMultiGoal==="function" && aiagMultiGoal(run.message);
+    if(typeof aiagProfile==="function") try{ run.profile=Object.assign(run.profile, await aiagProfile(opts)); }catch(e){ console.warn("agent profile", e); }
     if(prev) run.steps.push({kind:"resume", text:`continuing run ${prev.id} (${prev.steps.filter(x=>x.kind==="tool").length} tool steps so far)`});
     // a part it can name is built and checked straight away (23-formula-verify: aiagFastPath) —
     // alone that answers the request with no model round; otherwise the model gets told it exists
@@ -17534,18 +17545,27 @@ async function aiAgentRun(msg, opts){
       // reasoning costs most of the time: think to plan, after an error and when nudged; not for the
       // routine next call (the plan from the first turn stays in the system prompt instead)
       run.ctl=new AbortController();
-      let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:0.6, top_p:0.95, top_k:20,
-        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:think}}, run.ctl.signal); }
+      const t0=Date.now(), thinkNow=think && run.profile.think!==false;
+      run.inCall={round:i+1, since:t0};
+      let j; try{ j=await aiagPost("/api/llm/chat", {messages, tools:AIAG.tools, temperature:run.profile.temperature, top_p:0.95, top_k:20,
+        parallel_tool_calls:true, chat_template_kwargs:{enable_thinking:thinkNow}}, run.ctl.signal); }
       catch(e){ if(run.cancel) break; throw e; }
+      run.inCall=null;
       if(run.cancel) break;
       if(!j.ok){ run.error=j.error+(j.hint?" — "+j.hint:""); break; }
       if(j.restarted){ run.steps.push({kind:"restart", text:"the model server had stopped — restarted it and repeated the call"});
         aiagLine('<div class="ag-step bad"><span class="ag-tool">↻ โมเดลหยุดทำงาน</span><div class="ag-res">เริ่มใหม่ให้แล้ว ทำต่อจากเดิม</div></div>', "step"); }
       run.model_calls++; run.model_seconds+=j.elapsed_s||0;
       if(j.usage){ run.tokens.prompt=j.usage.prompt_tokens||run.tokens.prompt; run.tokens.completion+=j.usage.completion_tokens||0; }
+      // where the time goes, per call (ai_chat_status → calls): reading the prompt vs writing (incl. reasoning)
+      (run.calls=run.calls||[]).push({s:Math.round((j.elapsed_s||(Date.now()-t0)/1000)*10)/10, think:thinkNow,
+        prompt_tokens:j.usage&&j.usage.prompt_tokens, completion_tokens:j.usage&&j.usage.completion_tokens,
+        prompt_ms:j.timings&&Math.round(j.timings.prompt_ms), gen_ms:j.timings&&Math.round(j.timings.predicted_ms), cached:j.timings&&j.timings.cache_n});
       const m=((j.choices||[])[0]||{}).message||{};
       const thought=String(m.reasoning_content||"");
-      const calls=(m.tool_calls||[]).filter(c=>c&&c.function);
+      let calls=(m.tool_calls||[]).filter(c=>c&&c.function);
+      if(!calls.length && typeof aiagTextCalls==="function"){ const tc=aiagTextCalls(m.content, thought);
+        if(tc.length){ calls=tc; m.content=""; run.steps.push({kind:"nudge", text:`${tc.length} tool call(s) written as text — run as calls`}); } }
       messages.push(Object.assign({role:"assistant", content:m.content||""}, calls.length?{tool_calls:calls}:{}));
       if(thought) run.steps.push({kind:"think", text:aiagClip(thought, 4000)});
       // the plan rides on this assistant turn, not the system prompt: an unchanged prefix lets llama-server
@@ -17578,8 +17598,11 @@ async function aiAgentRun(msg, opts){
             built.add(key); }
           if(r.ok && r.result && r.result.spec_check && !/spec_check/.test(content)) content=aiagClip(JSON.stringify(r.result), 6000);
           messages.push({role:"tool", tool_call_id:tc.id||("call"+i), content});
-          if(passNote && stopAt===Infinity){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
+          if(passNote && stopAt===Infinity && !run.multiGoal){ stopAt=i+2; stopWhy="verified"; run.steps.push({kind:"nudge", text:"passed the acceptance test — asked to answer"});
             after.push({role:"user", content:passNote}); }
+          else if(passNote && run.multiGoal && !run.partNoted){ run.partNoted=true;
+            run.steps.push({kind:"nudge", text:"one part passed — the request asks for more"});
+            after.push({role:"user", content:passNote.replace(/It is done:.*$/, "")+" That is only part of what the user asked — carry on with the rest now. They already asked for all of it: do not ask for permission."}); }
           const st={kind:"tool", tool, args, ok:r.ok, ms:Math.round(performance.now()-t0),
                     summary:r.ok?aiagSummary(tool, r.result):undefined, error:r.ok?undefined:r.error, result:aiagClip(content, 2500)};
           run.steps.push(st);
@@ -17625,7 +17648,16 @@ async function aiAgentRun(msg, opts){
         messages.push({role:"user", content:`(system) Nothing has checked '${sh}' against the REQUEST yet. Call derive_spec {request:<the user's words>, sheet} — or set_spec with what the request says (formula / table.ones), not your circuit's table — then check_spec. If the request gives nothing to check against, answer and say it is unchecked.`});
         continue;
       }
-      run.final=(String(m.content||"").trim() || "(ไม่มีคำตอบ)");
+      const didWork=run.steps.some(x=>x.kind==="tool" && x.ok && !x.fast_path);
+      const wantsChange=typeof aiagWantsChange==="function" ? aiagWantsChange(run.message) : false;
+      if(!didWork && wantsChange && !run.noToolNudged && stopAt===Infinity){
+        run.noToolNudged=true;
+        run.steps.push({kind:"nudge", text:String(m.content||"").trim() ? "answered without calling any tool — asked to make the calls" : "empty answer, no tool call — asked to make the calls"});
+        messages.push({role:"user", content:"(system) You have not called any tool in this run — nothing has been changed or checked yet. "
+          +"The user already asked for this change: make the tool calls now (follow your plan). If you cannot do it, say so plainly in Thai — never say it is done or checked."});
+        continue; }
+      run.final=String(m.content||"").trim() || (didWork ? "(เอเจนต์ไม่ได้เขียนสรุป — ดูขั้นตอนด้านบน)" : "เอเจนต์ไม่ได้ทำอะไรในรอบนี้ (ไม่ได้เรียกเครื่องมือเลย) — ลองสั่งใหม่ให้ชัดขึ้น หรือแบ่งเป็นขั้นตอนเล็กลง");
+      if(typeof aiagNoWorkGuard==="function") run.final=aiagNoWorkGuard(run, run.final, didWork, wantsChange);
       break;
     }
     if(run.cancel && !run.final){ run.error="หยุดแล้ว ("+(run.cancelWhy||"สั่งหยุด")+")"; run.stopped=true; }
@@ -17682,7 +17714,7 @@ MCP_OPS.ai_chat = a=>{
     if(!prev || !prev.resumable) mcpFail("no run to resume"+(prev?` — run ${prev.id} ended with an answer or cannot be continued`:""), "resume works on a run stopped by ai_chat_stop, the step limit or the time budget, in this page (not after a reload)");
     a=Object.assign({}, a, {message:"(ทำต่อ) "+prev.message, mode:"agent"}); }
   const msg=String(a.message||"").trim(); if(!msg) mcpFail("message is required — what the user would type in the chat");
-  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev, noEscalate:a.escalate===false};
+  AIAG.nextOpts={maxSteps:a.max_steps, budgetS:a.budget_s, resume:prev, noEscalate:a.escalate===false, think:a.think, temperature:a.temperature};
   if(!AICHAT.open) toggleAiChat();
   if(a.mode){ if(!["build","qa","agent"].includes(a.mode)) mcpFail("mode is build | qa | agent"); aiSetMode(a.mode); }
   const t=$("#acInput"); t.value=msg;
@@ -20741,11 +20773,16 @@ MCP_OPS.build_hierarchy = async a=>{
   mcpBeforeChange("ประกอบแผ่น "+topName);
   // 1. the blocks: an existing sheet, or a verified part drawn once for the project
   const B={};
-  for(const b of blocks){
+  for(let b of blocks){
+    // an existing sheet given where a part goes (part:"div5", part:"sheet:div5", block:"div5") is that sheet
+    const strip=v=>String(v).replace(/^\s*(sheet|block|sch|module)\s*:\s*/i,"").trim();
+    if(!b.sheet && !b.part && b.block) b=Object.assign({}, b, {sheet:strip(b.block)});
+    if(b.part && !PARTS[b.part]){ const want=strip(b.part).toLowerCase(), ex=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
+      if(ex){ b=Object.assign({}, b, {sheet:ex.name}); delete b.part; } }
     const nm=sanId(String(b.name||b.id||"").trim()); if(!nm) fail("every block needs a name", 'e.g. {name:"cnt", part:"bcd_counter_multi"}');
     if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
     let sub=null;
-    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them — an existing sheet goes in sheet:'<name>' (sheets: "+Object.values(P).map(s=>s.name).join(", ")+")");
       try{ partCheckArgs(b.part, b.params||{}); }catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); }
       try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
       catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
@@ -20842,7 +20879,13 @@ MCP_OPS.build_hierarchy = async a=>{
     if(bus && bus.type===T && (bus.params.width||1)===p.width) return false;
     return !Array.from({length:p.width},(_,i)=>portsOn.get(bitName(p,i).toLowerCase())).every(c=>c && c.type===T); }).map(([p])=>p.name);
   if(missing.length){ delete P[sch.id]; fail(`ports ${missing.join(", ")} did not come out on the sheet — nothing was changed`, "report this; meanwhile declare them as single bits (an0, an1, …)"); }
-  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
+  if(tgt){
+    // a sheet other sheets use as a block keeps its ports, or their wires would come loose
+    const par=typeof busParents==="function" ? busParents(tgt) : [];
+    if(par.length){ const sig=x=>schPortList(x).map(p=>p.dir+":"+String(p.id).toLowerCase()+":"+(p.width||1)).sort().join(" ");
+      if(sig(tgt)!==sig(sch)){ delete P[sch.id]; fail(`'${tgt.name}' is used as a block in ${par.join(", ")} — its ports would change (now ${schPortList(tgt).map(p=>p.id).join(", ")}; the plan gives ${schPortList(sch).map(p=>p.id).join(", ")}) — nothing was changed`,
+        "declare exactly the same inputs / outputs (names and widths) so the sheets using it stay wired"); } }
+    tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
     ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
   else sch.name=uniqueSchName(topName, sch.id);
   if(a.pins && typeof a.pins==="object") sch.pinmap=Object.assign({}, sch.pinmap||{}, a.pins);
@@ -21873,6 +21916,225 @@ async function sqdBuild(msg, call){
       return {note:`(system) The app read the request itself and built the ${res.d.pattern} detector on sheet '${res.sheet}'`+
         (res.check.ok?" — it matches a reference detector on every clock, do not rebuild it. Do only the rest of the request.":`, but ${res.check.why} — fix it.`)};
     return {final:res.final};
+  };
+}
+
+/* ===== 49. What the agent checked, said plainly ==================================================
+   From testing the fine-tuned 4B (SFT1) on lab 7: asked "ถ้า sec>59 ไฟ error ติดมั้ย", it called check_spec
+   on a sheet with no spec, read back "pass undefined" and answered as if it had tested; it also said
+   "พร้อมลงบอร์ด" without running board_check. So:
+     - check_spec on a sheet with no spec answers pass:null + NO SPEC + what to call instead (probe), and the
+       step in the chat says so;
+     - probe takes a numbered INPUT group as one number (lab7's sw0..sw15 → sw:0x1260), like a bus;
+     - an answer that talks about the board, from a run that never ran board_check, gets the board doctor's
+       own verdict appended (the app checks; the model does not get to sound sure). */
+{
+  const _cs=MCP_OPS.check_spec;
+  const none=s=>({sheet:s.name, spec:null, pass:null, checked:false,
+    note:`NO SPEC on sheet '${s.name}' — nothing was checked. To test given input values (e.g. "if sw = … is led_error on?") `+
+      "call probe {inputs:{…}} and read the outputs (a numbered group like sw0..sw15 or a bus takes one number); "+
+      "for clocked behaviour call simulate. set_spec first if you want an acceptance test."});
+  MCP_OPS.check_spec=a=>{
+    if(a.all_sheets){ const r=_cs(a); if(!r.sheets.length) return {sheets:[], pass:null, checked:false, note:"NO SPEC on any sheet — nothing was checked"}; return r; }
+    const s=mcpSheet(a.sheet); if(!s.spec) return none(s);
+    return _cs(a);
+  };
+  const _sum=aiagSummary;
+  aiagSummary=function(tool, r){
+    if(tool==="check_spec" && r && r.checked===false) return "NO SPEC — nothing was checked (to test given inputs: probe)";
+    return _sum.apply(this, arguments);
+  };
+}
+
+/* ---- probe: a numbered INPUT group (sw0..sw15, a_0..a_3) as one number ---- */
+function acNumber(v, w){
+  if(typeof v==="number") return v;
+  const t=String(v).trim().replace(/_/g,"");
+  if(/^0x[0-9a-f]+$/i.test(t)) return parseInt(t.slice(2),16);
+  if(/^0b[01]+$/i.test(t)) return parseInt(t.slice(2),2);
+  if(/^[01]+$/.test(t) && t.length===w) return parseInt(t,2);
+  if(/^\d+$/.test(t)) return parseInt(t,10);
+  return NaN;
+}
+function acSplitGroups(sch, inputs){
+  if(!inputs || typeof inputs!=="object") return inputs;
+  const ins=sch.components.filter(c=>c.type==="IN"), has=n=>ins.some(c=>String(c.params.name).toLowerCase()===String(n).toLowerCase());
+  const out={};
+  Object.entries(inputs).forEach(([n,v])=>{
+    if(has(n)){ out[n]=v; return; }
+    const bits=[]; ins.forEach(c=>{ const m=/^(.*?)_?(\d+)$/.exec(String(c.params.name)); if(m && m[1].toLowerCase()===String(n).toLowerCase() && (c.params.width||1)===1) bits[+m[2]]=c.params.name; });
+    if(bits.length<2 || bits.some(b=>!b)){ out[n]=v; return; }                 // not a group: the core says "no INPUT"
+    const x=acNumber(v, bits.length);
+    if(isNaN(x)) mcpFail(`'${n}' is the group ${bits[0]}..${bits[bits.length-1]}: give one number`, `e.g. ${n}: 4704, "0x1260" or "0b${"0".repeat(bits.length)}"`);
+    bits.forEach((b,i)=>{ out[b]=(x>>i)&1; });
+  });
+  return out;
+}
+{
+  const _probe=MCP_OPS.probe;
+  MCP_OPS.probe=a=>{ const sch=mcpSheet(a.sheet); return _probe(Object.assign({}, a, {inputs:acSplitGroups(sch, a.inputs)})); };
+}
+
+/* ---- an answer about the board from a run that never ran board_check ---- */
+function aiagBoardVerdict(run){
+  if(!run.final || !/บอร์ด|board|\.bit|ลงชิป|fpga/i.test(run.final)) return "";
+  if((run.steps||[]).some(s=>s.tool==="board_check" && s.ok)) return "";
+  const sch=activeSch(); if(!sch || !sch.components.some(c=>c.type==="IN"||c.type==="OUT")) return "";
+  let F; try{ F=boardDoctor(sch); }catch(_){ return ""; }
+  const err=F.filter(f=>f.lvl==="err"), warn=F.filter(f=>f.lvl!=="err");
+  return `\n\n🩺 โปรแกรมตรวจการลงบอร์ดให้ (แผ่น ${sch.name}): `+
+    (err.length ? `ยังไม่พร้อม — พบปัญหา ${err.length} ข้อ: ${err.slice(0,3).map(f=>f.title).join(" · ")}` : "ไม่พบปัญหา")+
+    (warn.length ? ` (ข้อควรดู ${warn.length} ข้อ)` : "")+" — ดูรายละเอียดที่หน้า ลงบอร์ด ▸ 🩺";
+}
+{
+  const _v=aiagVerdict;
+  aiagVerdict=function(run){ let s=_v.apply(this, arguments); try{ s+=aiagBoardVerdict(run); }catch(e){ console.warn("board verdict", e); } return s; };
+}
+
+/* ---- run the model the way it was trained ----
+   SFT1 was fine-tuned with enable_thinking=False (tools/dataset/train_lora.py), but the agent asked it to
+   think on the first call and after every error / nudge — the slow part of a 40–50 s call, in a mode the
+   training never showed it. A fine-tuned model (catalog `trained`, or "sft" in the file name) now runs
+   without thinking and at a lower temperature; others as before. ai_chat {think, temperature} or
+   localStorage schstudio.agentThink ("0"/"1") / schstudio.agentTemp override. */
+async function aiagProfile(opts){
+  const out={};
+  let st=null; try{ st=typeof aiagModelStatus==="function" ? await aiagModelStatus() : null; }catch(_){}
+  const base=p=>String(p||"").split(/[\\/]/).pop().toLowerCase();
+  const cur=st && st.model ? base(st.model) : "";
+  const cat=st && st.catalog ? st.catalog.find(m=>base(m.path)===cur) : null;
+  if((cat && cat.trained) || /sft|lora|finetune|ft\d/.test(cur)){ out.think=false; out.temperature=0.3; out.trained=true; }
+  try{ const t=localStorage.getItem("schstudio.agentThink"); if(t==="0"||t==="1") out.think=t==="1";
+    const k=parseFloat(localStorage.getItem("schstudio.agentTemp")); if(k>=0 && k<=2) out.temperature=k; }catch(_){}
+  if(opts && typeof opts.think==="boolean") out.think=opts.think;
+  if(opts && opts.temperature!=null && +opts.temperature>=0 && +opts.temperature<=2) out.temperature=+opts.temperature;
+  if(cur) out.model=cur;
+  return out;
+}
+
+/* ---- from the div50 → div5 + div10 session (SFT1): ----
+   a run planned everything in its reasoning, called no tool and ended "(ไม่มีคำตอบ)"; the next one called
+   no tool and answered "สร้างใหม่แล้ว … ตรวจผ่าน 256 ขั้น" with the sheet untouched; and a request with
+   two goals stopped after the first because that one passed its acceptance test. */
+/* tool calls the model wrote as text instead of as calls: <tool_call>{json}</tool_call>, or the
+   <function=name><parameter=x>…</parameter></function> form — only names of the agent's tools */
+function aiagTextCalls(content, thought){
+  const known=new Set(((AIAG&&AIAG.tools)||[]).map(t=>t.function.name)), out=[];
+  const scan=txt=>{ const t=String(txt||""); if(!/<tool_call>|<function=/.test(t)) return;
+    for(const m of t.matchAll(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g)){
+      const body=m[1].trim(); let name=null, args=null;
+      if(body[0]==="{"){ try{ const j=JSON.parse(body); name=j.name; args=j.arguments||j.args||{}; }catch(_){ continue; } }
+      else { const f=/<function=([\w.-]+)>([\s\S]*?)(?:<\/function>|$)/.exec(body); if(!f) continue; name=f[1]; args={};
+        for(const q of f[2].matchAll(/<parameter=([\w.-]+)>\s*([\s\S]*?)\s*<\/parameter>/g)){ let v=q[2]; try{ v=JSON.parse(v); }catch(_){} args[q[1]]=v; } }
+      if(name && known.has(name)) out.push({id:"text"+out.length, type:"function", function:{name, arguments:typeof args==="string"?args:JSON.stringify(args||{})}}); } };
+  scan(content); if(!out.length) scan(thought);
+  return out;
+}
+/* the request asks for a change to the circuit (not only a question) */
+function aiagWantsChange(msg){
+  const t=String(msg||"");
+  const act=/(สร้าง|ทำ|แก้|ลบ|ต่อ|แตก|แยก|เปลี่ยน|แทน|ย้าย|วาง|ใส่|จัด|รวม|ประกอบ|เอาเลย|\b(build|make|create|delete|remove|replace|connect|fix|change|add|split)\b)/i.test(t);
+  if(!act) return false;
+  return !(typeof aiLooksLikeQuestion==="function" && aiLooksLikeQuestion(t) && !(typeof AIAG_MAKE_RE!=="undefined" && AIAG_MAKE_RE.test(t)) && !/(แก้|ลบ|แตก|แทน|เอาเลย|จัดไป)/.test(t));
+}
+/* more than one thing to do: several sheets named, or "… instead of the old one / then …" */
+function aiagMultiGoal(msg){
+  const t=String(msg||""), names=new Set();
+  for(const m of t.matchAll(/(?:แผ่น|ชีต|ชีท|sheet)\s*(?:ใหม่\s*)?(?:ชื่อ\s*)?[`"'“]?([A-Za-z_][A-Za-z0-9_]*)/gi)) names.add(m[1].toLowerCase());
+  return names.size>=2 || /(แทน|ของเดิม|อันเดิม|แตก|แยกเป็น|ต่อกับ|ต่อเข้า|แล้วให้|แล้วต่อ|แล้วเอา|แล้วก็|\breplace\b|\binstead\b|\bthen\b)/i.test(t);
+}
+/* an answer from a run that called no tool says so at the top — it can never claim work it did not do */
+function aiagNoWorkGuard(run, final, didWork, wantsChange){
+  if(didWork) return final;
+  const claims=/(แล้ว|เสร็จ|เรียบร้อย|ผ่าน|ตรวจ|ยืนยัน|\b(done|passed|created|built|verified|finished)\b)/i.test(final);
+  if(!wantsChange && !claims) return final;
+  return "⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย — ไม่มีอะไรถูกสร้าง แก้ หรือตรวจจริง"+(claims?" ข้อความด้านล่างจากโมเดลจึงเชื่อไม่ได้":"")+"\n\n"+final;
+}
+
+/* ===== 50. Synchronous counters / dividers drawn like the lab sheet =============================
+   The clock divider (15: dividerIntent) and the D-FF mod-N counter (fsmCounterIntent) came out as one
+   long left-to-right row — hard to read and to tidy. They are now drawn like the JK counter (jkLayout):
+   the flip-flops in one column on the right, bit 0 at the BOTTOM up to the last bit at the top (the
+   divider's clk_out toggle above them), and every gate in a column to the left, level with the pin it
+   feeds — gates that feed a flip-flop directly next to it, the ones feeding those one column further
+   out, and so on. clk_in bottom-left, each OUTPUT level with the Q it shows. Then the wires are routed
+   once (12-wire-tidy) and the sheet is locked as placed, like the JK counter. */
+const FFS_TYPES={DFF:1, JKFF:1, TFF:1, SRFF:1};
+const FFS_CLOCK_PINS=new Set(["clk","c","ck"]);
+function ffStackLayout(sch){
+  const G=GRID, comps=sch.components, by=id=>comps.find(c=>c.id===id), sz=c=>getSize(c);
+  // the flip-flops, bottom to top: ff0, ff1, … then any other (the divider's toggle "tq")
+  const ffs=comps.filter(c=>FFS_TYPES[c.type]).sort((a,b)=>{
+    const ia=/^ff(\d+)$/.exec(a.id), ib=/^ff(\d+)$/.exec(b.id);
+    return (ia?+ia[1]:1e6)-(ib?+ib[1]:1e6) || String(a.id).localeCompare(String(b.id)); });
+  if(ffs.length<2) return false;
+  // nets: every pin → its net; a net's driver = the pin on it that is an output
+  const parent=new Map(), key=(cid,pid)=>cid+"\u0001"+pid;
+  const find=k=>{ while(parent.get(k)!==k){ parent.set(k, parent.get(parent.get(k))); k=parent.get(k); } return k; };
+  const add=k=>{ if(!parent.has(k)) parent.set(k,k); };
+  const union=(a,b)=>{ add(a); add(b); const ra=find(a), rb=find(b); if(ra!==rb) parent.set(ra, rb); };
+  sch.wires.forEach(w=>union(key(w.from.cid,w.from.pid), key(w.to.cid,w.to.pid)));
+  comps.filter(c=>c.type==="JUNCTION").forEach(j=>add(key(j.id,"j")));
+  const driver=new Map();
+  for(const k of parent.keys()){ const [cid,pid]=k.split("\u0001"), c=by(cid); if(!c || c.type==="JUNCTION") continue;
+    const p=getPort(c,pid); if(p && p.dir==="out") driver.set(find(k), c); }
+  const drv=(cid,pid)=>parent.has(key(cid,pid)) ? driver.get(find(key(cid,pid)))||null : null;
+  const inPins=c=>(TYPES[c.type].ports(c.params||{})||[]).filter(p=>p.dir==="in").map(p=>p.id);
+  const isLogic=c=>c && !FFS_TYPES[c.type] && !["IN","OUT","JUNCTION","VCC","GND"].includes(c.type);
+  // place the flip-flops
+  const ffH=Math.max(...ffs.map(f=>sz(f).h)), ROW=snap(Math.max(G*12, ffH+G*6));
+  const X_FF=G*60, Y0=G*10, top=ffs.length-1;
+  ffs.forEach((f,i)=>{ f.x=X_FF; f.y=Y0+(top-i)*ROW; });
+  // walk back from each flip-flop's data pins, nearest first: depth 0 feeds a flip-flop, depth k feeds depth k−1
+  const info=new Map(), queue=[];
+  ffs.forEach(f=>inPins(f).filter(p=>!FFS_CLOCK_PINS.has(p)).forEach(pid=>{ const d=drv(f.id,pid);
+    if(isLogic(d) && !info.has(d.id)){ info.set(d.id,{depth:0, cons:f, pin:pid}); queue.push(d); }
+    else if(d && (d.type==="VCC"||d.type==="GND") && !info.has(d.id)) info.set(d.id,{depth:0, cons:f, pin:pid, rail:true}); }));
+  for(let q=0;q<queue.length;q++){ const g=queue[q], dg=info.get(g.id).depth;
+    inPins(g).forEach(pid=>{ const d=drv(g.id,pid); if(isLogic(d) && !info.has(d.id)){ info.set(d.id,{depth:dg+1, cons:g, pin:pid}); queue.push(d); } }); }
+  // columns from the flip-flops leftwards, widened for the widest gate
+  const maxDepth=Math.max(0, ...[...info.values()].map(v=>v.depth));
+  const colW=snap(Math.max(G*10, ...comps.filter(isLogic).map(c=>sz(c).w+G*5)));
+  const colX=d=>X_FF-colW*(d+1);
+  const used=[];
+  const free=(x,y,h)=>!used.some(u=>u.x===x && y<u.y+u.h+G && u.y<y+h+G);
+  const putAt=(c,x,wantY)=>{ c.x=x; c.y=0; const o=portPos(c,"o")||{y:sz(c).h/2}; let y=snap(wantY-o.y), k=0;
+    for(;k<80 && !free(x,y,sz(c).h);k++) y+=(k%2?1:-1)*G*(k+1);      // nearest free slot, up or down
+    c.y=y; used.push({x,y,h:sz(c).h}); };
+  ffs.forEach(f=>used.push({x:X_FF, y:f.y, h:sz(f).h}));
+  for(let d=0; d<=maxDepth; d++)
+    queue.filter(g=>info.get(g.id).depth===d)
+      .sort((a,b)=>portPos(info.get(a.id).cons, info.get(a.id).pin).y-portPos(info.get(b.id).cons, info.get(b.id).pin).y)
+      .forEach(g=>{ const v=info.get(g.id); putAt(g, colX(d), portPos(v.cons, v.pin).y); });
+  // constants beside the pin they hold
+  comps.filter(c=>(c.type==="VCC"||c.type==="GND") && info.get(c.id)).forEach(c=>{ const v=info.get(c.id), p=portPos(v.cons, v.pin);
+    c.x=X_FF-G*6; c.y=snap(p.y-(c.type==="VCC"?G*4:-G)); });
+  // logic that feeds no flip-flop (rare): a column of its own, below
+  let yLoose=Y0+(top+1)*ROW;
+  comps.filter(c=>isLogic(c) && !info.has(c.id)).forEach(c=>{ c.x=colX(maxDepth+1); c.y=yLoose; yLoose+=sz(c).h+G*2; });
+  // ports: INPUTs bottom-left (the clock under bit 0), OUTPUTs right, level with what drives them
+  const ins=comps.filter(c=>c.type==="IN"), xIn=colX(maxDepth+(comps.some(c=>isLogic(c)&&!info.has(c.id))?2:1))-G*4;
+  ins.forEach((c,k)=>{ c.x=xIn; c.y=snap(ffs[0].y+ffH+G*3+k*G*4); });
+  comps.filter(c=>c.type==="OUT").forEach(c=>{ const d=drv(c.id,"i"); let y=null;
+    if(d){ const pid=FFS_TYPES[d.type] ? "q" : "o", p=portPos(d,pid); if(p) y=p.y; }
+    c.x=X_FF+G*18; c.y=0; const pi=portPos(c,"i"); c.y=snap((y!=null?y:Y0)-pi.y); });
+  try{ normalizePortFanout(sch); }catch(_){}
+  try{ wtTidySheet(sch); }catch(e){ console.warn("ff stack layout", e); }
+  sch.locked=true;                                            // keep the drawing as placed (as the JK counter)
+  return true;
+}
+/* the two generators mark their intents; drawIntent places them (one route, after placing) */
+{
+  const _div=dividerIntent;
+  dividerIntent=function(){ const r=_div.apply(this, arguments); if(r && !r.error) r.layout="ffstack"; return r; };
+  const _cnt=fsmCounterIntent;
+  fsmCounterIntent=function(){ const r=_cnt.apply(this, arguments); if(r && !r.error) r.layout="ffstack"; return r; };
+  const _draw=drawIntent;
+  drawIntent=function(intent, opts){
+    if(!intent || intent.layout!=="ffstack" || (opts&&opts.noRoute)) return _draw.apply(this, arguments);
+    const r=_draw.call(this, intent, Object.assign({}, opts||{}, {noRoute:true}));
+    if(r && r.ok){ try{ if(!ffStackLayout(r.sch)) autoRouteSheet(r.sch); }catch(e){ console.warn("ff stack", e); try{ autoRouteSheet(r.sch); }catch(_){} } }
+    return r;
   };
 }
 

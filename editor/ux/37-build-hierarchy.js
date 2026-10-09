@@ -46,11 +46,16 @@ MCP_OPS.build_hierarchy = async a=>{
   mcpBeforeChange("ประกอบแผ่น "+topName);
   // 1. the blocks: an existing sheet, or a verified part drawn once for the project
   const B={};
-  for(const b of blocks){
+  for(let b of blocks){
+    // an existing sheet given where a part goes (part:"div5", part:"sheet:div5", block:"div5") is that sheet
+    const strip=v=>String(v).replace(/^\s*(sheet|block|sch|module)\s*:\s*/i,"").trim();
+    if(!b.sheet && !b.part && b.block) b=Object.assign({}, b, {sheet:strip(b.block)});
+    if(b.part && !PARTS[b.part]){ const want=strip(b.part).toLowerCase(), ex=Object.values(P).find(s=>String(s.name).toLowerCase()===want);
+      if(ex){ b=Object.assign({}, b, {sheet:ex.name}); delete b.part; } }
     const nm=sanId(String(b.name||b.id||"").trim()); if(!nm) fail("every block needs a name", 'e.g. {name:"cnt", part:"bcd_counter_multi"}');
     if(B[nm.toLowerCase()] || names.has(nm.toLowerCase())) fail(`name '${nm}' is used twice (blocks and ports need different names)`);
     let sub=null;
-    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them");
+    if(b.part){ if(!PARTS[b.part]) fail(`unknown part '${b.part}'`, "list_parts shows them — an existing sheet goes in sheet:'<name>' (sheets: "+Object.values(P).map(s=>s.name).join(", ")+")");
       try{ partCheckArgs(b.part, b.params||{}); }catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); }
       try{ const sn=ptSub(b.part, Object.assign({}, b.params||{})); sub=Object.values(P).find(s=>s.name===sn); }
       catch(e){ fail(`block ${nm}: ${e.message}`, e.hint); } }
@@ -147,7 +152,13 @@ MCP_OPS.build_hierarchy = async a=>{
     if(bus && bus.type===T && (bus.params.width||1)===p.width) return false;
     return !Array.from({length:p.width},(_,i)=>portsOn.get(bitName(p,i).toLowerCase())).every(c=>c && c.type===T); }).map(([p])=>p.name);
   if(missing.length){ delete P[sch.id]; fail(`ports ${missing.join(", ")} did not come out on the sheet — nothing was changed`, "report this; meanwhile declare them as single bits (an0, an1, …)"); }
-  if(tgt){ tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
+  if(tgt){
+    // a sheet other sheets use as a block keeps its ports, or their wires would come loose
+    const par=typeof busParents==="function" ? busParents(tgt) : [];
+    if(par.length){ const sig=x=>schPortList(x).map(p=>p.dir+":"+String(p.id).toLowerCase()+":"+(p.width||1)).sort().join(" ");
+      if(sig(tgt)!==sig(sch)){ delete P[sch.id]; fail(`'${tgt.name}' is used as a block in ${par.join(", ")} — its ports would change (now ${schPortList(tgt).map(p=>p.id).join(", ")}; the plan gives ${schPortList(sch).map(p=>p.id).join(", ")}) — nothing was changed`,
+        "declare exactly the same inputs / outputs (names and widths) so the sheets using it stay wired"); } }
+    tgt.components=sch.components; tgt.wires=sch.wires; tgt.portOrder=sch.portOrder;
     ["verified","builtFrom","fsm"].forEach(k=>delete tgt[k]); delete P[sch.id]; state.openTabs=(state.openTabs||[]).filter(i=>i!==sch.id); sch=tgt; }
   else sch.name=uniqueSchName(topName, sch.id);
   if(a.pins && typeof a.pins==="object") sch.pinmap=Object.assign({}, sch.pinmap||{}, a.pins);

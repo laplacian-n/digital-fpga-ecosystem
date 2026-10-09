@@ -291,6 +291,7 @@ MCP_OPS.disconnect = a=>{
 MCP_OPS.delete = a=>{
   const sch=mcpUse(a.sheet); let refs=a.refs||a.ref||a.components||a.ids||a.targets||a.target||a.names;
   if(refs==null) mcpFail("give refs: [\"id or name\", …]", "delete {refs:[\"U1\",\"g3\"]}");
+  if(typeof refs==="string" && /^\s*\[/.test(refs)){ try{ refs=JSON.parse(refs); }catch(_){} }   // a list sent as JSON text
   if(!Array.isArray(refs)) refs=[refs];
   const cs=refs.map(r=>mcpComp(sch,r)); mcpBeforeChange("ลบ");
   const ids=new Set(cs.map(c=>c.id));

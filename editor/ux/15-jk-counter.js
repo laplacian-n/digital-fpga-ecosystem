@@ -131,7 +131,7 @@ function dividerIntent(N, opts){
       const q="ff"+i+".q";
       const x = i===0 ? "ff0.qn" : gate("XOR",[q, carry]);
       nets.push({from:gate("AND",[x, ntc]), to:"ff"+i+".d"});
-      carry = i===0 ? q : gate("AND",[carry, q]);
+      if(i<n-1) carry = i===0 ? q : gate("AND",[carry, q]);     // (none after the last bit: it would drive nothing)
     }
   }
   if(even){
