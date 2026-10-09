@@ -140,8 +140,7 @@ function aiagRunSummary(run, full){
     in_model_call:run.inCall ? {round:run.inCall.round, seconds:Math.round((Date.now()-run.inCall.since)/1000)} : undefined,
     resumable:!!run.resumable, resumed_from:run.resumed_from, verified:run.verified||undefined, escalated:run.escalated||undefined,
     steps:run.steps.map(s=>s.kind!=="tool" ? (full||s.kind==="nudge" ? {kind:s.kind, text:s.text} : {kind:s.kind, text:aiagClip(s.text, 300)})
-      : full ? {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms, result:s.result}
-      : {tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms})};
+      : Object.assign({tool:s.tool, args:s.args, ok:s.ok, summary:s.summary, error:s.error, ms:s.ms}, full?{result:s.result}:{}, s.by_app?{by_app:true}:{}, s.fast_path?{fast_path:true}:{}))};
 }
 function aiagRemember(run){
   try{ const L=JSON.parse(localStorage.getItem("schstudio.agentRuns")||"[]").filter(x=>x.id!==run.id);
@@ -161,7 +160,7 @@ async function aiAgentRun(msg, opts){
   opts=opts||{};
   const prev=opts.resume||null;
   // earlier turns (not this message, which the caller already put in the log)
-  const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).filter(h=>!/^⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย/.test(String(h.text||""))).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
+  const hist=(AICHAT.history||[]).slice(0,-1).slice(-6).filter(h=>!/^⚠/.test(String(h.text||""))).map(h=>({role:h.role==="user"?"user":"assistant", content:String(h.text||"").slice(0,600)}));
   const maxSteps=Math.max(1, Math.min(60, +opts.maxSteps||AIAG_MAX_STEPS)), budgetS=Math.max(10, +opts.budgetS||AIAG_BUDGET_S);
   const run={id:++AIAG.seq, message:prev?prev.message:msg, started:Date.now(), state:"running", steps:[], final:null, error:null,
              model_calls:0, tokens:{prompt:0, completion:0}, model_seconds:0, max_steps:maxSteps, budget_s:budgetS,
@@ -202,7 +201,7 @@ async function aiAgentRun(msg, opts){
     run._messages=messages;
     // sheets changed and not yet checked / simulated on — the nudge names them
     const needCheck=new Set(), needSim=new Set(), made=new Set();
-    let nudges=0, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0, gated=false;
+    let nudges=0, unanswered=false, think=true, planned=false, circularN=0, stopAt=Infinity, stopWhy="", stall=0, gated=false;
     const built=new Set();          // sheet + what it was built from: the same rebuild twice is a loop
     let budgetStart=run.started;    // restarts when a bigger model takes over
     for(let i=0; i<maxSteps && !run.final; i++){
@@ -257,6 +256,7 @@ async function aiAgentRun(msg, opts){
       if(!planned && thought){ planned=true; messages[messages.length-1].content=(m.content?m.content+"\n\n":"")+"(my plan) "+aiagClip(thought, 1500); }
       think=false;
       if(calls.length){
+        unanswered=false;
         // the app's own notes wait until every call of this turn has its result: a user message between
         // two tool results breaks the order the chat template expects (assistant → tool, tool, … → user)
         const after=[];
@@ -318,8 +318,11 @@ async function aiAgentRun(msg, opts){
       }
       // it changed a circuit but did not check / simulate THAT sheet (it once verified an empty sheet
       // while the real one had a wrong carry): name the sheets and what is missing
+      // a nudge answered with words only is not repeated: the model that cannot make the call there wrote
+      // made-up results ("ผ่าน 1,000 จาก 1,000") each time it was pushed again (div25: 4 calls, 120 s)
+      if(unanswered && typeof aiagUnansweredFinish==="function"){ run.final=await aiagUnansweredFinish(run, m.content, needCheck, needSim); break; }
       if((needCheck.size || needSim.size) && nudges<2 && stopAt===Infinity){
-        nudges++; think=true;
+        nudges++; think=true; unanswered=true;
         const miss=[...new Set([...needCheck, ...needSim])].map(n=>`'${n}' (${[needCheck.has(n)&&"check", needSim.has(n)&&"simulate or verify_truth_table"].filter(Boolean).join(" + ")})`).join(", ");
         run.steps.push({kind:"nudge", text:"not verified yet: "+miss});
         messages.push({role:"user", content:`(system) You changed ${miss} but did not verify ${needCheck.size+needSim.size>2?"them":"it"}. Call those tools with sheet set to that name, compare the result with what the circuit must do, fix it if it is wrong, then answer.`});
@@ -342,10 +345,12 @@ async function aiAgentRun(msg, opts){
         continue; }
       run.final=String(m.content||"").trim() || (didWork ? "(เอเจนต์ไม่ได้เขียนสรุป — ดูขั้นตอนด้านบน)" : "เอเจนต์ไม่ได้ทำอะไรในรอบนี้ (ไม่ได้เรียกเครื่องมือเลย) — ลองสั่งใหม่ให้ชัดขึ้น หรือแบ่งเป็นขั้นตอนเล็กลง");
       if(typeof aiagNoWorkGuard==="function") run.final=aiagNoWorkGuard(run, run.final, didWork, wantsChange);
+      if(didWork && typeof aiagClaimGuard==="function") run.final=aiagClaimGuard(run, run.final);
       break;
     }
     if(run.cancel && !run.final){ run.error="หยุดแล้ว ("+(run.cancelWhy||"สั่งหยุด")+")"; run.stopped=true; }
     if(!run.final && !run.error){ run.error=`หยุดที่ ${maxSteps} รอบ — งานนี้อาจใหญ่เกินไปสำหรับโมเดลในเครื่อง`; run.stopped=true; }
+    if(run.final && typeof aiagScrubLang==="function") run.final=aiagScrubLang(run, run.final);
     if(run.final && typeof aiagVerdict==="function" && !run.fastFinal) run.final+=aiagVerdict(run);
   }catch(e){ run.error=String(e&&e.message||e); }
   run.state=run.final?"done":run.stopped?"stopped":"error"; run.seconds=Math.round((Date.now()-run.started)/100)/10;

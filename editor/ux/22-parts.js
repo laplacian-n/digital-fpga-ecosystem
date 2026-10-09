@@ -291,7 +291,7 @@ function partVerifySeq(sch, part, p){
 function partBuild(kind, a){
   const part=PARTS[kind]; if(!part) mcpFail(`unknown part '${kind}'`, "list_parts shows them: "+Object.keys(PARTS).join(", "));
   const p=partParams(kind, a||{});
-  let it=part.build(p); if(it && it.W) it={module:it.module, components:it.components, nets:it.nets};
+  let it=part.build(p); if(it && it.W) it=Object.assign({module:it.module, components:it.components, nets:it.nets}, it.layout?{layout:it.layout}:{});
   const bits=it.bits;
   it.module=sanId(a.name||it.module||kind);
   // the throw-away copy a big part is checked on needs connections, not routed wires (20 s for lab 6's top)
