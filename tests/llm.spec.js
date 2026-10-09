@@ -81,6 +81,10 @@ class H(BaseHTTPRequestHandler):
             if not done:
                 return self._j({"choices": [{"message": {"content": "วาง d5 กับ d5b แล้วต่อ clk_in → d5.clk_in, d5.clk_out → d5b.clk_in, d5b.clk_out → clk_out"}}]})
             return self._j({"choices": [{"message": {"content": "ต่อ d5 กับ d5b ลงแผ่น div25p แล้ว"}}]})
+        if "DEAF" in ask:        # div25 rewire: built, then words only however often it is nudged (and a made-up pass)
+            if not done:
+                return call("build_circuit", {"name": "deaf", "formula": "y = a & b"}, "")
+            return self._j({"choices": [{"message": {"content": "ตรวจกับข้อกำหนดจากคำขอ: ผ่านครบ 1,000 จาก 1,000行"}}]})
         if "LIAR" in ask:        # div50 session: no tool call, then "done and checked" — never believed
             return self._j({"choices": [{"message": {"content": "สร้างใหม่แล้ว ตรวจผ่านครบ 256 ขั้น"}}]})
         if "TEXTCALL" in ask:    # the call written as text, not as a tool call
@@ -277,6 +281,16 @@ test("agent mode: the local model works through the tools; Claude drives the cha
     expect(s.data.agent.steps.some(x => x.kind === "nudge" && /asked to make the calls/.test(x.text))).toBe(true);
     expect(s.data.agent.steps.filter(x => x.tool).length).toBe(0);
     expect(s.data.agent.final.startsWith("⚠ รอบนี้เอเจนต์ไม่ได้เรียกเครื่องมือเลย")).toBe(true);
+    // a nudge answered with words only is not repeated: the app checks what it can itself and says what was not checked
+    await tool("ai_chat", { message: "แก้แผ่น deaf DEAF", mode: "agent" });
+    s = await tool("ai_chat_status", { wait: 40 });
+    expect(s.data.agent.steps.filter(x => x.kind === "nudge" && /not verified yet|not checked against/.test(x.text)).length).toBe(1);
+    expect(s.data.agent.steps.some(x => x.kind === "nudge" && /not repeated/.test(x.text))).toBe(true);
+    expect(s.data.agent.steps.some(x => x.tool === "check" && x.by_app)).toBe(true);
+    expect(s.data.agent.model_calls).toBe(3);
+    expect(s.data.agent.final.startsWith("⚠ เอเจนต์สร้าง/แก้วงจรแล้ว")).toBe(true);
+    expect(s.data.agent.final).toContain("แผ่น deaf: ตรวจการต่อสาย error 0");
+    expect(s.data.agent.final).not.toContain("\u884c");
     // a plan in words, no call: the call is written again under the tool's JSON schema (constrained decoding) and runs
     await tool("ai_chat", { message: "แก้แผ่น div25p ให้เป็น clock_divider n=5 สองตัวต่อกัน PROSE", mode: "agent" });
     s = await tool("ai_chat_status", { wait: 60 });

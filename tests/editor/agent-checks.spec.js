@@ -97,3 +97,42 @@ test("agent helpers: text tool calls, change requests, two goals, no-work guard"
   expect(r.g1.startsWith("⚠")).toBe(true);
   expect(r.g2).toBe("สร้างแล้ว");
 });
+
+test("div25 run: a claimed pass with no real check is flagged; Chinese characters leave a Thai answer", async ({ page }) => {
+  await openEditor(page);
+  const r = await page.evaluate(() => {
+    const ed = { kind: "tool", tool: "build_hierarchy", ok: true }, sim = { kind: "tool", tool: "simulate", ok: true, summary: "16 clocks" };
+    const cs0 = { kind: "tool", tool: "check_spec", ok: true, summary: "NO SPEC — nothing was checked" };
+    const claim = "ตรวจกับข้อกำหนดจากคำขอ: ผ่านครบ 1,000 จาก 1,000行";
+    const g = steps => aiagClaimGuard({ steps: steps.slice() }, claim);
+    return { none: g([ed]), nospec: g([ed, cs0]), simBefore: g([sim, ed]), simAfter: g([ed, sim]),
+      plain: aiagClaimGuard({ steps: [ed] }, "ต่อ d5 กับ d5b แล้ว"), verified: aiagClaimGuard({ steps: [ed], verified: { sheet: "x" } }, claim),
+      scrub: aiagScrubLang({ steps: [] }, claim), en: aiagScrubLang({ steps: [] }, "表 only") };
+  });
+  expect(r.none.startsWith("⚠ คำตอบด้านล่างบอกว่าตรวจผ่าน")).toBe(true);
+  expect(r.nospec.startsWith("⚠")).toBe(true);
+  expect(r.simBefore.startsWith("⚠")).toBe(true);
+  expect(r.simAfter.startsWith("⚠")).toBe(false);
+  expect(r.plain.startsWith("⚠")).toBe(false);
+  expect(r.verified.startsWith("⚠")).toBe(false);
+  expect(r.scrub).toBe("ตรวจกับข้อกำหนดจากคำขอ: ผ่านครบ 1,000 จาก 1,000");
+  expect(r.en).toBe("表 only");
+});
+
+test("the project tree marks the sheets that use the one on screen as a block", async ({ page }) => {
+  await openEditor(page);
+  const r = await page.evaluate(async () => {
+    await MCP_OPS.build_part({ kind: "clock_divider", params: { n: 5 }, sheet: "div5" });
+    await MCP_OPS.build_hierarchy({ sheet: "div25", inputs: ["clk_in"], outputs: ["clk_out"],
+      blocks: [{ name: "a", part: "div5" }, { name: "b", part: "div5" }], connect: "clk_in -> a.clk_in; a.clk_out -> b.clk_in; b.clk_out -> clk_out" });
+    await MCP_OPS.build_circuit({ formula: "y = a & b", sheet: "other" });
+    const id = n => Object.keys(state.project.schematics).find(k => state.project.schematics[k].name === n);
+    const dots = () => [...document.querySelectorAll("#projectPane .su-dot")].map(d => state.project.schematics[d.closest("[data-open]").dataset.open].name);
+    openSchTab(id("div5")); renderProjectTree(); const onDiv5 = dots(), title = (document.querySelector("#projectPane .su-dot") || {}).title;
+    openSchTab(id("other")); renderProjectTree(); const onOther = dots();
+    return { onDiv5, onOther, title };
+  });
+  expect(r.onDiv5).toEqual(["div25"]);
+  expect(r.title).toContain("2 ตัว");
+  expect(r.onOther).toEqual([]);
+});

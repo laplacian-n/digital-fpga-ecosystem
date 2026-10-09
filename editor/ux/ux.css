@@ -304,3 +304,6 @@
 /* 45: board pin under each INPUT / OUTPUT once pins are being chosen */
 .pin-tags .pin-tag{font-size:10px;fill:var(--muted,#6b7280);font-family:system-ui,sans-serif;pointer-events:all}
 .pin-tags .pin-tag.bad{fill:#dc2626;font-weight:600}
+/* 52: sheets that use the one on screen as a block */
+.tree-item.sch{position:relative}
+.su-dot{position:absolute;left:13px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:var(--err,#dc2626);opacity:.45;pointer-events:auto}
