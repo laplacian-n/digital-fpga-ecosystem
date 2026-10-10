@@ -3488,6 +3488,16 @@ function reorderSubPins(block, dir, orderedPids){
   if(newCids.length!==blocks.length || new Set(newCids).size!==blocks.length) return false;  // must be a permutation
   if(newCids.every((cid,i)=>cid===blocks[i].id)) return false;                                // no change
   newCids.forEach((cid,i)=>{ const b=sub.components.find(c=>c.id===cid); if(b){ b.x=slots[i].x; b.y=slots[i].y; } });
+  // a generated sheet lists its pins in sub.portOrder, which schPortList reads before positions: the
+  // blocks moved but the symbol kept its order (the drag looked like it did nothing) — keep both in step
+  const k=dir==="in"?"in":"out";
+  if(sub.portOrder && Array.isArray(sub.portOrder[k])){
+    const names=newCids.map(cid=>(sub.components.find(c=>c.id===cid)||{params:{}}).params.name);
+    sub.portOrder[k]=names.concat(sub.portOrder[k].filter(n=>!names.includes(n)));
+  }
+  // the wires on the moved port blocks still ran to the old spots (a locked sheet is not healed): re-route them
+  if(typeof wtReroute==="function"){ const moved=new Set(newCids);
+    try{ wtReroute(sub, new Set(sub.wires.filter(w=>moved.has(w.from.cid)||moved.has(w.to.cid)).map(w=>w.id))); }catch(e){ console.warn("reorder re-route", e); } }
   snapshot(); renderAll();
   return true;
 }
@@ -21596,7 +21606,7 @@ function aiagDeescalate(run){
 }
 
 /* ===== 45. Board pins on the drawing, and events you can wait for ====================================
-   - Once a sheet has any board pin chosen, every INPUT / OUTPUT shows its pin under it on the canvas
+   - (Off by default since 2.5.3 — localStorage schstudio.pinTags=1 turns it on.) Once a sheet has any board pin chosen, every INPUT / OUTPUT shows its pin under it on the canvas
      (SW3, LED0, 7SEG a, หลัก 1, CLK) — red when it has none yet or shares a pin with another port, so
      a conflict or a forgotten port is seen where it is drawn, not only on the pin page.
    - get_events {wait}: waits (≤40 s) for the next edit instead of returning nothing — an outside tool
@@ -21613,11 +21623,14 @@ function ptagInfo(sch){
   const by={}; bits.forEach(b=>(by[b.port]=by[b.port]||[]).push(b));
   return {by, count};
 }
+/* off unless asked for (localStorage schstudio.pinTags = 1): on a full sheet the tags crowded the drawing,
+   and the pin page / board doctor already show the same */
+function ptagOn(){ try{ return localStorage.getItem("schstudio.pinTags")==="1"; }catch(_){ return false; } }
 {
   const _render=render;
   render=function(){ const r=_render.apply(this, arguments);
     try{ const sch=activeSch(), world=canvas.firstChild;
-      if(!sch || !world || !sch.pinmap || !Object.keys(sch.pinmap).length) return r;
+      if(!ptagOn() || !sch || !world || !sch.pinmap || !Object.keys(sch.pinmap).length) return r;
       const {by, count}=ptagInfo(sch), layer=el("g",{class:"pin-tags"});
       sch.components.filter(c=>c.type==="IN"||c.type==="OUT").forEach(c=>{
         const L=by[sanId(c.params.name)] || by[c.params.name]; if(!L) return;
