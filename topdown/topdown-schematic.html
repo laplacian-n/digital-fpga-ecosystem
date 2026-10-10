@@ -469,7 +469,10 @@ function pins(n){
     (n.pinsT||[]).forEach((p,i)=>a.push({id:'T'+i,x:n.x+at('T',i,(i+1)*n.w/(n.pinsT.length+1)),y:n.y,side:'top',...norm(p)}));
   } else if(n.type==='gate'){
     const ni=n.inputs||2;
-    for(let i=0;i<ni;i++) a.push({id:'in'+i,x:n.x-8-((n.invIn&&n.invIn[i])?2*BUBBLE_R:0),y:n.y+n.h*(i+1)/(ni+1),side:'left',name:''});
+    // inY / inLead: a sheet drawn for paper by the gate editor (53-topdown-paper) puts the inputs on its
+    // routing grid and gives every input one lead length, so a bubble does not move its pin off the column
+    for(let i=0;i<ni;i++) a.push({id:'in'+i,x:n.inLead!=null?n.x-n.inLead:n.x-8-((n.invIn&&n.invIn[i])?2*BUBBLE_R:0),
+      y:n.y+((n.inY&&n.inY[i]!=null)?n.inY[i]:n.h*(i+1)/(ni+1)),side:'left',name:''});
     const bub=(n.gate==='nand'||n.gate==='nor'||n.gate==='xnor'||n.gate==='not');
     a.push({id:'out',x:n.x+n.w+(bub?9:0)+8,y:n.y+n.h/2,side:'right',name:''});
   } else if(n.type==='mux'){
@@ -511,7 +514,7 @@ function geom(n){
       // an inversion bubble sits on the body edge; the stub starts past it
       const st=p.inv?BUBBLE_R*2:0;
       L.push([[p.x+dx*st,p.y+dy*st],[p.x+dx*PIN_LEAD,p.y+dy*PIN_LEAD]]);
-      const clk=bareName(p.name).toLowerCase()==='clk';
+      const clk=!!p.clk||bareName(p.name).toLowerCase()==='clk';   // p.clk: a clock pin with another name (clk20)
       const wd=CLK_WEDGE.d*ts;                      // how far the wedge reaches in
       // The name has to clear the wedge. It used to start 6 in from the edge
       // while the wedge reached 9, so the triangle sat on top of the first
@@ -2022,7 +2025,7 @@ function recalc(n){ if(n.type==='block'){
      the screen font, plainly overlapping once the plotter's wider engraving
      font drew it. 7 px per character is the wider of the two fonts. */
   const CW=7*ts;
-  const lead=p=>bareName(norm(p).name).toLowerCase()==='clk'?(CLK_WEDGE.d+4)*ts:6*ts;
+  const lead=p=>(norm(p).clk||bareName(norm(p).name).toLowerCase()==='clk')?(CLK_WEDGE.d+4)*ts:6*ts;
   const wOf=p=>norm(p).name.length*CW;
   let need=Math.max(120,n.label.length*CW+30);
   for(let i=0;i<rows;i++){
@@ -2401,10 +2404,13 @@ function importSheet(sh){
   normalizeSheet(sh); fixSheetDefaults(sh);
   const old=sh.src?P.sheets.find(x=>x.src===sh.src):null;
   if(sh.exact){                    // the gate editor's own placement + routing: keep it as drawn
-    if(old){ old.nodes=sh.nodes; old.wires=sh.wires; old.module=sh.module||old.module; old.title=sh.title||old.title; old.exact=true; P.active=P.sheets.indexOf(old); }
+    if(old){ old.nodes=sh.nodes; old.wires=sh.wires; old.module=sh.module||old.module; old.title=sh.title||old.title; old.exact=true;
+      if(sh.paper){ old.frame=sh.frame; old.paper=true; } P.active=P.sheets.indexOf(old); }
     else { P.sheets.push(sh); P.active=P.sheets.length-1; }
     sel={type:null,id:null};
-    wrapFrame(true); fitPageScale(true); fitView(); render(); syncSheetProps();
+    // a sheet drawn for paper brings its own frame: the ports sit OUTSIDE it, their tails crossing it
+    if(!sh.paper) wrapFrame(true);
+    fitPageScale(true); fitView(); render(); syncSheetProps();
     return {updated:!!old, added:0, removed:0, exact:true};
   }
   if(!old){
