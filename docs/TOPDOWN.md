@@ -65,5 +65,9 @@ those two circuits.
   wire is added or deleted.
   - A wire whose corner the user drags becomes theirs: `auto` is cleared, and it becomes an
     obstacle for the others.
-- Sheets sent from the gate editor still use the exact 1:1 transfer (`schematicToTopdownExact`).
-  The engine is for block-level sheets and for "✨ จัดวางอัตโนมัติ".
+- Sheets sent from the gate editor are **redrawn for paper** by the gate editor itself
+  (`editor/ux/53-topdown-paper.js`, `tdPaperSheet`): the placement rules above, buses regrouped from
+  numbered pins, and every wire routed by the gate editor's own router on parts shaped like these
+  symbols — then sent as an exact sheet with its own frame (`paper:true`). If that cannot join every
+  pin cleanly, the old 1:1 transfer (`schematicToTopdownExact`) is used. This engine (`TDE`) stays for
+  sheets drawn in Top-Down itself.
