@@ -25,6 +25,21 @@ class FlashCmdTests(unittest.TestCase):
             p = Path(t) / "elsewhere" / "x.bit"
             self.assertEqual(board._cli_path(p, Path(t) / "tools"), str(p))
 
+    @unittest.skipUnless(board.IS_WIN, "Windows only")
+    def test_a_thai_folder_goes_by_a_plain_path(self):
+        # openFPGALoader reads its arguments in the ANSI code page: เอกสาร arrived as ?????? and
+        # "Error: fail to open" (loading into the FPGA from OneDrive/เอกสาร/FPGA Ecosystem/Projects)
+        with tempfile.TemporaryDirectory() as t:
+            tools = Path(t) / "tools"; tools.mkdir()
+            bit = Path(t) / "เอกสาร" / "Projects" / "top.bit"; bit.parent.mkdir(parents=True); bit.write_bytes(b"bits")
+            got = board._cli_path(bit, tools)
+            self.assertTrue(got.isascii() and " " not in got, got)
+            target = got if Path(got).is_absolute() else tools / got
+            self.assertEqual(Path(target).read_bytes(), b"bits")
+
+    def test_sram_load_uses_a_plain_path(self):
+        self.assertIn('"-m", _cli_path(bit, Path(ofl).parent)', Path(board.__file__).read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()
